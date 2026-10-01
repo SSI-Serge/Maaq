@@ -130,6 +130,72 @@ export function useApiAction<TInput, TResult>(
   return { run, pending, slow, error, reset };
 }
 
+/** Valeur stabilisée après une pause de saisie (recherche au fil de la frappe). */
+export function useDebounced<T>(value: T, delayMs = 300): T {
+  const [settled, setSettled] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setSettled(value), delayMs);
+    return () => clearTimeout(timer);
+  }, [value, delayMs]);
+  return settled;
+}
+
+export interface MutationState {
+  run: <TResult>(path: string, options: { method: "POST" | "PUT" | "PATCH" | "DELETE"; body?: unknown }) => Promise<TResult | undefined>;
+  pending: boolean;
+  slow: boolean;
+  error: ApiError | undefined;
+  reset: () => void;
+}
+
+/**
+ * Comme useApiAction, pour des actions dont l'adresse varie (bloquer tel agent, retirer tel contrat).
+ * La clé d'idempotence est conservée tant que la même action est retentée (CC-7).
+ */
+export function useApiMutation(): MutationState {
+  const [pending, setPending] = useState(false);
+  const [slow, setSlow] = useState(false);
+  const [error, setError] = useState<ApiError>();
+  const attempt = useRef<{ signature: string; key: string } | null>(null);
+  const inFlight = useRef(false);
+
+  const run = useCallback(async <TResult,>(path: string, options: { method: "POST" | "PUT" | "PATCH" | "DELETE"; body?: unknown }) => {
+    if (inFlight.current) return undefined;
+    inFlight.current = true;
+    const signature = `${options.method} ${path} ${JSON.stringify(options.body ?? null)}`;
+    if (attempt.current?.signature !== signature) attempt.current = { signature, key: newIdempotencyKey() };
+    setPending(true);
+    setSlow(false);
+    setError(undefined);
+    try {
+      const result = await apiRequest<TResult>(path, {
+        method: options.method,
+        body: options.body,
+        idempotencyKey: attempt.current.key,
+        onSlow: () => setSlow(true),
+      });
+      attempt.current = null;
+      return result;
+    } catch (err) {
+      const apiError = err instanceof ApiError ? err : new ApiError("server", String(err));
+      if (apiError.kind === "rejected") attempt.current = null;
+      setError(apiError);
+      return undefined;
+    } finally {
+      inFlight.current = false;
+      setPending(false);
+      setSlow(false);
+    }
+  }, []);
+
+  const reset = useCallback(() => {
+    attempt.current = null;
+    setError(undefined);
+  }, []);
+
+  return { run, pending, slow, error, reset };
+}
+
 const DRAFT_PREFIX = "maaq:draft:";
 
 /**

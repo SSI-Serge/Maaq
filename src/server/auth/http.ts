@@ -98,6 +98,13 @@ export async function requireProfile(options: { allowGrace?: boolean } = {}): Pr
   return { session, ctx: context };
 }
 
+/** Garde de la console : profil administrateur connecté et déverrouillé. */
+export async function requireAdmin(): Promise<{ session: SessionContext; ctx: Ctx }> {
+  const guarded = await requireProfile();
+  if (guarded.session.user.role !== "admin") throw new Rejection("forbidden", "Accès réservé à l'administration.", 403);
+  return guarded;
+}
+
 // --- Parcours en attente ----------------------------------------------------
 
 export async function setPending(pending: PendingVerification, now: Date): Promise<void> {

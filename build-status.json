@@ -3,7 +3,7 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-10-01T14:58:44Z",
+  "updated": "2026-10-01T15:19:12Z",
   "deploys": [],
   "features": [
     {
@@ -224,51 +224,95 @@
         {
           "id": "f2s1",
           "title": "US-64 · Créer le compte d'un utilisateur principal",
-          "state": "planning",
-          "env": null
+          "state": "done",
+          "env": null,
+          "unsure": "L'email d'activation arrive seulement dans la boîte de test : aucun vrai envoi d'email n'est branché."
         },
         {
           "id": "f2s2",
           "title": "US-69 · Modifier le plafond quotidien de demandes d'un compte",
-          "state": "planning",
+          "state": "done",
           "env": null
         },
         {
           "id": "f2s3",
           "title": "US-65 · Paramétrer les délais et les limites de la plateforme",
-          "state": "planning",
-          "env": null
+          "state": "done",
+          "env": null,
+          "unsure": "Les nouveaux réglages seront lus par les traitements automatiques, qui arrivent dans les lots suivants."
         },
         {
           "id": "f2s4",
           "title": "US-45 · Mettre à disposition un agent IA",
-          "state": "planning",
-          "env": null
+          "state": "done",
+          "env": null,
+          "unsure": "La liste des agents à publier vient du Digitorn simulé : à revérifier avec la vraie API."
         },
         {
           "id": "f2s5",
           "title": "US-46 · Bloquer l'accès à un agent",
-          "state": "planning",
+          "state": "done",
           "env": null
         },
         {
           "id": "f2s6",
           "title": "US-47 · Réactiver l'accès à un agent",
-          "state": "planning",
+          "state": "done",
           "env": null
         },
         {
           "id": "f2s7",
           "title": "US-48 · Définir la liste des contrats obligatoires",
-          "state": "planning",
+          "state": "done",
           "env": null
         }
       ],
-      "decisions": [],
-      "unsure": [],
-      "activity": [],
-      "building": true,
-      "currentAction": "Lecture des user stories et maquettes de la console…"
+      "decisions": [
+        {
+          "at": "2026-10-01T15:00:12Z",
+          "what": "L'agent à publier se choisit dans la liste des agents Digitorn pas encore publiés ; son nom reste modifiable."
+        },
+        {
+          "at": "2026-10-01T15:00:12Z",
+          "what": "Les actions soumises à validation se saisissent une par ligne, plutôt qu'une simple case à cocher."
+        },
+        {
+          "at": "2026-10-01T15:00:12Z",
+          "what": "Un champ « liste de choix » d'un contrat demande ses choix, un par ligne."
+        },
+        {
+          "at": "2026-10-01T15:00:12Z",
+          "what": "Le lien d'activation reçu par email vaut vérification de l'appareil : pas de code en plus à l'activation."
+        },
+        {
+          "at": "2026-10-01T15:19:12Z",
+          "what": "Petite table technique ajoutée pour qu'une action relancée ne s'exécute jamais deux fois (règle CC-7)."
+        }
+      ],
+      "unsure": [
+        "Console vérifiée dans le panneau navigateur réduit ; pas encore relue sur un grand écran."
+      ],
+      "activity": [
+        {
+          "at": "2026-10-01T15:19:12Z",
+          "kind": "ok",
+          "what": "78 tests automatiques au vert, compilation de production réussie"
+        },
+        {
+          "at": "2026-10-01T15:19:12Z",
+          "kind": "ok",
+          "what": "Agent bloqué, compte créé puis activé par son lien, vérifiés dans le navigateur"
+        },
+        {
+          "at": "2026-10-01T15:00:12Z",
+          "kind": "work",
+          "what": "Lecture des 7 user stories et des 5 maquettes de la console"
+        }
+      ],
+      "needsYou": {
+        "title": "Prêt à être envoyé sur la branche de test",
+        "text": "Les 7 user stories de la console sont construites et vérifiées (78 tests). Rien n'est envoyé sur GitHub avant ton accord."
+      }
     },
     {
       "id": "f3",
@@ -674,6 +718,11 @@
       "name": "Réglages complets (appareils, carnets, données)",
       "tag": "Proposed, not built",
       "note": "Le lot 1 n'y met que la déconnexion ; le reste arrive au lot 8."
+    },
+    {
+      "name": "Boîte du support dans les Réglages de la console",
+      "tag": "Proposed, not built",
+      "note": "La maquette la place sous « Réglages » ; elle arrive avec le support au lot 8. Rien n'est perdu."
     }
   ]
 }

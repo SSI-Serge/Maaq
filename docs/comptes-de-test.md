@@ -20,3 +20,10 @@ Les emails et SMS envoyés par l'application arrivent dans la boîte de test : h
 - Puis l'application demande de créer un schéma tactile (tracer au doigt ou toucher les points un à un).
 - Les codes de « Schéma oublié ? » et « Mot de passe oublié ? » arrivent aussi dans la boîte de test.
 - Pour repartir de zéro : `npm run db:reset` (efface la base de développement et recrée les comptes).
+
+## Console d'administration
+
+- Se connecter avec admin@maaq.test : on arrive sur « Agents IA ».
+- Deux agents (Admin_Classify, Admin_lib) et quatre contrats obligatoires sont déjà créés.
+- « Créer un compte » envoie un lien d'activation dans la boîte de test ; l'ouvrir permet d'activer le compte.
+- Astuce : ouvrir la console sur http://127.0.0.1:3000 et l'application sur http://localhost:3000 garde deux sessions séparées.

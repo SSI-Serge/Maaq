@@ -61,7 +61,14 @@ export interface LogbookItem {
   participants: string[];
 }
 
+/** Agent hébergé chez Digitorn, qui peut être publié dans le catalogue MAAQ (US-45 RT2). */
+export interface HostedAgent {
+  ref: string;
+  name: string;
+}
+
 export interface DigitornClient {
+  listHostedAgents(): Promise<HostedAgent[]>;
   submitRequest(input: SubmitRequestInput): Promise<void>;
   getConversation(userRef: string, agentRef: string): Promise<ChatEvent[]>;
   decideAction(input: DecideActionInput): Promise<ActionProposal>;

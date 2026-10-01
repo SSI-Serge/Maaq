@@ -4,6 +4,7 @@ import type {
   ChatEvent,
   DecideActionInput,
   DigitornClient,
+  HostedAgent,
   LogbookItem,
   SubmitRequestInput,
 } from "./types";
@@ -15,6 +16,16 @@ export interface MockOptions {
   executionDelayMs?: number;
   now?: () => Date;
 }
+
+/** Agents fictifs hébergés par le simulateur. */
+export const MOCK_HOSTED_AGENTS: HostedAgent[] = [
+  { ref: "admin_classify", name: "Admin_Classify" },
+  { ref: "admin_rdv", name: "Admin_RDV" },
+  { ref: "admin_lib", name: "Admin_lib" },
+  { ref: "admin_impots", name: "Admin_Impots" },
+  { ref: "perso_courses", name: "Perso_Courses" },
+  { ref: "contrats_challenge", name: "Contrats_Challenge" },
+];
 
 const APPOINTMENT_PATTERN = /rendez-vous|\brdv\b|réserv/i;
 const EMAIL_PATTERN = /\be-?mail\b|\bmail\b|écri[st]|envoie/i;
@@ -37,6 +48,10 @@ export class MockDigitorn implements DigitornClient {
     this.replyDelayMs = options.replyDelayMs ?? 1500;
     this.executionDelayMs = options.executionDelayMs ?? 1000;
     this.now = options.now ?? (() => new Date());
+  }
+
+  async listHostedAgents(): Promise<HostedAgent[]> {
+    return MOCK_HOSTED_AGENTS.map((agent) => ({ ...agent }));
   }
 
   async submitRequest(input: SubmitRequestInput): Promise<void> {

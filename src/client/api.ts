@@ -101,7 +101,8 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
           credentials: "same-origin",
         });
         if (response.ok) {
-          return (response.status === 204 ? undefined : await response.json()) as T;
+          // 204 : null (et non undefined), pour distinguer un succès sans contenu d'un échec.
+          return (response.status === 204 ? null : await response.json()) as T;
         }
         if (response.status >= 400 && response.status < 500) {
           const payload = (await response.json().catch(() => null)) as { error?: RejectedBody } | null;

@@ -97,7 +97,7 @@ function canRecover(user: FoundUser): boolean {
 export function homeFor(session: SessionContext): string {
   if (session.user.inGracePeriod) return "/reprise-compte";
   if (session.user.role !== "admin" && (!session.device.hasPattern || session.device.patternLocked)) return "/schema/creer";
-  if (session.user.role === "admin") return "/admin";
+  if (session.user.role === "admin") return "/admin/agents";
   if (session.user.role === "primary_user" && !session.user.setupCompleted) return "/configuration";
   return "/accueil";
 }

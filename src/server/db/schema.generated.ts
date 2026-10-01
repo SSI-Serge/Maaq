@@ -528,6 +528,15 @@ export interface ErrorReports {
   user_comment: string | null;
 }
 
+export interface IdempotencyKeys {
+  created_at: Generated<Timestamp>;
+  idempotency_key: string;
+  request_path: string;
+  response_body: Json | null;
+  response_status: number;
+  user_id: string;
+}
+
 export interface LegalAcceptances {
   accepted_at: Generated<Timestamp>;
   id: Generated<Int8>;
@@ -822,6 +831,7 @@ export interface DB {
   devices: Devices;
   erasure_traces: ErasureTraces;
   error_reports: ErrorReports;
+  idempotency_keys: IdempotencyKeys;
   legal_acceptances: LegalAcceptances;
   legal_document_versions: LegalDocumentVersions;
   logbook_entries: LogbookEntries;

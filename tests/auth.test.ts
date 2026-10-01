@@ -99,7 +99,7 @@ describe("US-3 — connexion par mot de passe", () => {
     const admin = await createProfile(db, { role: "admin" });
     const notConfigured = await createProfile(db, { setupCompleted: false });
     const adminSession = await signInNewDevice(admin.email);
-    expect(adminSession.next).toBe("/admin");
+    expect(adminSession.next).toBe("/admin/agents");
 
     const primary = await signInNewDevice(notConfigured.email);
     expect(primary.next).toBe("/schema/creer"); // RF7 : schéma d'abord
