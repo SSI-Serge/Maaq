@@ -1,0 +1,110 @@
+/* Charte MAAQ — reprise à l'identique des maquettes (docs/maquettes). */
+:root {
+  --bg: #e9e1d2;
+  --bg-raised: #f6f0e4;
+  --bg-sunken: #dfd5c0;
+  --ink: #2b211f;
+  --ink-soft: #6e5f58;
+  --line: #ddcfc0;
+  --primary: #7a2e32;
+  --primary-strong: #5e2126;
+  --primary-soft: #edd9d6;
+  --primary-ink: #f7f1e6;
+  --secondary: #b4913a;
+  --secondary-strong: #93731f;
+  --secondary-soft: #f2e7c6;
+  --success: #5e7048;
+  --success-bg: #e2e6d1;
+  --warning: #b67a24;
+  --warning-bg: #f2e1c0;
+  --error: #a8502e;
+  --error-bg: #f1ded2;
+  --radius: 10px;
+  --shadow: 0 1px 2px rgba(43, 33, 31, 0.07), 0 8px 24px rgba(43, 33, 31, 0.09);
+
+  --font-serif: var(--font-newsreader), "Newsreader", Georgia, serif;
+  --font-sans: var(--font-karla), "Karla", system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), "IBM Plex Mono", ui-monospace, monospace;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--bg);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  margin: 0;
+  color: var(--ink);
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+button,
+input,
+textarea,
+select {
+  font-family: var(--font-sans);
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+:focus-visible {
+  outline: 2px solid var(--secondary);
+  outline-offset: 2px;
+}
+
+@keyframes maaq-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(0.94);
+    opacity: 0.85;
+  }
+}
+
+@keyframes maaq-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

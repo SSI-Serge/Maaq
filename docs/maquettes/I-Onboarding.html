@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>MAAQ — Activation invité</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=Karla:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --bg:#E9E1D2; --bg-raised:#F6F0E4; --bg-sunken:#DFD5C0;
+    --ink:#2B211F; --ink-soft:#6E5F58; --line:#DDCFC0;
+    --primary:#7A2E32; --primary-strong:#5E2126; --primary-soft:#EDD9D6; --primary-ink:#F7F1E6;
+    --secondary:#B4913A; --secondary-strong:#93731F; --secondary-soft:#F2E7C6;
+    --radius:10px;
+    --shadow:0 1px 2px rgba(43,33,31,0.07), 0 8px 24px rgba(43,33,31,0.09);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Karla',sans-serif;background:var(--bg);color:var(--ink);}
+  h1,h2{font-family:'Newsreader',serif;font-weight:500;margin:0;color:var(--ink);}
+  a{text-decoration:none;color:inherit;}
+  button{font-family:'Karla',sans-serif;cursor:pointer;}
+</style>
+</helmet>
+<div style="width:390px;height:844px;box-sizing:border-box;background:var(--bg);display:flex;flex-direction:column;overflow:hidden;">
+
+  <div style="padding:44px 24px 18px;">
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--primary);margin-bottom:8px;">Invitation MAAQ</div>
+    <h1 style="font-size:22px;margin-bottom:6px;">{{stepTitle}}</h1>
+    <p style="font-size:13px;color:var(--ink-soft);margin:0 0 14px;">Étape {{stepLabel}} sur 2</p>
+    <div style="height:6px;border-radius:3px;background:var(--bg-sunken);overflow:hidden;">
+      <div style="{{progressStyle}}"></div>
+    </div>
+  </div>
+
+  <div style="flex:1;overflow-y:auto;padding:6px 24px 24px;">
+
+    <sc-if value="{{isStep1}}" hint-placeholder-val="{{true}}">
+      <div style="display:flex;flex-direction:column;gap:16px;">
+        <div style="background:var(--secondary-soft);border-radius:12px;padding:16px;">
+          <div style="font-size:13px;color:var(--secondary-strong);line-height:1.5;">Vous avez été invité(e) par <b>Camille Faucher</b> à rejoindre MAAQ pour accéder à ses agents IA.</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink-soft);">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="flex-shrink:0;"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+          Ce lien d'invitation est valable 30 minutes. Passé ce délai, demandez à Camille de vous en envoyer un nouveau.
+        </div>
+        <div style="background:var(--bg-raised);border:1px solid var(--line);border-radius:var(--radius);padding:16px;display:flex;flex-direction:column;gap:10px;">
+          <div style="display:flex;justify-content:space-between;font-size:13px;"><span style="color:var(--ink-soft);">Nom</span><span style="font-weight:600;">Julien Martin</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:13px;"><span style="color:var(--ink-soft);">Email</span><span style="font-weight:600;">julien@exemple.fr</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:13px;"><span style="color:var(--ink-soft);">Téléphone</span><span style="font-weight:600;">06 98 76 54 32</span></div>
+        </div>
+        <p style="font-size:12px;color:var(--ink-soft);line-height:1.5;margin:0;">Ces informations ont été renseignées par Camille lors de votre ajout. Vous pourrez les corriger ensuite depuis vos réglages.</p>
+        <p style="font-size:12px;color:var(--ink-soft);line-height:1.5;margin:0;">En continuant, vous acceptez la <a href="Confidentialite.html" style="color:var(--primary);font-weight:700;text-decoration:underline;">politique de confidentialité et les conditions d'utilisation</a>.</p>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{isStep2}}" hint-placeholder-val="{{false}}">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:16px;">
+        <p style="font-size:13px;color:var(--ink-soft);text-align:center;margin:0;max-width:26ch;">Définissez un schéma tactile pour déverrouiller MAAQ rapidement la prochaine fois.</p>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:20px;background:var(--bg-raised);border:1px solid var(--line);border-radius:14px;padding:24px;">
+          <div style="width:14px;height:14px;border-radius:50%;background:var(--primary);border:2px solid var(--primary);"></div>
+          <div style="width:14px;height:14px;border-radius:50%;border:2px solid var(--ink-soft);"></div>
+          <div style="width:14px;height:14px;border-radius:50%;border:2px solid var(--ink-soft);"></div>
+          <div style="width:14px;height:14px;border-radius:50%;border:2px solid var(--ink-soft);"></div>
+          <div style="width:14px;height:14px;border-radius:50%;background:var(--primary);border:2px solid var(--primary);"></div>
+          <div style="width:14px;height:14px;border-radius:50%;border:2px solid var(--ink-soft);"></div>
+          <div style="width:14px;height:14px;border-radius:50%;border:2px solid var(--ink-soft);"></div>
+          <div style="width:14px;height:14px;border-radius:50%;border:2px solid var(--ink-soft);"></div>
+          <div style="width:14px;height:14px;border-radius:50%;background:var(--primary);border:2px solid var(--primary);"></div>
+        </div>
+        <p style="font-size:11px;color:var(--ink-soft);text-align:center;margin:0;">Vous pourrez le modifier à tout moment depuis Réglages.</p>
+      </div>
+    </sc-if>
+
+  </div>
+
+  <div style="display:flex;gap:10px;padding:16px 24px 28px;border-top:1px solid var(--line);background:var(--bg-raised);">
+    <sc-if value="{{isStep2}}" hint-placeholder-val="{{false}}">
+      <button onClick="{{goBack}}" style="flex:1;background:transparent;border:1px solid var(--line);color:var(--ink);font-weight:600;font-size:14px;border-radius:8px;padding:13px;">Retour</button>
+    </sc-if>
+    <sc-if value="{{isStep1}}" hint-placeholder-val="{{true}}">
+      <button onClick="{{goNext}}" style="flex:1;background:var(--primary);color:var(--primary-ink);border:none;font-weight:600;font-size:14px;border-radius:8px;padding:13px;">Continuer</button>
+    </sc-if>
+    <sc-if value="{{isStep2}}" hint-placeholder-val="{{false}}">
+      <a href="I-Agents.html" style="flex:1;display:flex;align-items:center;justify-content:center;background:var(--primary);color:var(--primary-ink);font-weight:600;font-size:14px;border-radius:8px;padding:13px;">Confirmer mon schéma</a>
+    </sc-if>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props){
+    super(props);
+    this.state = { step: 1 };
+  }
+  renderVals(){
+    const step = this.state.step;
+    return {
+      isStep1: step === 1,
+      isStep2: step === 2,
+      stepLabel: String(step),
+      stepTitle: step === 1 ? 'Bienvenue sur MAAQ' : 'Votre schéma tactile',
+      progressStyle: "height:100%;border-radius:3px;background:var(--primary);width:" + (step === 1 ? '50%' : '100%') + ";",
+      goNext: () => this.setState({ step: 2 }),
+      goBack: () => this.setState({ step: 1 }),
+    };
+  }
+}
+</script>
+</body>
+</html>

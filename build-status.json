@@ -1,0 +1,600 @@
+{
+  "project": {
+    "name": "MAAQ",
+    "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
+  },
+  "updated": "2026-10-01T14:18:48Z",
+  "deploys": [],
+  "features": [
+    {
+      "id": "f0",
+      "name": "Fondations",
+      "oneLiner": "Le squelette de l'application sur lequel tout le reste s'appuie.",
+      "stories": [
+        {
+          "id": "f0s1",
+          "title": "Ouvrir MAAQ sur son téléphone, aux couleurs des maquettes",
+          "state": "testing",
+          "env": null
+        },
+        {
+          "id": "f0s2",
+          "title": "Retrouver ses données dans une base conforme à la conception",
+          "state": "testing",
+          "env": null
+        },
+        {
+          "id": "f0s3",
+          "title": "Discuter avec un Digitorn simulé en attendant la vraie API",
+          "state": "testing",
+          "env": null
+        },
+        {
+          "id": "f0s4",
+          "title": "Recevoir les emails et SMS dans une boîte de test",
+          "state": "testing",
+          "env": null
+        }
+      ],
+      "decisions": [
+        {
+          "at": "2026-10-01T14:04:21Z",
+          "what": "Une seule application Next.js pour le mobile et la console d'administration."
+        },
+        {
+          "at": "2026-10-01T14:04:21Z",
+          "what": "La base reprend le schéma SQL de la conception tel quel, sans le redessiner."
+        },
+        {
+          "at": "2026-10-01T14:04:21Z",
+          "what": "En développement, la base tourne toute seule sur le poste, sans rien installer."
+        },
+        {
+          "at": "2026-10-01T14:04:21Z",
+          "what": "Digitorn, emails, SMS et Google Drive sont simulés tant que les vrais services ne sont pas prêts."
+        },
+        {
+          "at": "2026-10-01T14:04:21Z",
+          "what": "Tout se passe sur la branche de test ; pause et démo à la fin de chaque lot avant d'envoyer le code."
+        }
+      ],
+      "unsure": [],
+      "activity": [
+        {
+          "at": "2026-10-01T14:18:48Z",
+          "kind": "work",
+          "what": "Socle écrit : base, charte, Digitorn simulé, boîte de test"
+        },
+        {
+          "at": "2026-10-01T14:04:21Z",
+          "kind": "ok",
+          "what": "Stratégie de développement validée"
+        },
+        {
+          "at": "2026-10-01T13:57:20Z",
+          "kind": "work",
+          "what": "Lecture des user stories, de la conception BDD et des 37 maquettes"
+        }
+      ],
+      "building": true,
+      "currentAction": "Écriture et lancement des tests automatiques…"
+    },
+    {
+      "id": "f1",
+      "name": "Accès et sécurité",
+      "oneLiner": "Se connecter, se reconnecter par schéma, vérifier un appareil, se déconnecter.",
+      "stories": [
+        {
+          "id": "f1s1",
+          "title": "US-2 · Accéder à l'application depuis l'écran d'accueil",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f1s2",
+          "title": "US-3 · Se connecter à MAAQ",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f1s3",
+          "title": "US-51 · Vérifier mon identité sur un nouvel appareil",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f1s4",
+          "title": "US-6 · Se reconnecter rapidement via un schéma tactile",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f1s5",
+          "title": "US-7 · Être verrouillé après plusieurs échecs du schéma tactile",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f1s6",
+          "title": "US-8 · Récupérer l'accès après un oubli du schéma tactile",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f1s7",
+          "title": "US-66 · Réinitialiser mon mot de passe oublié",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f1s8",
+          "title": "US-52 · Verrouiller automatiquement l'application après inactivité",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f1s9",
+          "title": "US-9 · Se déconnecter de l'application",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f1s10",
+          "title": "US-1 · Être guidé pour installer MAAQ sur l'écran d'accueil",
+          "state": "planning",
+          "env": null
+        }
+      ],
+      "decisions": [],
+      "unsure": [],
+      "activity": []
+    },
+    {
+      "id": "f2",
+      "name": "Console d'administration",
+      "oneLiner": "L'administrateur crée les comptes, publie et bloque les agents, règle la plateforme.",
+      "stories": [
+        {
+          "id": "f2s1",
+          "title": "US-64 · Créer le compte d'un utilisateur principal",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f2s2",
+          "title": "US-69 · Modifier le plafond quotidien de demandes d'un compte",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f2s3",
+          "title": "US-65 · Paramétrer les délais et les limites de la plateforme",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f2s4",
+          "title": "US-45 · Mettre à disposition un agent IA",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f2s5",
+          "title": "US-46 · Bloquer l'accès à un agent",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f2s6",
+          "title": "US-47 · Réactiver l'accès à un agent",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f2s7",
+          "title": "US-48 · Définir la liste des contrats obligatoires",
+          "state": "planning",
+          "env": null
+        }
+      ],
+      "decisions": [],
+      "unsure": [],
+      "activity": []
+    },
+    {
+      "id": "f3",
+      "name": "Compte et invités",
+      "oneLiner": "Renseigner ses informations, inviter ses proches et gérer ses invités.",
+      "stories": [
+        {
+          "id": "f3s1",
+          "title": "US-10 · Renseigner les informations nécessaires aux agents",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f3s2",
+          "title": "US-11 · Renseigner les informations concernant son invité",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f3s3",
+          "title": "US-12 · Modifier mes informations de configuration",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f3s4",
+          "title": "US-18 · Ajouter un invité",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f3s5",
+          "title": "US-4 · Activer son accès en tant qu'invité",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f3s6",
+          "title": "US-5 · Renvoyer un nouveau lien d'invitation expiré",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f3s7",
+          "title": "US-19 · Modifier les informations d'un invité",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f3s8",
+          "title": "US-20 · Supprimer un invité",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f3s9",
+          "title": "US-21 · Consulter le nombre d'invités disponibles",
+          "state": "planning",
+          "env": null
+        }
+      ],
+      "decisions": [],
+      "unsure": [],
+      "activity": []
+    },
+    {
+      "id": "f4",
+      "name": "Catalogue et dashboard",
+      "oneLiner": "Parcourir les agents, les ajouter à son dashboard Pro ou Perso.",
+      "stories": [
+        {
+          "id": "f4s1",
+          "title": "US-23 · Parcourir le catalogue d'agents par rubrique",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f4s2",
+          "title": "US-24 · Consulter la fiche descriptive d'un agent",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f4s3",
+          "title": "US-25 · Rechercher un agent par mot-clé",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f4s4",
+          "title": "US-26 · Ajouter un agent à mon dashboard",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f4s5",
+          "title": "US-27 · Être informé de la limite de 10 agents par rubrique",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f4s6",
+          "title": "US-28 · Retirer un agent de mon dashboard",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f4s7",
+          "title": "US-22 · Consulter mon dashboard par onglet (Pro / Perso)",
+          "state": "planning",
+          "env": null
+        }
+      ],
+      "decisions": [],
+      "unsure": [],
+      "activity": []
+    },
+    {
+      "id": "f5",
+      "name": "Connecteurs",
+      "oneLiner": "Brancher Google Drive, boîtes mail et permissions dont les agents ont besoin.",
+      "stories": [
+        {
+          "id": "f5s1",
+          "title": "US-67 · Connecter le Google Drive du compte",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f5s2",
+          "title": "US-13 · Renseigner l'adresse email de connexion d'un agent",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f5s3",
+          "title": "US-14 · Autoriser les permissions nécessaires à un agent",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f5s4",
+          "title": "US-15 · Configurer la boîte mail de validation d'un agent",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f5s5",
+          "title": "US-16 · Définir les adresses en copie systématique d'un agent",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f5s6",
+          "title": "US-17 · Ajouter mes propres adresses en copie d'un agent",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f5s7",
+          "title": "US-29 · Être informé qu'un agent n'est pas encore configuré",
+          "state": "planning",
+          "env": null
+        }
+      ],
+      "decisions": [],
+      "unsure": [],
+      "activity": []
+    },
+    {
+      "id": "f6",
+      "name": "Tchat avec les agents",
+      "oneLiner": "Demander une action à un agent, valider ce qu'il propose.",
+      "stories": [
+        {
+          "id": "f6s1",
+          "title": "US-37 · Accéder rapidement au tchat d'un agent",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f6s2",
+          "title": "US-60 · Être informé que j'échange avec une IA",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f6s3",
+          "title": "US-41 · Découvrir le tchat d'un agent sans historique",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f6s4",
+          "title": "US-38 · Demander à un agent de réaliser une action",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f6s5",
+          "title": "US-70 · Être limité à un nombre de demandes par jour",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f6s6",
+          "title": "US-39 · Valider une action proposée par l'agent",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f6s7",
+          "title": "US-42 · Être informé d'un accès agent bloqué",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f6s8",
+          "title": "US-61 · Signaler une réponse ou une action erronée d'un agent",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f6s9",
+          "title": "US-43 · Perte de l'historique du tchat à la déconnexion",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f6s10",
+          "title": "US-44 · Expiration automatique des conversations anciennes",
+          "state": "planning",
+          "env": null
+        }
+      ],
+      "decisions": [],
+      "unsure": [],
+      "activity": []
+    },
+    {
+      "id": "f7",
+      "name": "Contrats",
+      "oneLiner": "Décrire ses contrats, déposer les documents, consentir au challenge.",
+      "stories": [
+        {
+          "id": "f7s1",
+          "title": "US-30 · Accéder à la page Contrats",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f7s2",
+          "title": "US-31 · Consulter les agents des Contrats",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f7s3",
+          "title": "US-32 · Consulter la liste de mes contrats",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f7s4",
+          "title": "US-33 · Renseigner les détails d'un contrat",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f7s5",
+          "title": "US-34 · Ajouter les documents scannés d'un contrat",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f7s6",
+          "title": "US-35 · Modifier ou supprimer les détails et documents d'un contrat",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f7s7",
+          "title": "US-36 · Donner ou retirer mon consentement au challenge d'un contrat",
+          "state": "planning",
+          "env": null
+        }
+      ],
+      "decisions": [],
+      "unsure": [],
+      "activity": []
+    },
+    {
+      "id": "f8",
+      "name": "Réglages, carnet et support",
+      "oneLiner": "Retrouver ses réglages, ses carnets de bord et contacter le support.",
+      "stories": [
+        {
+          "id": "f8s1",
+          "title": "US-49 · Accéder aux Réglages",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f8s2",
+          "title": "US-50 · Accéder aux carnets de bord depuis les Réglages",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f8s3",
+          "title": "US-40 · Consulter le carnet de bord d'un agent",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f8s4",
+          "title": "US-53 · Révoquer l'accès d'un appareil",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f8s5",
+          "title": "US-62 · Contacter le support par message écrit",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f8s6",
+          "title": "US-63 · Contacter le support par message dicté",
+          "state": "planning",
+          "env": null
+        }
+      ],
+      "decisions": [],
+      "unsure": [],
+      "activity": []
+    },
+    {
+      "id": "f9",
+      "name": "Conformité RGPD",
+      "oneLiner": "Exporter ou supprimer ses données, délais de grâce, purges automatiques.",
+      "stories": [
+        {
+          "id": "f9s1",
+          "title": "US-54 · Consulter la politique de confidentialité et les conditions d'utilisation",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f9s2",
+          "title": "US-55 · Exporter mes données",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f9s3",
+          "title": "US-56 · Supprimer mes données et mon compte",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f9s4",
+          "title": "US-57 · Anonymiser les demandes d'un invité supprimé dans le carnet partagé",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f9s5",
+          "title": "US-58 · Supprimer automatiquement un compte après désabonnement",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f9s6",
+          "title": "US-68 · Supprimer automatiquement les comptes et invités jamais activés",
+          "state": "planning",
+          "env": null
+        },
+        {
+          "id": "f9s7",
+          "title": "US-59 · Reprendre mon compte pendant le délai de grâce",
+          "state": "planning",
+          "env": null
+        }
+      ],
+      "decisions": [],
+      "unsure": [],
+      "activity": []
+    }
+  ],
+  "parkingLot": [
+    {
+      "name": "Mise en ligne de l'application",
+      "tag": "Proposed, not built",
+      "note": "On en reparle après les premiers lots ; rien n'est perdu."
+    }
+  ]
+}

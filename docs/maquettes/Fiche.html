@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>MAAQ — Fiche agent</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=Karla:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --bg:#E9E1D2; --bg-raised:#F6F0E4; --bg-sunken:#DFD5C0;
+    --ink:#2B211F; --ink-soft:#6E5F58; --line:#DDCFC0;
+    --primary:#7A2E32; --primary-strong:#5E2126; --primary-soft:#EDD9D6; --primary-ink:#F7F1E6;
+    --secondary:#B4913A; --secondary-strong:#93731F; --secondary-soft:#F2E7C6;
+    --success:#5E7048; --success-bg:#E2E6D1;
+    --warning:#B67A24; --warning-bg:#F2E1C0;
+    --error:#A8502E; --error-bg:#F1DED2;
+    --radius:10px;
+    --shadow:0 1px 2px rgba(43,33,31,0.07), 0 8px 24px rgba(43,33,31,0.09);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Karla',sans-serif;background:var(--bg);color:var(--ink);}
+  h1,h2,h3,h4{font-family:'Newsreader',serif;font-weight:500;margin:0;color:var(--ink);}
+  a{text-decoration:none;color:inherit;}
+  button{font-family:'Karla',sans-serif;cursor:pointer;}
+</style>
+</helmet>
+<div style="width:390px;height:844px;box-sizing:border-box;background:var(--bg);display:flex;flex-direction:column;overflow:hidden;">
+
+  <div style="display:flex;align-items:center;gap:10px;padding:44px 20px 16px;border-bottom:1px solid var(--line);background:var(--bg-raised);">
+    <a href="Catalogue.html" aria-label="Retour au catalogue" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;color:var(--ink);flex-shrink:0;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+    </a>
+    <h1 style="font-size:19px;">Fiche de l'agent</h1>
+  </div>
+
+  <div style="flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:16px;">
+
+    <div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+        <div style="font-family:'Newsreader',serif;font-size:24px;">Admin_Courriers</div>
+        <span style="font-size:10px;font-weight:700;color:var(--secondary-strong);background:var(--secondary-soft);border-radius:100px;padding:3px 9px;white-space:nowrap;">Pro</span>
+      </div>
+      <p style="font-size:13px;color:var(--ink-soft);margin:0;line-height:1.5;">Rédaction et envoi de courriers administratifs.</p>
+    </div>
+
+    <sc-if value="{{inMaintenance}}" hint-placeholder-val="{{false}}">
+      <div style="background:var(--warning-bg);color:var(--warning);border-radius:var(--radius);padding:12px 16px;font-size:13px;font-weight:600;">Cet agent est temporairement en maintenance.</div>
+    </sc-if>
+
+    <div style="background:var(--bg-raised);border:1px solid var(--line);border-radius:var(--radius);padding:16px;">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:8px;">À quoi il sert</div>
+      <p style="font-size:13px;color:var(--ink);margin:0;line-height:1.5;">Prépare un brouillon de courrier ou d'email à partir de votre demande. Vous relisez et validez avant tout envoi en votre nom.</p>
+    </div>
+
+    <div style="background:var(--bg-raised);border:1px solid var(--line);border-radius:var(--radius);padding:16px;">
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:10px;">Ce qu'il faut configurer</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div style="display:flex;gap:8px;align-items:flex-start;font-size:13px;color:var(--ink);line-height:1.4;"><span style="color:var(--secondary-strong);">●</span>Vos informations générales (déjà renseignées dans Réglages)</div>
+        <div style="display:flex;gap:8px;align-items:flex-start;font-size:13px;color:var(--ink);line-height:1.4;"><span style="color:var(--secondary-strong);">●</span>Une boîte mail de validation, pour recevoir les brouillons à relire</div>
+      </div>
+      <p style="font-size:11px;color:var(--ink-soft);margin:12px 0 0;line-height:1.5;">Cet agent apparaîtra dans l'onglet Pro de votre dashboard. Rien à saisir maintenant : la configuration se fait après l'ajout, par l'utilisateur principal.</p>
+    </div>
+
+    <sc-if value="{{showLimitMsg}}" hint-placeholder-val="{{false}}">
+      <div style="background:var(--warning-bg);border:1px solid var(--warning);border-radius:var(--radius);padding:14px 16px;display:flex;flex-direction:column;gap:8px;">
+        <p style="font-size:13px;color:var(--ink);margin:0;line-height:1.5;">Vous avez atteint le maximum de 10 agents dans la rubrique Pro. Retirez un agent de cette rubrique pour en ajouter un nouveau.</p>
+        <a href="U-Agents.html" style="font-size:13px;font-weight:700;color:var(--primary);">Gérer mes agents Pro ›</a>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{added}}" hint-placeholder-val="{{false}}">
+      <div style="background:var(--success-bg);border-radius:var(--radius);padding:14px 16px;display:flex;flex-direction:column;gap:6px;">
+        <div style="font-size:13px;font-weight:700;color:var(--success);">Admin_Courriers a été ajouté à votre onglet Pro</div>
+        <a href="Connecteurs.html" style="font-size:13px;font-weight:700;color:var(--primary);">Configurer maintenant ›</a>
+      </div>
+    </sc-if>
+
+  </div>
+
+  <sc-if value="{{canAdd}}" hint-placeholder-val="{{true}}">
+    <div style="padding:14px 20px 12px;border-top:1px solid var(--line);background:var(--bg-raised);">
+      <button onClick="{{addAgent}}" disabled="{{atLimit}}" style="width:100%;background:var(--primary);color:var(--primary-ink);border:none;font-weight:600;font-size:14px;border-radius:8px;padding:13px;">Ajouter à mon dashboard</button>
+    </div>
+  </sc-if>
+  <sc-if value="{{cannotAdd}}" hint-placeholder-val="{{false}}">
+    <div style="padding:14px 20px 12px;border-top:1px solid var(--line);background:var(--bg-raised);">
+      <button disabled style="width:100%;background:var(--bg-sunken);color:var(--ink-soft);border:none;font-weight:600;font-size:14px;border-radius:8px;padding:13px;">Déjà ajouté</button>
+    </div>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"atLimit":{"editor":"boolean","default":false,"section":"États (Tweaks)"},"inMaintenance":{"editor":"boolean","default":false,"section":"États (Tweaks)"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props){
+    super(props);
+    this.state = { added: false, showLimitMsg: false };
+  }
+  renderVals(){
+    const s = this.state;
+    const p = this.props;
+    return {
+      inMaintenance: !!p.inMaintenance,
+      added: s.added,
+      canAdd: !s.added,
+      cannotAdd: s.added,
+      atLimit: !!p.atLimit,
+      showLimitMsg: s.showLimitMsg,
+      addAgent: () => p.atLimit ? this.setState({ showLimitMsg: true }) : this.setState({ added: true, showLimitMsg: false }),
+    };
+  }
+}
+</script>
+</body>
+</html>
