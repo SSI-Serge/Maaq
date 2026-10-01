@@ -3,7 +3,7 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-10-01T14:57:40Z",
+  "updated": "2026-10-01T14:58:44Z",
   "deploys": [],
   "features": [
     {
@@ -184,12 +184,21 @@
         {
           "at": "2026-10-01T14:57:40Z",
           "what": "Un survol de souris sans clic ne relie plus de point sur la grille du schéma."
+        },
+        {
+          "at": "2026-10-01T14:58:44Z",
+          "what": "Accès et sécurité validés : envoi sur la branche de test approuvé."
         }
       ],
       "unsure": [
         "Les écrans d'arrivée (accueil, console, configuration) sont provisoires : ils seront remplacés aux lots 2, 3 et 4."
       ],
       "activity": [
+        {
+          "at": "2026-10-01T14:58:44Z",
+          "kind": "ok",
+          "what": "Code envoyé sur la branche de test (pas encore en production)"
+        },
         {
           "at": "2026-10-01T14:57:40Z",
           "kind": "ok",
@@ -205,11 +214,7 @@
           "kind": "work",
           "what": "Lecture des 10 user stories et des 10 maquettes du lot"
         }
-      ],
-      "needsYou": {
-        "title": "Prêt à être envoyé sur la branche de test",
-        "text": "Les 10 user stories d'accès et de sécurité sont construites et vérifiées (63 tests). Rien n'est envoyé sur GitHub avant ton accord."
-      }
+      ]
     },
     {
       "id": "f2",
@@ -261,7 +266,9 @@
       ],
       "decisions": [],
       "unsure": [],
-      "activity": []
+      "activity": [],
+      "building": true,
+      "currentAction": "Lecture des user stories et maquettes de la console…"
     },
     {
       "id": "f3",
