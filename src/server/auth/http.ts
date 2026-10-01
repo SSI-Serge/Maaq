@@ -3,7 +3,7 @@ import { db } from "@/server/db/client";
 import { Rejection } from "@/server/http";
 import { safeTimezone } from "./format";
 import { IDLE_LOCK_MINUTES, PENDING_FLOW_MINUTES } from "./rules";
-import { getSession, type Ctx, type PendingVerification, type SessionContext } from "./service";
+import { closedSessionReason, getSession, type Ctx, type PendingVerification, type SessionContext } from "./service";
 import { signToken, verifyToken } from "./tokens";
 
 /**
@@ -77,6 +77,13 @@ export async function currentSession(context: Ctx = ctx()): Promise<SessionConte
   return getSession(context, (await cookies()).get(SESSION)?.value);
 }
 
+export const ACCESS_REMOVED = "Votre accès à MAAQ a été retiré";
+
+/** La session de cet appareil a été fermée parce que l'utilisateur principal a supprimé l'invité (US-20 RF3). */
+export async function accessRemoved(context: Ctx): Promise<boolean> {
+  return (await closedSessionReason(context, (await cookies()).get(SESSION)?.value)) === "guest_removed";
+}
+
 export async function isUnlocked(session: SessionContext, now: Date): Promise<boolean> {
   const token = verifyToken<{ sid: string; exp: number }>((await cookies()).get(UNLOCK)?.value, now);
   return token?.sid === session.sessionId;
@@ -89,7 +96,10 @@ export async function isUnlocked(session: SessionContext, now: Date): Promise<bo
 export async function requireProfile(options: { allowGrace?: boolean } = {}): Promise<{ session: SessionContext; ctx: Ctx }> {
   const context = ctx();
   const session = await currentSession(context);
-  if (!session) throw new Rejection("unauthenticated", "Votre session a expiré. Reconnectez-vous.", 401);
+  if (!session) {
+    if ((await accessRemoved(context))) throw new Rejection("access_removed", ACCESS_REMOVED, 401);
+    throw new Rejection("unauthenticated", "Votre session a expiré. Reconnectez-vous.", 401);
+  }
   if (!(await isUnlocked(session, context.now))) throw new Rejection("locked", "MAAQ est verrouillé.", 423);
   if (session.user.inGracePeriod && !options.allowGrace) {
     throw new Rejection("grace_period", "Votre compte est en cours de suppression.", 403);

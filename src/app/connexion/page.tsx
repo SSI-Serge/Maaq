@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 import { ApiError, apiRequest } from "@/client/api";
 import {
   deviceTimezone,
@@ -24,7 +24,16 @@ type Tab = "password" | "pattern";
 
 /** Écran de connexion (US-3) avec l'onglet de déverrouillage par schéma (US-6), maquette Connexion. */
 export default function LoginPage() {
+  return (
+    <Suspense>
+      <Login />
+    </Suspense>
+  );
+}
+
+function Login() {
   const router = useRouter();
+  const accessRemoved = useSearchParams().get("acces") === "retire";
   const [state, setState] = useState<AuthState | null>(null);
   const [tab, setTab] = useState<Tab>("password");
   const [patternLocked, setPatternLocked] = useState(false);
@@ -63,6 +72,11 @@ export default function LoginPage() {
   return (
     <AuthScreen>
       <Heading title="Bienvenue" lead="Vos agents IA pour l'administratif et le quotidien, en toute transparence." />
+      {accessRemoved && (
+        <div style={{ marginBottom: 16 }}>
+          <Notice tone="error">Votre accès à MAAQ a été retiré</Notice>
+        </div>
+      )}
 
       <div className={styles.tabs} role="tablist">
         <button

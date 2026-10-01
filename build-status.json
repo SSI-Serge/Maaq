@@ -3,7 +3,7 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-10-01T15:43:37Z",
+  "updated": "2026-10-01T23:00:19Z",
   "deploys": [],
   "features": [
     {
@@ -323,61 +323,109 @@
         {
           "id": "f3s1",
           "title": "US-10 · Renseigner les informations nécessaires aux agents",
-          "state": "planning",
-          "env": null
+          "state": "done",
+          "env": null,
+          "unsure": "Le formulaire d'informations est prêt mais ne s'ouvre pas encore à l'ajout d'un agent : le dashboard arrive au lot 4."
         },
         {
           "id": "f3s2",
           "title": "US-11 · Renseigner les informations concernant son invité",
-          "state": "planning",
-          "env": null
+          "state": "done",
+          "env": null,
+          "unsure": "Idem : les champs d'un invité dépendent des agents de son dashboard, qui arrive au lot 4."
         },
         {
           "id": "f3s3",
           "title": "US-12 · Modifier mes informations de configuration",
-          "state": "planning",
-          "env": null
+          "state": "done",
+          "env": null,
+          "unsure": "Les informations sont envoyées au Digitorn simulé ; le format réel reste à valider avec Digitorn."
         },
         {
           "id": "f3s4",
           "title": "US-18 · Ajouter un invité",
-          "state": "planning",
-          "env": null
+          "state": "done",
+          "env": null,
+          "unsure": "L'envoi d'invitation se fait dans la foulée de la requête : à surveiller avec un vrai prestataire d'emails."
         },
         {
           "id": "f3s5",
           "title": "US-4 · Activer son accès en tant qu'invité",
-          "state": "planning",
-          "env": null
+          "state": "done",
+          "env": null,
+          "unsure": "Le SMS d'invitation arrive seulement dans la boîte de test ; pas encore essayé avec un vrai téléphone iPhone."
         },
         {
           "id": "f3s6",
           "title": "US-5 · Renvoyer un nouveau lien d'invitation expiré",
-          "state": "planning",
+          "state": "done",
           "env": null
         },
         {
           "id": "f3s7",
           "title": "US-19 · Modifier les informations d'un invité",
-          "state": "planning",
+          "state": "done",
           "env": null
         },
         {
           "id": "f3s8",
           "title": "US-20 · Supprimer un invité",
-          "state": "planning",
+          "state": "done",
           "env": null
         },
         {
           "id": "f3s9",
           "title": "US-21 · Consulter le nombre d'invités disponibles",
-          "state": "planning",
+          "state": "done",
           "env": null
         }
       ],
-      "decisions": [],
-      "unsure": [],
-      "activity": []
+      "decisions": [
+        {
+          "at": "2026-10-01T15:46:55Z",
+          "what": "L'étape 2 de la configuration enregistre l'invité 1 sans l'inviter ; l'invitation part depuis « Mes invités »."
+        },
+        {
+          "at": "2026-10-01T15:46:55Z",
+          "what": "L'email de connexion reste affiché mais non modifiable à l'étape 1 (la maquette le montrait modifiable)."
+        },
+        {
+          "at": "2026-10-01T15:46:55Z",
+          "what": "Le formulaire « Informations nécessaires à un agent » est construit maintenant ; il s'ouvrira à l'ajout d'un agent au lot 4."
+        },
+        {
+          "at": "2026-10-01T15:46:55Z",
+          "what": "Barre d'onglets en bas de l'application : Agents, Invités (utilisateur principal), Réglages ; Contrats arrivera au lot 7."
+        },
+        {
+          "at": "2026-10-01T23:00:19Z",
+          "what": "Un lien d'invitation déjà utilisé affiche « Votre accès est déjà activé » ; un lien expiré ou remplacé nomme l'utilisateur principal."
+        }
+      ],
+      "unsure": [
+        "Les écrans n'ont été essayés que dans un téléphone simulé, pas sur un vrai téléphone."
+      ],
+      "activity": [
+        {
+          "at": "2026-10-01T23:00:19Z",
+          "kind": "ok",
+          "what": "101 tests automatiques au vert, compilation de production réussie"
+        },
+        {
+          "at": "2026-10-01T23:00:19Z",
+          "kind": "ok",
+          "what": "Invitation, activation, retrait d'accès et informations par agent vérifiés dans le navigateur"
+        },
+        {
+          "at": "2026-10-01T15:46:55Z",
+          "kind": "work",
+          "what": "Lecture des 9 user stories et des 5 maquettes du lot"
+        }
+      ],
+      "needsYou": {
+        "title": "Prêt à être envoyé sur la branche de test",
+        "text": "Les 9 user stories du compte et des invités sont construites et vérifiées (101 tests). Rien n'est envoyé sur GitHub avant ton accord."
+      }
     },
     {
       "id": "f4",
@@ -724,6 +772,16 @@
       "name": "Boîte du support dans les Réglages de la console",
       "tag": "Proposed, not built",
       "note": "La maquette la place sous « Réglages » ; elle arrive avec le support au lot 8. Rien n'est perdu."
+    },
+    {
+      "name": "Ouverture automatique du formulaire d'informations à l'ajout d'un agent",
+      "tag": "Started, paused",
+      "note": "Le formulaire existe déjà ; il sera relié au bouton « Ajouter à mon dashboard » au lot 4. Rien n'est perdu."
+    },
+    {
+      "name": "Message « Terminez votre configuration » à l'ouverture d'un tchat",
+      "tag": "Proposed, not built",
+      "note": "Dépend du tchat (lot 6). Rien n'est perdu."
     }
   ]
 }

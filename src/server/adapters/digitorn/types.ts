@@ -69,6 +69,8 @@ export interface HostedAgent {
 
 export interface DigitornClient {
   listHostedAgents(): Promise<HostedAgent[]>;
+  /** Transmet les informations d'un profil pour un agent, dès qu'elles changent (US-12 RF5, D11). */
+  updateProfileInfo(userRef: string, agentRef: string, info: Record<string, string | string[]>): Promise<void>;
   submitRequest(input: SubmitRequestInput): Promise<void>;
   getConversation(userRef: string, agentRef: string): Promise<ChatEvent[]>;
   decideAction(input: DecideActionInput): Promise<ActionProposal>;

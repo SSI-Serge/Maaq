@@ -128,12 +128,13 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
 }
 
 /** Événements écoutés par la garde de session : application verrouillée ou session expirée. */
-export const SESSION_EVENTS = { locked: "maaq:locked", signedOut: "maaq:signed-out" } as const;
+export const SESSION_EVENTS = { locked: "maaq:locked", signedOut: "maaq:signed-out", accessRemoved: "maaq:access-removed" } as const;
 
 function notifySessionChange(code: string): void {
   if (typeof window === "undefined") return;
   if (code === "locked") window.dispatchEvent(new Event(SESSION_EVENTS.locked));
   if (code === "unauthenticated") window.dispatchEvent(new Event(SESSION_EVENTS.signedOut));
+  if (code === "access_removed") window.dispatchEvent(new Event(SESSION_EVENTS.accessRemoved));
 }
 
 /** Nouvelle clé d'idempotence, à conserver pendant tous les « Réessayer » d'une même action. */

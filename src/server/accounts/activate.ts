@@ -38,36 +38,86 @@ export async function currentLegalVersions(db: Db, now: Date): Promise<LegalVers
 
 type LinkState =
   | { kind: "valid"; linkId: string; userId: string; firstName: string; role: "primary_user" | "guest" | "admin"; accountId: string | null }
-  | { kind: "expired" }
+  | { kind: "used"; linkKind: ActivationKindName; host: string | null }
+  | { kind: "expired"; linkKind: ActivationKindName; host: string | null }
   | { kind: "invalid" };
+
+type ActivationKindName = "account_activation" | "guest_invitation";
 
 async function readLink(db: Db, token: string, now: Date, lock: boolean): Promise<LinkState> {
   let query = db
     .selectFrom("activation_links as l")
     .innerJoin("users as u", "u.id", "l.user_id")
-    .select(["l.id", "l.expires_at", "l.used_at", "l.revoked_at", "u.id as user_id", "u.first_name", "u.role", "u.account_id", "u.status"])
+    .leftJoin("users as h", (join) => join.onRef("h.account_id", "=", "u.account_id").on("h.role", "=", "primary_user"))
+    .select([
+      "l.id",
+      "l.kind",
+      "l.expires_at",
+      "l.used_at",
+      "l.revoked_at",
+      "u.id as user_id",
+      "u.first_name",
+      "u.role",
+      "u.account_id",
+      "u.status",
+      "h.first_name as host_first_name",
+    ])
     .where("l.token_hash", "=", sha256(token));
-  if (lock) query = query.forUpdate();
+  if (lock) query = query.forUpdate("l");
   const row = await query.executeTakeFirst();
-  if (!row || row.used_at || row.status !== "pending_activation") return { kind: "invalid" };
-  // Un lien remplacé par un renvoi est traité comme expiré : le message invite à en demander un nouveau.
-  if (row.revoked_at || new Date(row.expires_at) <= now) return { kind: "expired" };
+  if (!row) return { kind: "invalid" };
+  const host = row.kind === "guest_invitation" ? row.host_first_name : null;
+  // Lien déjà utilisé : « Votre accès est déjà activé » (US-4 RF7).
+  if (row.used_at) return { kind: "used", linkKind: row.kind, host };
+  // Lien remplacé par un renvoi, invité supprimé ou délai dépassé : même message qu'un lien expiré (US-4 RF6, RF8).
+  if (row.revoked_at || row.status !== "pending_activation" || new Date(row.expires_at) <= now) {
+    return { kind: "expired", linkKind: row.kind, host };
+  }
   return { kind: "valid", linkId: row.id, userId: row.user_id, firstName: row.first_name, role: row.role, accountId: row.account_id };
 }
 
 export type ActivationInfo =
-  | { kind: "valid"; firstName: string; legal: LegalVersion[] }
-  | { kind: "expired" }
+  | {
+      kind: "valid";
+      role: "primary_user" | "guest";
+      firstName: string;
+      profile: { firstName: string; lastName: string; email: string; phone: string | null };
+      host: { firstName: string; lastName: string } | null;
+      legal: LegalVersion[];
+    }
+  | { kind: "used" | "expired"; linkKind: ActivationKindName; host: string | null }
   | { kind: "invalid" };
 
 export async function inspectActivation(ctx: Ctx, token: string): Promise<ActivationInfo> {
   const link = await readLink(ctx.db, token, ctx.now, false);
   if (link.kind !== "valid") return link;
-  return { kind: "valid", firstName: link.firstName, legal: await currentLegalVersions(ctx.db, ctx.now) };
+  const profile = await ctx.db
+    .selectFrom("users")
+    .select(["first_name", "last_name", "email", "phone"])
+    .where("id", "=", link.userId)
+    .executeTakeFirstOrThrow();
+  const host =
+    link.role === "guest" && link.accountId
+      ? await ctx.db
+          .selectFrom("users")
+          .select(["first_name", "last_name"])
+          .where("account_id", "=", link.accountId)
+          .where("role", "=", "primary_user")
+          .executeTakeFirst()
+      : undefined;
+  return {
+    kind: "valid",
+    role: link.role === "guest" ? "guest" : "primary_user",
+    firstName: link.firstName,
+    profile: { firstName: profile.first_name, lastName: profile.last_name, email: profile.email, phone: profile.phone },
+    host: host ? { firstName: host.first_name, lastName: host.last_name } : null,
+    legal: await currentLegalVersions(ctx.db, ctx.now),
+  };
 }
 
 export type ActivationResult =
-  | { kind: "expired" | "invalid" | "weak" | "mismatch" | "not_accepted" }
+  | { kind: "invalid" | "weak" | "mismatch" | "not_accepted" }
+  | { kind: "used" | "expired"; linkKind: ActivationKindName; host: string | null }
   | { kind: "session"; token: string; sessionId: string; expiresAt: Date; deviceId: string };
 
 /**
@@ -86,7 +136,8 @@ export async function activate(
 
   return ctx.db.transaction().execute(async (trx) => {
     const link = await readLink(trx, input.token, ctx.now, true);
-    if (link.kind !== "valid") return { kind: link.kind };
+    if (link.kind === "invalid") return { kind: "invalid" };
+    if (link.kind !== "valid") return { kind: link.kind, linkKind: link.linkKind, host: link.host };
 
     await trx.updateTable("activation_links").set({ used_at: ctx.now }).where("id", "=", link.linkId).execute();
     await trx

@@ -40,6 +40,7 @@ export class MockDigitorn implements DigitornClient {
   private readonly proposals = new Map<string, { proposal: ActionProposal; userRef: string; agentRef: string }>();
   private readonly requests = new Set<string>();
   private readonly logbook: LogbookItem[] = [];
+  private readonly profileInfo = new Map<string, Record<string, string | string[]>>();
   private readonly replyDelayMs: number;
   private readonly executionDelayMs: number;
   private readonly now: () => Date;
@@ -52,6 +53,15 @@ export class MockDigitorn implements DigitornClient {
 
   async listHostedAgents(): Promise<HostedAgent[]> {
     return MOCK_HOSTED_AGENTS.map((agent) => ({ ...agent }));
+  }
+
+  async updateProfileInfo(userRef: string, agentRef: string, info: Record<string, string | string[]>): Promise<void> {
+    this.profileInfo.set(key(userRef, agentRef), { ...info });
+  }
+
+  /** Informations reçues pour un profil et un agent (contrôle dans les tests). */
+  profileInfoOf(userRef: string, agentRef: string): Record<string, string | string[]> | undefined {
+    return this.profileInfo.get(key(userRef, agentRef));
   }
 
   async submitRequest(input: SubmitRequestInput): Promise<void> {

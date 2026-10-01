@@ -27,3 +27,11 @@ Les emails et SMS envoyés par l'application arrivent dans la boîte de test : h
 - Deux agents (Admin_Classify, Admin_lib) et quatre contrats obligatoires sont déjà créés.
 - « Créer un compte » envoie un lien d'activation dans la boîte de test ; l'ouvrir permet d'activer le compte.
 - Astuce : ouvrir la console sur http://127.0.0.1:3000 et l'application sur http://localhost:3000 garde deux sessions séparées.
+
+## Invités et informations par agent
+
+- Camille (utilisateur principal) voit l'onglet « Invités » : quota, ajout, modification, suppression, renvoi de lien.
+- « Envoyer l'invitation » ou « Ajouter un invité » dépose l'invitation dans la boîte de test (`/dev/boite`) : ouvrir le lien reçu active l'accès de l'invité.
+- Astuce : activer l'invité sur http://127.0.0.1:3000 pendant que Camille reste sur http://localhost:3000.
+- Le dashboard d'agents arrive au lot 4 : pour essayer « Informations par agent », ajouter l'agent à un profil directement en base (table `profile_agents`).
+- Pour repartir de zéro : `npm run db:reset`.

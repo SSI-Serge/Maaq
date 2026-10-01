@@ -6,7 +6,7 @@ import { ApiError, apiRequest } from "@/client/api";
 import { deviceTimezone } from "@/client/auth";
 import { useApiQuery } from "@/client/hooks";
 import { AuthScreen, ErrorLine, Heading } from "@/components/auth/parts";
-import { Button, Field, Loading, Notice } from "@/components/ui";
+import { Button, ButtonLink, Field, Loading, Notice } from "@/components/ui";
 import styles from "@/components/auth/auth.module.css";
 
 interface LegalVersion {
@@ -33,7 +33,13 @@ export default function ActivationPage() {
 
 function Activation() {
   const token = useSearchParams().get("jeton") ?? "";
-  const info = useApiQuery<{ firstName: string; legal: LegalVersion[] }>(`/api/activation?jeton=${encodeURIComponent(token)}`);
+  const info = useApiQuery<{
+    role: "primary_user" | "guest";
+    firstName: string;
+    profile: { firstName: string; lastName: string; email: string; phone: string | null };
+    host: { firstName: string; lastName: string } | null;
+    legal: LegalVersion[];
+  }>(`/api/activation?jeton=${encodeURIComponent(token)}`);
   const [accepted, setAccepted] = useState(false);
   const [step, setStep] = useState<"legal" | "password">("legal");
 
@@ -46,7 +52,19 @@ function Activation() {
   }
 
   if (info.error) {
-    const linkProblem = info.error.body?.code === "link_expired" || info.error.body?.code === "link_invalid";
+    const code = info.error.body?.code;
+    // Lien déjà utilisé : l'accès est déjà activé (US-4 RF7).
+    if (code === "link_used") {
+      return (
+        <AuthScreen>
+          <Heading eyebrow="Activation du compte" title="Votre accès est déjà activé" lead="Vous pouvez vous connecter à MAAQ avec votre email et votre mot de passe." />
+          <ButtonLink href="/connexion" block>
+            Se connecter
+          </ButtonLink>
+        </AuthScreen>
+      );
+    }
+    const linkProblem = code === "link_expired" || code === "link_invalid";
     return (
       <AuthScreen>
         <Heading eyebrow="Activation du compte" title={linkProblem ? "Lien non valable" : "Activation impossible"} />
@@ -62,10 +80,40 @@ function Activation() {
       {step === "legal" ? (
         <div className={styles.form}>
           <Heading
-            eyebrow="Activation du compte"
+            eyebrow={info.data.role === "guest" ? "Invitation MAAQ" : "Activation du compte"}
             title={`Bienvenue ${info.data.firstName}`}
-            lead="Avant de continuer, merci de consulter la politique de confidentialité et les conditions d'utilisation de MAAQ."
+            lead={
+              info.data.host ? (
+                <>
+                  Vous avez été invité(e) par <b>{`${info.data.host.firstName} ${info.data.host.lastName}`}</b> à rejoindre MAAQ pour accéder à ses
+                  agents IA, qui s&apos;occupent de l&apos;administratif et du quotidien.
+                </>
+              ) : (
+                "Avant de continuer, merci de consulter la politique de confidentialité et les conditions d'utilisation de MAAQ."
+              )
+            }
           />
+          {info.data.role === "guest" && (
+            <div style={{ background: "var(--bg-raised)", border: "1px solid var(--line)", borderRadius: 10, padding: "12px 14px", fontSize: 13, lineHeight: 1.7 }}>
+              <div>
+                <span style={{ color: "var(--ink-soft)" }}>Nom : </span>
+                {info.data.profile.firstName} {info.data.profile.lastName}
+              </div>
+              <div>
+                <span style={{ color: "var(--ink-soft)" }}>Email : </span>
+                {info.data.profile.email}
+              </div>
+              {info.data.profile.phone && (
+                <div>
+                  <span style={{ color: "var(--ink-soft)" }}>Téléphone : </span>
+                  {info.data.profile.phone}
+                </div>
+              )}
+              <p className={styles.note} style={{ textAlign: "left", marginTop: 8 }}>
+                Ces informations ont été renseignées par {info.data.host?.firstName} lors de votre ajout. Vous pourrez les corriger depuis vos réglages.
+              </p>
+            </div>
+          )}
           {info.data.legal.map((doc) => (
             <details key={doc.id} style={{ background: "var(--bg-raised)", border: "1px solid var(--line)", borderRadius: 10, padding: "12px 14px" }}>
               <summary style={{ fontWeight: 600, fontSize: 14, cursor: "pointer" }}>
@@ -128,7 +176,7 @@ function PasswordStep({ token }: { token: string }) {
       {message && <Notice tone="error">{message}</Notice>}
       <ErrorLine error={error} />
       <Button type="submit" block loading={pending} disabled={!password || !confirmation}>
-        Activer mon compte
+        Activer mon accès
       </Button>
     </form>
   );

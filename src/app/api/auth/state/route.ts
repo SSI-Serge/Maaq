@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { maskEmail } from "@/server/auth/format";
-import { ctx, currentSession, isUnlocked, readPending } from "@/server/auth/http";
+import { accessRemoved, ctx, currentSession, isUnlocked, readPending } from "@/server/auth/http";
 import { homeFor } from "@/server/auth/service";
 import { handler } from "@/server/http";
 
@@ -11,7 +11,11 @@ export const GET = handler(async () => {
   const context = ctx();
   const session = await currentSession(context);
   if (!session) {
-    return NextResponse.json({ authenticated: false, pendingVerification: (await readPending(context.now)) !== null });
+    return NextResponse.json({
+      authenticated: false,
+      pendingVerification: (await readPending(context.now)) !== null,
+      accessRemoved: await accessRemoved(context),
+    });
   }
   return NextResponse.json({
     authenticated: true,

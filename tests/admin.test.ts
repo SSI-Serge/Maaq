@@ -184,20 +184,20 @@ describe("US-64 — créer le compte d'un utilisateur principal", () => {
     expect(accepted.length).toBeGreaterThanOrEqual(2);
 
     // Usage unique (RT2).
-    expect(await activate(now(), input)).toEqual({ kind: "invalid" });
+    expect(await activate(now(), input)).toMatchObject({ kind: "used" });
   });
 
   it("RF6 : un lien expiré ou remplacé n'active plus le compte", async () => {
     const email = `expire-${Date.now()}@maaq.test`;
     const { accountId } = await createAccount(now(), adminId, { ...base, email });
     const firstToken = (await messagesTo(email))[0].text.match(/jeton=([\w-]+)/)![1];
-    expect(await inspectActivation({ db, now: minutesLater(new Date(), 31) }, firstToken)).toEqual({ kind: "expired" });
+    expect(await inspectActivation({ db, now: minutesLater(new Date(), 31) }, firstToken)).toMatchObject({ kind: "expired", linkKind: "account_activation" });
 
     await resendActivation(now(), adminId, accountId);
     const mails = await messagesTo(email);
     expect(mails).toHaveLength(2);
     const secondToken = mails[0].text.match(/jeton=([\w-]+)/)![1];
-    expect(await inspectActivation(now(), firstToken)).toEqual({ kind: "expired" });
+    expect(await inspectActivation(now(), firstToken)).toMatchObject({ kind: "expired" });
     expect(await inspectActivation(now(), secondToken)).toMatchObject({ kind: "valid" });
   });
 });

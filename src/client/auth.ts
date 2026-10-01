@@ -6,7 +6,7 @@ import { clearAllDrafts } from "./hooks";
 
 /** Ce que le serveur dit de la connexion sur cet appareil (GET /api/auth/state). */
 export type AuthState =
-  | { authenticated: false; pendingVerification: boolean }
+  | { authenticated: false; pendingVerification: boolean; accessRemoved?: boolean }
   | {
       authenticated: true;
       unlocked: boolean;

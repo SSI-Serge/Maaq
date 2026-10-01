@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ApiError, SESSION_EVENTS, apiRequest } from "@/client/api";
 import { fetchAuthState, signOut, type AuthState } from "@/client/auth";
 import { Button, Field, Logo, Notice, RetryNotice, Screen } from "@/components/ui";
@@ -11,13 +11,20 @@ import { PatternLockedNotice, PatternUnlock } from "./PatternUnlock";
 
 type SignedIn = Extract<AuthState, { authenticated: true }>;
 
-const SessionContext = createContext<SignedIn | null>(null);
+const SessionContext = createContext<{ session: SignedIn; reload: () => Promise<void> } | null>(null);
 
 /** Profil connecté, pour les écrans protégés. */
 export function useSessionUser(): SignedIn["user"] {
-  const session = useContext(SessionContext);
-  if (!session) throw new Error("useSessionUser doit être utilisé sous <AuthGate>");
-  return session.user;
+  const value = useContext(SessionContext);
+  if (!value) throw new Error("useSessionUser doit être utilisé sous <AuthGate>");
+  return value.session.user;
+}
+
+/** Relit l'état de la session (ex. après la configuration initiale, l'écran d'arrivée change). */
+export function useSessionReload(): () => Promise<void> {
+  const value = useContext(SessionContext);
+  if (!value) throw new Error("useSessionReload doit être utilisé sous <AuthGate>");
+  return value.reload;
 }
 
 const IDLE_MS = 5 * 60_000;
@@ -46,6 +53,10 @@ export function AuthGate({ children }: { children: ReactNode }) {
   }, []);
   const fail = useCallback((err: unknown) => setError(err as ApiError), []);
   const load = useCallback(() => fetchAuthState().then(apply, fail), [apply, fail]);
+  const contextValue = useMemo(
+    () => (state?.authenticated ? { session: state, reload: load } : null),
+    [state, load],
+  );
 
   useEffect(() => {
     fetchAuthState().then(apply, fail);
@@ -54,7 +65,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   // Redirections selon l'état de la session.
   useEffect(() => {
     if (!state) return;
-    if (!state.authenticated) return router.replace("/connexion");
+    if (!state.authenticated) return router.replace(state.accessRemoved ? "/connexion?acces=retire" : "/connexion");
     if (!state.unlocked) return;
     const target = forcedDestination(state, pathname);
     if (target && target !== pathname) router.replace(target);
@@ -69,11 +80,14 @@ export function AuthGate({ children }: { children: ReactNode }) {
   useEffect(() => {
     const onLocked = () => lock(false);
     const onSignedOut = () => router.replace("/connexion");
+    const onRemoved = () => router.replace("/connexion?acces=retire");
     window.addEventListener(SESSION_EVENTS.locked, onLocked);
     window.addEventListener(SESSION_EVENTS.signedOut, onSignedOut);
+    window.addEventListener(SESSION_EVENTS.accessRemoved, onRemoved);
     return () => {
       window.removeEventListener(SESSION_EVENTS.locked, onLocked);
       window.removeEventListener(SESSION_EVENTS.signedOut, onSignedOut);
+      window.removeEventListener(SESSION_EVENTS.accessRemoved, onRemoved);
     };
   }, [lock, router]);
 
@@ -90,7 +104,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   if (!state.authenticated) return <Screen centered><Logo size="large" pulse /></Screen>;
 
   return (
-    <SessionContext.Provider value={state}>
+    <SessionContext.Provider value={contextValue}>
       {everUnlocked && (
         <div className={unlocked ? undefined : styles.hiddenContent} aria-hidden={!unlocked}>
           {children}

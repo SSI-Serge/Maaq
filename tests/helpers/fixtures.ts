@@ -83,3 +83,27 @@ export async function messagesTo(to: string) {
 export function minutesLater(base: Date, minutes: number): Date {
   return new Date(base.getTime() + minutes * 60_000);
 }
+
+/** Contexte de session minimal d'un profil, pour appeler directement les services. */
+export async function sessionFor(db: Kysely<DB>, userId: string): Promise<import("@/server/auth/service").SessionContext> {
+  const u = await db
+    .selectFrom("users")
+    .select(["id", "account_id", "role", "guest_rank", "first_name", "last_name", "email", "initial_setup_step", "status"])
+    .where("id", "=", userId)
+    .executeTakeFirstOrThrow();
+  return {
+    sessionId: randomUUID(),
+    user: {
+      id: u.id,
+      accountId: u.account_id,
+      role: u.role,
+      guestRank: u.guest_rank,
+      firstName: u.first_name,
+      lastName: u.last_name,
+      email: u.email,
+      setupCompleted: u.initial_setup_step === null || u.initial_setup_step === "completed",
+      inGracePeriod: u.status === "grace_period",
+    },
+    device: { id: randomUUID(), type: "android", timezone: "Europe/Paris", hasPattern: true, patternLocked: false },
+  };
+}

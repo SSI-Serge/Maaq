@@ -186,6 +186,13 @@ export async function getSession(ctx: Ctx, token: string | undefined): Promise<S
   };
 }
 
+/** Raison pour laquelle la session de ce jeton a été fermée, s'il y en a une (ex. invité retiré). */
+export async function closedSessionReason(ctx: Ctx, token: string | undefined) {
+  if (!token) return null;
+  const row = await ctx.db.selectFrom("sessions").select("revoked_reason").where("token_hash", "=", sha256(token)).executeTakeFirst();
+  return row?.revoked_reason ?? null;
+}
+
 async function logSecurityEvent(
   db: Db,
   event: { userId: string | null; type: SecurityEventType; deviceId?: string | null; now: Date; details?: Record<string, unknown> },

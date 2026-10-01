@@ -7,14 +7,25 @@ import { handler, parseBody, Rejection } from "@/server/http";
 
 export const dynamic = "force-dynamic";
 
-const EXPIRED = "Ce lien d'activation a expiré. Contactez MAAQ pour recevoir un nouveau lien.";
-const INVALID = "Ce lien d'activation n'est pas valable ou a déjà été utilisé.";
+const INVALID = "Ce lien d'activation n'est pas valable.";
 
-/** État d'un lien d'activation et textes juridiques à accepter (US-64 RF5, RF6). */
+/** Lien expiré, remplacé ou dont l'invité a été supprimé (US-4 RF6, RF8 ; US-64 RF6). */
+function expired(linkKind: string, host: string | null | undefined): Rejection {
+  const message =
+    linkKind === "guest_invitation"
+      ? `Ce lien d'invitation a expiré. Demandez à ${host ?? "la personne qui vous a invité"} de vous renvoyer une invitation.`
+      : "Ce lien d'activation a expiré. Contactez MAAQ pour recevoir un nouveau lien.";
+  return new Rejection("link_expired", message, 410);
+}
+
+const used = () => new Rejection("link_used", "Votre accès est déjà activé", 409);
+
+/** État d'un lien d'activation, coordonnées du profil et textes juridiques à accepter (US-4 RF4, US-64 RF5). */
 export const GET = handler(async (request: Request) => {
   const token = new URL(request.url).searchParams.get("jeton") ?? "";
   const info = await inspectActivation(ctx(), token);
-  if (info.kind === "expired") throw new Rejection("link_expired", EXPIRED, 410);
+  if (info.kind === "expired") throw expired(info.linkKind, info.host);
+  if (info.kind === "used") throw used();
   if (info.kind === "invalid") throw new Rejection("link_invalid", INVALID, 404);
   return NextResponse.json(info);
 });
@@ -27,7 +38,7 @@ const schema = z.object({
   timezone: z.string().max(64).optional(),
 });
 
-/** Active le compte : acceptation des textes, mot de passe, session ouverte sur cet appareil. */
+/** Active l'accès : acceptation des textes, mot de passe, session ouverte sur cet appareil (US-4 RF5). */
 export const POST = handler(async (request: Request) => {
   const body = await parseBody(request, schema);
   const context = ctx();
@@ -39,8 +50,10 @@ export const POST = handler(async (request: Request) => {
       throw new Rejection("password_weak", MESSAGES.passwordWeak);
     case "mismatch":
       throw new Rejection("password_mismatch", MESSAGES.passwordMismatch);
+    case "used":
+      throw used();
     case "expired":
-      throw new Rejection("link_expired", EXPIRED, 410);
+      throw expired(result.linkKind, result.host);
     case "invalid":
       throw new Rejection("link_invalid", INVALID, 404);
     case "session":
