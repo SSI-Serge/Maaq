@@ -36,7 +36,11 @@ describe("base de données", () => {
 
   it("crée les données de démonstration une seule fois", async () => {
     expect(await seedDemo(pool)).toBe(false);
-    const { rows } = await pool.query("SELECT role, count(*)::int AS n FROM users GROUP BY role ORDER BY role");
+    const { rows } = await pool.query(
+      `SELECT role, count(*)::int AS n FROM users
+        WHERE email IN ('admin@maaq.test', 'camille@maaq.test', 'dominique@maaq.test', 'lou@maaq.test')
+        GROUP BY role ORDER BY role`,
+    );
     expect(rows).toEqual([
       { role: "admin", n: 1 },
       { role: "primary_user", n: 1 },

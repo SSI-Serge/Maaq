@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { z } from "zod";
 
 /** Refus métier : le client l'affiche tel quel, sans proposer « Réessayer » automatiquement. */
 export class Rejection extends Error {
@@ -33,4 +34,17 @@ export function handler<Args extends unknown[]>(
       return NextResponse.json({ error: { code: "server_error", message: "Erreur interne" } }, { status: 500 });
     }
   };
+}
+
+/** Lit et valide le corps JSON d'une requête ; un corps invalide devient un refus 400. */
+export async function parseBody<S extends z.ZodType>(request: Request, schema: S): Promise<z.infer<S>> {
+  let raw: unknown;
+  try {
+    raw = await request.json();
+  } catch {
+    throw new Rejection("invalid_body", "Requête invalide.", 400);
+  }
+  const parsed = schema.safeParse(raw);
+  if (!parsed.success) throw new Rejection("invalid_body", "Requête invalide.", 400, parsed.error.issues);
+  return parsed.data;
 }

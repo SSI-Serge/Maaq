@@ -3,7 +3,7 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-10-01T14:31:50Z",
+  "updated": "2026-10-01T14:57:40Z",
   "deploys": [],
   "features": [
     {
@@ -104,67 +104,112 @@
         {
           "id": "f1s1",
           "title": "US-2 · Accéder à l'application depuis l'écran d'accueil",
-          "state": "planning",
-          "env": null
+          "state": "done",
+          "env": null,
+          "unsure": "L'écran « pas de connexion » au lancement ne marche qu'en version de production : pas encore essayé."
         },
         {
           "id": "f1s2",
           "title": "US-3 · Se connecter à MAAQ",
-          "state": "planning",
+          "state": "done",
           "env": null
         },
         {
           "id": "f1s3",
           "title": "US-51 · Vérifier mon identité sur un nouvel appareil",
-          "state": "planning",
-          "env": null
+          "state": "done",
+          "env": null,
+          "unsure": "Le SMS arrive seulement dans la boîte de test : aucun vrai prestataire SMS n'est branché."
         },
         {
           "id": "f1s4",
           "title": "US-6 · Se reconnecter rapidement via un schéma tactile",
-          "state": "planning",
-          "env": null
+          "state": "done",
+          "env": null,
+          "unsure": "Tracé vérifié à la souris dans le navigateur ; pas encore au doigt sur un vrai téléphone."
         },
         {
           "id": "f1s5",
           "title": "US-7 · Être verrouillé après plusieurs échecs du schéma tactile",
-          "state": "planning",
+          "state": "done",
           "env": null
         },
         {
           "id": "f1s6",
           "title": "US-8 · Récupérer l'accès après un oubli du schéma tactile",
-          "state": "planning",
+          "state": "done",
           "env": null
         },
         {
           "id": "f1s7",
           "title": "US-66 · Réinitialiser mon mot de passe oublié",
-          "state": "planning",
-          "env": null
+          "state": "done",
+          "env": null,
+          "unsure": "Parcours vérifié par les tests automatiques, pas encore cliqué de bout en bout dans le navigateur."
         },
         {
           "id": "f1s8",
           "title": "US-52 · Verrouiller automatiquement l'application après inactivité",
-          "state": "planning",
-          "env": null
+          "state": "done",
+          "env": null,
+          "unsure": "Le verrouillage après 5 minutes est vérifié par la logique, pas en attendant 5 vraies minutes."
         },
         {
           "id": "f1s9",
           "title": "US-9 · Se déconnecter de l'application",
-          "state": "planning",
+          "state": "done",
           "env": null
         },
         {
           "id": "f1s10",
           "title": "US-1 · Être guidé pour installer MAAQ sur l'écran d'accueil",
-          "state": "planning",
-          "env": null
+          "state": "done",
+          "env": null,
+          "unsure": "Pas encore essayé sur un vrai Android ni un vrai iPhone ; le bouton « Installer MAAQ » dépend du navigateur."
         }
       ],
-      "decisions": [],
-      "unsure": [],
-      "activity": []
+      "decisions": [
+        {
+          "at": "2026-10-01T14:35:06Z",
+          "what": "Le schéma tactile se trace au doigt sur la grille ; toucher les points un par un marche aussi."
+        },
+        {
+          "at": "2026-10-01T14:35:06Z",
+          "what": "Après 5 minutes sans activité, l'écran se verrouille sur place : on revient exactement où on était."
+        },
+        {
+          "at": "2026-10-01T14:35:06Z",
+          "what": "Après un mot de passe réinitialisé, on propose le schéma seulement sur un appareil déjà reconnu."
+        },
+        {
+          "at": "2026-10-01T14:57:40Z",
+          "what": "Un survol de souris sans clic ne relie plus de point sur la grille du schéma."
+        }
+      ],
+      "unsure": [
+        "Les écrans d'arrivée (accueil, console, configuration) sont provisoires : ils seront remplacés aux lots 2, 3 et 4."
+      ],
+      "activity": [
+        {
+          "at": "2026-10-01T14:57:40Z",
+          "kind": "ok",
+          "what": "63 tests automatiques au vert, compilation de production réussie"
+        },
+        {
+          "at": "2026-10-01T14:57:40Z",
+          "kind": "ok",
+          "what": "Connexion, appareil, schéma, verrouillage et récupération vérifiés dans le navigateur"
+        },
+        {
+          "at": "2026-10-01T14:35:06Z",
+          "kind": "work",
+          "what": "Lecture des 10 user stories et des 10 maquettes du lot"
+        }
+      ],
+      "needsYou": {
+        "title": "Prêt à être envoyé sur la branche de test",
+        "text": "Les 10 user stories d'accès et de sécurité sont construites et vérifiées (63 tests). Rien n'est envoyé sur GitHub avant ton accord."
+      }
     },
     {
       "id": "f2",
@@ -612,6 +657,16 @@
       "name": "Mise en ligne de l'application",
       "tag": "Proposed, not built",
       "note": "On en reparle après les premiers lots ; rien n'est perdu."
+    },
+    {
+      "name": "« Annuler la suppression » sur l'écran de reprise de compte",
+      "tag": "Proposed, not built",
+      "note": "L'écran affiche déjà la date de suppression ; le bouton arrive avec US-59 au lot 9. Rien n'est perdu."
+    },
+    {
+      "name": "Réglages complets (appareils, carnets, données)",
+      "tag": "Proposed, not built",
+      "note": "Le lot 1 n'y met que la déconnexion ; le reste arrive au lot 8."
     }
   ]
 }

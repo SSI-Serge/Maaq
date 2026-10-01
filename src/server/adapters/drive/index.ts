@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { dataDir } from "@/server/data-dir";
 
 /**
  * Stockage des documents de contrats dans le Google Drive du compte (D7, D14).
@@ -20,7 +21,7 @@ const SAFE_ID = /^[0-9a-f-]{36}$/;
 
 /** Faux Google Drive pour le développement : un dossier par compte dans .data/drive. */
 export class LocalDrive implements DriveStorage {
-  constructor(private readonly root: string = path.join(process.cwd(), ".data", "drive")) {}
+  constructor(private readonly root: string = path.join(dataDir(), "drive")) {}
 
   async upload(input: { accountId: string; fileName: string; mimeType: string; content: Buffer }) {
     const fileId = randomUUID();

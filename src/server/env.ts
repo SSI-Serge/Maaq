@@ -10,6 +10,7 @@ const schema = z.object({
   APP_URL: z.string().url().default("http://localhost:3000"),
   ENCRYPTION_KEY: base64Key,
   HMAC_KEY: base64Key,
+  AUTH_SECRET: base64Key,
   DIGITORN_MODE: z.enum(["mock", "live"]).default("mock"),
   DIGITORN_API_URL: z.string().url().optional(),
   DIGITORN_API_KEY: z.string().optional(),

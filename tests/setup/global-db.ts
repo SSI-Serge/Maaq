@@ -1,4 +1,4 @@
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { Pool } from "pg";
@@ -23,9 +23,13 @@ export default async function setup(project: TestProject) {
   if (!databaseUrl) {
     const port = 5434 + Math.floor(Math.random() * 500);
     const dir = await mkdtemp(path.join(os.tmpdir(), "maaq-test-pg-"));
-    const pg = await startEmbeddedDb({ dir, port, databases: ["maaq_test"], persistent: false });
+    const pg = await startEmbeddedDb({ dir, port, databases: ["maaq_test"] });
     databaseUrl = `postgres://${DEV_USER}:${DEV_PASSWORD}@localhost:${port}/maaq_test`;
-    stop = () => pg.stop();
+    stop = async () => {
+      await pg.stop();
+      // Sous Windows, les fichiers peuvent rester verrouillés un instant après l'arrêt.
+      await rm(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 }).catch(() => {});
+    };
   }
 
   const pool = new Pool({ connectionString: databaseUrl });

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { IBM_Plex_Mono, Karla, Newsreader } from "next/font/google";
+import { AppBoot } from "@/components/AppBoot";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import "./globals.css";
 
@@ -30,6 +31,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="fr" className={`${newsreader.variable} ${karla.variable} ${plexMono.variable}`}>
       <body>
+        <AppBoot />
         <OfflineBanner />
         {children}
       </body>

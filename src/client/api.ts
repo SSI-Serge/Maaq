@@ -106,6 +106,7 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
         if (response.status >= 400 && response.status < 500) {
           const payload = (await response.json().catch(() => null)) as { error?: RejectedBody } | null;
           const body = payload?.error ?? { code: "rejected", message: MESSAGES.server };
+          notifySessionChange(body.code);
           throw new ApiError("rejected", body.message, response.status, body);
         }
         lastError = new ApiError("server", MESSAGES.server, response.status);
@@ -123,6 +124,15 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
     clearTimeout(deadlineTimer);
     if (slowTimer) clearTimeout(slowTimer);
   }
+}
+
+/** Événements écoutés par la garde de session : application verrouillée ou session expirée. */
+export const SESSION_EVENTS = { locked: "maaq:locked", signedOut: "maaq:signed-out" } as const;
+
+function notifySessionChange(code: string): void {
+  if (typeof window === "undefined") return;
+  if (code === "locked") window.dispatchEvent(new Event(SESSION_EVENTS.locked));
+  if (code === "unauthenticated") window.dispatchEvent(new Event(SESSION_EVENTS.signedOut));
 }
 
 /** Nouvelle clé d'idempotence, à conserver pendant tous les « Réessayer » d'une même action. */

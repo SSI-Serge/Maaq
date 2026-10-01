@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
 import { useId } from "react";
 import styles from "./ui.module.css";
@@ -53,6 +54,25 @@ export function Button({ variant = "primary", block = false, loading = false, di
       {loading && <span className={styles.spinner} aria-hidden />}
       {children}
     </button>
+  );
+}
+
+/** Lien présenté comme un bouton (navigation vers un autre écran). */
+export function ButtonLink({
+  href,
+  variant = "primary",
+  block = false,
+  children,
+}: {
+  href: string;
+  variant?: ButtonVariant;
+  block?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <Link href={href} className={cx(styles.button, styles[variant], block && styles.block)}>
+      {children}
+    </Link>
   );
 }
 

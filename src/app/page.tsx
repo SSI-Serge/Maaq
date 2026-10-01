@@ -1,21 +1,43 @@
 "use client";
 
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { MESSAGES } from "@/client/api";
+import { detectPlatform, fetchAuthState, installGuide } from "@/client/auth";
 import { useApiQuery, useOnline } from "@/client/hooks";
-import { Button, Card, Eyebrow, Logo, Screen, uiStyles } from "@/components/ui";
+import { Button, Logo, Screen, uiStyles } from "@/components/ui";
 
-/** Écran de démarrage (maquette Démarrage) : splash, connexion lente, erreur ou hors connexion. */
+const MINIMUM_SPLASH_MS = 700;
+
+/**
+ * Démarrage (US-2, maquette Démarrage) : écran aux couleurs de MAAQ, puis
+ *  - guidage d'installation à la première visite sur un téléphone (US-1) ;
+ *  - écran de connexion sans session mémorisée, ou écran du profil (déverrouillage par schéma) sinon (US-2 RF3).
+ */
 export default function StartupPage() {
+  const router = useRouter();
   const online = useOnline();
   const health = useApiQuery<{ status: string }>(online ? "/api/health" : null);
-  const [minimumSplashDone, setMinimumSplashDone] = useState(false);
+  const [splashDone, setSplashDone] = useState(false);
+  const [routingError, setRoutingError] = useState(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => setMinimumSplashDone(true), 900);
+    const timer = setTimeout(() => setSplashDone(true), MINIMUM_SPLASH_MS);
     return () => clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    if (!health.data || !splashDone) return;
+    const platform = detectPlatform();
+    const onPhone = platform.os === "android" || platform.os === "iphone";
+    if (onPhone && !platform.standalone && !installGuide.dismissed()) {
+      router.replace("/installer");
+      return;
+    }
+    fetchAuthState()
+      .then((state) => router.replace(state.authenticated ? state.home : "/connexion"))
+      .catch(() => setRoutingError(true));
+  }, [health.data, splashDone, router]);
 
   if (!online) {
     return (
@@ -26,50 +48,32 @@ export default function StartupPage() {
         </svg>
         <h1 className={uiStyles.statusTitle}>Pas de connexion internet</h1>
         <p className={uiStyles.statusText}>MAAQ nécessite une connexion pour fonctionner.</p>
-        <Button onClick={health.reload}>Réessayer</Button>
+        <Button onClick={() => window.location.reload()}>Réessayer</Button>
       </Screen>
     );
   }
 
-  if (health.error) {
-    const isTimeout = health.error.kind === "timeout";
+  if (health.error || routingError) {
+    const isTimeout = health.error?.kind === "timeout";
     return (
       <Screen centered>
         <div className={`${uiStyles.statusIcon} ${isTimeout ? uiStyles.statusIconNeutral : uiStyles.statusIconError}`} aria-hidden>
           {isTimeout ? "M" : "!"}
         </div>
         <p className={uiStyles.statusText}>{isTimeout ? MESSAGES.timeout : MESSAGES.server}</p>
-        <Button onClick={health.reload}>Réessayer</Button>
-      </Screen>
-    );
-  }
-
-  if (health.loading || !minimumSplashDone) {
-    return (
-      <Screen centered>
-        <Logo size="large" pulse />
-        {health.slow && <p className={uiStyles.statusText} style={{ marginTop: 18 }}>Toujours en cours…</p>}
+        <Button onClick={() => window.location.reload()}>Réessayer</Button>
       </Screen>
     );
   }
 
   return (
-    <Screen>
-      <Logo />
-      <div style={{ marginTop: 36, display: "flex", flexDirection: "column", gap: 16 }}>
-        <h1 style={{ fontSize: 26, lineHeight: 1.25 }}>Les fondations sont en place</h1>
-        <p style={{ fontSize: 14, color: "var(--ink-soft)", lineHeight: 1.5, margin: 0 }}>
-          Le service répond et la base de données est à jour. Les écrans de connexion arrivent avec le lot 1.
+    <Screen centered>
+      <Logo size="large" pulse />
+      {health.slow && (
+        <p className={uiStyles.statusText} style={{ marginTop: 18 }}>
+          Toujours en cours…
         </p>
-        <Card>
-          <Eyebrow>Outils de développement</Eyebrow>
-          <ul style={{ margin: "10px 0 0", paddingLeft: 18, fontSize: 14, lineHeight: 1.9 }}>
-            <li><Link href="/dev/charte" style={{ color: "var(--secondary-strong)", fontWeight: 600 }}>Charte et composants</Link></li>
-            <li><Link href="/dev/digitorn" style={{ color: "var(--secondary-strong)", fontWeight: 600 }}>Digitorn simulé</Link></li>
-            <li><Link href="/dev/boite" style={{ color: "var(--secondary-strong)", fontWeight: 600 }}>Boîte de test (emails et SMS)</Link></li>
-          </ul>
-        </Card>
-      </div>
+      )}
     </Screen>
   );
 }

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { appendFile, mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
+import { dataDir } from "@/server/data-dir";
 import type { Messenger, OutboxEntry, OutgoingEmail, OutgoingSms } from "./types";
 
 /**
@@ -8,7 +9,7 @@ import type { Messenger, OutboxEntry, OutgoingEmail, OutgoingSms } from "./types
  * ajouté à .data/outbox.jsonl et consultable sur /dev/boite.
  */
 export class DevOutbox implements Messenger {
-  constructor(private readonly file: string = path.join(process.cwd(), ".data", "outbox.jsonl")) {}
+  constructor(private readonly file: string = path.join(dataDir(), "outbox.jsonl")) {}
 
   async sendEmail(message: OutgoingEmail): Promise<void> {
     await this.append({ channel: "email", to: message.to, subject: message.subject, text: message.text });

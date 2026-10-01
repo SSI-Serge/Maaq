@@ -1,10 +1,9 @@
 import { Kysely, PostgresDialect } from "kysely";
-import { Pool, types } from "pg";
+import { Pool } from "pg";
 import { env } from "@/server/env";
 import type { DB } from "./schema.generated";
 
-// bigint (int8) : renvoyé en chaîne par défaut ; nos identifiants tiennent dans un number.
-types.setTypeParser(types.builtins.INT8, (value) => Number(value));
+// Les identifiants bigint restent des chaînes (comportement de pg, reflété par les types générés).
 
 declare global {
   // Une seule instance en développement malgré le rechargement à chaud de Next.js.
