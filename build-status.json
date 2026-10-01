@@ -3,7 +3,7 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-10-01T14:18:48Z",
+  "updated": "2026-10-01T14:31:50Z",
   "deploys": [],
   "features": [
     {
@@ -14,26 +14,28 @@
         {
           "id": "f0s1",
           "title": "Ouvrir MAAQ sur son téléphone, aux couleurs des maquettes",
-          "state": "testing",
+          "state": "done",
           "env": null
         },
         {
           "id": "f0s2",
           "title": "Retrouver ses données dans une base conforme à la conception",
-          "state": "testing",
+          "state": "done",
           "env": null
         },
         {
           "id": "f0s3",
           "title": "Discuter avec un Digitorn simulé en attendant la vraie API",
-          "state": "testing",
-          "env": null
+          "state": "done",
+          "env": null,
+          "unsure": "Le vrai Digitorn n'existe pas encore : le simulateur repose sur nos hypothèses."
         },
         {
           "id": "f0s4",
           "title": "Recevoir les emails et SMS dans une boîte de test",
-          "state": "testing",
-          "env": null
+          "state": "done",
+          "env": null,
+          "unsure": "Aucun vrai prestataire d'emails ou de SMS n'est branché."
         }
       ],
       "decisions": [
@@ -56,10 +58,27 @@
         {
           "at": "2026-10-01T14:04:21Z",
           "what": "Tout se passe sur la branche de test ; pause et démo à la fin de chaque lot avant d'envoyer le code."
+        },
+        {
+          "at": "2026-10-01T14:31:50Z",
+          "what": "Fondations validées : envoi sur la branche de test approuvé."
         }
       ],
-      "unsure": [],
+      "unsure": [
+        "Vérifié sur un téléphone simulé dans le navigateur, pas encore sur un vrai téléphone.",
+        "Les contrôles automatiques en ligne (GitHub) n'ont pas encore tourné : ils démarreront à l'envoi."
+      ],
       "activity": [
+        {
+          "at": "2026-10-01T14:31:50Z",
+          "kind": "ok",
+          "what": "Code des fondations envoyé sur la branche de test (pas encore en production)"
+        },
+        {
+          "at": "2026-10-01T14:25:59Z",
+          "kind": "ok",
+          "what": "Fondations vérifiées : tests, compilation et démo dans le navigateur"
+        },
         {
           "at": "2026-10-01T14:18:48Z",
           "kind": "work",
@@ -75,9 +94,7 @@
           "kind": "work",
           "what": "Lecture des user stories, de la conception BDD et des 37 maquettes"
         }
-      ],
-      "building": true,
-      "currentAction": "Écriture et lancement des tests automatiques…"
+      ]
     },
     {
       "id": "f1",
