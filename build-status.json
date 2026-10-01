@@ -3,7 +3,7 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-10-01T23:00:19Z",
+  "updated": "2026-10-01T23:01:32Z",
   "deploys": [],
   "features": [
     {
@@ -400,12 +400,21 @@
         {
           "at": "2026-10-01T23:00:19Z",
           "what": "Un lien d'invitation déjà utilisé affiche « Votre accès est déjà activé » ; un lien expiré ou remplacé nomme l'utilisateur principal."
+        },
+        {
+          "at": "2026-10-01T23:01:32Z",
+          "what": "Compte et invités validés : envoi sur la branche de test approuvé."
         }
       ],
       "unsure": [
         "Les écrans n'ont été essayés que dans un téléphone simulé, pas sur un vrai téléphone."
       ],
       "activity": [
+        {
+          "at": "2026-10-01T23:01:32Z",
+          "kind": "ok",
+          "what": "Code envoyé sur la branche de test (pas encore en production)"
+        },
         {
           "at": "2026-10-01T23:00:19Z",
           "kind": "ok",
@@ -421,11 +430,7 @@
           "kind": "work",
           "what": "Lecture des 9 user stories et des 5 maquettes du lot"
         }
-      ],
-      "needsYou": {
-        "title": "Prêt à être envoyé sur la branche de test",
-        "text": "Les 9 user stories du compte et des invités sont construites et vérifiées (101 tests). Rien n'est envoyé sur GitHub avant ton accord."
-      }
+      ]
     },
     {
       "id": "f4",
@@ -477,7 +482,9 @@
       ],
       "decisions": [],
       "unsure": [],
-      "activity": []
+      "activity": [],
+      "building": true,
+      "currentAction": "Lecture des user stories et maquettes du catalogue…"
     },
     {
       "id": "f5",
