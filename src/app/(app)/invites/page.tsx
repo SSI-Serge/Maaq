@@ -245,7 +245,9 @@ function GuestCard({ guest, canDesignate, onUpdated }: { guest: Guest; canDesign
             mutation.reset();
             setMode("view");
           }}
-        />
+        >
+          <ErrorLine error={mutation.error} onRetry={() => act(`/api/guests/${guest.id}`, "DELETE", `${guest.firstName} ${guest.lastName} a été supprimé`)} />
+        </ConfirmDialog>
       )}
       {mode === "designate" && (
         <ConfirmDialog
@@ -254,10 +256,14 @@ function GuestCard({ guest, canDesignate, onUpdated }: { guest: Guest; canDesign
           confirmLabel="Désigner"
           confirming={mutation.pending}
           onConfirm={() => act(`/api/guests/${guest.id}/core`, "POST", `${guest.firstName} ${guest.lastName} est désormais Invité 1`)}
-          onCancel={() => setMode("view")}
-        />
+          onCancel={() => {
+            mutation.reset();
+            setMode("view");
+          }}
+        >
+          <ErrorLine error={mutation.error} onRetry={() => act(`/api/guests/${guest.id}/core`, "POST", `${guest.firstName} ${guest.lastName} est désormais Invité 1`)} />
+        </ConfirmDialog>
       )}
-      {(mode === "delete" || mode === "designate") && <ErrorLine error={mutation.error} />}
     </Section>
   );
 }

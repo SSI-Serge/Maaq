@@ -104,10 +104,12 @@ export interface ConfirmDialogProps {
   onConfirm: () => void;
   onCancel: () => void;
   confirming?: boolean;
+  /** Contenu complémentaire, par exemple un message d'erreur, affiché dans la fenêtre. */
+  children?: ReactNode;
 }
 
 /** Fenêtre de confirmation (US-9 RF2, RF3). */
-export function ConfirmDialog({ title, text, confirmLabel, onConfirm, onCancel, confirming }: ConfirmDialogProps) {
+export function ConfirmDialog({ title, text, confirmLabel, onConfirm, onCancel, confirming, children }: ConfirmDialogProps) {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => event.key === "Escape" && !confirming && onCancel();
     window.addEventListener("keydown", onKey);
@@ -121,6 +123,7 @@ export function ConfirmDialog({ title, text, confirmLabel, onConfirm, onCancel, 
           {title}
         </h2>
         {text && <p className={styles.dialogText}>{text}</p>}
+        {children}
         <div className={styles.dialogActions}>
           <Button block loading={confirming} onClick={onConfirm}>
             {confirmLabel}

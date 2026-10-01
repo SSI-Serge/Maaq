@@ -75,6 +75,8 @@ function AgentInformation() {
 
 function InfoForm({ path, form }: { path: string; form: AgentInfoForm }) {
   const router = useRouter();
+  // Page de retour demandée (ex. le dashboard après l'ajout d'un agent) ; seuls les chemins internes sont acceptés.
+  const requested = useSearchParams().get("retour");
   const mutation = useApiMutation();
   // Valeurs de départ : celles enregistrées, sinon celles reprises d'un autre agent (à confirmer).
   const [values, setValues] = useState<Record<string, string[]>>(() =>
@@ -108,7 +110,7 @@ function InfoForm({ path, form }: { path: string; form: AgentInfoForm }) {
     if (result) setDone(true);
   }
 
-  const back = "/reglages";
+  const back = requested && /^\/(?!\/)/.test(requested) ? requested : "/reglages";
 
   if (done) {
     return (

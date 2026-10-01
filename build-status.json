@@ -3,7 +3,7 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-10-01T23:01:32Z",
+  "updated": "2026-10-01T23:18:00Z",
   "deploys": [],
   "features": [
     {
@@ -440,51 +440,95 @@
         {
           "id": "f4s1",
           "title": "US-23 · Parcourir le catalogue d'agents par rubrique",
-          "state": "planning",
+          "state": "done",
           "env": null
         },
         {
           "id": "f4s2",
           "title": "US-24 · Consulter la fiche descriptive d'un agent",
-          "state": "planning",
-          "env": null
+          "state": "done",
+          "env": null,
+          "unsure": "Le bandeau de maintenance et le retour au catalogue sont vérifiés par les tests ; pas relu avec un vrai catalogue de 50 agents."
         },
         {
           "id": "f4s3",
           "title": "US-25 · Rechercher un agent par mot-clé",
-          "state": "planning",
+          "state": "done",
           "env": null
         },
         {
           "id": "f4s4",
           "title": "US-26 · Ajouter un agent à mon dashboard",
-          "state": "planning",
-          "env": null
+          "state": "done",
+          "env": null,
+          "unsure": "Le lien « Configurer maintenant » vers les connecteurs arrive avec le lot 5 ; en attendant la carte indique « À configurer »."
         },
         {
           "id": "f4s5",
           "title": "US-27 · Être informé de la limite de 10 agents par rubrique",
-          "state": "planning",
+          "state": "done",
           "env": null
         },
         {
           "id": "f4s6",
           "title": "US-28 · Retirer un agent de mon dashboard",
-          "state": "planning",
+          "state": "done",
           "env": null
         },
         {
           "id": "f4s7",
           "title": "US-22 · Consulter mon dashboard par onglet (Pro / Perso)",
-          "state": "planning",
-          "env": null
+          "state": "done",
+          "env": null,
+          "unsure": "Le lien « Ouvrir le tchat » des cartes arrive avec le tchat (lot 6). Le temps de chargement sous 2 secondes n'est pas mesuré."
         }
       ],
-      "decisions": [],
-      "unsure": [],
-      "activity": [],
-      "building": true,
-      "currentAction": "Lecture des user stories et maquettes du catalogue…"
+      "decisions": [
+        {
+          "at": "2026-10-01T23:02:35Z",
+          "what": "La recherche s'applique côté serveur sur tout le catalogue visible, sans tenir compte des accents ni des majuscules."
+        },
+        {
+          "at": "2026-10-01T23:02:35Z",
+          "what": "Le bouton « Ajouter » reste actif à 10 agents : c'est l'appui qui affiche le message de limite et le lien « Gérer mes agents »."
+        },
+        {
+          "at": "2026-10-01T23:02:35Z",
+          "what": "À l'ajout d'un agent qui demande des informations, le formulaire d'informations s'ouvre aussitôt."
+        },
+        {
+          "at": "2026-10-01T23:02:35Z",
+          "what": "« Ouvrir le tchat » et « Configurer maintenant » seront branchés avec le tchat (lot 6) et les connecteurs (lot 5) : pas de faux écran en attendant."
+        },
+        {
+          "at": "2026-10-01T23:18:00Z",
+          "what": "Un message d'erreur de retrait ou de suppression s'affiche dans la fenêtre de confirmation, pas derrière elle."
+        }
+      ],
+      "unsure": [
+        "Vérifié dans un téléphone simulé, avec 4 agents de démonstration seulement."
+      ],
+      "activity": [
+        {
+          "at": "2026-10-01T23:18:00Z",
+          "kind": "ok",
+          "what": "115 tests automatiques au vert, compilation de production réussie"
+        },
+        {
+          "at": "2026-10-01T23:18:00Z",
+          "kind": "ok",
+          "what": "Dashboard, catalogue, recherche, ajout, limite et retrait vérifiés dans le navigateur"
+        },
+        {
+          "at": "2026-10-01T23:02:35Z",
+          "kind": "work",
+          "what": "Lecture des 7 user stories et des 3 maquettes du lot"
+        }
+      ],
+      "needsYou": {
+        "title": "Prêt à être envoyé sur la branche de test",
+        "text": "Les 7 user stories du catalogue et du dashboard sont construites et vérifiées (115 tests). Rien n'est envoyé sur GitHub avant ton accord."
+      }
     },
     {
       "id": "f5",
@@ -789,6 +833,16 @@
       "name": "Message « Terminez votre configuration » à l'ouverture d'un tchat",
       "tag": "Proposed, not built",
       "note": "Dépend du tchat (lot 6). Rien n'est perdu."
+    },
+    {
+      "name": "Bouton « Ouvrir le tchat » sur les cartes d'agents",
+      "tag": "Proposed, not built",
+      "note": "Dépend du tchat (lot 6). Rien n'est perdu."
+    },
+    {
+      "name": "Lien « Configurer maintenant » après l'ajout d'un agent",
+      "tag": "Proposed, not built",
+      "note": "Dépend de l'écran Connecteurs (lot 5). Rien n'est perdu."
     }
   ]
 }

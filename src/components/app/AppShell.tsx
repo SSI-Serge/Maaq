@@ -43,7 +43,19 @@ const TABS: Tab[] = [
 ];
 
 /** Écran de l'application mobile : en-tête, contenu défilant et onglets en bas. */
-export function AppShell({ title, subtitle, back, children }: { title: string; subtitle?: ReactNode; back?: { href: string; label: string }; children: ReactNode }) {
+export function AppShell({
+  title,
+  subtitle,
+  back,
+  action,
+  children,
+}: {
+  title: string;
+  subtitle?: ReactNode;
+  back?: { href: string; label: string };
+  action?: ReactNode;
+  children: ReactNode;
+}) {
   const pathname = usePathname();
   const user = useSessionUser();
   const tabs = TABS.filter((tab) => !tab.primaryOnly || user.role === "primary_user");
@@ -56,7 +68,10 @@ export function AppShell({ title, subtitle, back, children }: { title: string; s
             ‹ {back.label}
           </Link>
         )}
-        <h1 className={styles.title}>{title}</h1>
+        <div className={styles.headerRow}>
+          <h1 className={styles.title}>{title}</h1>
+          {action}
+        </div>
         {subtitle && <p className={styles.subtitle}>{subtitle}</p>}
       </header>
       <div className={styles.content}>{children}</div>

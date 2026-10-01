@@ -35,3 +35,10 @@ Les emails et SMS envoyés par l'application arrivent dans la boîte de test : h
 - Astuce : activer l'invité sur http://127.0.0.1:3000 pendant que Camille reste sur http://localhost:3000.
 - Le dashboard d'agents arrive au lot 4 : pour essayer « Informations par agent », ajouter l'agent à un profil directement en base (table `profile_agents`).
 - Pour repartir de zéro : `npm run db:reset`.
+
+## Catalogue et dashboard
+
+- Quatre agents de démonstration : Admin_Classify (Pro, bloqué pour maintenance), Admin_Courriers et Admin_Impots (Pro), Admin_lib (Perso).
+- Depuis le dashboard, « Catalogue » ouvre le catalogue ; la recherche ignore accents et majuscules.
+- Un agent qui demande des informations ouvre le formulaire dès l'ajout ; fermé sans enregistrer, l'agent reste « À configurer ».
+- Pour essayer la limite par rubrique : modifier « Agents maximum par rubrique » dans la console (Paramètres).
