@@ -3,7 +3,7 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-10-02T05:48:50Z",
+  "updated": "2026-10-02T05:50:46Z",
   "deploys": [],
   "features": [
     {
@@ -751,6 +751,10 @@
         {
           "at": "2026-10-02T05:48:50Z",
           "what": "Mots-clés de démonstration du simulateur : « échec » fait échouer une action, « silence » empêche toute réponse (voir docs/comptes-de-test.md)."
+        },
+        {
+          "at": "2026-10-02T05:50:46Z",
+          "what": "Tchat validé : envoi sur la branche de test approuvé."
         }
       ],
       "unsure": [
@@ -758,6 +762,11 @@
         "Le tchat n'a été cliqué que du côté utilisateur principal ; le côté invité est couvert par les tests automatiques."
       ],
       "activity": [
+        {
+          "at": "2026-10-02T05:50:46Z",
+          "kind": "ok",
+          "what": "Code envoyé sur la branche de test (pas encore en production)"
+        },
         {
           "at": "2026-10-02T05:48:50Z",
           "kind": "ok",
@@ -779,11 +788,7 @@
           "what": "Lecture des 10 user stories et de la maquette du tchat ; lot 5 envoyé sur la branche de test"
         }
       ],
-      "building": false,
-      "needsYou": {
-        "title": "Prêt à être envoyé sur la branche de test",
-        "text": "Les 10 user stories du tchat sont construites et vérifiées (171 tests, essai dans le navigateur). Rien n'est envoyé sur GitHub avant ton accord."
-      }
+      "building": false
     },
     {
       "id": "f7",
@@ -835,7 +840,9 @@
       ],
       "decisions": [],
       "unsure": [],
-      "activity": []
+      "activity": [],
+      "building": true,
+      "currentAction": "Lecture des user stories et maquettes des contrats…"
     },
     {
       "id": "f8",
