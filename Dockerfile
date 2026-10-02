@@ -7,7 +7,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
-# Variables factices : le build ne se connecte à rien, l'application lit les vraies au démarrage.
+# Le build ne se connecte à rien (vérifié sans fichier .env) : l'application lit sa configuration au démarrage.
 RUN npm run build
 
 # --- Étape 2 : image finale, légère ---
