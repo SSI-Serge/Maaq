@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Sortie autonome : une image Docker légère (déploiement sur Cloud Run).
+  output: "standalone",
   // Les paquets natifs restent côté serveur, hors du bundle.
   serverExternalPackages: ["@node-rs/argon2", "pg", "embedded-postgres"],
   poweredByHeader: false,

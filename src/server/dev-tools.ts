@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 
-/** Outils réservés au développement local : boîte de test, Digitorn simulé, charte. */
+/**
+ * Outils de développement : boîte de test, Digitorn simulé, charte. Ils existent en développement local et dans
+ * une zone de test en ligne (MAAQ_ZONE=test), où `src/proxy.ts` les réserve à qui détient la clé
+ * MAAQ_DEV_TOOLS_KEY. Jamais en production.
+ */
 export function isDevToolsEnabled(): boolean {
-  return process.env.NODE_ENV !== "production";
+  return process.env.NODE_ENV !== "production" || process.env.MAAQ_ZONE === "test";
 }
 
 /** Réponse 404 si une route de développement est appelée en production. */

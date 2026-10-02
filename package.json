@@ -20,6 +20,7 @@
     "db:migrate": "tsx scripts/db-migrate.ts",
     "db:seed": "tsx scripts/db-seed.ts",
     "db:reset": "tsx scripts/db-reset.ts",
+    "deploy:secrets": "tsx scripts/gen-secrets.ts",
     "check:release": "tsx scripts/check-release.ts",
     "db:types": "kysely-codegen --dialect postgres --out-file src/server/db/schema.generated.ts"
   },

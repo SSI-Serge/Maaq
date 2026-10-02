@@ -6,7 +6,8 @@ import { hashSecret } from "../../src/server/security/password";
  * Chaque partie (profils, catalogue, contrats) n'est créée que si elle n'existe pas encore :
  * une base déjà remplie reçoit seulement ce qui a été ajouté depuis.
  */
-export const DEMO_PASSWORD = "Demo-maaq-2026";
+// Modifiable (variable DEMO_PASSWORD) pour une zone de test en ligne : le mot de passe public de la documentation n'y a pas sa place.
+export const DEMO_PASSWORD = process.env.DEMO_PASSWORD || "Demo-maaq-2026";
 
 export async function seedDemo(pool: Pool): Promise<boolean> {
   const client = await pool.connect();
