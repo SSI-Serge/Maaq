@@ -3,7 +3,7 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-10-02T07:18:17Z",
+  "updated": "2026-10-02T07:23:52Z",
   "deploys": [],
   "features": [
     {
@@ -1090,6 +1090,10 @@
         {
           "at": "2026-10-02T07:18:17Z",
           "what": "Un script de contrôle (`npm run check:release`) bloque la mise en production tant que les textes juridiques, le nom du partenaire et les boîtes du support et des alertes sont provisoires."
+        },
+        {
+          "at": "2026-10-02T07:23:52Z",
+          "what": "Conformité validée : envoi sur la branche de test approuvé. Les 9 lots sont construits."
         }
       ],
       "unsure": [
@@ -1097,6 +1101,11 @@
         "Côté invité, les écrans d'acceptation, d'export et de suppression n'ont été cliqués que du côté utilisateur principal."
       ],
       "activity": [
+        {
+          "at": "2026-10-02T07:23:52Z",
+          "kind": "ok",
+          "what": "Code envoyé sur la branche de test (pas encore en production)"
+        },
         {
           "at": "2026-10-02T07:18:17Z",
           "kind": "ok",
@@ -1113,11 +1122,7 @@
           "what": "Contrôle avant mise en production ajouté : il liste ce qui manque (textes définitifs, partenaire, boîtes support et alertes)"
         }
       ],
-      "building": false,
-      "needsYou": {
-        "title": "Dernier lot prêt à être envoyé sur la branche de test",
-        "text": "Les 7 user stories de conformité sont construites et vérifiées (277 tests, essai dans le navigateur). C'est le dernier lot : après ton accord et l'envoi, les 70 user stories sont construites sur la branche de test. Rien n'est envoyé sur GitHub avant ton accord."
-      }
+      "building": false
     }
   ],
   "parkingLot": [
