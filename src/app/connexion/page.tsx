@@ -113,6 +113,12 @@ function Login() {
         />
       )}
       {tab === "pattern" && patternLocked && <PatternLockedNotice onUsePassword={() => setTab("password")} />}
+
+      <p style={{ textAlign: "center", marginTop: 22 }}>
+        <Link href="/confidentialite?retour=/connexion" className={styles.link}>
+          Confidentialité et conditions d&apos;utilisation
+        </Link>
+      </p>
     </AuthScreen>
   );
 }

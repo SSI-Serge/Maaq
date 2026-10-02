@@ -336,7 +336,7 @@ describe("US-40, US-50 — carnet de bord", () => {
 describe("traitements périodiques", () => {
   it("US-40 RT2 : la synchronisation n'a lieu que lorsque l'échéance est passée", async () => {
     await db.insertInto("logbook_sync_runs").values({ started_at: new Date(), status: "succeeded", finished_at: new Date() }).execute();
-    expect(await runDueJobs(at())).toEqual({ logbook: "not_due", purged: null });
+    expect(await runDueJobs(at())).toMatchObject({ logbook: "not_due", purged: null, lifecycle: expect.any(Object), exports: expect.any(Object) });
     const forced = await runDueJobs(at(), { force: true });
     expect(forced.logbook).toMatchObject({ status: "succeeded" });
     expect(forced.purged).not.toBeNull();

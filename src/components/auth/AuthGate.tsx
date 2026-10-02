@@ -27,6 +27,26 @@ export function useSessionReload(): () => Promise<void> {
   return value.reload;
 }
 
+const RETURN_KEY = "maaq:after-login";
+
+function rememberReturn(path: string): void {
+  try {
+    sessionStorage.setItem(RETURN_KEY, path);
+  } catch {
+    // stockage indisponible : on arrivera simplement sur l'accueil
+  }
+}
+
+function takeReturn(): string | null {
+  try {
+    const value = sessionStorage.getItem(RETURN_KEY);
+    sessionStorage.removeItem(RETURN_KEY);
+    return value && /^\/export\?id=[0-9a-f-]{36}$/.test(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
 const IDLE_MS = 5 * 60_000;
 const CHECK_EVERY_MS = 10_000;
 const HEARTBEAT_MS = 60_000;
@@ -65,8 +85,16 @@ export function AuthGate({ children }: { children: ReactNode }) {
   // Redirections selon l'état de la session.
   useEffect(() => {
     if (!state) return;
-    if (!state.authenticated) return router.replace(state.accessRemoved ? "/connexion?acces=retire" : "/connexion");
+    if (!state.authenticated) {
+      // Un lien reçu par email (téléchargement de l'export) : on y revient après la connexion (US-55 RF6).
+      if (pathname === "/export") rememberReturn(window.location.pathname + window.location.search);
+      return router.replace(state.accessRemoved ? "/connexion?acces=retire" : "/connexion");
+    }
     if (!state.unlocked) return;
+    if (state.home === "/accueil" && pathname === "/accueil") {
+      const back = takeReturn();
+      if (back) return router.replace(back);
+    }
     const target = forcedDestination(state, pathname);
     if (target && target !== pathname) router.replace(target);
   }, [state, pathname, router]);
@@ -131,7 +159,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
 /** Écran imposé avant tout le reste, ou espace réservé au rôle (administration / application). */
 function forcedDestination(state: SignedIn, pathname: string): string | null {
   const home = state.home;
-  if (home === "/schema/creer" || home === "/reprise-compte") return pathname === home ? null : home;
+  if (home === "/schema/creer" || home === "/reprise-compte" || home === "/conditions") return pathname === home ? null : home;
   if (pathname === "/reglages") return null; // accessible à tous, pour pouvoir se déconnecter
   if (home === "/configuration") return pathname === home ? null : home;
   if (pathname === "/reprise-compte") return home;

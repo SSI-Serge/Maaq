@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { maskEmail } from "@/server/auth/format";
+import { pendingAcceptance } from "@/server/compliance/legal";
 import { accessRemoved, ctx, currentSession, isUnlocked, readPending } from "@/server/auth/http";
 import { homeFor } from "@/server/auth/service";
 import { handler } from "@/server/http";
@@ -17,6 +18,10 @@ export const GET = handler(async () => {
       accessRemoved: await accessRemoved(context),
     });
   }
+  // Textes à accepter avant tout accès, sauf quand un écran prioritaire s'impose déjà (US-54 RF4).
+  let home = homeFor(session);
+  const legalPending = (await pendingAcceptance(context.db, session.user.id, session.user.role, context.now)).length > 0;
+  if (legalPending && home !== "/schema/creer" && home !== "/reprise-compte") home = "/conditions";
   return NextResponse.json({
     authenticated: true,
     unlocked: await isUnlocked(session, context.now),
@@ -27,6 +32,6 @@ export const GET = handler(async () => {
       guestRank: session.user.guestRank,
     },
     device: { hasPattern: session.device.hasPattern, patternLocked: session.device.patternLocked },
-    home: homeFor(session),
+    home,
   });
 });

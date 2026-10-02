@@ -21,6 +21,7 @@ export default defineConfig({
       HMAC_KEY: randomBytes(32).toString("base64"),
       AUTH_SECRET: randomBytes(32).toString("base64"),
       CRON_SECRET: randomBytes(24).toString("hex"),
+      BILLING_WEBHOOK_SECRET: randomBytes(24).toString("hex"),
       MAAQ_DATA_DIR: path.join(os.tmpdir(), `maaq-test-data-${process.pid}`),
     },
     hookTimeout: 120_000,

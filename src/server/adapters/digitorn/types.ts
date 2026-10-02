@@ -96,6 +96,12 @@ export interface ClassifyDocumentInput {
   content: Buffer;
 }
 
+export interface DigitornUserData {
+  conversations: Record<string, ChatEvent[]>;
+  configurations: Record<string, AgentConfiguration>;
+  profileInfo: Record<string, Record<string, string | string[]>>;
+}
+
 export interface DigitornClient {
   listHostedAgents(): Promise<HostedAgent[]>;
   /**
@@ -119,5 +125,10 @@ export interface DigitornClient {
   classifyDocument(input: ClassifyDocumentInput): Promise<{ driveFileRef: string; alreadyClassified: boolean }>;
   fetchLogbook(since: Date): Promise<LogbookItem[]>;
   eraseConversation(userRef: string, agentRef: string): Promise<void>;
+  /** Supprime tout ce que Digitorn détient d'un profil : historique, configuration, carnet (US-56 RT1, US-58 RT1). */
   deleteProfile(userRef: string): Promise<void>;
+  /** Données d'un profil détenues par Digitorn, intégrées à son export (US-55 RT1). */
+  exportUserData(userRef: string): Promise<DigitornUserData>;
+  /** Retire les données personnelles d'un invité supprimé des entrées de carnet détenues par Digitorn (US-57 RT1). */
+  anonymizeLogbook(userRef: string): Promise<void>;
 }

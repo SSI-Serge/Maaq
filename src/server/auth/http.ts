@@ -4,6 +4,7 @@ import { Rejection } from "@/server/http";
 import { safeTimezone } from "./format";
 import { IDLE_LOCK_MINUTES, PENDING_FLOW_MINUTES } from "./rules";
 import { closedSessionReason, getSession, type Ctx, type PendingVerification, type SessionContext } from "./service";
+import { pendingAcceptance } from "@/server/compliance/legal";
 import { signToken, verifyToken } from "./tokens";
 
 /**
@@ -94,7 +95,7 @@ export async function isUnlocked(session: SessionContext, now: Date): Promise<bo
  * (5 minutes glissantes) sauf pour une lecture automatique en arrière-plan (`passive`), qui ne
  * compte pas comme une activité de la personne (US-52). Refus 401 sans session, 423 si verrouillée.
  */
-export async function requireProfile(options: { allowGrace?: boolean; passive?: boolean } = {}): Promise<{ session: SessionContext; ctx: Ctx }> {
+export async function requireProfile(options: { allowGrace?: boolean; passive?: boolean; allowLegalPending?: boolean } = {}): Promise<{ session: SessionContext; ctx: Ctx }> {
   const context = ctx();
   const session = await currentSession(context);
   if (!session) {
@@ -104,6 +105,10 @@ export async function requireProfile(options: { allowGrace?: boolean; passive?: 
   if (!(await isUnlocked(session, context.now))) throw new Rejection("locked", "MAAQ est verrouillé.", 423);
   if (session.user.inGracePeriod && !options.allowGrace) {
     throw new Rejection("grace_period", "Votre compte est en cours de suppression.", 403);
+  }
+  // Une nouvelle version des textes doit être acceptée avant tout accès (US-54 RF4).
+  if (!options.allowLegalPending && !session.user.inGracePeriod && (await pendingAcceptance(context.db, session.user.id, session.user.role, context.now)).length > 0) {
+    throw new Rejection("legal_required", "Veuillez accepter les conditions d'utilisation et la politique de confidentialité pour continuer.", 403);
   }
   if (!options.passive) await markUnlocked(session.sessionId, context.now);
   return { session, ctx: context };

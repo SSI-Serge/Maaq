@@ -10,6 +10,7 @@ import type {
   ClassifyDocumentInput,
   DecideActionInput,
   DigitornClient,
+  DigitornUserData,
   HostedAgent,
   LogbookItem,
   SubmitRequestInput,
@@ -205,7 +206,41 @@ export class MockDigitorn implements DigitornClient {
     this.conversations.delete(k);
   }
 
+  /** Profils entièrement supprimés chez Digitorn, et entrées de carnet anonymisées (contrôle dans les tests). */
+  readonly deletedProfiles: string[] = [];
+  readonly anonymizedProfiles: string[] = [];
+
+  async exportUserData(userRef: string): Promise<DigitornUserData> {
+    const conversations: DigitornUserData["conversations"] = {};
+    for (const [k, events] of this.conversations) {
+      if (k.startsWith(`${userRef}|`)) conversations[k.slice(userRef.length + 1)] = structuredClone(events);
+    }
+    const configurations: DigitornUserData["configurations"] = {};
+    for (const [k, config] of this.agentConfigurations) {
+      if (k.startsWith(`${userRef}|`)) configurations[k.slice(userRef.length + 1)] = structuredClone(config);
+    }
+    const profileInfo: DigitornUserData["profileInfo"] = {};
+    for (const [k, info] of this.profileInfo) {
+      if (k.startsWith(`${userRef}|`)) profileInfo[k.slice(userRef.length + 1)] = structuredClone(info);
+    }
+    return { conversations, configurations, profileInfo };
+  }
+
+  async anonymizeLogbook(userRef: string): Promise<void> {
+    this.anonymizedProfiles.push(userRef);
+    for (const item of this.logbook) {
+      if (item.userRef === userRef) item.text = "(données personnelles retirées)";
+    }
+  }
+
   async deleteProfile(userRef: string): Promise<void> {
+    this.deletedProfiles.push(userRef);
+    for (const k of [...this.agentConfigurations.keys()]) {
+      if (k.startsWith(`${userRef}|`)) this.agentConfigurations.delete(k);
+    }
+    for (const k of [...this.profileInfo.keys()]) {
+      if (k.startsWith(`${userRef}|`)) this.profileInfo.delete(k);
+    }
     for (const k of [...this.conversations.keys()]) {
       if (k.startsWith(`${userRef}|`)) this.conversations.delete(k);
     }

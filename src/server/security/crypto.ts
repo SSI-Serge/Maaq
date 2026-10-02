@@ -22,6 +22,21 @@ export function decrypt(payload: Buffer, key: Buffer): string {
   return Buffer.concat([decipher.update(payload.subarray(29)), decipher.final()]).toString("utf8");
 }
 
+/** Même chiffrement pour un fichier (export de données, US-55 RT2). */
+export function encryptBytes(plain: Buffer, key: Buffer): Buffer {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", key, iv);
+  const data = Buffer.concat([cipher.update(plain), cipher.final()]);
+  return Buffer.concat([Buffer.from([FORMAT_VERSION]), iv, cipher.getAuthTag(), data]);
+}
+
+export function decryptBytes(payload: Buffer, key: Buffer): Buffer {
+  if (payload[0] !== FORMAT_VERSION) throw new Error("Format de chiffrement inconnu");
+  const decipher = createDecipheriv("aes-256-gcm", key, payload.subarray(1, 13));
+  decipher.setAuthTag(payload.subarray(13, 29));
+  return Buffer.concat([decipher.update(payload.subarray(29)), decipher.final()]);
+}
+
 /** Jeton aléatoire envoyé à l'utilisateur (lien d'activation, cookie de session). */
 export function randomToken(): string {
   return randomBytes(32).toString("base64url");

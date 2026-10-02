@@ -3,7 +3,7 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-10-02T06:51:36Z",
+  "updated": "2026-10-02T07:18:17Z",
   "deploys": [],
   "features": [
     {
@@ -1015,63 +1015,116 @@
         {
           "id": "f9s1",
           "title": "US-54 · Consulter la politique de confidentialité et les conditions d'utilisation",
-          "state": "planning",
-          "env": null
+          "state": "done",
+          "env": null,
+          "unsure": "Les textes actuels sont des textes de démonstration : les textes définitifs sont à fournir. Il n'y a pas d'écran de console pour publier une nouvelle version : elle s'ajoute en base (le contrôle avant mise en production, `npm run check:release`, bloque tant que les textes sont provisoires)."
         },
         {
           "id": "f9s2",
           "title": "US-55 · Exporter mes données",
-          "state": "planning",
-          "env": null
+          "state": "done",
+          "env": null,
+          "unsure": "L'email de l'export contient un lien vers une page de l'application (connexion demandée, puis retour à cette page). Les documents de contrats sont inclus dans l'archive ; le détail des données de Digitorn dépend de leur API, simulée ici."
         },
         {
           "id": "f9s3",
           "title": "US-56 · Supprimer mes données et mon compte",
-          "state": "planning",
-          "env": null
+          "state": "done",
+          "env": null,
+          "unsure": "Le mot de passe est contrôlé avec la même protection que la connexion (blocage après 5 échecs). La suppression chez Digitorn est simulée."
         },
         {
           "id": "f9s4",
           "title": "US-57 · Anonymiser les demandes d'un invité supprimé dans le carnet partagé",
-          "state": "planning",
-          "env": null
+          "state": "done",
+          "env": null,
+          "unsure": "Les noms et numéros sont retirés du texte des entrées de l'invité, par recherche de son nom, de son email, de son téléphone et de tout numéro ou adresse qui y ressemble. Un nom cité dans la demande d'une autre personne n'est pas touché."
         },
         {
           "id": "f9s5",
           "title": "US-58 · Supprimer automatiquement un compte après désabonnement",
-          "state": "planning",
-          "env": null
+          "state": "done",
+          "env": null,
+          "unsure": "Les sauvegardes sont purgées au bout de 2 ans en dehors de l'application : cela relève de l'hébergement, à mettre en place au déploiement et à citer dans la politique de confidentialité (point DPO de la spec). L'outil de facturation réel n'est pas branché : le point d'entrée existe (désabonnement, réabonnement) et attend leur format."
         },
         {
           "id": "f9s6",
           "title": "US-68 · Supprimer automatiquement les comptes et invités jamais activés",
-          "state": "planning",
-          "env": null
+          "state": "done",
+          "env": null,
+          "unsure": "Après la suppression, un ancien lien d'activation affiche un message de lien expiré générique (le nom de la personne qui a invité n'est plus connu)."
         },
         {
           "id": "f9s7",
           "title": "US-59 · Reprendre mon compte pendant le délai de grâce",
-          "state": "planning",
-          "env": null
+          "state": "done",
+          "env": null,
+          "unsure": "Côté invité, l'écran de reprise a été vérifié par les tests automatiques mais pas cliqué dans le navigateur."
         }
       ],
-      "decisions": [],
-      "unsure": [],
-      "activity": [],
-      "building": true,
-      "currentAction": "Lecture des user stories de conformité (confidentialité, export, suppression, désabonnement)…"
+      "decisions": [
+        {
+          "at": "2026-10-02T07:18:17Z",
+          "what": "Une nouvelle version des textes légaux est demandée à la connexion suivante, avant tout accès : le serveur refuse toute autre action tant qu'elle n'est pas acceptée. L'administrateur n'a rien à accepter."
+        },
+        {
+          "at": "2026-10-02T07:18:17Z",
+          "what": "L'export est un fichier ZIP chiffré sur le serveur (document lisible, données structurées, documents de contrats), préparé en arrière-plan ; le lien arrive par email, valable 7 jours, et le téléchargement demande d'être connecté."
+        },
+        {
+          "at": "2026-10-02T07:18:17Z",
+          "what": "Un compte en délai de grâce coupe l'accès de tous ses profils ; seul l'utilisateur principal peut le reprendre. Après un désabonnement par la facturation, la reprise demande un nouvel abonnement, signalé par la facturation."
+        },
+        {
+          "at": "2026-10-02T07:18:17Z",
+          "what": "À la suppression définitive d'un invité, ses demandes du carnet sont masquées pendant leur anonymisation, nettoyées de ses données personnelles, puis réaffichées sous « Invité supprimé ». Si l'anonymisation échoue, elles restent masquées et l'opération est reprise."
+        },
+        {
+          "at": "2026-10-02T07:18:17Z",
+          "what": "Une suppression définitive laisse seulement une trace non nominative (date et identifiants techniques) ; la preuve des consentements aux contrats est gardée 5 ans après la fin de l'abonnement."
+        },
+        {
+          "at": "2026-10-02T07:18:17Z",
+          "what": "Les suppressions arrivées à échéance, les rappels et les comptes jamais activés sont traités à chaque passage du planificateur (toutes les 5 minutes) ; un échec chez Digitorn alerte l'administrateur et est réessayé chaque jour."
+        },
+        {
+          "at": "2026-10-02T07:18:17Z",
+          "what": "Un script de contrôle (`npm run check:release`) bloque la mise en production tant que les textes juridiques, le nom du partenaire et les boîtes du support et des alertes sont provisoires."
+        }
+      ],
+      "unsure": [
+        "Les purges définitives n'ont été vérifiées que par les tests automatiques et sur des données de démonstration : à surveiller de près à la première mise en ligne.",
+        "Côté invité, les écrans d'acceptation, d'export et de suppression n'ont été cliqués que du côté utilisateur principal."
+      ],
+      "activity": [
+        {
+          "at": "2026-10-02T07:18:17Z",
+          "kind": "ok",
+          "what": "277 tests automatiques au vert (35 nouveaux pour la conformité), compilation de production réussie"
+        },
+        {
+          "at": "2026-10-02T07:18:17Z",
+          "kind": "ok",
+          "what": "Vérifié dans le navigateur : textes légaux (public et à l'acceptation), blocage tant que non acceptés, export de bout en bout (email, téléchargement), mot de passe erroné puis suppression, écran de reprise et annulation avec email aux invités"
+        },
+        {
+          "at": "2026-10-02T07:18:17Z",
+          "kind": "ok",
+          "what": "Contrôle avant mise en production ajouté : il liste ce qui manque (textes définitifs, partenaire, boîtes support et alertes)"
+        }
+      ],
+      "building": false,
+      "needsYou": {
+        "title": "Dernier lot prêt à être envoyé sur la branche de test",
+        "text": "Les 7 user stories de conformité sont construites et vérifiées (277 tests, essai dans le navigateur). C'est le dernier lot : après ton accord et l'envoi, les 70 user stories sont construites sur la branche de test. Rien n'est envoyé sur GitHub avant ton accord."
+      }
     }
   ],
   "parkingLot": [
     {
       "name": "Mise en ligne de l'application",
       "tag": "Proposed, not built",
-      "note": "On en reparle après les premiers lots ; rien n'est perdu."
-    },
-    {
-      "name": "« Annuler la suppression » sur l'écran de reprise de compte",
-      "tag": "Proposed, not built",
-      "note": "L'écran affiche déjà la date de suppression ; le bouton arrive avec US-59 au lot 9. Rien n'est perdu."
+      "note": "Tous les lots sont construits sur la branche de test. Avant la production : textes juridiques et nom du partenaire définitifs, boîtes support et alertes réelles, vraie API Digitorn, Google Drive et Google Agenda réels, antivirus, service d'envoi d'emails et de SMS, outil de facturation. `npm run check:release` liste ce qui manque."
     },
     {
       "name": "Widget Digitorn pour connecter le Drive du compte",
@@ -1107,6 +1160,21 @@
       "name": "Bouton de dictée dans la zone de saisie du tchat",
       "tag": "Proposed, not built",
       "note": "Présent sur la maquette du tchat mais décrit par aucune user story du tchat ; la dictée existe pour le support (US-63). À trancher avec toi."
+    },
+    {
+      "name": "Publication des textes légaux depuis la console",
+      "tag": "Proposed, not built",
+      "note": "Aujourd'hui une nouvelle version s'ajoute en base. Un écran de la console n'est décrit par aucune user story."
+    },
+    {
+      "name": "Anonymisation des noms cités dans les demandes des autres profils",
+      "tag": "Proposed, not built",
+      "note": "Seules les entrées de l'invité supprimé sont nettoyées ; une demande d'un autre profil qui le cite par son nom ne l'est pas."
+    },
+    {
+      "name": "Purge des sauvegardes à 2 ans",
+      "tag": "Proposed, not built",
+      "note": "À mettre en place avec l'hébergement, et à mentionner dans la politique de confidentialité (point DPO de la spec)."
     }
   ]
 }

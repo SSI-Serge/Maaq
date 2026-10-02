@@ -7,7 +7,8 @@ import { handler, parseBody, Rejection } from "@/server/http";
 
 export const dynamic = "force-dynamic";
 
-const INVALID = "Ce lien d'activation n'est pas valable.";
+// Lien inconnu : aussi le cas d'un compte ou d'un invité jamais activé, supprimé depuis (US-68 RF5). On ne sait plus qui l'avait invité.
+const INVALID = "Ce lien a expiré. Demandez à la personne qui vous a invité de vous renvoyer une invitation, ou contactez MAAQ pour recevoir un nouveau lien.";
 
 /** Lien expiré, remplacé ou dont l'invité a été supprimé (US-4 RF6, RF8 ; US-64 RF6). */
 function expired(linkKind: string, host: string | null | undefined): Rejection {

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useApiMutation, useApiQuery } from "@/client/hooks";
 import { AgentInfoList } from "@/components/app/AgentInfoList";
+import { ExportSection } from "@/components/settings/ExportSection";
 import { AppShell, Section, appStyles as s } from "@/components/app/AppShell";
 import { useSessionReload, useSessionUser } from "@/components/auth/AuthGate";
 import { LogoutButton } from "@/components/auth/LogoutButton";
@@ -96,6 +97,19 @@ export default function SettingsPage() {
               </span>
             </span>
             <span aria-hidden>›</span>
+          </Link>
+          <Link href="/confidentialite?retour=/reglages" className={s.navItem}>
+            Confidentialité et conditions d&apos;utilisation <span aria-hidden>›</span>
+          </Link>
+        </div>
+      </Section>
+
+      <ExportSection />
+
+      <Section title={user.role === "primary_user" ? "Désabonnement et suppression du compte" : "Supprimer mon compte"}>
+        <div className={s.navList}>
+          <Link href="/reglages/suppression" className={s.navItem} style={{ color: "var(--error)" }}>
+            {user.role === "primary_user" ? "Désabonnement et suppression du compte" : "Supprimer mon compte et mes données"} <span aria-hidden>›</span>
           </Link>
         </div>
       </Section>

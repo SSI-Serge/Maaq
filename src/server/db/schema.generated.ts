@@ -157,6 +157,7 @@ export interface Accounts {
    */
   subscription_ended_at: Timestamp | null;
   updated_at: Generated<Timestamp>;
+  grace_reminder_sent_at: Timestamp | null;
 }
 
 export interface ActionDecisions {

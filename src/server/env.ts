@@ -17,6 +17,8 @@ const schema = z.object({
   MESSAGING_MODE: z.enum(["dev"]).default("dev"),
   DRIVE_MODE: z.enum(["local"]).default("local"),
   CRON_SECRET: z.string().min(16, "au moins 16 caractères"),
+  /** Secret de l'outil de facturation qui signale désabonnements et réabonnements (US-58 RT2). Sans lui, ce point d'entrée est fermé. */
+  BILLING_WEBHOOK_SECRET: z.string().min(16, "au moins 16 caractères").optional(),
 });
 
 export type Env = z.infer<typeof schema>;
