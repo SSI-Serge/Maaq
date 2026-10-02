@@ -3,7 +3,7 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-10-02T06:10:17Z",
+  "updated": "2026-10-02T06:12:12Z",
   "deploys": [],
   "features": [
     {
@@ -867,6 +867,10 @@
         {
           "at": "2026-10-02T06:10:17Z",
           "what": "Le consentement est inscrit au journal des preuves à chaque changement, avec la version du texte et une empreinte de l'email ; la suppression complète d'un contrat le remet à « désactivé » et l'inscrit aussi."
+        },
+        {
+          "at": "2026-10-02T06:12:12Z",
+          "what": "Contrats validé : envoi sur la branche de test approuvé."
         }
       ],
       "unsure": [
@@ -874,6 +878,11 @@
         "Le téléphone (appareil photo, envoi réel d'une photo) n'a pas été essayé : seul l'envoi d'un fichier depuis l'ordinateur l'a été."
       ],
       "activity": [
+        {
+          "at": "2026-10-02T06:12:12Z",
+          "kind": "ok",
+          "what": "Code envoyé sur la branche de test (pas encore en production)"
+        },
         {
           "at": "2026-10-02T06:10:17Z",
           "kind": "ok",
@@ -890,11 +899,7 @@
           "what": "Un bug trouvé par les tests et corrigé : un envoi bloqué 30 s restait « en cours » au lieu de proposer « Réessayer »"
         }
       ],
-      "building": false,
-      "needsYou": {
-        "title": "Prêt à être envoyé sur la branche de test",
-        "text": "Les 7 user stories des contrats sont construites et vérifiées (215 tests, essai dans le navigateur). Rien n'est envoyé sur GitHub avant ton accord."
-      }
+      "building": false
     },
     {
       "id": "f8",
@@ -940,7 +945,9 @@
       ],
       "decisions": [],
       "unsure": [],
-      "activity": []
+      "activity": [],
+      "building": true,
+      "currentAction": "Lecture des user stories et maquettes des réglages, du carnet et du support…"
     },
     {
       "id": "f9",
