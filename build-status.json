@@ -3,7 +3,7 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-10-02T06:36:20Z",
+  "updated": "2026-10-02T06:51:36Z",
   "deploys": [],
   "features": [
     {
@@ -973,6 +973,10 @@
         {
           "at": "2026-10-02T06:36:20Z",
           "what": "Le même nettoyage couvre désormais les tables techniques (clés d'idempotence, demandes du tchat, compteurs de demandes) en plus du carnet et des signalements."
+        },
+        {
+          "at": "2026-10-02T06:51:36Z",
+          "what": "Réglages, carnet et support validés : envoi sur la branche de test approuvé."
         }
       ],
       "unsure": [
@@ -980,6 +984,11 @@
         "Le carnet n'a pas été essayé avec beaucoup d'entrées dans le navigateur (pagination vérifiée par les tests)."
       ],
       "activity": [
+        {
+          "at": "2026-10-02T06:51:36Z",
+          "kind": "ok",
+          "what": "Code envoyé sur la branche de test (pas encore en production)"
+        },
         {
           "at": "2026-10-02T06:36:20Z",
           "kind": "ok",
@@ -996,11 +1005,7 @@
           "what": "Un défaut trouvé par les tests et corrigé : une entrée livrée en retard par Digitorn aurait pu être perdue à la synchronisation"
         }
       ],
-      "building": false,
-      "needsYou": {
-        "title": "Prêt à être envoyé sur la branche de test",
-        "text": "Les 6 user stories de ce lot (Réglages, carnet, appareils, support écrit et dicté) sont construites et vérifiées (242 tests, essai dans le navigateur). Rien n'est envoyé sur GitHub avant ton accord."
-      }
+      "building": false
     },
     {
       "id": "f9",
@@ -1052,7 +1057,9 @@
       ],
       "decisions": [],
       "unsure": [],
-      "activity": []
+      "activity": [],
+      "building": true,
+      "currentAction": "Lecture des user stories de conformité (confidentialité, export, suppression, désabonnement)…"
     }
   ],
   "parkingLot": [
