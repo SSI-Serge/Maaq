@@ -63,16 +63,40 @@ export default function SettingsPage() {
 
       {user.role === "primary_user" && <GuestsInformation />}
 
+      {/* Rubriques dans l'ordre retenu (US-49 RF2, RF3, RF5) ; le menu reste accessible même si les informations ne chargent pas (RF7). */}
       <Section title="Mon compte">
         <div className={s.navList}>
-          <Link href="/connecteurs" className={s.navItem}>
-            Connecteurs <span aria-hidden>›</span>
-          </Link>
           {user.role === "primary_user" && (
             <Link href="/invites" className={s.navItem}>
               Invités <span aria-hidden>›</span>
             </Link>
           )}
+          <Link href="/connecteurs" className={s.navItem}>
+            {user.role === "primary_user" ? "Connecteurs" : "Mes connecteurs"} <span aria-hidden>›</span>
+          </Link>
+          {user.role === "primary_user" && (
+            <Link href="/reglages/appareils" className={s.navItem}>
+              <span>
+                Appareils
+                <span className={s.muted} style={{ display: "block", fontWeight: 400, fontSize: 12 }}>
+                  Schéma tactile activé · verrouillage après 5 min
+                </span>
+              </span>
+              <span aria-hidden>›</span>
+            </Link>
+          )}
+          <Link href="/reglages/support" className={s.navItem}>
+            Aide et support <span aria-hidden>›</span>
+          </Link>
+          <Link href="/reglages/carnet" className={s.navItem}>
+            <span>
+              Carnet
+              <span className={s.muted} style={{ display: "block", fontWeight: 400, fontSize: 12 }}>
+                Historique des demandes, agent par agent
+              </span>
+            </span>
+            <span aria-hidden>›</span>
+          </Link>
         </div>
       </Section>
 

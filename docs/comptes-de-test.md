@@ -72,3 +72,13 @@ Les emails et SMS envoyés par l'application arrivent dans la boîte de test : h
 - « Agents des Contrats » : un agent de la rubrique « Agents des Contrats » doit d'abord être créé dans la console (Agents IA), puis ajouté depuis le catalogue.
 - Le texte de consentement contient « [nom du partenaire] » : le nom réel est à fournir (une nouvelle version du texte pourra être publiée).
 
+## Réglages, appareils, carnet de bord et support
+
+- Réglages : l'utilisateur principal voit Invités, Connecteurs, Appareils, Aide et support, Carnet ; l'invité voit « Mes connecteurs », Aide et support, Carnet. L'administrateur a Aide et support (`/admin/support`) dans ses Réglages.
+- Appareils (utilisateur principal) : « Révoquer » ferme les sessions de l'appareil, prévient la personne par email (boîte de test) et l'oblige à repasser par la vérification d'identité. Révoquer « Cet appareil » déconnecte et efface les tchats. L'administrateur voit aussi les appareils d'un compte sur la fiche du compte.
+- Carnet de bord : alimenté par la synchronisation avec Digitorn (simulé). Elle tourne toute seule toutes les X heures (5 par défaut, console > Paramètres) ; pour la lancer tout de suite après avoir fait des demandes dans le tchat :
+  `curl -X POST http://localhost:3000/api/dev/sync` (ou, depuis la console du navigateur, `fetch('/api/dev/sync', { method: 'POST' })`).
+- Les traitements périodiques (synchronisation, nettoyage du carnet, des signalements et des tables techniques) peuvent aussi être déclenchés par un planificateur externe : `POST /api/cron/run` avec l'en-tête `Authorization: Bearer <CRON_SECRET>` (valeur dans `.env`). `MAAQ_SCHEDULER=off` désactive le planificateur intégré.
+- Support : le message arrive dans la boîte de test à `support@maaq.test` (réglage « Boîte du support » de la console), avec prénom, email, rôle, appareil et version ; une copie part au profil. Les alertes (échec de synchronisation) vont à `alertes@maaq.test`.
+- Dictée : demande l'accès au micro de l'appareil. La transcription utilise la reconnaissance vocale du navigateur quand elle existe ; sans elle, le texte se saisit à la main. Le texte seul est envoyé, jamais le son.
+

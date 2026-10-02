@@ -12,7 +12,7 @@ export async function seedDemo(pool: Pool): Promise<boolean> {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    const created = [await seedProfiles(client), await seedCatalog(client), await seedContracts(client)].some(Boolean);
+    const created = [await seedProfiles(client), await seedCatalog(client), await seedContracts(client), await seedMailboxes(client)].some(Boolean);
     await client.query("COMMIT");
     return created;
   } catch (error) {
@@ -162,4 +162,13 @@ async function seedContracts(client: PoolClient): Promise<boolean> {
     }
   }
   return true;
+}
+
+/** Boîtes du support et des alertes, pour que les messages arrivent dans la boîte de test (/dev/boite). Sans écraser un réglage de l'administrateur. */
+async function seedMailboxes(client: PoolClient): Promise<boolean> {
+  const { rowCount } = await client.query(
+    `UPDATE platform_settings SET value_text = CASE setting_key WHEN 'support_email' THEN 'support@maaq.test' ELSE 'alertes@maaq.test' END
+      WHERE setting_key IN ('support_email', 'alert_email') AND value_text IS NULL`,
+  );
+  return (rowCount ?? 0) > 0;
 }

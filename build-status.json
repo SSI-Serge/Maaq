@@ -3,7 +3,7 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-10-02T06:12:12Z",
+  "updated": "2026-10-02T06:36:20Z",
   "deploys": [],
   "features": [
     {
@@ -909,45 +909,98 @@
         {
           "id": "f8s1",
           "title": "US-49 · Accéder aux Réglages",
-          "state": "planning",
-          "env": null
+          "state": "done",
+          "env": null,
+          "unsure": "Les rubriques Confidentialité, Exporter mes données et Désabonnement / suppression du compte n'y figurent pas encore : elles arrivent avec le lot 9."
         },
         {
           "id": "f8s2",
           "title": "US-50 · Accéder aux carnets de bord depuis les Réglages",
-          "state": "planning",
-          "env": null
+          "state": "done",
+          "env": null,
+          "unsure": "Le carnet affiche le prénom de la personne pour chaque entrée, y compris pour les actions ; la maquette montre parfois le nom de l'agent comme auteur."
         },
         {
           "id": "f8s3",
           "title": "US-40 · Consulter le carnet de bord d'un agent",
-          "state": "planning",
-          "env": null
+          "state": "done",
+          "env": null,
+          "unsure": "Le carnet est alimenté par un Digitorn simulé : l'API réelle (annoncée vers le 14/10/2026) peut différer. Chaque synchronisation relit aussi les dernières 24 h pour ne rien perdre si Digitorn livre en retard (hypothèse). Les nettoyages sont lancés avec la synchronisation, au moins une fois par jour."
         },
         {
           "id": "f8s4",
           "title": "US-53 · Révoquer l'accès d'un appareil",
-          "state": "planning",
-          "env": null
+          "state": "done",
+          "env": null,
+          "unsure": "Pas essayé avec un vrai second appareil : seuls des appareils de démonstration ont été révoqués. Côté administrateur, l'écran ajouté à la fiche du compte n'est pas maquetté."
         },
         {
           "id": "f8s5",
           "title": "US-62 · Contacter le support par message écrit",
-          "state": "planning",
-          "env": null
+          "state": "done",
+          "env": null,
+          "unsure": "Le support n'est joignable que si son adresse est renseignée dans les paramètres (sinon message « support indisponible »). La maquette limite le message à 1 000 caractères ; j'ai suivi la user story (10 à 2 000)."
         },
         {
           "id": "f8s6",
           "title": "US-63 · Contacter le support par message dicté",
-          "state": "planning",
-          "env": null
+          "state": "done",
+          "env": null,
+          "unsure": "Le micro n'a pas pu être essayé dans le navigateur de test : la dictée a été vérifiée avec un micro simulé. La transcription passe par le navigateur (selon l'appareil, ses serveurs ne sont pas forcément en Union européenne) : un service de transcription européen reste à choisir. Le fonctionnement dans l'application installée sur iPhone est à tester sur un vrai appareil."
         }
       ],
-      "decisions": [],
-      "unsure": [],
-      "activity": [],
-      "building": true,
-      "currentAction": "Lecture des user stories et maquettes des réglages, du carnet et du support…"
+      "decisions": [
+        {
+          "at": "2026-10-02T06:36:20Z",
+          "what": "Le carnet suit la règle D3 : l'utilisateur principal et l'invité 1 voient tout le compte ; un invité secondaire voit ses demandes et celles du noyau où il est participant."
+        },
+        {
+          "at": "2026-10-02T06:36:20Z",
+          "what": "La synchronisation du carnet tourne seule toutes les X heures (réglable) ; un échec est enregistré, signalé par email à l'adresse d'alerte, et réessayé à l'échéance suivante. Un planificateur externe peut la déclencher par une adresse protégée."
+        },
+        {
+          "at": "2026-10-02T06:36:20Z",
+          "what": "Les entrées du carnet plus anciennes que la durée de rétention disparaissent aussitôt de l'écran, avant même le nettoyage quotidien."
+        },
+        {
+          "at": "2026-10-02T06:36:20Z",
+          "what": "Révoquer un appareil ferme ses sessions, prévient la personne par email, journalise l'action avec son auteur et efface les tchats comme une déconnexion."
+        },
+        {
+          "at": "2026-10-02T06:36:20Z",
+          "what": "Le message dicté part en arrière-plan : on peut quitter l'écran, une confirmation « message dicté transmis » s'affiche à la fin sur n'importe quel écran."
+        },
+        {
+          "at": "2026-10-02T06:36:20Z",
+          "what": "Le même nettoyage couvre désormais les tables techniques (clés d'idempotence, demandes du tchat, compteurs de demandes) en plus du carnet et des signalements."
+        }
+      ],
+      "unsure": [
+        "Côté invité, les écrans Réglages, Carnet et Support n'ont été cliqués que du côté utilisateur principal ; l'invité est couvert par les tests automatiques.",
+        "Le carnet n'a pas été essayé avec beaucoup d'entrées dans le navigateur (pagination vérifiée par les tests)."
+      ],
+      "activity": [
+        {
+          "at": "2026-10-02T06:36:20Z",
+          "kind": "ok",
+          "what": "242 tests automatiques au vert (27 nouveaux pour les appareils, le carnet, le support et les traitements périodiques), compilation de production réussie"
+        },
+        {
+          "at": "2026-10-02T06:36:20Z",
+          "kind": "ok",
+          "what": "Vérifié dans le navigateur : menu Réglages dans l'ordre, appareils et révocation, carnet avec sélecteur à saisie, support écrit (emails reçus dans la boîte de test), dictée avec micro simulé et envoi en arrière-plan, écrans de la console"
+        },
+        {
+          "at": "2026-10-02T06:36:20Z",
+          "kind": "ok",
+          "what": "Un défaut trouvé par les tests et corrigé : une entrée livrée en retard par Digitorn aurait pu être perdue à la synchronisation"
+        }
+      ],
+      "building": false,
+      "needsYou": {
+        "title": "Prêt à être envoyé sur la branche de test",
+        "text": "Les 6 user stories de ce lot (Réglages, carnet, appareils, support écrit et dicté) sont construites et vérifiées (242 tests, essai dans le navigateur). Rien n'est envoyé sur GitHub avant ton accord."
+      }
     },
     {
       "id": "f9",
@@ -1014,44 +1067,9 @@
       "note": "L'écran affiche déjà la date de suppression ; le bouton arrive avec US-59 au lot 9. Rien n'est perdu."
     },
     {
-      "name": "Réglages complets (appareils, carnets, données)",
-      "tag": "Proposed, not built",
-      "note": "Le lot 1 n'y met que la déconnexion ; le reste arrive au lot 8."
-    },
-    {
-      "name": "Boîte du support dans les Réglages de la console",
-      "tag": "Proposed, not built",
-      "note": "La maquette la place sous « Réglages » ; elle arrive avec le support au lot 8. Rien n'est perdu."
-    },
-    {
-      "name": "Ouverture automatique du formulaire d'informations à l'ajout d'un agent",
-      "tag": "Started, paused",
-      "note": "Le formulaire existe déjà ; il sera relié au bouton « Ajouter à mon dashboard » au lot 4. Rien n'est perdu."
-    },
-    {
-      "name": "Lien « Configurer maintenant » après l'ajout d'un agent",
-      "tag": "Proposed, not built",
-      "note": "Dépend de l'écran Connecteurs (lot 5). Rien n'est perdu."
-    },
-    {
       "name": "Widget Digitorn pour connecter le Drive du compte",
       "tag": "Proposed, not built",
       "note": "Dépend du format de retour de Digitorn (à confirmer). La connexion depuis MAAQ fonctionne déjà. Rien n'est perdu."
-    },
-    {
-      "name": "Lien « Carnet de bord » dans l'en-tête du tchat",
-      "tag": "Proposed, not built",
-      "note": "La maquette le prévoit ; il arrive avec le carnet au lot 8. Rien n'est perdu."
-    },
-    {
-      "name": "Bouton de dictée dans la zone de saisie du tchat",
-      "tag": "Proposed, not built",
-      "note": "Présent sur la maquette mais décrit par aucune user story du tchat (la dictée est prévue pour le support, US-63). À trancher avec toi."
-    },
-    {
-      "name": "Nettoyage automatique des tables techniques (clés d'idempotence, demandes du tchat, compteurs)",
-      "tag": "Proposed, not built",
-      "note": "Aucun traitement planifié n'existe encore ; il arrivera avec les traitements du lot 9. Ces tables grossissent très lentement d'ici là."
     },
     {
       "name": "Entrée « Catalogue » dans la barre du bas",
@@ -1067,6 +1085,21 @@
       "name": "Reprise d'un envoi de document là où il s'était arrêté",
       "tag": "Proposed, not built",
       "note": "Aujourd'hui l'envoi recommence depuis le début après une coupure. Cela demande un envoi par morceaux, à voir si les gros scans posent problème."
+    },
+    {
+      "name": "Lien « Carnet de bord » dans l'en-tête du tchat",
+      "tag": "Proposed, not built",
+      "note": "Le carnet existe maintenant ; il reste à ajouter le lien dans l'en-tête du tchat, comme sur la maquette. Rien n'est perdu."
+    },
+    {
+      "name": "Choix d'un service de transcription vocale européen",
+      "tag": "Proposed, not built",
+      "note": "La dictée utilise pour l'instant la reconnaissance du navigateur ; la user story demande un service hébergé dans l'Union européenne (US-63 RT2)."
+    },
+    {
+      "name": "Bouton de dictée dans la zone de saisie du tchat",
+      "tag": "Proposed, not built",
+      "note": "Présent sur la maquette du tchat mais décrit par aucune user story du tchat ; la dictée existe pour le support (US-63). À trancher avec toi."
     }
   ]
 }

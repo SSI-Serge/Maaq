@@ -4,7 +4,7 @@ import { useParams } from "next/navigation";
 import { useState } from "react";
 import { useApiMutation, useApiQuery } from "@/client/hooks";
 import { BackLink, PageHead, adminStyles as s, formatDate } from "@/components/admin/AdminShell";
-import { ErrorLine } from "@/components/auth/parts";
+import { ConfirmDialog, ErrorLine } from "@/components/auth/parts";
 import { Button, Loading, Notice } from "@/components/ui";
 import { ACCOUNT_STATUS } from "@/components/admin/labels";
 
@@ -32,7 +32,79 @@ export default function AccountPage() {
       {account.loading && !account.data && <Loading slow={account.slow} />}
       <ErrorLine error={account.error} onRetry={account.reload} />
       {account.data && <AccountCard key={account.data.dailyRequestLimit} account={account.data} onChanged={account.reload} />}
+      {account.data && <DevicesPanel accountId={id} />}
     </>
+  );
+}
+
+interface PersonDevices {
+  userId: string;
+  firstName: string;
+  lastName: string;
+  role: "primary_user" | "guest";
+  devices: { id: string; type: "android" | "iphone" | "desktop" | "other"; browser: string | null; lastActivityAt: string }[];
+}
+
+const DEVICE_TYPE = { iphone: "iPhone", android: "Android", desktop: "Ordinateur", other: "Appareil" } as const;
+
+/** Appareils des profils du compte, avec révocation par l'administrateur (US-53 RF7, CA 7.1). */
+function DevicesPanel({ accountId }: { accountId: string }) {
+  const devices = useApiQuery<{ people: PersonDevices[] }>(`/api/admin/accounts/${accountId}/devices`);
+  const [asking, setAsking] = useState<{ id: string; label: string } | null>(null);
+  const revoke = useApiMutation();
+
+  async function confirm() {
+    if (!asking) return;
+    const result = await revoke.run(`/api/admin/devices/${asking.id}/revoke`, { method: "POST" });
+    if (result) {
+      setAsking(null);
+      devices.reload();
+    }
+  }
+
+  return (
+    <section className={s.panel} style={{ maxWidth: 720 }}>
+      <div className={s.panelTitle}>Appareils connectés</div>
+      {devices.loading && !devices.data && <Loading slow={devices.slow} />}
+      <ErrorLine error={devices.error} onRetry={devices.reload} />
+      {devices.data?.people.map((person) => (
+        <div key={person.userId} style={{ marginTop: 10 }}>
+          <div className={s.small} style={{ fontWeight: 700 }}>
+            {person.firstName} {person.lastName} · {person.role === "primary_user" ? "Utilisateur principal" : "Invité"}
+          </div>
+          {person.devices.length === 0 && <div className={s.muted}>Aucun appareil connecté.</div>}
+          {person.devices.map((device) => {
+            const label = `${DEVICE_TYPE[device.type]} de ${person.firstName}`;
+            return (
+              <div key={device.id} className={s.row} style={{ justifyContent: "space-between", marginTop: 6 }}>
+                <span className={s.small}>
+                  {label}
+                  {device.browser ? ` · ${device.browser}` : ""} · dernière activité {formatDate(device.lastActivityAt)}
+                </span>
+                <Button variant="secondary" onClick={() => setAsking({ id: device.id, label })}>
+                  Révoquer
+                </Button>
+              </div>
+            );
+          })}
+        </div>
+      ))}
+      {asking && (
+        <ConfirmDialog
+          title="Révoquer l'accès de cet appareil ?"
+          text={`${asking.label} : la personne devra vérifier à nouveau son identité pour se reconnecter.`}
+          confirmLabel="Révoquer"
+          confirming={revoke.pending}
+          onConfirm={confirm}
+          onCancel={() => {
+            revoke.reset();
+            setAsking(null);
+          }}
+        >
+          <ErrorLine error={revoke.error} onRetry={confirm} />
+        </ConfirmDialog>
+      )}
+    </section>
   );
 }
 

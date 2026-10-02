@@ -277,7 +277,14 @@ export class MockDigitorn implements DigitornClient {
   }
 
   private log(userRef: string, agentRef: string, type: LogbookItem["type"], text: string, participants: string[]): void {
+    const results: Partial<Record<LogbookItem["type"], string>> = {
+      request: "Transmise à l'agent",
+      action_done: "Action exécutée",
+      action_validated: "Validée par la personne",
+      action_refused: "Aucune action réalisée",
+    };
     this.logbook.push({
+      result: results[type],
       externalId: randomUUID(),
       userRef,
       agentRef,

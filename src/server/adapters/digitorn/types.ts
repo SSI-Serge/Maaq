@@ -60,6 +60,8 @@ export interface LogbookItem {
   agentRef: string;
   type: "request" | "action_done" | "action_validated" | "action_refused";
   text: string;
+  /** Résultat de la demande ou de l'action, quand Digitorn le fournit (US-40 RF2). */
+  result?: string;
   occurredAt: string;
   participants: string[];
 }
