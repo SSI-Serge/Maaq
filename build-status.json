@@ -3,7 +3,7 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-10-01T23:18:00Z",
+  "updated": "2026-10-02T04:46:15Z",
   "deploys": [],
   "features": [
     {
@@ -503,12 +503,21 @@
         {
           "at": "2026-10-01T23:18:00Z",
           "what": "Un message d'erreur de retrait ou de suppression s'affiche dans la fenêtre de confirmation, pas derrière elle."
+        },
+        {
+          "at": "2026-10-02T04:46:15Z",
+          "what": "Catalogue et dashboard validés : envoi sur la branche de test approuvé."
         }
       ],
       "unsure": [
         "Vérifié dans un téléphone simulé, avec 4 agents de démonstration seulement."
       ],
       "activity": [
+        {
+          "at": "2026-10-02T04:46:15Z",
+          "kind": "ok",
+          "what": "Code envoyé sur la branche de test (pas encore en production)"
+        },
         {
           "at": "2026-10-01T23:18:00Z",
           "kind": "ok",
@@ -524,11 +533,7 @@
           "kind": "work",
           "what": "Lecture des 7 user stories et des 3 maquettes du lot"
         }
-      ],
-      "needsYou": {
-        "title": "Prêt à être envoyé sur la branche de test",
-        "text": "Les 7 user stories du catalogue et du dashboard sont construites et vérifiées (115 tests). Rien n'est envoyé sur GitHub avant ton accord."
-      }
+      ]
     },
     {
       "id": "f5",
@@ -580,7 +585,9 @@
       ],
       "decisions": [],
       "unsure": [],
-      "activity": []
+      "activity": [],
+      "building": true,
+      "currentAction": "Lecture des user stories et maquettes des connecteurs…"
     },
     {
       "id": "f6",
