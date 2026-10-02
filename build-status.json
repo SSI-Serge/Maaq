@@ -3,8 +3,90 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-10-02T07:23:52Z",
-  "deploys": [],
+  "updated": "2026-10-02T22:25:39Z",
+  "deploys": [
+    {
+      "at": "2026-10-02T22:25:39Z",
+      "env": "preview",
+      "what": "Zone de test en ligne sur https://test.maaq.fr : toute l'application, avec les comptes de démonstration, des emails réels (Brevo) et le reste simulé (Digitorn, Google, SMS, facturation). Pas encore en production.",
+      "storyIds": [
+        "f0s1",
+        "f0s2",
+        "f0s3",
+        "f0s4",
+        "f1s1",
+        "f1s2",
+        "f1s3",
+        "f1s4",
+        "f1s5",
+        "f1s6",
+        "f1s7",
+        "f1s8",
+        "f1s9",
+        "f1s10",
+        "f2s1",
+        "f2s2",
+        "f2s3",
+        "f2s4",
+        "f2s5",
+        "f2s6",
+        "f2s7",
+        "f3s1",
+        "f3s2",
+        "f3s3",
+        "f3s4",
+        "f3s5",
+        "f3s6",
+        "f3s7",
+        "f3s8",
+        "f3s9",
+        "f4s1",
+        "f4s2",
+        "f4s3",
+        "f4s4",
+        "f4s5",
+        "f4s6",
+        "f4s7",
+        "f5s1",
+        "f5s2",
+        "f5s3",
+        "f5s4",
+        "f5s5",
+        "f5s6",
+        "f5s7",
+        "f6s1",
+        "f6s2",
+        "f6s3",
+        "f6s4",
+        "f6s5",
+        "f6s6",
+        "f6s7",
+        "f6s8",
+        "f6s9",
+        "f6s10",
+        "f7s1",
+        "f7s2",
+        "f7s3",
+        "f7s4",
+        "f7s5",
+        "f7s6",
+        "f7s7",
+        "f8s1",
+        "f8s2",
+        "f8s3",
+        "f8s4",
+        "f8s5",
+        "f8s6",
+        "f9s1",
+        "f9s2",
+        "f9s3",
+        "f9s4",
+        "f9s5",
+        "f9s6",
+        "f9s7"
+      ]
+    }
+  ],
   "features": [
     {
       "id": "f0",
@@ -15,27 +97,31 @@
           "id": "f0s1",
           "title": "Ouvrir MAAQ sur son téléphone, aux couleurs des maquettes",
           "state": "done",
-          "env": null
+          "env": "preview",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f0s2",
           "title": "Retrouver ses données dans une base conforme à la conception",
           "state": "done",
-          "env": null
+          "env": "preview",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f0s3",
           "title": "Discuter avec un Digitorn simulé en attendant la vraie API",
           "state": "done",
-          "env": null,
-          "unsure": "Le vrai Digitorn n'existe pas encore : le simulateur repose sur nos hypothèses."
+          "env": "preview",
+          "unsure": "Le vrai Digitorn n'existe pas encore : le simulateur repose sur nos hypothèses.",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f0s4",
           "title": "Recevoir les emails et SMS dans une boîte de test",
           "state": "done",
-          "env": null,
-          "unsure": "Aucun vrai prestataire d'emails ou de SMS n'est branché."
+          "env": "preview",
+          "unsure": "Aucun vrai prestataire d'emails ou de SMS n'est branché.",
+          "at": "2026-10-02T22:25:39Z"
         }
       ],
       "decisions": [
@@ -105,67 +191,77 @@
           "id": "f1s1",
           "title": "US-2 · Accéder à l'application depuis l'écran d'accueil",
           "state": "done",
-          "env": null,
-          "unsure": "L'écran « pas de connexion » au lancement ne marche qu'en version de production : pas encore essayé."
+          "env": "preview",
+          "unsure": "L'écran « pas de connexion » au lancement ne marche qu'en version de production : pas encore essayé.",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f1s2",
           "title": "US-3 · Se connecter à MAAQ",
           "state": "done",
-          "env": null
+          "env": "preview",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f1s3",
           "title": "US-51 · Vérifier mon identité sur un nouvel appareil",
           "state": "done",
-          "env": null,
-          "unsure": "Le SMS arrive seulement dans la boîte de test : aucun vrai prestataire SMS n'est branché."
+          "env": "preview",
+          "unsure": "Le SMS arrive seulement dans la boîte de test : aucun vrai prestataire SMS n'est branché.",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f1s4",
           "title": "US-6 · Se reconnecter rapidement via un schéma tactile",
           "state": "done",
-          "env": null,
-          "unsure": "Tracé vérifié à la souris dans le navigateur ; pas encore au doigt sur un vrai téléphone."
+          "env": "preview",
+          "unsure": "Tracé vérifié à la souris dans le navigateur ; pas encore au doigt sur un vrai téléphone.",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f1s5",
           "title": "US-7 · Être verrouillé après plusieurs échecs du schéma tactile",
           "state": "done",
-          "env": null
+          "env": "preview",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f1s6",
           "title": "US-8 · Récupérer l'accès après un oubli du schéma tactile",
           "state": "done",
-          "env": null
+          "env": "preview",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f1s7",
           "title": "US-66 · Réinitialiser mon mot de passe oublié",
           "state": "done",
-          "env": null,
-          "unsure": "Parcours vérifié par les tests automatiques, pas encore cliqué de bout en bout dans le navigateur."
+          "env": "preview",
+          "unsure": "Parcours vérifié par les tests automatiques, pas encore cliqué de bout en bout dans le navigateur.",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f1s8",
           "title": "US-52 · Verrouiller automatiquement l'application après inactivité",
           "state": "done",
-          "env": null,
-          "unsure": "Le verrouillage après 5 minutes est vérifié par la logique, pas en attendant 5 vraies minutes."
+          "env": "preview",
+          "unsure": "Le verrouillage après 5 minutes est vérifié par la logique, pas en attendant 5 vraies minutes.",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f1s9",
           "title": "US-9 · Se déconnecter de l'application",
           "state": "done",
-          "env": null
+          "env": "preview",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f1s10",
           "title": "US-1 · Être guidé pour installer MAAQ sur l'écran d'accueil",
           "state": "done",
-          "env": null,
-          "unsure": "Pas encore essayé sur un vrai Android ni un vrai iPhone ; le bouton « Installer MAAQ » dépend du navigateur."
+          "env": "preview",
+          "unsure": "Pas encore essayé sur un vrai Android ni un vrai iPhone ; le bouton « Installer MAAQ » dépend du navigateur.",
+          "at": "2026-10-02T22:25:39Z"
         }
       ],
       "decisions": [
@@ -225,46 +321,53 @@
           "id": "f2s1",
           "title": "US-64 · Créer le compte d'un utilisateur principal",
           "state": "done",
-          "env": null,
-          "unsure": "L'email d'activation arrive seulement dans la boîte de test : aucun vrai envoi d'email n'est branché."
+          "env": "preview",
+          "unsure": "L'email d'activation arrive seulement dans la boîte de test : aucun vrai envoi d'email n'est branché.",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f2s2",
           "title": "US-69 · Modifier le plafond quotidien de demandes d'un compte",
           "state": "done",
-          "env": null
+          "env": "preview",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f2s3",
           "title": "US-65 · Paramétrer les délais et les limites de la plateforme",
           "state": "done",
-          "env": null,
-          "unsure": "Les nouveaux réglages seront lus par les traitements automatiques, qui arrivent dans les lots suivants."
+          "env": "preview",
+          "unsure": "Les nouveaux réglages seront lus par les traitements automatiques, qui arrivent dans les lots suivants.",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f2s4",
           "title": "US-45 · Mettre à disposition un agent IA",
           "state": "done",
-          "env": null,
-          "unsure": "La liste des agents à publier vient du Digitorn simulé : à revérifier avec la vraie API."
+          "env": "preview",
+          "unsure": "La liste des agents à publier vient du Digitorn simulé : à revérifier avec la vraie API.",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f2s5",
           "title": "US-46 · Bloquer l'accès à un agent",
           "state": "done",
-          "env": null
+          "env": "preview",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f2s6",
           "title": "US-47 · Réactiver l'accès à un agent",
           "state": "done",
-          "env": null
+          "env": "preview",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f2s7",
           "title": "US-48 · Définir la liste des contrats obligatoires",
           "state": "done",
-          "env": null
+          "env": "preview",
+          "at": "2026-10-02T22:25:39Z"
         }
       ],
       "decisions": [
@@ -324,60 +427,69 @@
           "id": "f3s1",
           "title": "US-10 · Renseigner les informations nécessaires aux agents",
           "state": "done",
-          "env": null,
-          "unsure": "Le formulaire d'informations est prêt mais ne s'ouvre pas encore à l'ajout d'un agent : le dashboard arrive au lot 4."
+          "env": "preview",
+          "unsure": "Le formulaire d'informations est prêt mais ne s'ouvre pas encore à l'ajout d'un agent : le dashboard arrive au lot 4.",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f3s2",
           "title": "US-11 · Renseigner les informations concernant son invité",
           "state": "done",
-          "env": null,
-          "unsure": "Idem : les champs d'un invité dépendent des agents de son dashboard, qui arrive au lot 4."
+          "env": "preview",
+          "unsure": "Idem : les champs d'un invité dépendent des agents de son dashboard, qui arrive au lot 4.",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f3s3",
           "title": "US-12 · Modifier mes informations de configuration",
           "state": "done",
-          "env": null,
-          "unsure": "Les informations sont envoyées au Digitorn simulé ; le format réel reste à valider avec Digitorn."
+          "env": "preview",
+          "unsure": "Les informations sont envoyées au Digitorn simulé ; le format réel reste à valider avec Digitorn.",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f3s4",
           "title": "US-18 · Ajouter un invité",
           "state": "done",
-          "env": null,
-          "unsure": "L'envoi d'invitation se fait dans la foulée de la requête : à surveiller avec un vrai prestataire d'emails."
+          "env": "preview",
+          "unsure": "L'envoi d'invitation se fait dans la foulée de la requête : à surveiller avec un vrai prestataire d'emails.",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f3s5",
           "title": "US-4 · Activer son accès en tant qu'invité",
           "state": "done",
-          "env": null,
-          "unsure": "Le SMS d'invitation arrive seulement dans la boîte de test ; pas encore essayé avec un vrai téléphone iPhone."
+          "env": "preview",
+          "unsure": "Le SMS d'invitation arrive seulement dans la boîte de test ; pas encore essayé avec un vrai téléphone iPhone.",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f3s6",
           "title": "US-5 · Renvoyer un nouveau lien d'invitation expiré",
           "state": "done",
-          "env": null
+          "env": "preview",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f3s7",
           "title": "US-19 · Modifier les informations d'un invité",
           "state": "done",
-          "env": null
+          "env": "preview",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f3s8",
           "title": "US-20 · Supprimer un invité",
           "state": "done",
-          "env": null
+          "env": "preview",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f3s9",
           "title": "US-21 · Consulter le nombre d'invités disponibles",
           "state": "done",
-          "env": null
+          "env": "preview",
+          "at": "2026-10-02T22:25:39Z"
         }
       ],
       "decisions": [
@@ -441,46 +553,53 @@
           "id": "f4s1",
           "title": "US-23 · Parcourir le catalogue d'agents par rubrique",
           "state": "done",
-          "env": null
+          "env": "preview",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f4s2",
           "title": "US-24 · Consulter la fiche descriptive d'un agent",
           "state": "done",
-          "env": null,
-          "unsure": "Le bandeau de maintenance et le retour au catalogue sont vérifiés par les tests ; pas relu avec un vrai catalogue de 50 agents."
+          "env": "preview",
+          "unsure": "Le bandeau de maintenance et le retour au catalogue sont vérifiés par les tests ; pas relu avec un vrai catalogue de 50 agents.",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f4s3",
           "title": "US-25 · Rechercher un agent par mot-clé",
           "state": "done",
-          "env": null
+          "env": "preview",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f4s4",
           "title": "US-26 · Ajouter un agent à mon dashboard",
           "state": "done",
-          "env": null,
-          "unsure": "Le lien « Configurer maintenant » vers les connecteurs arrive avec le lot 5 ; en attendant la carte indique « À configurer »."
+          "env": "preview",
+          "unsure": "Le lien « Configurer maintenant » vers les connecteurs arrive avec le lot 5 ; en attendant la carte indique « À configurer ».",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f4s5",
           "title": "US-27 · Être informé de la limite de 10 agents par rubrique",
           "state": "done",
-          "env": null
+          "env": "preview",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f4s6",
           "title": "US-28 · Retirer un agent de mon dashboard",
           "state": "done",
-          "env": null
+          "env": "preview",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f4s7",
           "title": "US-22 · Consulter mon dashboard par onglet (Pro / Perso)",
           "state": "done",
-          "env": null,
-          "unsure": "Le lien « Ouvrir le tchat » des cartes arrive avec le tchat (lot 6). Le temps de chargement sous 2 secondes n'est pas mesuré."
+          "env": "preview",
+          "unsure": "Le lien « Ouvrir le tchat » des cartes arrive avec le tchat (lot 6). Le temps de chargement sous 2 secondes n'est pas mesuré.",
+          "at": "2026-10-02T22:25:39Z"
         }
       ],
       "decisions": [
@@ -544,49 +663,56 @@
           "id": "f5s1",
           "title": "US-67 · Connecter le Google Drive du compte",
           "state": "done",
-          "env": null,
-          "unsure": "Le widget Digitorn (deuxième façon de connecter le Drive) n'est pas construit : seule la connexion depuis MAAQ existe."
+          "env": "preview",
+          "unsure": "Le widget Digitorn (deuxième façon de connecter le Drive) n'est pas construit : seule la connexion depuis MAAQ existe.",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f5s2",
           "title": "US-13 · Renseigner l'adresse email de connexion d'un agent",
           "state": "done",
-          "env": null,
-          "unsure": "Côté invité, l'écran Connecteurs n'a été vérifié que par les tests automatiques, pas dans le navigateur."
+          "env": "preview",
+          "unsure": "Côté invité, l'écran Connecteurs n'a été vérifié que par les tests automatiques, pas dans le navigateur.",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f5s3",
           "title": "US-14 · Autoriser les permissions nécessaires à un agent",
           "state": "done",
-          "env": null,
-          "unsure": "Le vrai consentement Google (Digitorn) n'existe pas encore : tout passe par une page simulée. Le retour sur iPhone dans l'application installée reste à tester sur un vrai appareil."
+          "env": "preview",
+          "unsure": "Le vrai consentement Google (Digitorn) n'existe pas encore : tout passe par une page simulée. Le retour sur iPhone dans l'application installée reste à tester sur un vrai appareil.",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f5s4",
           "title": "US-15 · Configurer la boîte mail de validation d'un agent",
           "state": "done",
-          "env": null,
-          "unsure": "Le code de vérification arrive seulement dans la boîte de test. Sa durée de 30 minutes est une hypothèse (la spec ne la fixe pas)."
+          "env": "preview",
+          "unsure": "Le code de vérification arrive seulement dans la boîte de test. Sa durée de 30 minutes est une hypothèse (la spec ne la fixe pas).",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f5s5",
           "title": "US-16 · Définir les adresses en copie systématique d'un agent",
           "state": "done",
-          "env": null,
-          "unsure": "Les adresses en copie ne sont pas encore utilisées pour de vrais rendez-vous : cela dépend du tchat (lot 6)."
+          "env": "preview",
+          "unsure": "Les adresses en copie ne sont pas encore utilisées pour de vrais rendez-vous : cela dépend du tchat (lot 6).",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f5s6",
           "title": "US-17 · Ajouter mes propres adresses en copie d'un agent",
           "state": "done",
-          "env": null,
-          "unsure": "Vérifié par les tests pour l'invité 1 et l'invité secondaire ; pas essayé dans le navigateur."
+          "env": "preview",
+          "unsure": "Vérifié par les tests pour l'invité 1 et l'invité secondaire ; pas essayé dans le navigateur.",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f5s7",
           "title": "US-29 · Être informé qu'un agent n'est pas encore configuré",
           "state": "done",
-          "env": null
+          "env": "preview",
+          "at": "2026-10-02T22:25:39Z"
         }
       ],
       "decisions": [
@@ -651,68 +777,78 @@
           "id": "f6s1",
           "title": "US-37 · Accéder rapidement au tchat d'un agent",
           "state": "done",
-          "env": null,
-          "unsure": "Le lien vers le carnet de bord, dans l'en-tête de la maquette, n'existe pas encore : il arrive avec le carnet (lot 8)."
+          "env": "preview",
+          "unsure": "Le lien vers le carnet de bord, dans l'en-tête de la maquette, n'existe pas encore : il arrive avec le carnet (lot 8).",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f6s2",
           "title": "US-60 · Être informé que j'échange avec une IA",
           "state": "done",
-          "env": null
+          "env": "preview",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f6s3",
           "title": "US-41 · Découvrir le tchat d'un agent sans historique",
           "state": "done",
-          "env": null
+          "env": "preview",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f6s4",
           "title": "US-38 · Demander à un agent de réaliser une action",
           "state": "done",
-          "env": null,
-          "unsure": "Le texte de la demande n'est transmis qu'à un Digitorn simulé : le format réel de l'échange reste à valider avec Digitorn. Le bouton de dictée de la maquette n'est pas construit (aucune user story du tchat ne le décrit)."
+          "env": "preview",
+          "unsure": "Le texte de la demande n'est transmis qu'à un Digitorn simulé : le format réel de l'échange reste à valider avec Digitorn. Le bouton de dictée de la maquette n'est pas construit (aucune user story du tchat ne le décrit).",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f6s5",
           "title": "US-70 · Être limité à un nombre de demandes par jour",
           "state": "done",
-          "env": null
+          "env": "preview",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f6s6",
           "title": "US-39 · Valider une action proposée par l'agent",
           "state": "done",
-          "env": null,
-          "unsure": "Les cartes (rendez-vous, email) viennent du simulateur : le contenu réel envoyé par Digitorn peut différer. Le message « exécution plus longue que prévu » apparaît après 1 minute, durée choisie sans précision de la spec."
+          "env": "preview",
+          "unsure": "Les cartes (rendez-vous, email) viennent du simulateur : le contenu réel envoyé par Digitorn peut différer. Le message « exécution plus longue que prévu » apparaît après 1 minute, durée choisie sans précision de la spec.",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f6s7",
           "title": "US-42 · Être informé d'un accès agent bloqué",
           "state": "done",
-          "env": null,
-          "unsure": "Le blocage est repris par relecture toutes les 15 s (3 s pendant une attente) : la spec demande « 30 s au plus »."
+          "env": "preview",
+          "unsure": "Le blocage est repris par relecture toutes les 15 s (3 s pendant une attente) : la spec demande « 30 s au plus ».",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f6s8",
           "title": "US-61 · Signaler une réponse ou une action erronée d'un agent",
           "state": "done",
-          "env": null,
-          "unsure": "Le texte des réponses signalées est conservé tel quel en base ; la spec recommande de le chiffrer (à voir au lot 9). Le support n'est prévenu que si son adresse est renseignée dans les paramètres."
+          "env": "preview",
+          "unsure": "Le texte des réponses signalées est conservé tel quel en base ; la spec recommande de le chiffrer (à voir au lot 9). Le support n'est prévenu que si son adresse est renseignée dans les paramètres.",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f6s9",
           "title": "US-43 · Perte de l'historique du tchat à la déconnexion",
           "state": "done",
-          "env": null,
-          "unsure": "L'effacement à la déconnexion est testé automatiquement ; le cas « appareil révoqué » n'a pas été cliqué dans le navigateur."
+          "env": "preview",
+          "unsure": "L'effacement à la déconnexion est testé automatiquement ; le cas « appareil révoqué » n'a pas été cliqué dans le navigateur.",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f6s10",
           "title": "US-44 · Expiration automatique des conversations anciennes",
           "state": "done",
-          "env": null,
-          "unsure": "L'historique disparaît à l'affichage : la suppression chez Digitorn d'une conversation de plus de 4 jours dépendra de leur API."
+          "env": "preview",
+          "unsure": "L'historique disparaît à l'affichage : la suppression chez Digitorn d'une conversation de plus de 4 jours dépendra de leur API.",
+          "at": "2026-10-02T22:25:39Z"
         }
       ],
       "decisions": [
@@ -799,48 +935,55 @@
           "id": "f7s1",
           "title": "US-30 · Accéder à la page Contrats",
           "state": "done",
-          "env": null,
-          "unsure": "La navigation reprend la maquette (Agents, Contrats, Invités, Réglages) ; le Catalogue reste accessible depuis le dashboard, alors que la user story le place dans la barre du bas."
+          "env": "preview",
+          "unsure": "La navigation reprend la maquette (Agents, Contrats, Invités, Réglages) ; le Catalogue reste accessible depuis le dashboard, alors que la user story le place dans la barre du bas.",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f7s2",
           "title": "US-31 · Consulter les agents des Contrats",
           "state": "done",
-          "env": null
+          "env": "preview",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f7s3",
           "title": "US-32 · Consulter la liste de mes contrats",
           "state": "done",
-          "env": null,
-          "unsure": "L'invité 1 et l'invité secondaire n'ont pas été cliqués dans le navigateur (seulement testés automatiquement). Le texte de consentement contient « [nom du partenaire] » en attendant le nom réel."
+          "env": "preview",
+          "unsure": "L'invité 1 et l'invité secondaire n'ont pas été cliqués dans le navigateur (seulement testés automatiquement). Le texte de consentement contient « [nom du partenaire] » en attendant le nom réel.",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f7s4",
           "title": "US-33 · Renseigner les détails d'un contrat",
           "state": "done",
-          "env": null,
-          "unsure": "Les détails s'ouvrent sous la carte du contrat, comme sur la maquette, et non sur un écran séparé comme le dit la user story."
+          "env": "preview",
+          "unsure": "Les détails s'ouvrent sous la carte du contrat, comme sur la maquette, et non sur un écran séparé comme le dit la user story.",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f7s5",
           "title": "US-34 · Ajouter les documents scannés d'un contrat",
           "state": "done",
-          "env": null,
-          "unsure": "Le classement dans le Drive est simulé (Digitorn et Google Drive fictifs) ; l'antivirus ne reconnaît que le fichier de test EICAR. Après une coupure réseau, l'envoi recommence depuis le début (trois fois) au lieu de reprendre là où il s'était arrêté."
+          "env": "preview",
+          "unsure": "Le classement dans le Drive est simulé (Digitorn et Google Drive fictifs) ; l'antivirus ne reconnaît que le fichier de test EICAR. Après une coupure réseau, l'envoi recommence depuis le début (trois fois) au lieu de reprendre là où il s'était arrêté.",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f7s6",
           "title": "US-35 · Modifier ou supprimer les détails et documents d'un contrat",
           "state": "done",
-          "env": null
+          "env": "preview",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f7s7",
           "title": "US-36 · Donner ou retirer mon consentement au challenge d'un contrat",
           "state": "done",
-          "env": null,
-          "unsure": "La preuve de consentement est enregistrée avec une empreinte de l'email ; sa valeur juridique reste à confirmer avec le DPO (la spec le signale)."
+          "env": "preview",
+          "unsure": "La preuve de consentement est enregistrée avec une empreinte de l'email ; sa valeur juridique reste à confirmer avec le DPO (la spec le signale).",
+          "at": "2026-10-02T22:25:39Z"
         }
       ],
       "decisions": [
@@ -910,43 +1053,49 @@
           "id": "f8s1",
           "title": "US-49 · Accéder aux Réglages",
           "state": "done",
-          "env": null,
-          "unsure": "Les rubriques Confidentialité, Exporter mes données et Désabonnement / suppression du compte n'y figurent pas encore : elles arrivent avec le lot 9."
+          "env": "preview",
+          "unsure": "Les rubriques Confidentialité, Exporter mes données et Désabonnement / suppression du compte n'y figurent pas encore : elles arrivent avec le lot 9.",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f8s2",
           "title": "US-50 · Accéder aux carnets de bord depuis les Réglages",
           "state": "done",
-          "env": null,
-          "unsure": "Le carnet affiche le prénom de la personne pour chaque entrée, y compris pour les actions ; la maquette montre parfois le nom de l'agent comme auteur."
+          "env": "preview",
+          "unsure": "Le carnet affiche le prénom de la personne pour chaque entrée, y compris pour les actions ; la maquette montre parfois le nom de l'agent comme auteur.",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f8s3",
           "title": "US-40 · Consulter le carnet de bord d'un agent",
           "state": "done",
-          "env": null,
-          "unsure": "Le carnet est alimenté par un Digitorn simulé : l'API réelle (annoncée vers le 14/10/2026) peut différer. Chaque synchronisation relit aussi les dernières 24 h pour ne rien perdre si Digitorn livre en retard (hypothèse). Les nettoyages sont lancés avec la synchronisation, au moins une fois par jour."
+          "env": "preview",
+          "unsure": "Le carnet est alimenté par un Digitorn simulé : l'API réelle (annoncée vers le 14/10/2026) peut différer. Chaque synchronisation relit aussi les dernières 24 h pour ne rien perdre si Digitorn livre en retard (hypothèse). Les nettoyages sont lancés avec la synchronisation, au moins une fois par jour.",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f8s4",
           "title": "US-53 · Révoquer l'accès d'un appareil",
           "state": "done",
-          "env": null,
-          "unsure": "Pas essayé avec un vrai second appareil : seuls des appareils de démonstration ont été révoqués. Côté administrateur, l'écran ajouté à la fiche du compte n'est pas maquetté."
+          "env": "preview",
+          "unsure": "Pas essayé avec un vrai second appareil : seuls des appareils de démonstration ont été révoqués. Côté administrateur, l'écran ajouté à la fiche du compte n'est pas maquetté.",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f8s5",
           "title": "US-62 · Contacter le support par message écrit",
           "state": "done",
-          "env": null,
-          "unsure": "Le support n'est joignable que si son adresse est renseignée dans les paramètres (sinon message « support indisponible »). La maquette limite le message à 1 000 caractères ; j'ai suivi la user story (10 à 2 000)."
+          "env": "preview",
+          "unsure": "Le support n'est joignable que si son adresse est renseignée dans les paramètres (sinon message « support indisponible »). La maquette limite le message à 1 000 caractères ; j'ai suivi la user story (10 à 2 000).",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f8s6",
           "title": "US-63 · Contacter le support par message dicté",
           "state": "done",
-          "env": null,
-          "unsure": "Le micro n'a pas pu être essayé dans le navigateur de test : la dictée a été vérifiée avec un micro simulé. La transcription passe par le navigateur (selon l'appareil, ses serveurs ne sont pas forcément en Union européenne) : un service de transcription européen reste à choisir. Le fonctionnement dans l'application installée sur iPhone est à tester sur un vrai appareil."
+          "env": "preview",
+          "unsure": "Le micro n'a pas pu être essayé dans le navigateur de test : la dictée a été vérifiée avec un micro simulé. La transcription passe par le navigateur (selon l'appareil, ses serveurs ne sont pas forcément en Union européenne) : un service de transcription européen reste à choisir. Le fonctionnement dans l'application installée sur iPhone est à tester sur un vrai appareil.",
+          "at": "2026-10-02T22:25:39Z"
         }
       ],
       "decisions": [
@@ -1016,50 +1165,57 @@
           "id": "f9s1",
           "title": "US-54 · Consulter la politique de confidentialité et les conditions d'utilisation",
           "state": "done",
-          "env": null,
-          "unsure": "Les textes actuels sont des textes de démonstration : les textes définitifs sont à fournir. Il n'y a pas d'écran de console pour publier une nouvelle version : elle s'ajoute en base (le contrôle avant mise en production, `npm run check:release`, bloque tant que les textes sont provisoires)."
+          "env": "preview",
+          "unsure": "Les textes actuels sont des textes de démonstration : les textes définitifs sont à fournir. Il n'y a pas d'écran de console pour publier une nouvelle version : elle s'ajoute en base (le contrôle avant mise en production, `npm run check:release`, bloque tant que les textes sont provisoires).",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f9s2",
           "title": "US-55 · Exporter mes données",
           "state": "done",
-          "env": null,
-          "unsure": "L'email de l'export contient un lien vers une page de l'application (connexion demandée, puis retour à cette page). Les documents de contrats sont inclus dans l'archive ; le détail des données de Digitorn dépend de leur API, simulée ici."
+          "env": "preview",
+          "unsure": "L'email de l'export contient un lien vers une page de l'application (connexion demandée, puis retour à cette page). Les documents de contrats sont inclus dans l'archive ; le détail des données de Digitorn dépend de leur API, simulée ici.",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f9s3",
           "title": "US-56 · Supprimer mes données et mon compte",
           "state": "done",
-          "env": null,
-          "unsure": "Le mot de passe est contrôlé avec la même protection que la connexion (blocage après 5 échecs). La suppression chez Digitorn est simulée."
+          "env": "preview",
+          "unsure": "Le mot de passe est contrôlé avec la même protection que la connexion (blocage après 5 échecs). La suppression chez Digitorn est simulée.",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f9s4",
           "title": "US-57 · Anonymiser les demandes d'un invité supprimé dans le carnet partagé",
           "state": "done",
-          "env": null,
-          "unsure": "Les noms et numéros sont retirés du texte des entrées de l'invité, par recherche de son nom, de son email, de son téléphone et de tout numéro ou adresse qui y ressemble. Un nom cité dans la demande d'une autre personne n'est pas touché."
+          "env": "preview",
+          "unsure": "Les noms et numéros sont retirés du texte des entrées de l'invité, par recherche de son nom, de son email, de son téléphone et de tout numéro ou adresse qui y ressemble. Un nom cité dans la demande d'une autre personne n'est pas touché.",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f9s5",
           "title": "US-58 · Supprimer automatiquement un compte après désabonnement",
           "state": "done",
-          "env": null,
-          "unsure": "Les sauvegardes sont purgées au bout de 2 ans en dehors de l'application : cela relève de l'hébergement, à mettre en place au déploiement et à citer dans la politique de confidentialité (point DPO de la spec). L'outil de facturation réel n'est pas branché : le point d'entrée existe (désabonnement, réabonnement) et attend leur format."
+          "env": "preview",
+          "unsure": "Les sauvegardes sont purgées au bout de 2 ans en dehors de l'application : cela relève de l'hébergement, à mettre en place au déploiement et à citer dans la politique de confidentialité (point DPO de la spec). L'outil de facturation réel n'est pas branché : le point d'entrée existe (désabonnement, réabonnement) et attend leur format.",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f9s6",
           "title": "US-68 · Supprimer automatiquement les comptes et invités jamais activés",
           "state": "done",
-          "env": null,
-          "unsure": "Après la suppression, un ancien lien d'activation affiche un message de lien expiré générique (le nom de la personne qui a invité n'est plus connu)."
+          "env": "preview",
+          "unsure": "Après la suppression, un ancien lien d'activation affiche un message de lien expiré générique (le nom de la personne qui a invité n'est plus connu).",
+          "at": "2026-10-02T22:25:39Z"
         },
         {
           "id": "f9s7",
           "title": "US-59 · Reprendre mon compte pendant le délai de grâce",
           "state": "done",
-          "env": null,
-          "unsure": "Côté invité, l'écran de reprise a été vérifié par les tests automatiques mais pas cliqué dans le navigateur."
+          "env": "preview",
+          "unsure": "Côté invité, l'écran de reprise a été vérifié par les tests automatiques mais pas cliqué dans le navigateur.",
+          "at": "2026-10-02T22:25:39Z"
         }
       ],
       "decisions": [
@@ -1094,13 +1250,28 @@
         {
           "at": "2026-10-02T07:23:52Z",
           "what": "Conformité validée : envoi sur la branche de test approuvé. Les 9 lots sont construits."
+        },
+        {
+          "at": "2026-10-02T22:25:39Z",
+          "what": "Zone de test hébergée sur Google Cloud Run (base Supabase en Europe, domaine test.maaq.fr). Les outils de test (boîte de test) y sont réservés à qui détient une clé."
+        },
+        {
+          "at": "2026-10-02T22:25:39Z",
+          "what": "Les emails partent réellement par Brevo avec le domaine maaq.fr authentifié ; les SMS restent simulés. La zone de test garde aussi une copie des emails dans la boîte de test."
         }
       ],
       "unsure": [
         "Les purges définitives n'ont été vérifiées que par les tests automatiques et sur des données de démonstration : à surveiller de près à la première mise en ligne.",
-        "Côté invité, les écrans d'acceptation, d'export et de suppression n'ont été cliqués que du côté utilisateur principal."
+        "Côté invité, les écrans d'acceptation, d'export et de suppression n'ont été cliqués que du côté utilisateur principal.",
+        "La zone de test a été essayée pour la connexion et l'envoi d'un email d'activation ; le reste de l'application n'y a pas encore été parcouru en entier.",
+        "Le Digitorn simulé garde ses conversations en mémoire d'une seule instance : après une pause du service, l'historique des tchats repart de zéro."
       ],
       "activity": [
+        {
+          "at": "2026-10-02T22:25:39Z",
+          "kind": "live",
+          "what": "Zone de test en ligne ouverte sur https://test.maaq.fr (aperçu, pas la production)"
+        },
         {
           "at": "2026-10-02T07:23:52Z",
           "kind": "ok",
@@ -1127,9 +1298,9 @@
   ],
   "parkingLot": [
     {
-      "name": "Mise en ligne de l'application",
+      "name": "Mise en ligne de l'application (production)",
       "tag": "Proposed, not built",
-      "note": "Tous les lots sont construits sur la branche de test. Avant la production : textes juridiques et nom du partenaire définitifs, boîtes support et alertes réelles, vraie API Digitorn, Google Drive et Google Agenda réels, antivirus, service d'envoi d'emails et de SMS, outil de facturation. `npm run check:release` liste ce qui manque."
+      "note": "La zone de test est ouverte. Pour la production : textes juridiques et nom du partenaire définitifs, boîtes support et alertes réelles, vraie API Digitorn, Google Drive et Agenda réels, antivirus, SMS, outil de facturation, sauvegardes. `npm run check:release` liste ce qui manque."
     },
     {
       "name": "Widget Digitorn pour connecter le Drive du compte",
@@ -1180,6 +1351,16 @@
       "name": "Purge des sauvegardes à 2 ans",
       "tag": "Proposed, not built",
       "note": "À mettre en place avec l'hébergement, et à mentionner dans la politique de confidentialité (point DPO de la spec)."
+    },
+    {
+      "name": "Envoi de SMS réels",
+      "tag": "Proposed, not built",
+      "note": "Aucun fournisseur de SMS n'est branché : les codes de vérification passent par l'email et les invitations par SMS ne partent pas. Rien n'est perdu."
+    },
+    {
+      "name": "Emails mis en forme (logo, couleurs)",
+      "tag": "Proposed, not built",
+      "note": "Les emails sont en texte brut pour l'instant. Rien n'est perdu."
     }
   ]
 }
