@@ -28,6 +28,7 @@
     "@node-rs/argon2": "^2.2.1",
     "kysely": "^0.29.6",
     "next": "^16.3.8",
+    "nodemailer": "^10.0.13",
     "pg": "^8.23.1",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
@@ -35,6 +36,7 @@
   },
   "devDependencies": {
     "@types/node": "^22",
+    "@types/nodemailer": "^8.0.2",
     "@types/pg": "^8",
     "@types/react": "^19",
     "@types/react-dom": "^19",
