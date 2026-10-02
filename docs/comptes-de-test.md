@@ -62,3 +62,13 @@ Les emails et SMS envoyés par l'application arrivent dans la boîte de test : h
 - Plafond de demandes : par défaut 50 par jour. Pour l'essayer vite, baisser `daily_request_limit` du compte en base ; l'avertissement apparaît à 5 demandes restantes.
 - Les conversations vivent dans la mémoire du simulateur : elles disparaissent au redémarrage du serveur de développement.
 
+## Contrats (page « Contrats »)
+
+- L'entrée « Contrats » apparaît pour l'utilisateur principal et l'invité 1 (Dominique) ; un invité secondaire ne la voit pas.
+- « Mes contrats » : les quatre contrats de démonstration, à renseigner (champs obligatoires, formats), avec documents et consentement au challenge. Les données sont partagées entre Camille et Dominique.
+- Le classement des documents exige le Google Drive du compte : sans lui, le document passe à « Classement impossible » (bouton « Réessayer »). Pour le connecter, passer par Connecteurs (agent qui demande le Drive du compte) puis la page Google simulée.
+- Pour simuler un classement qui échoue : donner au fichier un nom contenant « echec-classement ». Le fichier de test antivirus EICAR est refusé à l'envoi.
+- Les documents classés sont rangés dans `.data/drive/<compte>` (faux Google Drive) ; les envois en cours dans `.data/staging`.
+- « Agents des Contrats » : un agent de la rubrique « Agents des Contrats » doit d'abord être créé dans la console (Agents IA), puis ajouté depuis le catalogue.
+- Le texte de consentement contient « [nom du partenaire] » : le nom réel est à fournir (une nouvelle version du texte pourra être publiée).
+

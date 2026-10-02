@@ -84,6 +84,16 @@ export interface AgentConfiguration {
   ccAddresses: string[];
 }
 
+/** Document à classer par l'agent Admin_Classify dans le Drive du compte (US-34 RF12). */
+export interface ClassifyDocumentInput {
+  accountId: string;
+  /** Profil dont le Google Drive est utilisé : toujours l'utilisateur principal (US-34 RT1). */
+  ownerRef: string;
+  fileName: string;
+  mimeType: string;
+  content: Buffer;
+}
+
 export interface DigitornClient {
   listHostedAgents(): Promise<HostedAgent[]>;
   /**
@@ -100,6 +110,11 @@ export interface DigitornClient {
   submitRequest(input: SubmitRequestInput): Promise<void>;
   getConversation(userRef: string, agentRef: string): Promise<ChatEvent[]>;
   decideAction(input: DecideActionInput): Promise<ActionProposal>;
+  /**
+   * Classe un document dans le Drive de l'utilisateur principal, ou le retrouve s'il y est déjà
+   * (jamais de doublon). Échoue si le Drive est inaccessible ou si le classement n'aboutit pas.
+   */
+  classifyDocument(input: ClassifyDocumentInput): Promise<{ driveFileRef: string; alreadyClassified: boolean }>;
   fetchLogbook(since: Date): Promise<LogbookItem[]>;
   eraseConversation(userRef: string, agentRef: string): Promise<void>;
   deleteProfile(userRef: string): Promise<void>;

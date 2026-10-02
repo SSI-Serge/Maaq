@@ -26,16 +26,15 @@ let adminId: string;
 beforeAll(async () => {
   db = testDb();
   adminId = (await createProfile(db, { role: "admin" })).id;
-  const legal = await db.selectFrom("legal_document_versions").select("id").executeTakeFirst();
-  if (!legal) {
-    await db
-      .insertInto("legal_document_versions")
-      .values([
-        { document_type: "privacy_policy", version_label: "test", content: "Politique", published_at: new Date(0) },
-        { document_type: "terms_of_use", version_label: "test", content: "Conditions", published_at: new Date(0) },
-      ])
-      .execute();
-  }
+  // Textes à accepter à l'activation ; « doNothing » car plusieurs fichiers de test les préparent en parallèle.
+  await db
+    .insertInto("legal_document_versions")
+    .values([
+      { document_type: "privacy_policy", version_label: "test", content: "Politique", published_at: new Date(0) },
+      { document_type: "terms_of_use", version_label: "test", content: "Conditions", published_at: new Date(0) },
+    ])
+    .onConflict((oc) => oc.columns(["document_type", "version_label"]).doNothing())
+    .execute();
 });
 afterAll(async () => {
   await db.destroy();

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { drive } from "@/server/adapters/drive";
 import { env } from "@/server/env";
 import type {
   ActionProposal,
@@ -6,6 +7,7 @@ import type {
   AuthorizationResult,
   GoogleConnector,
   ChatEvent,
+  ClassifyDocumentInput,
   DecideActionInput,
   DigitornClient,
   HostedAgent,
@@ -170,6 +172,23 @@ export class MockDigitorn implements DigitornClient {
       this.log(entry.userRef, entry.agentRef, "action_done", proposal.summary, proposal.participants);
     });
     return { ...proposal };
+  }
+
+  /** Échecs de classement à simuler (tests) ; un nom de fichier contenant « echec-classement » échoue aussi (démonstration). */
+  classificationFailures = 0;
+  readonly classified: ClassifyDocumentInput[] = [];
+
+  async classifyDocument(input: ClassifyDocumentInput): Promise<{ driveFileRef: string; alreadyClassified: boolean }> {
+    if (this.classificationFailures > 0) {
+      this.classificationFailures--;
+      throw new Error("Classement impossible (Drive injoignable)");
+    }
+    if (/echec-classement/i.test(input.fileName)) throw new Error("Classement impossible (démonstration)");
+    this.classified.push(input);
+    const existing = await drive().findByContent(input.accountId, input.content);
+    if (existing) return { driveFileRef: existing.fileId, alreadyClassified: true };
+    const { fileId } = await drive().upload({ accountId: input.accountId, fileName: input.fileName, mimeType: input.mimeType, content: input.content });
+    return { driveFileRef: fileId, alreadyClassified: false };
   }
 
   async fetchLogbook(since: Date): Promise<LogbookItem[]> {

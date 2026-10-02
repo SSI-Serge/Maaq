@@ -24,6 +24,7 @@ export const GET = handler(async () => {
       firstName: session.user.firstName,
       maskedEmail: maskEmail(session.user.email),
       role: session.user.role,
+      guestRank: session.user.guestRank,
     },
     device: { hasPattern: session.device.hasPattern, patternLocked: session.device.patternLocked },
     home: homeFor(session),

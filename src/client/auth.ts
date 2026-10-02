@@ -10,7 +10,7 @@ export type AuthState =
   | {
       authenticated: true;
       unlocked: boolean;
-      user: { firstName: string; maskedEmail: string; role: "admin" | "primary_user" | "guest" };
+      user: { firstName: string; maskedEmail: string; role: "admin" | "primary_user" | "guest"; guestRank: "core" | "secondary" | null };
       device: { hasPattern: boolean; patternLocked: boolean };
       home: string;
     };

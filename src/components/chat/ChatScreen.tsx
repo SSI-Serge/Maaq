@@ -80,7 +80,7 @@ function useNow(active: boolean): number {
 }
 
 /** Tchat avec un agent (US-37, US-38, US-39, US-41, US-42, US-60, US-61, US-70), maquette Tchat. */
-export function ChatScreen({ agentId }: { agentId: string }) {
+export function ChatScreen({ agentId, backHref = "/accueil" }: { agentId: string; backHref?: string }) {
   const user = useSessionUser();
   const { data, error, offset, load } = useChatView(agentId);
   const [draft, setDraft, clearDraft] = useDraft(`chat:${agentId}`);
@@ -268,7 +268,7 @@ export function ChatScreen({ agentId }: { agentId: string }) {
   return (
     <div className={styles.screen}>
       <header className={styles.header}>
-        <Link href="/accueil" className={styles.iconLink} aria-label="Retour au dashboard">
+        <Link href={backHref} className={styles.iconLink} aria-label="Retour">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
             <path d="M15 18l-6-6 6-6" />
           </svg>
@@ -305,8 +305,8 @@ export function ChatScreen({ agentId }: { agentId: string }) {
               </button>
             )}
             {error.kind === "rejected" && (
-              <Link href="/accueil" className={styles.smallButton}>
-                Retour au dashboard
+              <Link href={backHref} className={styles.smallButton}>
+                Retour
               </Link>
             )}
           </div>

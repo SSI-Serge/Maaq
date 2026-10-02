@@ -30,7 +30,8 @@ export interface DashboardAgent {
 
 export interface Dashboard {
   max: number;
-  tabs: Record<"pro" | "perso", DashboardAgent[]>;
+  /** « contracts » alimente l'onglet « Agents des Contrats » de la page Contrats (US-31). */
+  tabs: Record<"pro" | "perso" | "contracts", DashboardAgent[]>;
 }
 
 function requireProfileWithDashboard(session: SessionContext): void {
@@ -195,14 +196,14 @@ export async function getDashboard(ctx: Ctx, session: SessionContext): Promise<D
     .innerJoin("agents as a", "a.id", "d.agent_id")
     .select(["d.agent_id", "d.name", "d.short_description", "d.category_code", "d.display_status", "a.maintenance_message"])
     .where("d.user_id", "=", session.user.id)
-    .where("d.category_code", "in", ["pro", "perso"])
+    .where("d.category_code", "in", ["pro", "perso", "contracts"])
     .orderBy("d.added_at")
     .orderBy("d.agent_id")
     .execute();
 
-  const tabs: Dashboard["tabs"] = { pro: [], perso: [] };
+  const tabs: Dashboard["tabs"] = { pro: [], perso: [], contracts: [] };
   for (const row of rows) {
-    tabs[row.category_code as "pro" | "perso"].push({
+    tabs[row.category_code as "pro" | "perso" | "contracts"].push({
       id: row.agent_id!,
       name: row.name!,
       shortDescription: row.short_description!,

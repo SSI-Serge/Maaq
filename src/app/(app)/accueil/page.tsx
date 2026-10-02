@@ -2,34 +2,20 @@
 
 import Link from "next/link";
 import { useState, useSyncExternalStore } from "react";
-import { useApiMutation, useApiQuery } from "@/client/hooks";
+import { useApiQuery } from "@/client/hooks";
+import { AgentCard, type DashboardAgent } from "@/components/app/AgentCard";
 import { AppShell, Section, appStyles as s } from "@/components/app/AppShell";
 import { useSessionUser } from "@/components/auth/AuthGate";
-import { ConfirmDialog, ErrorLine } from "@/components/auth/parts";
 import { ButtonLink, RetryNotice } from "@/components/ui";
 
 type Tab = "pro" | "perso";
-type Status = "ready" | "to_configure" | "blocked";
-
-interface Agent {
-  id: string;
-  name: string;
-  shortDescription: string;
-  status: Status;
-  maintenanceMessage: string | null;
-}
 
 interface Dashboard {
   max: number;
-  tabs: Record<Tab, Agent[]>;
+  tabs: Record<Tab, DashboardAgent[]>;
 }
 
 const TAB_LABEL: Record<Tab, string> = { pro: "Pro", perso: "Perso" };
-const STATUS: Record<Status, { label: string; tone: string }> = {
-  ready: { label: "Prêt", tone: s.ok },
-  to_configure: { label: "À configurer", tone: s.warn },
-  blocked: { label: "Bloqué", tone: s.error },
-};
 const LAST_TAB_KEY = "maaq:dashboard-tab";
 
 const noSubscription = () => () => {};
@@ -109,71 +95,9 @@ export default function DashboardPage() {
       )}
 
       {agents.map((agent) => (
-        <AgentCard key={agent.id} agent={agent} onRemoved={dashboard.reload} />
+        <AgentCard key={agent.id} agent={agent} origin="/accueil" onRemoved={dashboard.reload} />
       ))}
     </AppShell>
-  );
-}
-
-function AgentCard({ agent, onRemoved }: { agent: Agent; onRemoved: () => void }) {
-  const [confirming, setConfirming] = useState(false);
-  const mutation = useApiMutation();
-  const status = STATUS[agent.status];
-
-  async function remove() {
-    const result = await mutation.run<null>(`/api/dashboard/agents/${agent.id}`, { method: "DELETE" });
-    if (result !== undefined) {
-      setConfirming(false);
-      onRemoved();
-    }
-  }
-
-  return (
-    <article className={s.agentCard}>
-      <div className={s.cardActions}>
-        <div className={s.agentName}>{agent.name}</div>
-        <span className={`${s.badge} ${status.tone}`}>
-          <span className={s.dot} aria-hidden />
-          {status.label}
-        </span>
-      </div>
-      <p className={s.muted}>{agent.shortDescription}</p>
-      {agent.status === "blocked" && <p className={s.muted} style={{ color: "var(--error)" }}>Bloqué par l&apos;administrateur — {(agent.maintenanceMessage ?? "maintenance en cours").replace(/[.\s]+$/, "")}.</p>}
-      {agent.status === "to_configure" && <p className={s.muted}>Cet agent n&apos;est pas encore configuré : il manque des éléments pour l&apos;utiliser.</p>}
-      <div className={s.cardActions}>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <Link href={`/tchat/${agent.id}`} className={s.smallButton} style={{ background: "var(--primary)", color: "var(--primary-ink)", padding: "7px 12px", borderRadius: 8 }}>
-            Ouvrir le tchat
-          </Link>
-          <Link href={`/catalogue/${agent.id}`} className={s.smallButton}>
-            Voir la fiche
-          </Link>
-          {agent.status === "to_configure" && (
-            <Link href={`/connecteurs?agent=${agent.id}`} className={s.smallButton}>
-              Configurer
-            </Link>
-          )}
-        </div>
-        <button className={`${s.smallButton} ${s.danger}`} onClick={() => setConfirming(true)}>
-          Retirer
-        </button>
-      </div>
-      {confirming && (
-        <ConfirmDialog
-          title={`Retirer ${agent.name} ?`}
-          text="Sa configuration et son carnet de bord sont conservés."
-          confirmLabel="Retirer"
-          confirming={mutation.pending}
-          onConfirm={remove}
-          onCancel={() => {
-            mutation.reset();
-            setConfirming(false);
-          }}
-        >
-          <ErrorLine error={mutation.error} onRetry={remove} />
-        </ConfirmDialog>
-      )}
-    </article>
   );
 }
 
