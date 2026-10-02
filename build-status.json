@@ -3,7 +3,7 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-10-02T05:21:06Z",
+  "updated": "2026-10-02T05:22:28Z",
   "deploys": [],
   "features": [
     {
@@ -609,6 +609,10 @@
         {
           "at": "2026-10-02T05:21:06Z",
           "what": "Correction du lot 3 : les informations d'un agent sont désormais bien transmises au Digitorn simulé (le profil reçoit son identifiant Digitorn à la première transmission)."
+        },
+        {
+          "at": "2026-10-02T05:22:28Z",
+          "what": "Connecteurs validés : envoi sur la branche de test approuvé."
         }
       ],
       "unsure": [
@@ -616,6 +620,11 @@
         "À la révocation d'une autorisation, le message « À reconnecter » s'affiche sur l'écran Connecteurs ; son affichage dans le tchat arrive au lot 6."
       ],
       "activity": [
+        {
+          "at": "2026-10-02T05:22:28Z",
+          "kind": "ok",
+          "what": "Code envoyé sur la branche de test (pas encore en production)"
+        },
         {
           "at": "2026-10-02T05:21:06Z",
           "kind": "ok",
@@ -631,11 +640,7 @@
           "kind": "work",
           "what": "Lecture des 7 user stories et de la maquette Connecteurs ; dépôt Git réparé après l'interruption"
         }
-      ],
-      "needsYou": {
-        "title": "Prêt à être envoyé sur la branche de test",
-        "text": "Les 7 user stories des connecteurs sont construites et vérifiées (138 tests). Rien n'est envoyé sur GitHub avant ton accord."
-      }
+      ]
     },
     {
       "id": "f6",
@@ -705,7 +710,9 @@
       ],
       "decisions": [],
       "unsure": [],
-      "activity": []
+      "activity": [],
+      "building": true,
+      "currentAction": "Lecture des user stories et maquettes du tchat…"
     },
     {
       "id": "f7",
