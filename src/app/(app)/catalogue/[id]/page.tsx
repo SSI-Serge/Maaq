@@ -172,7 +172,15 @@ function SheetBody({ sheet, onChanged }: { sheet: Sheet; onChanged: () => void }
             <Link href={dashboardHref} style={{ textDecoration: "underline" }}>
               Voir mon dashboard ›
             </Link>
-            {done.status === "to_configure" && !done.needsInfo && <> Cet agent est « À configurer ».</>}
+            {done.status === "to_configure" && !done.needsInfo && (
+              <>
+                {" "}
+                Cet agent est « À configurer ».{" "}
+                <Link href={`/connecteurs?agent=${sheet.id}`} style={{ textDecoration: "underline" }}>
+                  Configurer maintenant ›
+                </Link>
+              </>
+            )}
           </Notice>
         )}
         {added ? (

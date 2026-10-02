@@ -18,13 +18,15 @@ export const IDLE_LOCK_MINUTES = 5;
 /** Durée laissée pour terminer une vérification d'appareil ou un parcours de récupération. */
 export const PENDING_FLOW_MINUTES = 30;
 
-export type CodePurpose = "device_verification" | "access_recovery" | "password_reset";
+export type CodePurpose = "device_verification" | "access_recovery" | "password_reset" | "validation_mailbox";
 
 /** Codes à 6 chiffres : durée de validité selon l'usage (US-51 RF2, US-8 RF4, US-66 RF4). */
 export const CODE_TTL_MINUTES: Record<CodePurpose, number> = {
   device_verification: 10,
   access_recovery: 30,
   password_reset: 30,
+  // La spec ne fixe pas cette durée : même valeur que les codes de récupération.
+  validation_mailbox: 30,
 };
 
 /** 5 codes incorrects invalident le code (US-8 RF6, US-51 RF4, US-66 RF5). */

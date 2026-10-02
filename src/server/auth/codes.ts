@@ -25,6 +25,8 @@ export interface IssueInput {
   channel: "email" | "sms";
   target: string;
   deviceIdentifier?: string;
+  /** Connexion « boîte de validation » à vérifier (US-15 RF4). */
+  agentConnectionId?: string;
   now: Date;
 }
 
@@ -75,6 +77,7 @@ export async function issueCode(db: Kysely<DB>, input: IssueInput): Promise<Issu
         code_hash: secretDigest(`code:${purpose}`, userId, code),
         expires_at: expiresAt,
         device_identifier: input.deviceIdentifier ?? null,
+        agent_connection_id: input.agentConnectionId ?? null,
         created_at: now,
       })
       .execute();
@@ -90,6 +93,7 @@ export interface CheckInput {
   purpose: CodePurpose;
   code: string;
   deviceIdentifier?: string;
+  agentConnectionId?: string;
   now: Date;
 }
 
@@ -107,6 +111,7 @@ export async function checkCode(db: Kysely<DB>, input: CheckInput): Promise<Chec
       .limit(1)
       .forUpdate();
     if (input.deviceIdentifier) query = query.where("device_identifier", "=", input.deviceIdentifier);
+    if (input.agentConnectionId) query = query.where("agent_connection_id", "=", input.agentConnectionId);
     const row = await query.executeTakeFirst();
 
     if (!row) return "missing";

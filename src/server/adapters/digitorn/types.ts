@@ -67,8 +67,31 @@ export interface HostedAgent {
   name: string;
 }
 
+export type GoogleConnector = "google_drive" | "google_calendar";
+
+/** Résultat d'un parcours de consentement Google, opéré par Digitorn (US-14 RT1). */
+export type AuthorizationResult =
+  | { status: "pending" }
+  | { status: "authorized" | "partial" | "denied"; accountEmail: string; missing: string[] };
+
+/** Éléments de configuration d'un agent transmis à Digitorn (US-15 RT1, US-16 RT2). */
+export interface AgentConfiguration {
+  validationMailbox: string | null;
+  googleAccounts: Partial<Record<GoogleConnector, string>>;
+  ccAddresses: string[];
+}
+
 export interface DigitornClient {
   listHostedAgents(): Promise<HostedAgent[]>;
+  /**
+   * Démarre un consentement Google. `state` revient tel quel avec l'utilisateur (US-14 RF3) ;
+   * MAAQ ne reçoit que le résultat, jamais de mot de passe (US-13 RT1).
+   */
+  beginAuthorization(input: { state: string; profileRef: string; connector: GoogleConnector; email: string; returnUrl: string }): Promise<{ consentUrl: string }>;
+  getAuthorizationResult(state: string): Promise<AuthorizationResult>;
+  /** Retire l'autorisation d'un ancien compte ou d'une connexion déconnectée (US-13 RF8, RF9). */
+  revokeAuthorization(profileRef: string, connector: GoogleConnector, email: string): Promise<void>;
+  updateAgentConfiguration(profileRef: string, agentRef: string, config: AgentConfiguration): Promise<void>;
   /** Transmet les informations d'un profil pour un agent, dès qu'elles changent (US-12 RF5, D11). */
   updateProfileInfo(userRef: string, agentRef: string, info: Record<string, string | string[]>): Promise<void>;
   submitRequest(input: SubmitRequestInput): Promise<void>;

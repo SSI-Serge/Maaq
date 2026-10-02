@@ -42,3 +42,11 @@ Les emails et SMS envoyés par l'application arrivent dans la boîte de test : h
 - Depuis le dashboard, « Catalogue » ouvre le catalogue ; la recherche ignore accents et majuscules.
 - Un agent qui demande des informations ouvre le formulaire dès l'ajout ; fermé sans enregistrer, l'agent reste « À configurer ».
 - Pour essayer la limite par rubrique : modifier « Agents maximum par rubrique » dans la console (Paramètres).
+
+## Connecteurs (Google simulé)
+
+- Réglages > Connecteurs : un onglet par agent qui demande un connecteur (Agenda, Drive, boîte de validation) ou des adresses en copie.
+- « Autoriser » envoie vers http://localhost:3000/dev/google, qui remplace la page de consentement Google : autoriser (avec un autre compte si on le saisit), autoriser en partie, ou refuser. On revient ensuite dans MAAQ.
+- Pour simuler une autorisation retirée côté Google : ouvrir http://localhost:3000/dev/google sans paramètre, puis « Retirer l'autorisation côté Google » ; le connecteur passe à « À reconnecter ».
+- Le code de la boîte de validation arrive dans http://localhost:3000/dev/boite.
+- Tester en restant sur http://localhost:3000 : la page Google simulée y renvoie toujours.

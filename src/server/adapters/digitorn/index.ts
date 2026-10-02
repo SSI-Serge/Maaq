@@ -17,3 +17,11 @@ export function digitorn(): DigitornClient {
 }
 
 export type * from "./types";
+
+/** Simulateur Digitorn, pour les pages et routes de développement (consentement Google simulé). */
+export function devDigitorn(): MockDigitorn {
+  const client = digitorn();
+  // Pas de `instanceof` : en développement, routes et pages reçoivent chacune leur copie de la classe.
+  if (typeof (client as Partial<MockDigitorn>).completeConsent !== "function") throw new Error("Le simulateur Digitorn n'est pas actif.");
+  return client as MockDigitorn;
+}

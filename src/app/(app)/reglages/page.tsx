@@ -65,6 +65,9 @@ export default function SettingsPage() {
 
       <Section title="Mon compte">
         <div className={s.navList}>
+          <Link href="/connecteurs" className={s.navItem}>
+            Connecteurs <span aria-hidden>›</span>
+          </Link>
           {user.role === "primary_user" && (
             <Link href="/invites" className={s.navItem}>
               Invités <span aria-hidden>›</span>

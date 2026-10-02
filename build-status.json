@@ -3,7 +3,7 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-10-02T04:46:15Z",
+  "updated": "2026-10-02T05:21:06Z",
   "deploys": [],
   "features": [
     {
@@ -543,51 +543,99 @@
         {
           "id": "f5s1",
           "title": "US-67 · Connecter le Google Drive du compte",
-          "state": "planning",
-          "env": null
+          "state": "done",
+          "env": null,
+          "unsure": "Le widget Digitorn (deuxième façon de connecter le Drive) n'est pas construit : seule la connexion depuis MAAQ existe."
         },
         {
           "id": "f5s2",
           "title": "US-13 · Renseigner l'adresse email de connexion d'un agent",
-          "state": "planning",
-          "env": null
+          "state": "done",
+          "env": null,
+          "unsure": "Côté invité, l'écran Connecteurs n'a été vérifié que par les tests automatiques, pas dans le navigateur."
         },
         {
           "id": "f5s3",
           "title": "US-14 · Autoriser les permissions nécessaires à un agent",
-          "state": "planning",
-          "env": null
+          "state": "done",
+          "env": null,
+          "unsure": "Le vrai consentement Google (Digitorn) n'existe pas encore : tout passe par une page simulée. Le retour sur iPhone dans l'application installée reste à tester sur un vrai appareil."
         },
         {
           "id": "f5s4",
           "title": "US-15 · Configurer la boîte mail de validation d'un agent",
-          "state": "planning",
-          "env": null
+          "state": "done",
+          "env": null,
+          "unsure": "Le code de vérification arrive seulement dans la boîte de test. Sa durée de 30 minutes est une hypothèse (la spec ne la fixe pas)."
         },
         {
           "id": "f5s5",
           "title": "US-16 · Définir les adresses en copie systématique d'un agent",
-          "state": "planning",
-          "env": null
+          "state": "done",
+          "env": null,
+          "unsure": "Les adresses en copie ne sont pas encore utilisées pour de vrais rendez-vous : cela dépend du tchat (lot 6)."
         },
         {
           "id": "f5s6",
           "title": "US-17 · Ajouter mes propres adresses en copie d'un agent",
-          "state": "planning",
-          "env": null
+          "state": "done",
+          "env": null,
+          "unsure": "Vérifié par les tests pour l'invité 1 et l'invité secondaire ; pas essayé dans le navigateur."
         },
         {
           "id": "f5s7",
           "title": "US-29 · Être informé qu'un agent n'est pas encore configuré",
-          "state": "planning",
+          "state": "done",
           "env": null
         }
       ],
-      "decisions": [],
-      "unsure": [],
-      "activity": [],
-      "building": true,
-      "currentAction": "Lecture des user stories et maquettes des connecteurs…"
+      "decisions": [
+        {
+          "at": "2026-10-02T04:58:27Z",
+          "what": "La page de consentement Google est simulée par une page de développement : autoriser, autoriser en partie, refuser, ou autoriser avec un autre compte."
+        },
+        {
+          "at": "2026-10-02T04:58:27Z",
+          "what": "Le code de vérification de la boîte de validation est valable 30 minutes, comme les autres codes de récupération (la spec ne le précise pas)."
+        },
+        {
+          "at": "2026-10-02T04:58:27Z",
+          "what": "Un agent ne voit son onglet Connecteurs que s'il demande un connecteur ou prévoit des adresses en copie."
+        },
+        {
+          "at": "2026-10-02T04:58:27Z",
+          "what": "Le lien « Configurer » apparaît sur les cartes « À configurer » du dashboard et dans la confirmation d'ajout d'un agent."
+        },
+        {
+          "at": "2026-10-02T05:21:06Z",
+          "what": "Correction du lot 3 : les informations d'un agent sont désormais bien transmises au Digitorn simulé (le profil reçoit son identifiant Digitorn à la première transmission)."
+        }
+      ],
+      "unsure": [
+        "Le côté invité n'a pas été cliqué dans le navigateur (seulement testé automatiquement).",
+        "À la révocation d'une autorisation, le message « À reconnecter » s'affiche sur l'écran Connecteurs ; son affichage dans le tchat arrive au lot 6."
+      ],
+      "activity": [
+        {
+          "at": "2026-10-02T05:21:06Z",
+          "kind": "ok",
+          "what": "138 tests automatiques au vert, compilation de production réussie"
+        },
+        {
+          "at": "2026-10-02T05:21:06Z",
+          "kind": "ok",
+          "what": "Connexion Google (autorisée, partielle, compte remplacé), boîte de validation, copies et révocation vérifiées dans le navigateur"
+        },
+        {
+          "at": "2026-10-02T04:58:27Z",
+          "kind": "work",
+          "what": "Lecture des 7 user stories et de la maquette Connecteurs ; dépôt Git réparé après l'interruption"
+        }
+      ],
+      "needsYou": {
+        "title": "Prêt à être envoyé sur la branche de test",
+        "text": "Les 7 user stories des connecteurs sont construites et vérifiées (138 tests). Rien n'est envoyé sur GitHub avant ton accord."
+      }
     },
     {
       "id": "f6",
@@ -850,6 +898,16 @@
       "name": "Lien « Configurer maintenant » après l'ajout d'un agent",
       "tag": "Proposed, not built",
       "note": "Dépend de l'écran Connecteurs (lot 5). Rien n'est perdu."
+    },
+    {
+      "name": "Widget Digitorn pour connecter le Drive du compte",
+      "tag": "Proposed, not built",
+      "note": "Dépend du format de retour de Digitorn (à confirmer). La connexion depuis MAAQ fonctionne déjà. Rien n'est perdu."
+    },
+    {
+      "name": "Message « À reconnecter » dans le tchat de l'agent",
+      "tag": "Proposed, not built",
+      "note": "Dépend du tchat (lot 6). Rien n'est perdu."
     }
   ]
 }

@@ -4,6 +4,7 @@ import { env } from "@/server/env";
 import { Rejection } from "@/server/http";
 import { normalizePhone } from "@/server/phone";
 import { decrypt, encrypt } from "@/server/security/crypto";
+import { ensureDigitornRef } from "./digitorn-ref";
 
 /**
  * Informations propres à chaque agent (US-10 RF2, RF12, RF13 ; US-11 RF2 ; US-12) : définies par
@@ -230,12 +231,9 @@ export async function saveAgentInfo(
     }
   });
 
-  if (target.digitorn_user_ref) {
-    const info = Object.fromEntries(
-      fields.map((f) => [f.label, f.max_items > 1 ? (clean.get(f.id) ?? []) : (clean.get(f.id)?.[0] ?? "")]),
-    );
-    await digitorn().updateProfileInfo(target.digitorn_user_ref, agent.digitorn_agent_ref, info);
-  }
+  // Transmission immédiate à Digitorn (US-12 RF5) : le profil reçoit son identifiant Digitorn au besoin.
+  const info = Object.fromEntries(fields.map((f) => [f.label, f.max_items > 1 ? (clean.get(f.id) ?? []) : (clean.get(f.id)?.[0] ?? "")]));
+  await digitorn().updateProfileInfo(await ensureDigitornRef(ctx.db, target.id), agent.digitorn_agent_ref, info);
   return getAgentInfoForm(ctx, viewer, targetUserId, agentId);
 }
 

@@ -141,9 +141,16 @@ function AgentCard({ agent, onRemoved }: { agent: Agent; onRemoved: () => void }
       {agent.status === "blocked" && <p className={s.muted} style={{ color: "var(--error)" }}>Bloqué par l&apos;administrateur — {(agent.maintenanceMessage ?? "maintenance en cours").replace(/[.\s]+$/, "")}.</p>}
       {agent.status === "to_configure" && <p className={s.muted}>Cet agent n&apos;est pas encore configuré : il manque des éléments pour l&apos;utiliser.</p>}
       <div className={s.cardActions}>
-        <Link href={`/catalogue/${agent.id}`} className={s.smallButton}>
-          Voir la fiche
-        </Link>
+        <div style={{ display: "flex", gap: 10 }}>
+          <Link href={`/catalogue/${agent.id}`} className={s.smallButton}>
+            Voir la fiche
+          </Link>
+          {agent.status === "to_configure" && (
+            <Link href={`/connecteurs?agent=${agent.id}`} className={s.smallButton}>
+              Configurer
+            </Link>
+          )}
+        </div>
         <button className={`${s.smallButton} ${s.danger}`} onClick={() => setConfirming(true)}>
           Retirer
         </button>

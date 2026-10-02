@@ -1,6 +1,10 @@
 import { randomUUID } from "node:crypto";
+import { env } from "@/server/env";
 import type {
   ActionProposal,
+  AgentConfiguration,
+  AuthorizationResult,
+  GoogleConnector,
   ChatEvent,
   DecideActionInput,
   DigitornClient,
@@ -27,6 +31,12 @@ export const MOCK_HOSTED_AGENTS: HostedAgent[] = [
   { ref: "contrats_challenge", name: "Contrats_Challenge" },
 ];
 
+/** Permissions non accordées lors d'une autorisation partielle. */
+const MISSING_PERMISSIONS: Record<GoogleConnector, string[]> = {
+  google_drive: ["Créer et déplacer des fichiers dans les dossiers dédiés"],
+  google_calendar: ["Consulter et créer des événements dans votre agenda"],
+};
+
 const APPOINTMENT_PATTERN = /rendez-vous|\brdv\b|réserv/i;
 const EMAIL_PATTERN = /\be-?mail\b|\bmail\b|écri[st]|envoie/i;
 
@@ -41,6 +51,9 @@ export class MockDigitorn implements DigitornClient {
   private readonly requests = new Set<string>();
   private readonly logbook: LogbookItem[] = [];
   private readonly profileInfo = new Map<string, Record<string, string | string[]>>();
+  private readonly authorizations = new Map<string, { connector: GoogleConnector; email: string; profileRef: string; result: AuthorizationResult }>();
+  private readonly agentConfigurations = new Map<string, AgentConfiguration>();
+  readonly revocations: { profileRef: string; connector: GoogleConnector; email: string }[] = [];
   private readonly replyDelayMs: number;
   private readonly executionDelayMs: number;
   private readonly now: () => Date;
@@ -53,6 +66,44 @@ export class MockDigitorn implements DigitornClient {
 
   async listHostedAgents(): Promise<HostedAgent[]> {
     return MOCK_HOSTED_AGENTS.map((agent) => ({ ...agent }));
+  }
+
+  async beginAuthorization(input: { state: string; profileRef: string; connector: GoogleConnector; email: string; returnUrl: string }) {
+    this.authorizations.set(input.state, { connector: input.connector, email: input.email, profileRef: input.profileRef, result: { status: "pending" } });
+    const base = env().APP_URL.replace(/\/$/, "");
+    return { consentUrl: `${base}/dev/google?etat=${encodeURIComponent(input.state)}` };
+  }
+
+  async getAuthorizationResult(state: string): Promise<AuthorizationResult> {
+    return this.authorizations.get(state)?.result ?? { status: "pending" };
+  }
+
+  /** Simule le choix de l'utilisateur sur la page de consentement Google. */
+  completeConsent(state: string, outcome: "authorized" | "partial" | "denied", accountEmail?: string): boolean {
+    const pending = this.authorizations.get(state);
+    if (!pending) return false;
+    const missing = outcome === "partial" ? MISSING_PERMISSIONS[pending.connector] : [];
+    pending.result = { status: outcome, accountEmail: accountEmail ?? pending.email, missing };
+    return true;
+  }
+
+  /** Autorisation en attente de consentement, pour la page de développement. */
+  pendingAuthorization(state: string) {
+    const entry = this.authorizations.get(state);
+    return entry ? { connector: entry.connector, email: entry.email } : null;
+  }
+
+  async revokeAuthorization(profileRef: string, connector: GoogleConnector, email: string): Promise<void> {
+    this.revocations.push({ profileRef, connector, email });
+  }
+
+  async updateAgentConfiguration(profileRef: string, agentRef: string, config: AgentConfiguration): Promise<void> {
+    this.agentConfigurations.set(key(profileRef, agentRef), structuredClone(config));
+  }
+
+  /** Configuration reçue pour un profil et un agent (contrôle dans les tests). */
+  agentConfigurationOf(profileRef: string, agentRef: string): AgentConfiguration | undefined {
+    return this.agentConfigurations.get(key(profileRef, agentRef));
   }
 
   async updateProfileInfo(userRef: string, agentRef: string, info: Record<string, string | string[]>): Promise<void> {
