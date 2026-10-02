@@ -528,6 +528,14 @@ export interface ErrorReports {
   user_comment: string | null;
 }
 
+export interface ChatRequests {
+  agent_id: Int8;
+  counted_date: Timestamp;
+  created_at: Generated<Timestamp>;
+  request_id: string;
+  user_id: string;
+}
+
 export interface IdempotencyKeys {
   created_at: Generated<Timestamp>;
   idempotency_key: string;
@@ -819,6 +827,7 @@ export interface DB {
   agents: Agents;
   cc_addresses: CcAddresses;
   chat_erasure_requests: ChatErasureRequests;
+  chat_requests: ChatRequests;
   connector_types: ConnectorTypes;
   contract_consent_events: ContractConsentEvents;
   contract_definitions: ContractDefinitions;

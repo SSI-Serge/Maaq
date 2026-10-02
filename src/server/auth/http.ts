@@ -91,9 +91,10 @@ export async function isUnlocked(session: SessionContext, now: Date): Promise<bo
 
 /**
  * Garde des routes protégées : session valide ET déverrouillée. Prolonge le déverrouillage
- * (5 minutes glissantes). Refus 401 sans session, 423 si l'application est verrouillée.
+ * (5 minutes glissantes) sauf pour une lecture automatique en arrière-plan (`passive`), qui ne
+ * compte pas comme une activité de la personne (US-52). Refus 401 sans session, 423 si verrouillée.
  */
-export async function requireProfile(options: { allowGrace?: boolean } = {}): Promise<{ session: SessionContext; ctx: Ctx }> {
+export async function requireProfile(options: { allowGrace?: boolean; passive?: boolean } = {}): Promise<{ session: SessionContext; ctx: Ctx }> {
   const context = ctx();
   const session = await currentSession(context);
   if (!session) {
@@ -104,7 +105,7 @@ export async function requireProfile(options: { allowGrace?: boolean } = {}): Pr
   if (session.user.inGracePeriod && !options.allowGrace) {
     throw new Rejection("grace_period", "Votre compte est en cours de suppression.", 403);
   }
-  await markUnlocked(session.sessionId, context.now);
+  if (!options.passive) await markUnlocked(session.sessionId, context.now);
   return { session, ctx: context };
 }
 

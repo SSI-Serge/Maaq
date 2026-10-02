@@ -3,7 +3,7 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-10-02T05:22:28Z",
+  "updated": "2026-10-02T05:48:50Z",
   "deploys": [],
   "features": [
     {
@@ -650,69 +650,140 @@
         {
           "id": "f6s1",
           "title": "US-37 · Accéder rapidement au tchat d'un agent",
-          "state": "planning",
-          "env": null
+          "state": "done",
+          "env": null,
+          "unsure": "Le lien vers le carnet de bord, dans l'en-tête de la maquette, n'existe pas encore : il arrive avec le carnet (lot 8)."
         },
         {
           "id": "f6s2",
           "title": "US-60 · Être informé que j'échange avec une IA",
-          "state": "planning",
+          "state": "done",
           "env": null
         },
         {
           "id": "f6s3",
           "title": "US-41 · Découvrir le tchat d'un agent sans historique",
-          "state": "planning",
+          "state": "done",
           "env": null
         },
         {
           "id": "f6s4",
           "title": "US-38 · Demander à un agent de réaliser une action",
-          "state": "planning",
-          "env": null
+          "state": "done",
+          "env": null,
+          "unsure": "Le texte de la demande n'est transmis qu'à un Digitorn simulé : le format réel de l'échange reste à valider avec Digitorn. Le bouton de dictée de la maquette n'est pas construit (aucune user story du tchat ne le décrit)."
         },
         {
           "id": "f6s5",
           "title": "US-70 · Être limité à un nombre de demandes par jour",
-          "state": "planning",
+          "state": "done",
           "env": null
         },
         {
           "id": "f6s6",
           "title": "US-39 · Valider une action proposée par l'agent",
-          "state": "planning",
-          "env": null
+          "state": "done",
+          "env": null,
+          "unsure": "Les cartes (rendez-vous, email) viennent du simulateur : le contenu réel envoyé par Digitorn peut différer. Le message « exécution plus longue que prévu » apparaît après 1 minute, durée choisie sans précision de la spec."
         },
         {
           "id": "f6s7",
           "title": "US-42 · Être informé d'un accès agent bloqué",
-          "state": "planning",
-          "env": null
+          "state": "done",
+          "env": null,
+          "unsure": "Le blocage est repris par relecture toutes les 15 s (3 s pendant une attente) : la spec demande « 30 s au plus »."
         },
         {
           "id": "f6s8",
           "title": "US-61 · Signaler une réponse ou une action erronée d'un agent",
-          "state": "planning",
-          "env": null
+          "state": "done",
+          "env": null,
+          "unsure": "Le texte des réponses signalées est conservé tel quel en base ; la spec recommande de le chiffrer (à voir au lot 9). Le support n'est prévenu que si son adresse est renseignée dans les paramètres."
         },
         {
           "id": "f6s9",
           "title": "US-43 · Perte de l'historique du tchat à la déconnexion",
-          "state": "planning",
-          "env": null
+          "state": "done",
+          "env": null,
+          "unsure": "L'effacement à la déconnexion est testé automatiquement ; le cas « appareil révoqué » n'a pas été cliqué dans le navigateur."
         },
         {
           "id": "f6s10",
           "title": "US-44 · Expiration automatique des conversations anciennes",
-          "state": "planning",
-          "env": null
+          "state": "done",
+          "env": null,
+          "unsure": "L'historique disparaît à l'affichage : la suppression chez Digitorn d'une conversation de plus de 4 jours dépendra de leur API."
         }
       ],
-      "decisions": [],
-      "unsure": [],
-      "activity": [],
-      "building": true,
-      "currentAction": "Lecture des user stories et maquettes du tchat…"
+      "decisions": [
+        {
+          "at": "2026-10-02T05:24:43Z",
+          "what": "L'historique du tchat reste chez Digitorn (simulé) : MAAQ ne stocke aucun message, seulement les décisions d'actions et les signalements."
+        },
+        {
+          "at": "2026-10-02T05:24:43Z",
+          "what": "Le tchat se met à jour en le relisant toutes les quelques secondes : c'est ainsi que blocage, réactivation et réponses arrivent sans action de l'utilisateur."
+        },
+        {
+          "at": "2026-10-02T05:24:43Z",
+          "what": "Cette relecture ne repousse pas le verrouillage de l'application : seule l'activité de la personne le fait."
+        },
+        {
+          "at": "2026-10-02T05:24:43Z",
+          "what": "Le plafond de demandes est compté avant l'envoi à l'agent, et décompté si l'envoi échoue : un « Réessayer » ne compte qu'une fois."
+        },
+        {
+          "at": "2026-10-02T05:24:43Z",
+          "what": "Le lien vers le carnet de bord dans l'en-tête du tchat arrivera avec le carnet (lot 8)."
+        },
+        {
+          "at": "2026-10-02T05:48:50Z",
+          "what": "Quand l'agent n'a pas répondu après 2 minutes, « Réessayer » renvoie la même demande : elle n'est ni recomptée dans le plafond ni exécutée deux fois."
+        },
+        {
+          "at": "2026-10-02T05:48:50Z",
+          "what": "Un message écrit sans connexion attend jusqu'à 10 minutes et part tout seul au retour du réseau ; au-delà, il passe à « Non envoyé »."
+        },
+        {
+          "at": "2026-10-02T05:48:50Z",
+          "what": "Quand le plafond du jour est atteint, la personne peut encore valider ou refuser une action déjà proposée ; son texte reste dans la zone de saisie."
+        },
+        {
+          "at": "2026-10-02T05:48:50Z",
+          "what": "Mots-clés de démonstration du simulateur : « échec » fait échouer une action, « silence » empêche toute réponse (voir docs/comptes-de-test.md)."
+        }
+      ],
+      "unsure": [
+        "Les relectures du tchat se font par interrogation régulière du serveur ; une vraie notification instantanée n'est pas prévue.",
+        "Le tchat n'a été cliqué que du côté utilisateur principal ; le côté invité est couvert par les tests automatiques."
+      ],
+      "activity": [
+        {
+          "at": "2026-10-02T05:48:50Z",
+          "kind": "ok",
+          "what": "Dernier contrôle : types, règles de style et compilation de production sans erreur"
+        },
+        {
+          "at": "2026-10-02T05:48:50Z",
+          "kind": "ok",
+          "what": "171 tests automatiques au vert (33 pour le tchat)"
+        },
+        {
+          "at": "2026-10-02T05:48:50Z",
+          "kind": "ok",
+          "what": "Tchat vérifié dans le navigateur : suggestions, envoi, réponse, carte d'action, validation, signalement, blocage en direct, plafond, attente de 30 s et 2 min, coupure de connexion"
+        },
+        {
+          "at": "2026-10-02T05:24:43Z",
+          "kind": "work",
+          "what": "Lecture des 10 user stories et de la maquette du tchat ; lot 5 envoyé sur la branche de test"
+        }
+      ],
+      "building": false,
+      "needsYou": {
+        "title": "Prêt à être envoyé sur la branche de test",
+        "text": "Les 10 user stories du tchat sont construites et vérifiées (171 tests, essai dans le navigateur). Rien n'est envoyé sur GitHub avant ton accord."
+      }
     },
     {
       "id": "f7",
@@ -892,16 +963,6 @@
       "note": "Le formulaire existe déjà ; il sera relié au bouton « Ajouter à mon dashboard » au lot 4. Rien n'est perdu."
     },
     {
-      "name": "Message « Terminez votre configuration » à l'ouverture d'un tchat",
-      "tag": "Proposed, not built",
-      "note": "Dépend du tchat (lot 6). Rien n'est perdu."
-    },
-    {
-      "name": "Bouton « Ouvrir le tchat » sur les cartes d'agents",
-      "tag": "Proposed, not built",
-      "note": "Dépend du tchat (lot 6). Rien n'est perdu."
-    },
-    {
       "name": "Lien « Configurer maintenant » après l'ajout d'un agent",
       "tag": "Proposed, not built",
       "note": "Dépend de l'écran Connecteurs (lot 5). Rien n'est perdu."
@@ -912,9 +973,24 @@
       "note": "Dépend du format de retour de Digitorn (à confirmer). La connexion depuis MAAQ fonctionne déjà. Rien n'est perdu."
     },
     {
-      "name": "Message « À reconnecter » dans le tchat de l'agent",
+      "name": "Lien « Carnet de bord » dans l'en-tête du tchat",
       "tag": "Proposed, not built",
-      "note": "Dépend du tchat (lot 6). Rien n'est perdu."
+      "note": "La maquette le prévoit ; il arrive avec le carnet au lot 8. Rien n'est perdu."
+    },
+    {
+      "name": "Bouton de dictée dans la zone de saisie du tchat",
+      "tag": "Proposed, not built",
+      "note": "Présent sur la maquette mais décrit par aucune user story du tchat (la dictée est prévue pour le support, US-63). À trancher avec toi."
+    },
+    {
+      "name": "« Ouvrir le tchat » depuis la page Contrats",
+      "tag": "Proposed, not built",
+      "note": "La page Contrats arrive au lot 7 ; le tchat est prêt à recevoir ce lien."
+    },
+    {
+      "name": "Nettoyage automatique des tables techniques (clés d'idempotence, demandes du tchat, compteurs)",
+      "tag": "Proposed, not built",
+      "note": "Aucun traitement planifié n'existe encore ; il arrivera avec les traitements du lot 9. Ces tables grossissent très lentement d'ici là."
     }
   ]
 }

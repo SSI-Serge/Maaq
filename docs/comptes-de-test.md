@@ -50,3 +50,15 @@ Les emails et SMS envoyés par l'application arrivent dans la boîte de test : h
 - Pour simuler une autorisation retirée côté Google : ouvrir http://localhost:3000/dev/google sans paramètre, puis « Retirer l'autorisation côté Google » ; le connecteur passe à « À reconnecter ».
 - Le code de la boîte de validation arrive dans http://localhost:3000/dev/boite.
 - Tester en restant sur http://localhost:3000 : la page Google simulée y renvoie toujours.
+
+## Tchat avec les agents (Digitorn simulé)
+
+- Dashboard > « Ouvrir le tchat » sur une carte d'agent. Un agent « À configurer » affiche l'écran informatif ; un agent bloqué (console > Agents) affiche la bannière de maintenance et grise la saisie, sans effacer l'historique.
+- L'agent simulé répond en 1,5 s. Mots-clés de démonstration :
+  - « rendez-vous », « rdv » ou « réserver » : carte d'action de rendez-vous (participants automatiques du foyer) ;
+  - « mail », « écris » ou « envoie » : carte de validation d'un email (objet, destinataire, brouillon) ;
+  - « échec » : l'action validée échouera (« L'action n'a pas pu être exécutée ») ;
+  - « silence » : l'agent ne répond jamais — « met plus de temps » à 30 s, « n'a pas pu répondre » + Réessayer à 2 min.
+- Plafond de demandes : par défaut 50 par jour. Pour l'essayer vite, baisser `daily_request_limit` du compte en base ; l'avertissement apparaît à 5 demandes restantes.
+- Les conversations vivent dans la mémoire du simulateur : elles disparaissent au redémarrage du serveur de développement.
+

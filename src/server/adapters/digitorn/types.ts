@@ -36,6 +36,9 @@ export interface ActionProposal {
   place?: string;
   participants: string[];
   recipient?: string;
+  /** Email à valider : objet et début du brouillon, tels que relus dans la boîte de validation (US-39 RF6). */
+  subject?: string;
+  draftPreview?: string;
   status: ActionStatus;
 }
 

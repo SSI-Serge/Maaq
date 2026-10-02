@@ -39,6 +39,10 @@ const MISSING_PERMISSIONS: Record<GoogleConnector, string[]> = {
 
 const APPOINTMENT_PATTERN = /rendez-vous|\brdv\b|réserv/i;
 const EMAIL_PATTERN = /\be-?mail\b|\bmail\b|écri[st]|envoie/i;
+/** Mot-clé de démonstration : l'action proposée échouera à l'exécution (US-39 RF9). */
+const FAILURE_PATTERN = /[ée]chec/i;
+/** Mot-clé de démonstration : l'agent ne répond jamais (attentes de 30 s et de 2 min, US-38 RF9, RF10). */
+const SILENCE_PATTERN = /silence/i;
 
 /**
  * Simulateur de Digitorn. Il garde les conversations en mémoire et imite le comportement
@@ -47,7 +51,7 @@ const EMAIL_PATTERN = /\be-?mail\b|\bmail\b|écri[st]|envoie/i;
  */
 export class MockDigitorn implements DigitornClient {
   private readonly conversations = new Map<string, ChatEvent[]>();
-  private readonly proposals = new Map<string, { proposal: ActionProposal; userRef: string; agentRef: string }>();
+  private readonly proposals = new Map<string, { proposal: ActionProposal; userRef: string; agentRef: string; willFail: boolean }>();
   private readonly requests = new Set<string>();
   private readonly logbook: LogbookItem[] = [];
   private readonly profileInfo = new Map<string, Record<string, string | string[]>>();
@@ -127,7 +131,7 @@ export class MockDigitorn implements DigitornClient {
       at: this.now().toISOString(),
     });
     this.log(input.userRef, input.agentRef, "request", input.text, input.context.autoParticipants);
-    this.later(this.replyDelayMs, () => this.reply(input));
+    if (!SILENCE_PATTERN.test(input.text)) this.later(this.replyDelayMs, () => this.reply(input));
   }
 
   async getConversation(userRef: string, agentRef: string): Promise<ChatEvent[]> {
@@ -158,6 +162,10 @@ export class MockDigitorn implements DigitornClient {
     proposal.status = "executing";
     this.log(entry.userRef, entry.agentRef, "action_validated", proposal.summary, proposal.participants);
     this.later(this.executionDelayMs, () => {
+      if (entry.willFail) {
+        proposal.status = "failed";
+        return;
+      }
       proposal.status = "succeeded";
       this.log(entry.userRef, entry.agentRef, "action_done", proposal.summary, proposal.participants);
     });
@@ -210,6 +218,8 @@ export class MockDigitorn implements DigitornClient {
           summary: "Envoyer l'email rédigé",
           participants: [],
           recipient: "destinataire@exemple.fr",
+          subject: "Votre demande",
+          draftPreview: `Madame, Monsieur, ${input.text.slice(0, 100)}…`,
           status: "pending",
         }
       : {
@@ -221,7 +231,7 @@ export class MockDigitorn implements DigitornClient {
           participants: [...input.context.autoParticipants],
           status: "pending",
         };
-    this.proposals.set(proposal.proposalId, { proposal, userRef: input.userRef, agentRef: input.agentRef });
+    this.proposals.set(proposal.proposalId, { proposal, userRef: input.userRef, agentRef: input.agentRef, willFail: FAILURE_PATTERN.test(input.text) });
     this.push(input.userRef, input.agentRef, {
       type: "agent_message",
       id: randomUUID(),

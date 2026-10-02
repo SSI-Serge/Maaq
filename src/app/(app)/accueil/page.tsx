@@ -141,7 +141,10 @@ function AgentCard({ agent, onRemoved }: { agent: Agent; onRemoved: () => void }
       {agent.status === "blocked" && <p className={s.muted} style={{ color: "var(--error)" }}>Bloqué par l&apos;administrateur — {(agent.maintenanceMessage ?? "maintenance en cours").replace(/[.\s]+$/, "")}.</p>}
       {agent.status === "to_configure" && <p className={s.muted}>Cet agent n&apos;est pas encore configuré : il manque des éléments pour l&apos;utiliser.</p>}
       <div className={s.cardActions}>
-        <div style={{ display: "flex", gap: 10 }}>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <Link href={`/tchat/${agent.id}`} className={s.smallButton} style={{ background: "var(--primary)", color: "var(--primary-ink)", padding: "7px 12px", borderRadius: 8 }}>
+            Ouvrir le tchat
+          </Link>
           <Link href={`/catalogue/${agent.id}`} className={s.smallButton}>
             Voir la fiche
           </Link>

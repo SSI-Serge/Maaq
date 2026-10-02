@@ -509,7 +509,7 @@ export async function verifyMailbox(ctx: Ctx, session: SessionContext, input: { 
  * Participants ajoutés d'office aux rendez-vous du profil selon son rang (décision D2) :
  * utilisateur principal → invité 1 ; invité 1 → utilisateur principal ; invité secondaire → les deux.
  */
-async function autoParticipants(db: Kysely<DB>, session: SessionContext): Promise<{ email: string; name: string }[]> {
+export async function autoParticipants(db: Kysely<DB>, session: SessionContext): Promise<{ email: string; name: string }[]> {
   const accountId = session.user.accountId!;
   const people = await db
     .selectFrom("users")
