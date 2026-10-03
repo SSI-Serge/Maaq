@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>MAAQ — Mes invités</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=Karla:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --bg:#E9E1D2; --bg-raised:#F6F0E4; --bg-sunken:#DFD5C0;
+    --ink:#2B211F; --ink-soft:#6E5F58; --line:#DDCFC0;
+    --primary:#7A2E32; --primary-strong:#5E2126; --primary-soft:#EDD9D6; --primary-ink:#F7F1E6;
+    --secondary:#B4913A; --secondary-strong:#93731F; --secondary-soft:#F2E7C6;
+    --success:#5E7048; --success-bg:#E2E6D1;
+    --warning:#B67A24; --warning-bg:#F2E1C0;
+    --error:#A8502E; --error-bg:#F1DED2;
+    --radius:10px;
+    --shadow:0 1px 2px rgba(43,33,31,0.07), 0 8px 24px rgba(43,33,31,0.09);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Karla',sans-serif;background:var(--bg);color:var(--ink);}
+  h1,h2,h3,h4{font-family:'Newsreader',serif;font-weight:500;margin:0;color:var(--ink);}
+  a{text-decoration:none;color:inherit;}
+  button{font-family:'Karla',sans-serif;cursor:pointer;}
+  input{font-family:'Karla',sans-serif;}
+  label{font-size:12px;font-weight:600;color:var(--ink-soft);}
+  .icon-btn{width:28px;height:28px;border-radius:6px;border:1px solid var(--line);background:var(--bg);display:flex;align-items:center;justify-content:center;color:var(--ink-soft);flex-shrink:0;}
+  .rank{font-size:10px;font-weight:700;border-radius:100px;padding:2px 8px;white-space:nowrap;}
+</style>
+</helmet>
+<div style="width:390px;height:844px;box-sizing:border-box;background:var(--bg);display:flex;flex-direction:column;overflow:hidden;">
+
+  <div style="display:flex;align-items:center;gap:10px;padding:44px 20px 16px;border-bottom:1px solid var(--line);background:var(--bg-raised);">
+    <a href="U-Agents.html" aria-label="Retour" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;color:var(--ink);flex-shrink:0;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+    </a>
+    <h1 style="font-size:19px;">Mes invités</h1>
+  </div>
+
+  <div style="flex:1;overflow-y:auto;padding:18px 20px 24px;display:flex;flex-direction:column;gap:16px;">
+
+    <div style="background:var(--bg-raised);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;">
+      <div style="display:flex;justify-content:space-between;font-size:13px;font-weight:600;margin-bottom:8px;">
+        <span>{{quotaLabel}}</span>
+        <span style="color:var(--ink-soft);font-weight:500;">Plan Famille</span>
+      </div>
+      <div style="height:6px;border-radius:3px;background:var(--bg-sunken);overflow:hidden;">
+        <div style="{{quotaBarStyle}}"></div>
+      </div>
+      <sc-if value="{{atQuota}}" hint-placeholder-val="{{false}}">
+        <p style="font-size:11px;color:var(--warning);margin:8px 0 0;font-weight:600;">Vous avez atteint le nombre maximum d'invités de votre plan.</p>
+      </sc-if>
+      <sc-if value="{{notAtQuota}}" hint-placeholder-val="{{true}}">
+        <p style="font-size:11px;color:var(--ink-soft);margin:8px 0 0;">Le nombre d'invités possibles dépend de votre plan souscrit. Le premier invité ajouté devient l'« Invité 1 ».</p>
+      </sc-if>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:10px;">
+
+      <sc-if value="{{julienVisible}}" hint-placeholder-val="{{true}}">
+        <div style="background:var(--bg-raised);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px;display:flex;flex-direction:column;gap:10px;">
+
+          <sc-if value="{{julienView}}" hint-placeholder-val="{{true}}">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+              <div>
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;">
+                  <span style="font-family:'Newsreader',serif;font-size:15px;">Julien Martin</span>
+                  <span class="rank" style="color:var(--primary-strong);background:var(--primary-soft);">Invité 1</span>
+                </div>
+                <div style="font-size:12px;color:var(--ink-soft);">julien@exemple.fr · 06 98 76 54 32</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+                <span style="font-size:11px;font-weight:700;color:var(--success);background:var(--success-bg);border-radius:100px;padding:3px 9px;white-space:nowrap;">Actif</span>
+                <button onClick="{{julienEdit}}" aria-label="Modifier Julien Martin" class="icon-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+                <button onClick="{{julienAskDelete}}" aria-label="Supprimer Julien Martin" class="icon-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{julienEditing}}" hint-placeholder-val="{{false}}">
+            <div style="font-family:'Newsreader',serif;font-size:15px;">Modifier l'invité</div>
+            <div style="display:flex;flex-direction:column;gap:5px;"><label>Nom</label><input type="text" value="Julien Martin" style="padding:9px 11px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:13px;"></div>
+            <div style="display:flex;flex-direction:column;gap:5px;"><label>Email</label><input type="email" value="julien@exemple.fr" style="padding:9px 11px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:13px;"></div>
+            <div style="display:flex;flex-direction:column;gap:5px;"><label>Téléphone</label><input type="tel" value="06 98 76 54 32" style="padding:9px 11px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:13px;"></div>
+            <div style="display:flex;gap:8px;">
+              <button onClick="{{julienCancel}}" style="flex:1;background:transparent;border:1px solid var(--line);color:var(--ink);font-weight:600;font-size:13px;border-radius:8px;padding:10px;">Annuler</button>
+              <button onClick="{{julienSave}}" style="flex:1;background:var(--primary);color:var(--primary-ink);border:none;font-weight:600;font-size:13px;border-radius:8px;padding:10px;">Enregistrer</button>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{julienDeleting}}" hint-placeholder-val="{{false}}">
+            <div style="font-size:13px;font-weight:700;color:var(--error);">Supprimer Julien Martin ?</div>
+            <p style="font-size:12px;color:var(--ink-soft);margin:0;line-height:1.5;">Il perdra immédiatement l'accès aux agents mis à disposition. Étant « Invité 1 », il fait partie du noyau du compte : après suppression, vous pourrez désigner un nouvel invité 1 parmi vos invités secondaires.</p>
+            <div style="display:flex;gap:8px;">
+              <button onClick="{{julienCancel}}" style="flex:1;background:transparent;border:1px solid var(--line);color:var(--ink);font-weight:600;font-size:13px;border-radius:8px;padding:10px;">Annuler</button>
+              <button onClick="{{julienConfirmDelete}}" style="flex:1;background:var(--error);color:var(--primary-ink);border:none;font-weight:600;font-size:13px;border-radius:8px;padding:10px;">Supprimer</button>
+            </div>
+          </sc-if>
+
+        </div>
+      </sc-if>
+
+      <sc-if value="{{elodieVisible}}" hint-placeholder-val="{{true}}">
+        <div style="background:var(--bg-raised);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px;display:flex;flex-direction:column;gap:10px;">
+
+          <sc-if value="{{elodieView}}" hint-placeholder-val="{{true}}">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+              <div>
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;">
+                  <span style="font-family:'Newsreader',serif;font-size:15px;">Élodie Faucher</span>
+                  <span class="rank" style="color:var(--ink-soft);background:var(--bg-sunken);">Invité secondaire</span>
+                </div>
+                <div style="font-size:12px;color:var(--ink-soft);">elodie@exemple.fr · 06 11 22 33 44</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
+                <button onClick="{{elodieEdit}}" aria-label="Modifier Élodie Faucher" class="icon-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+                <button onClick="{{elodieAskDelete}}" aria-label="Supprimer Élodie Faucher" class="icon-btn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button>
+              </div>
+            </div>
+
+            <sc-if value="{{elodieExpired}}" hint-placeholder-val="{{true}}">
+              <div>
+                <span style="font-size:11px;font-weight:700;color:var(--warning);background:var(--warning-bg);border-radius:100px;padding:3px 9px;white-space:nowrap;">Invitation expirée</span>
+              </div>
+              <p style="font-size:12px;color:var(--ink-soft);margin:0;line-height:1.5;">Le lien envoyé à Élodie a expiré au bout de 30 minutes sans activation.</p>
+              <sc-if value="{{elodieCanResend}}" hint-placeholder-val="{{true}}">
+                <button onClick="{{elodieResend}}" style="background:var(--primary);color:var(--primary-ink);border:none;font-weight:600;font-size:13px;border-radius:8px;padding:10px;">Renvoyer un nouveau lien</button>
+              </sc-if>
+              <sc-if value="{{elodieRateLimited}}" hint-placeholder-val="{{false}}">
+                <div style="background:var(--warning-bg);color:var(--warning);font-size:12px;font-weight:600;border-radius:8px;padding:8px 10px;">Trop d'envois récents. Réessayez dans une heure.</div>
+              </sc-if>
+            </sc-if>
+
+            <sc-if value="{{elodieActive}}" hint-placeholder-val="{{false}}">
+              <div>
+                <span style="font-size:11px;font-weight:700;color:var(--success);background:var(--success-bg);border-radius:100px;padding:3px 9px;white-space:nowrap;">Actif</span>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{noInvite1}}" hint-placeholder-val="{{false}}">
+              <button onClick="{{designateElodie}}" style="background:transparent;border:1px solid var(--secondary);color:var(--secondary-strong);font-weight:600;font-size:12px;border-radius:8px;padding:9px;">Désigner comme invité 1</button>
+            </sc-if>
+          </sc-if>
+
+          <sc-if value="{{elodieEditing}}" hint-placeholder-val="{{false}}">
+            <div style="font-family:'Newsreader',serif;font-size:15px;">Modifier l'invitée</div>
+            <div style="display:flex;flex-direction:column;gap:5px;"><label>Nom</label><input type="text" value="Élodie Faucher" style="padding:9px 11px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:13px;"></div>
+            <div style="display:flex;flex-direction:column;gap:5px;"><label>Email</label><input type="email" value="elodie@exemple.fr" style="padding:9px 11px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:13px;"></div>
+            <div style="display:flex;flex-direction:column;gap:5px;"><label>Téléphone</label><input type="tel" value="06 11 22 33 44" style="padding:9px 11px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:13px;"></div>
+            <div style="display:flex;gap:8px;">
+              <button onClick="{{elodieCancel}}" style="flex:1;background:transparent;border:1px solid var(--line);color:var(--ink);font-weight:600;font-size:13px;border-radius:8px;padding:10px;">Annuler</button>
+              <button onClick="{{elodieSave}}" style="flex:1;background:var(--primary);color:var(--primary-ink);border:none;font-weight:600;font-size:13px;border-radius:8px;padding:10px;">Enregistrer</button>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{elodieDeleting}}" hint-placeholder-val="{{false}}">
+            <div style="font-size:13px;font-weight:700;color:var(--error);">Supprimer Élodie Faucher ?</div>
+            <p style="font-size:12px;color:var(--ink-soft);margin:0;line-height:1.5;">Elle perdra immédiatement l'accès aux agents mis à disposition.</p>
+            <div style="display:flex;gap:8px;">
+              <button onClick="{{elodieCancel}}" style="flex:1;background:transparent;border:1px solid var(--line);color:var(--ink);font-weight:600;font-size:13px;border-radius:8px;padding:10px;">Annuler</button>
+              <button onClick="{{elodieConfirmDelete}}" style="flex:1;background:var(--error);color:var(--primary-ink);border:none;font-weight:600;font-size:13px;border-radius:8px;padding:10px;">Supprimer</button>
+            </div>
+          </sc-if>
+
+        </div>
+      </sc-if>
+
+      <sc-if value="{{toastShown}}" hint-placeholder-val="{{false}}">
+        <div style="display:flex;align-items:center;gap:8px;background:var(--success-bg);color:var(--success);border-radius:10px;padding:10px 14px;font-size:13px;font-weight:600;">{{toastText}}</div>
+      </sc-if>
+
+    </div>
+
+    <button onClick="{{toggleForm}}" style="display:flex;align-items:center;justify-content:center;gap:8px;background:transparent;border:1.5px dashed var(--secondary);color:var(--secondary-strong);border-radius:var(--radius);padding:13px;font-weight:600;font-size:13px;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+      Ajouter un invité
+    </button>
+
+    <sc-if value="{{showForm}}" hint-placeholder-val="{{false}}">
+      <div style="background:var(--bg-raised);border:1px solid var(--line);border-radius:var(--radius);padding:16px;display:flex;flex-direction:column;gap:12px;">
+        <div style="font-family:'Newsreader',serif;font-size:16px;">Nouvel invité</div>
+        <div style="display:flex;flex-direction:column;gap:5px;">
+          <label for="inom">Nom</label>
+          <input id="inom" type="text" placeholder="Nom complet" style="padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:13px;">
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px;">
+          <label for="iemail">Email</label>
+          <input id="iemail" type="email" placeholder="email@exemple.fr" style="padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:13px;">
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px;">
+          <label for="itel">Téléphone</label>
+          <input id="itel" type="tel" placeholder="06 00 00 00 00" style="padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:13px;">
+        </div>
+        <sc-if value="{{noInvite1}}" hint-placeholder-val="{{false}}">
+          <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:500;color:var(--ink);">
+            <input type="checkbox" style="width:16px;height:16px;">
+            Désigner comme invité 1
+          </label>
+        </sc-if>
+        <div style="display:flex;gap:8px;margin-top:4px;">
+          <button onClick="{{toggleForm}}" style="flex:1;background:transparent;border:1px solid var(--line);color:var(--ink);font-weight:600;font-size:13px;border-radius:8px;padding:11px;">Annuler</button>
+          <button onClick="{{saveInvite}}" style="flex:1;background:var(--primary);color:var(--primary-ink);border:none;font-weight:600;font-size:13px;border-radius:8px;padding:11px;">Inviter</button>
+        </div>
+      </div>
+    </sc-if>
+
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"noInvite1":{"editor":"boolean","default":false,"section":"États (Tweaks)"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props){
+    super(props);
+    this.state = {
+      showForm: false,
+      julienMode: 'view', julienRemoved: false,
+      elodieMode: 'view', elodieRemoved: false, elodieStatus: 'expired', elodieResendCount: 0,
+      toast: '',
+    };
+  }
+  flashToast(text){
+    this.setState({ toast: text });
+  }
+  renderVals(){
+    const s = this.state;
+    const p = this.props;
+    const activeCount = 2 - (s.julienRemoved ? 1 : 0) - (s.elodieRemoved ? 1 : 0);
+    const maxInvites = 3;
+    return {
+      showForm: s.showForm,
+      toggleForm: () => this.setState({ showForm: !s.showForm, toast: '' }),
+      saveInvite: () => { this.setState({ showForm: false }); this.flashToast('Invitation envoyée'); },
+
+      quotaLabel: activeCount + " sur " + maxInvites + " invités utilisés",
+      quotaBarStyle: "height:100%;border-radius:3px;background:var(--secondary);width:" + Math.round((activeCount / maxInvites) * 100) + "%;",
+      atQuota: activeCount >= maxInvites,
+      notAtQuota: activeCount < maxInvites,
+
+      noInvite1: !!p.noInvite1,
+
+      julienVisible: !s.julienRemoved,
+      julienView: s.julienMode === 'view',
+      julienEditing: s.julienMode === 'edit',
+      julienDeleting: s.julienMode === 'delete',
+      julienEdit: () => this.setState({ julienMode: 'edit' }),
+      julienAskDelete: () => this.setState({ julienMode: 'delete' }),
+      julienCancel: () => this.setState({ julienMode: 'view' }),
+      julienSave: () => { this.setState({ julienMode: 'view' }); this.flashToast('Informations mises à jour'); },
+      julienConfirmDelete: () => this.setState({ julienRemoved: true, julienMode: 'view' }),
+
+      elodieVisible: !s.elodieRemoved,
+      elodieView: s.elodieMode === 'view',
+      elodieEditing: s.elodieMode === 'edit',
+      elodieDeleting: s.elodieMode === 'delete',
+      elodieExpired: s.elodieStatus === 'expired',
+      elodieActive: s.elodieStatus === 'active',
+      elodieCanResend: s.elodieResendCount < 2,
+      elodieRateLimited: s.elodieResendCount >= 2,
+      elodieEdit: () => this.setState({ elodieMode: 'edit' }),
+      elodieAskDelete: () => this.setState({ elodieMode: 'delete' }),
+      elodieCancel: () => this.setState({ elodieMode: 'view' }),
+      elodieSave: () => { this.setState({ elodieMode: 'view' }); this.flashToast('Informations mises à jour'); },
+      elodieConfirmDelete: () => this.setState({ elodieRemoved: true, elodieMode: 'view' }),
+      elodieResend: () => {
+        const n = s.elodieResendCount + 1;
+        this.setState({ elodieResendCount: n });
+        if (n < 2) this.flashToast('Nouveau lien envoyé à Élodie');
+      },
+      designateElodie: () => this.flashToast('Élodie Faucher est désormais Invité 1'),
+
+      toastShown: s.toast !== '',
+      toastText: s.toast,
+    };
+  }
+}
+</script>
+</body>
+</html>

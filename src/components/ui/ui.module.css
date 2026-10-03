@@ -1,0 +1,282 @@
+/* Composants de base, d'après les styles des maquettes. */
+
+/* Écran mobile : 390 px de large au maximum, centré sur grand écran. */
+.screen {
+  width: 100%;
+  max-width: 390px;
+  min-height: 100dvh;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  padding: 40px 28px 24px;
+  position: relative;
+  background: var(--bg);
+}
+
+.centered {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 40px;
+}
+
+/* Logo */
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.logoMark {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--primary);
+  color: var(--primary-ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.logoMarkLarge {
+  width: 72px;
+  height: 72px;
+  border-radius: 18px;
+  font-size: 28px;
+}
+
+.logoMarkPulse {
+  animation: maaq-pulse 1.6s ease-in-out infinite;
+}
+
+.logoName {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 22px;
+  color: var(--ink);
+}
+
+/* Boutons */
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  font-weight: 600;
+  font-size: 14px;
+  border-radius: 8px;
+  padding: 13px 24px;
+  transition: background 0.15s ease;
+}
+
+.block {
+  width: 100%;
+}
+
+.primary {
+  background: var(--primary);
+  color: var(--primary-ink);
+}
+
+.primary:hover:not(:disabled) {
+  background: var(--primary-strong);
+}
+
+.secondary {
+  background: var(--bg-raised);
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+
+.secondary:hover:not(:disabled) {
+  background: var(--bg-sunken);
+}
+
+.ghost {
+  background: transparent;
+  color: var(--secondary-strong);
+  padding: 8px 4px;
+}
+
+.danger {
+  background: var(--error);
+  color: var(--primary-ink);
+}
+
+.button:disabled {
+  background: var(--line);
+  color: var(--ink-soft);
+  border-color: transparent;
+}
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  animation: maaq-spin 0.8s linear infinite;
+}
+
+/* Champs */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.input {
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--bg-raised);
+  font-size: 14px;
+  color: var(--ink);
+  width: 100%;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--secondary);
+}
+
+.inputError {
+  border-color: var(--error);
+}
+
+.fieldError {
+  font-size: 12px;
+  color: var(--error);
+  font-weight: 600;
+}
+
+.hint {
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+/* Messages */
+.notice {
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 8px;
+  padding: 9px 12px;
+  line-height: 1.5;
+}
+
+.notice_error {
+  background: var(--error-bg);
+  color: var(--error);
+}
+
+.notice_warning {
+  background: var(--warning-bg);
+  color: var(--warning);
+}
+
+.notice_success {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.notice_info {
+  background: var(--secondary-soft);
+  color: var(--secondary-strong);
+}
+
+.retry {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+/* Bandeau hors connexion (CC-4), fixé en haut de l'écran */
+.offlineBanner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: var(--ink);
+  color: var(--primary-ink);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  padding: 10px 16px;
+  padding-top: calc(10px + env(safe-area-inset-top));
+}
+
+/* Chargement */
+.loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+/* Écran d'état (démarrage, erreur, hors connexion) */
+.statusIcon {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 18px;
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: 22px;
+}
+
+.statusIconNeutral {
+  background: var(--bg-raised);
+  border: 2px solid var(--line);
+}
+
+.statusIconError {
+  background: var(--error-bg);
+  color: var(--error);
+  font-family: var(--font-sans);
+  font-size: 24px;
+}
+
+.statusText {
+  font-size: 14px;
+  color: var(--ink-soft);
+  line-height: 1.5;
+  margin: 0 0 18px;
+  max-width: 30ch;
+}
+
+.statusTitle {
+  font-size: 19px;
+  margin-bottom: 8px;
+}
+
+/* Carte */
+.card {
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}

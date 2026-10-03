@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>MAAQ — Catalogue d'agents</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=Karla:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --bg:#E9E1D2; --bg-raised:#F6F0E4; --bg-sunken:#DFD5C0;
+    --ink:#2B211F; --ink-soft:#6E5F58; --line:#DDCFC0;
+    --primary:#7A2E32; --primary-strong:#5E2126; --primary-soft:#EDD9D6; --primary-ink:#F7F1E6;
+    --secondary:#B4913A; --secondary-strong:#93731F; --secondary-soft:#F2E7C6;
+    --success:#5E7048; --success-bg:#E2E6D1;
+    --radius:10px;
+    --shadow:0 1px 2px rgba(43,33,31,0.07), 0 8px 24px rgba(43,33,31,0.09);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Karla',sans-serif;background:var(--bg);color:var(--ink);}
+  h1,h2,h3,h4{font-family:'Newsreader',serif;font-weight:500;margin:0;color:var(--ink);}
+  a{text-decoration:none;color:inherit;}
+  button{font-family:'Karla',sans-serif;cursor:pointer;}
+  input{font-family:'Karla',sans-serif;}
+</style>
+</helmet>
+<div style="width:390px;height:844px;box-sizing:border-box;background:var(--bg);display:flex;flex-direction:column;overflow:hidden;">
+
+  <div style="padding:44px 20px 14px;border-bottom:1px solid var(--line);background:var(--bg-raised);">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+      <a href="U-Agents.html" aria-label="Retour au dashboard" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;color:var(--ink);flex-shrink:0;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+      </a>
+      <h1 style="font-size:19px;">Catalogue d'agents</h1>
+    </div>
+    <p style="font-size:12px;color:var(--ink-soft);margin:0 0 12px;line-height:1.4;">Les agents mis à disposition par l'administrateur, classés en 3 rubriques. Chaque agent n'appartient qu'à une seule.</p>
+
+    <div style="position:relative;margin-bottom:10px;">
+      <label for="search" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);">Rechercher un agent</label>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:absolute;left:12px;top:12px;color:var(--ink-soft);"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+      <input id="search" type="search" value="{{query}}" onInput="{{onQuery}}" placeholder="Rechercher (ex. mutuelle, courrier…)" style="width:100%;padding:11px 14px 11px 36px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:13px;color:var(--ink);">
+    </div>
+
+    <div style="display:flex;gap:6px;background:var(--bg-sunken);border-radius:10px;padding:4px;">
+      <button onClick="{{pickPro}}" style="{{tabProStyle}}">Pro</button>
+      <button onClick="{{pickPerso}}" style="{{tabPersoStyle}}">Perso</button>
+      <sc-if value="{{showContratsTab}}" hint-placeholder-val="{{true}}">
+        <button onClick="{{pickContrats}}" style="{{tabContratsStyle}}">Agents des Contrats</button>
+      </sc-if>
+    </div>
+  </div>
+
+  <div style="flex:1;overflow-y:auto;padding:14px 20px 24px;display:flex;flex-direction:column;gap:10px;">
+
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-soft);">{{listLabel}}</div>
+
+    <sc-for list="{{agents}}" as="agent" hint-placeholder-count="3">
+      <a href="Fiche.html" style="display:block;background:var(--bg-raised);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px 16px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:4px;">
+          <div style="font-family:'Newsreader',serif;font-size:16px;">{{agent.name}}</div>
+          <div style="display:flex;gap:6px;flex-shrink:0;">
+            <sc-if value="{{agent.maintenance}}" hint-placeholder-val="{{false}}">
+              <span style="font-size:10px;font-weight:700;color:var(--warning);background:var(--warning-bg);border-radius:100px;padding:3px 9px;white-space:nowrap;">En maintenance</span>
+            </sc-if>
+            <span style="font-size:10px;font-weight:700;color:var(--secondary-strong);background:var(--secondary-soft);border-radius:100px;padding:3px 9px;white-space:nowrap;">{{agent.catLabel}}</span>
+          </div>
+        </div>
+        <p style="font-size:12px;color:var(--ink-soft);margin:0 0 10px;line-height:1.4;">{{agent.desc}}</p>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:12px;font-weight:600;color:var(--primary);">Voir la fiche ›</span>
+          <sc-if value="{{agent.added}}" hint-placeholder-val="{{false}}">
+            <span style="font-size:11px;font-weight:700;color:var(--success);">Ajouté</span>
+          </sc-if>
+        </div>
+      </a>
+    </sc-for>
+
+    <sc-if value="{{emptyRubric}}" hint-placeholder-val="{{false}}">
+      <div style="text-align:center;padding:30px 10px;color:var(--ink-soft);font-size:13px;line-height:1.5;">Aucun agent disponible dans cette rubrique pour le moment.</div>
+    </sc-if>
+
+    <sc-if value="{{noResults}}" hint-placeholder-val="{{false}}">
+      <div style="text-align:center;padding:30px 10px;display:flex;flex-direction:column;gap:10px;">
+        <p style="color:var(--ink-soft);font-size:13px;line-height:1.5;margin:0;">Aucun agent ne correspond à « {{query}} »</p>
+        <button onClick="{{clearSearch}}" style="background:transparent;border:1px solid var(--line);color:var(--ink);font-weight:600;font-size:12px;border-radius:8px;padding:8px 14px;align-self:center;">Parcourir les rubriques</button>
+      </div>
+    </sc-if>
+
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"rank":{"editor":"enum","options":["principal","invite1","secondaire"],"default":"principal","section":"États (Tweaks)"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props){
+    super(props);
+    this.state = { tab: 'pro', query: '' };
+  }
+  renderVals(){
+    const s = this.state;
+    const p = this.props;
+    const isSecondaire = p.rank === 'secondaire';
+    const tabStyle = (active) => "flex:1;padding:9px 0;border-radius:8px;border:none;font-weight:600;font-size:11px;background:" + (active ? 'var(--primary)' : 'transparent') + ";color:" + (active ? 'var(--primary-ink)' : 'var(--ink-soft)') + ";";
+    const catNames = { pro: 'Pro', perso: 'Perso', contrats: 'Agents des Contrats' };
+    const all = [
+      { name: 'Admin_Classify', desc: 'Classement automatique de vos documents administratifs.', cat: 'pro', added: true },
+      { name: 'Admin_Courriers', desc: 'Rédaction et envoi de courriers administratifs.', cat: 'pro', added: false },
+      { name: 'Admin_lib', desc: 'Prise de rendez-vous santé & assurance emprunteur.', cat: 'perso', added: true, maintenance: true },
+      { name: 'Admin_Impots', desc: 'Aide au suivi de votre déclaration d\'impôts.', cat: 'perso', added: false },
+      { name: 'Contrat_Mutuelle', desc: 'Négociation et suivi de votre cotisation de mutuelle.', cat: 'contrats', added: true },
+      { name: 'Contrat_Auto', desc: 'Négociation et suivi de votre cotisation d\'assurance auto.', cat: 'contrats', added: false },
+    ];
+    const visible = isSecondaire ? all.filter(a => a.cat !== 'contrats') : all;
+    const effectiveTab = (isSecondaire && s.tab === 'contrats') ? 'pro' : s.tab;
+    const q = s.query.trim().toLowerCase();
+    const filtered = visible.filter((a) => q
+      ? (a.name + ' ' + a.desc).toLowerCase().indexOf(q) !== -1
+      : a.cat === effectiveTab);
+    const agents = filtered.map((a) => ({
+      name: a.name, desc: a.desc, added: a.added, maintenance: !!a.maintenance,
+      catLabel: catNames[a.cat],
+    }));
+    return {
+      showContratsTab: !isSecondaire,
+      query: s.query,
+      onQuery: (e) => this.setState({ query: e.target.value }),
+      tabProStyle: tabStyle(!q && effectiveTab === 'pro'),
+      tabPersoStyle: tabStyle(!q && effectiveTab === 'perso'),
+      tabContratsStyle: tabStyle(!q && effectiveTab === 'contrats'),
+      pickPro: () => this.setState({ tab: 'pro', query: '' }),
+      pickPerso: () => this.setState({ tab: 'perso', query: '' }),
+      pickContrats: () => this.setState({ tab: 'contrats', query: '' }),
+      clearSearch: () => this.setState({ query: '' }),
+      listLabel: q ? 'Résultats dans toutes les rubriques' : 'Rubrique ' + catNames[effectiveTab],
+      agents: agents,
+      emptyRubric: !q && agents.length === 0,
+      noResults: !!q && agents.length === 0,
+    };
+  }
+}
+</script>
+</body>
+</html>

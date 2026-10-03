@@ -1,0 +1,29 @@
+# Dépendances
+node_modules/
+
+# Next.js
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+
+# Données locales de développement (base embarquée, boîte de test, faux Drive)
+.data/
+
+# Secrets
+.env
+.env.local
+.env.*.local
+
+# Tests
+coverage/
+playwright-report/
+test-results/
+
+# Divers
+.DS_Store
+Thumbs.db
+*.log
+
+# Archive d'origine des maquettes (le contenu est décompressé dans docs/maquettes)
+MAAQ_maquettes.zip

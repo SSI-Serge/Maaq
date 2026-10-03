@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>MAAQ Admin — Agents</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=Karla:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --bg:#E9E1D2; --bg-raised:#F6F0E4; --bg-sunken:#DFD5C0;
+    --ink:#2B211F; --ink-soft:#6E5F58; --line:#DDCFC0;
+    --primary:#7A2E32; --primary-strong:#5E2126; --primary-soft:#EDD9D6; --primary-ink:#F7F1E6;
+    --secondary:#B4913A; --secondary-strong:#93731F; --secondary-soft:#F2E7C6;
+    --success:#5E7048; --success-bg:#E2E6D1;
+    --warning:#B67A24; --warning-bg:#F2E1C0;
+    --error:#A8502E; --error-bg:#F1DED2;
+    --radius:10px;
+    --shadow:0 1px 2px rgba(43,33,31,0.07), 0 8px 24px rgba(43,33,31,0.09);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Karla',sans-serif;background:var(--bg);color:var(--ink);}
+  h1,h2,h3,h4{font-family:'Newsreader',serif;font-weight:500;margin:0;color:var(--ink);}
+  a{text-decoration:none;color:inherit;}
+  button{font-family:'Karla',sans-serif;cursor:pointer;}
+  input,textarea{font-family:'Karla',sans-serif;}
+</style>
+</helmet>
+<div style="width:1440px;height:900px;box-sizing:border-box;background:var(--bg);display:flex;overflow:hidden;">
+
+  <div style="width:232px;flex-shrink:0;background:var(--bg-raised);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:28px 18px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:34px;padding:0 6px;">
+      <div style="width:32px;height:32px;border-radius:8px;background:var(--primary);color:var(--primary-ink);display:flex;align-items:center;justify-content:center;font-family:'Newsreader',serif;font-weight:600;font-size:13px;">M</div>
+      <div>
+        <div style="font-family:'Newsreader',serif;font-style:italic;font-size:17px;">MAAQ</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);">Administration</div>
+      </div>
+    </div>
+    <a href="Admin-Agents.html" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;background:var(--primary-soft);color:var(--primary-strong);font-weight:700;font-size:13px;margin-bottom:4px;">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/></svg>
+      Agents
+    </a>
+    <a href="Admin-Contrats.html" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;color:var(--ink-soft);font-weight:600;font-size:13px;margin-bottom:4px;">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4M10 12h6M10 16h6"/></svg>
+      Contrats obligatoires
+    </a>
+    <a href="Admin-Support.html" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;color:var(--ink-soft);font-weight:600;font-size:13px;margin-bottom:4px;">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/></svg>
+      Réglages
+    </a>
+    <a href="Admin-Comptes.html" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;color:var(--ink-soft);font-weight:600;font-size:13px;margin-bottom:4px;">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6"/></svg>
+      Comptes
+    </a>
+    <a href="Admin-Parametres.html" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;color:var(--ink-soft);font-weight:600;font-size:13px;margin-bottom:4px;">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10.3 3h3.4l.6 2.4a7 7 0 0 1 1.8 1l2.3-.9 1.7 3-1.8 1.6a7 7 0 0 1 0 2l1.8 1.6-1.7 3-2.3-.9a7 7 0 0 1-1.8 1L13.7 21h-3.4l-.6-2.4a7 7 0 0 1-1.8-1l-2.3.9-1.7-3 1.8-1.6a7 7 0 0 1 0-2L3.9 10l1.7-3 2.3.9a7 7 0 0 1 1.8-1z"/><circle cx="12" cy="12" r="2.6"/></svg>
+      Paramètres
+    </a>
+  </div>
+
+  <div style="flex:1;overflow-y:auto;padding:40px 48px;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;">
+      <div>
+        <h1 style="font-size:24px;margin-bottom:8px;">Agents IA</h1>
+        <p style="font-size:13px;color:var(--ink-soft);margin:0;max-width:60ch;">Mettez un agent à disposition dans le catalogue (rubrique Pro, Perso ou Agents des Contrats), ou bloquez-en l'accès le temps d'une maintenance.</p>
+      </div>
+      <button onClick="{{toggleAddAgent}}" style="display:flex;align-items:center;gap:8px;background:var(--primary);color:var(--primary-ink);border:none;border-radius:8px;padding:11px 18px;font-weight:600;font-size:13px;white-space:nowrap;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+        Mettre à disposition un agent
+      </button>
+    </div>
+
+    <sc-if value="{{showAddAgent}}" hint-placeholder-val="{{false}}">
+      <div style="background:var(--bg-raised);border:1px solid var(--secondary);border-radius:var(--radius);padding:20px 24px;margin-bottom:20px;display:flex;flex-direction:column;gap:14px;max-width:680px;">
+        <div style="font-family:'Newsreader',serif;font-size:16px;">Nouvel agent</div>
+
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <label style="font-size:12px;font-weight:600;color:var(--ink-soft);">Nom de l'agent</label>
+          <input type="text" placeholder="Nom de l'agent (ex. Admin_RDV)" style="padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:13px;">
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <label style="font-size:12px;font-weight:600;color:var(--ink-soft);">Description courte pour les utilisateurs</label>
+          <input type="text" placeholder="Ex. Prise de rendez-vous santé et assurance emprunteur" style="padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:13px;">
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <span style="font-size:12px;font-weight:600;color:var(--ink-soft);">Rubrique du catalogue (un agent n'appartient qu'à une seule)</span>
+          <div style="display:flex;gap:6px;background:var(--bg-sunken);border-radius:10px;padding:4px;max-width:460px;">
+            <button onClick="{{pickCatPro}}" style="{{catProStyle}}">Pro</button>
+            <button onClick="{{pickCatPerso}}" style="{{catPersoStyle}}">Perso</button>
+            <button onClick="{{pickCatContrats}}" style="{{catContratsStyle}}">Agents des Contrats</button>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <label style="font-size:12px;font-weight:600;color:var(--ink-soft);">Exemples de demandes (un par ligne)</label>
+          <textarea placeholder="Prends-moi un rendez-vous chez le dentiste&#10;Renouvelle mon contrat d'assurance auto" style="min-height:56px;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:13px;resize:none;"></textarea>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <label style="font-size:12px;font-weight:600;color:var(--ink-soft);">Suggestions affichées dans le tchat (une par ligne)</label>
+          <textarea placeholder="Prendre un rendez-vous&#10;Voir mes contrats en cours" style="min-height:56px;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:13px;resize:none;"></textarea>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <span style="font-size:12px;font-weight:600;color:var(--ink-soft);">Connecteurs requis, et leur portée</span>
+          <sc-for list="{{connectorRows}}" as="conn" hint-placeholder-count="3">
+            <div style="display:flex;align-items:center;gap:12px;">
+              <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--ink);width:160px;flex-shrink:0;"><input type="checkbox" value="{{conn.enabled}}" onInput="{{conn.onToggle}}">{{conn.label}}</label>
+              <sc-if value="{{conn.enabled}}" hint-placeholder-val="{{false}}">
+                <select value="{{conn.scope}}" onInput="{{conn.onScope}}" style="padding:7px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:12px;">
+                  <option value="profil">Chaque profil</option>
+                  <option value="principal">Utilisateur principal</option>
+                  <option value="compte">Connexion unique du compte</option>
+                </select>
+              </sc-if>
+            </div>
+          </sc-for>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <span style="font-size:12px;font-weight:600;color:var(--ink-soft);">Informations utilisateur requises (ouvre le formulaire dédié après l'ajout de l'agent)</span>
+
+          <sc-if value="{{hasInfoFields}}" hint-placeholder-val="{{false}}">
+            <div style="background:var(--bg);border:1px solid var(--line);border-radius:8px;overflow:hidden;">
+              <table style="border-collapse:collapse;width:100%;">
+                <thead><tr>
+                  <th style="font-size:10px;text-transform:uppercase;color:var(--ink-soft);text-align:left;padding:6px 8px;">Libellé</th>
+                  <th style="font-size:10px;text-transform:uppercase;color:var(--ink-soft);text-align:left;padding:6px 8px;">Type</th>
+                  <th style="font-size:10px;text-transform:uppercase;color:var(--ink-soft);text-align:left;padding:6px 8px;">Oblig.</th>
+                  <th style="font-size:10px;text-transform:uppercase;color:var(--ink-soft);text-align:left;padding:6px 8px;">Max</th>
+                  <th style="font-size:10px;text-transform:uppercase;color:var(--ink-soft);text-align:left;padding:6px 8px;">Clé commune</th>
+                  <th></th>
+                </tr></thead>
+                <tbody>
+                  <tr data-sc-for-list="{{infoFields}}" data-sc-for-as="fld">
+                      <td style="font-size:12px;padding:6px 8px;border-top:1px solid var(--line);font-weight:600;">{{fld.label}}</td>
+                      <td style="font-size:12px;padding:6px 8px;border-top:1px solid var(--line);color:var(--ink-soft);">{{fld.typeLabel}}</td>
+                      <td style="font-size:12px;padding:6px 8px;border-top:1px solid var(--line);">{{fld.requiredLabel}}</td>
+                      <td style="font-size:12px;padding:6px 8px;border-top:1px solid var(--line);">{{fld.max}}</td>
+                      <td style="font-size:12px;padding:6px 8px;border-top:1px solid var(--line);color:var(--ink-soft);">{{fld.commonKeyLabel}}</td>
+                      <td style="padding:6px 8px;border-top:1px solid var(--line);text-align:right;"><button onClick="{{fld.remove}}" style="background:none;border:none;color:var(--error);font-weight:700;font-size:11px;padding:0;">Retirer</button></td>
+                    </tr>
+                  
+                </tbody>
+              </table>
+            </div>
+          </sc-if>
+
+          <div style="background:var(--bg);border:1px dashed var(--line);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px;">
+            <div style="display:flex;gap:8px;">
+              <input type="text" value="{{newFieldLabel}}" onInput="{{onNewFieldLabel}}" placeholder="Libellé (ex. Numéro fiscal)" style="flex:1;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg-raised);font-size:12px;">
+              <select value="{{newFieldType}}" onInput="{{onNewFieldType}}" style="padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg-raised);font-size:12px;">
+                <option value="texte">Texte</option>
+                <option value="telephone">Téléphone</option>
+                <option value="code_postal">Code postal</option>
+                <option value="date_passee">Date passée</option>
+                <option value="email">Email</option>
+              </select>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-soft);"><input type="checkbox" value="{{newFieldRequired}}" onInput="{{onNewFieldRequired}}">Obligatoire</label>
+              <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink-soft);">Max éléments <input type="number" min="1" value="{{newFieldMax}}" onInput="{{onNewFieldMax}}" style="width:60px;padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg-raised);font-size:12px;"></label>
+              <input type="text" value="{{newFieldCommonKey}}" onInput="{{onNewFieldCommonKey}}" placeholder="Clé commune (facultatif)" style="flex:1;padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg-raised);font-size:12px;">
+            </div>
+            <button onClick="{{addInfoField}}" style="align-self:flex-start;background:none;border:1px solid var(--secondary);color:var(--secondary-strong);font-weight:600;font-size:12px;border-radius:8px;padding:7px 12px;">+ Ajouter ce champ</button>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:6px;max-width:320px;">
+          <label style="font-size:12px;font-weight:600;color:var(--ink-soft);">Adresses en copie — nombre maximal par profil (0 = pas de section)</label>
+          <input type="number" min="0" value="{{ccMax}}" onInput="{{onCcMax}}" style="width:120px;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:13px;">
+        </div>
+
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink);">
+          <input type="checkbox" checked>
+          Les actions de cet agent doivent être validées par l'utilisateur avant exécution
+        </label>
+
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+          <button onClick="{{toggleAddAgent}}" style="background:transparent;border:1px solid var(--line);color:var(--ink);font-weight:600;font-size:13px;border-radius:8px;padding:9px 16px;">Annuler</button>
+          <button onClick="{{publishAgent}}" style="background:var(--primary);color:var(--primary-ink);border:none;font-weight:600;font-size:13px;border-radius:8px;padding:9px 16px;">Publier</button>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{agentAdded}}" hint-placeholder-val="{{false}}">
+      <div style="display:inline-flex;align-items:center;gap:8px;background:var(--success-bg);color:var(--success);border-radius:10px;padding:10px 16px;font-size:13px;font-weight:600;margin-bottom:20px;">✓ Agent ajouté au catalogue, rubrique {{catLabel}} — utilisateurs et invités peuvent l'ajouter à leur dashboard</div>
+    </sc-if>
+
+    <div style="display:flex;flex-direction:column;gap:14px;max-width:900px;">
+
+      <div style="background:var(--bg-raised);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px 24px;display:flex;align-items:center;gap:20px;">
+        <div style="flex:1;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+            <span style="font-family:'Newsreader',serif;font-size:17px;">Admin_Classify</span>
+            <span style="{{classifyBadgeStyle}}">{{classifyStatusLabel}}</span>
+            <span style="font-size:10px;font-weight:700;color:var(--secondary-strong);background:var(--secondary-soft);border-radius:100px;padding:3px 9px;">Pro</span>
+          </div>
+          <p style="font-size:13px;color:var(--ink-soft);margin:0;">Classement automatique des documents administratifs.</p>
+        </div>
+        <button onClick="{{classifyButtonAction}}" style="{{classifyButtonStyle}}">{{classifyButtonLabel}}</button>
+      </div>
+
+      <sc-if value="{{modalClassify}}" hint-placeholder-val="{{false}}">
+        <div style="background:var(--error-bg);border:1px solid var(--error);border-radius:var(--radius);padding:18px 22px;display:flex;flex-direction:column;gap:10px;">
+          <div style="font-size:13px;font-weight:700;color:var(--error);">Bloquer Admin_Classify pour maintenance</div>
+          <textarea placeholder="Message affiché aux utilisateurs et invités pendant le blocage…" style="min-height:60px;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg-raised);font-size:13px;resize:none;"></textarea>
+          <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button onClick="{{cancelModalClassify}}" style="background:transparent;border:1px solid var(--line);color:var(--ink);font-weight:600;font-size:13px;border-radius:8px;padding:9px 16px;">Annuler</button>
+            <button onClick="{{confirmBlockClassify}}" style="background:var(--error);color:var(--primary-ink);border:none;font-weight:600;font-size:13px;border-radius:8px;padding:9px 16px;">Confirmer le blocage</button>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{reactivateModalClassify}}" hint-placeholder-val="{{false}}">
+        <div style="background:var(--bg-raised);border:1px solid var(--line);border-radius:var(--radius);padding:18px 22px;display:flex;flex-direction:column;gap:10px;">
+          <div style="font-size:13px;font-weight:700;color:var(--ink);">Réactiver Admin_Classify pour tous les utilisateurs ?</div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button onClick="{{cancelReactivateClassify}}" style="background:transparent;border:1px solid var(--line);color:var(--ink);font-weight:600;font-size:13px;border-radius:8px;padding:9px 16px;">Annuler</button>
+            <button onClick="{{confirmReactivateClassify}}" style="background:var(--primary);color:var(--primary-ink);border:none;font-weight:600;font-size:13px;border-radius:8px;padding:9px 16px;">Réactiver</button>
+          </div>
+        </div>
+      </sc-if>
+
+      <div style="background:var(--bg-raised);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px 24px;display:flex;align-items:center;gap:20px;">
+        <div style="flex:1;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+            <span style="font-family:'Newsreader',serif;font-size:17px;">Admin_lib</span>
+            <span style="{{libBadgeStyle}}">{{libStatusLabel}}</span>
+            <span style="font-size:10px;font-weight:700;color:var(--secondary-strong);background:var(--secondary-soft);border-radius:100px;padding:3px 9px;">Perso</span>
+          </div>
+          <p style="font-size:13px;color:var(--ink-soft);margin:0;">Prise de rendez-vous santé &amp; assurance emprunteur.</p>
+        </div>
+        <button onClick="{{libButtonAction}}" style="{{libButtonStyle}}">{{libButtonLabel}}</button>
+      </div>
+
+      <sc-if value="{{modalLib}}" hint-placeholder-val="{{false}}">
+        <div style="background:var(--error-bg);border:1px solid var(--error);border-radius:var(--radius);padding:18px 22px;display:flex;flex-direction:column;gap:10px;">
+          <div style="font-size:13px;font-weight:700;color:var(--error);">Bloquer Admin_lib pour maintenance</div>
+          <textarea placeholder="Message affiché aux utilisateurs et invités pendant le blocage…" style="min-height:60px;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg-raised);font-size:13px;resize:none;"></textarea>
+          <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button onClick="{{cancelModalLib}}" style="background:transparent;border:1px solid var(--line);color:var(--ink);font-weight:600;font-size:13px;border-radius:8px;padding:9px 16px;">Annuler</button>
+            <button onClick="{{confirmBlockLib}}" style="background:var(--error);color:var(--primary-ink);border:none;font-weight:600;font-size:13px;border-radius:8px;padding:9px 16px;">Confirmer le blocage</button>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{reactivateModalLib}}" hint-placeholder-val="{{false}}">
+        <div style="background:var(--bg-raised);border:1px solid var(--line);border-radius:var(--radius);padding:18px 22px;display:flex;flex-direction:column;gap:10px;">
+          <div style="font-size:13px;font-weight:700;color:var(--ink);">Réactiver Admin_lib pour tous les utilisateurs ?</div>
+          <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button onClick="{{cancelReactivateLib}}" style="background:transparent;border:1px solid var(--line);color:var(--ink);font-weight:600;font-size:13px;border-radius:8px;padding:9px 16px;">Annuler</button>
+            <button onClick="{{confirmReactivateLib}}" style="background:var(--primary);color:var(--primary-ink);border:none;font-weight:600;font-size:13px;border-radius:8px;padding:9px 16px;">Réactiver</button>
+          </div>
+        </div>
+      </sc-if>
+
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props){
+    super(props);
+    this.state = {
+      classifyBlocked: false, libBlocked: true,
+      modalClassify: false, modalLib: false,
+      reactivateModalClassify: false, reactivateModalLib: false,
+      showAddAgent: false, agentAdded: false, cat: 'pro',
+      connectors: {
+        drive: { enabled: false, scope: 'profil' },
+        agenda: { enabled: false, scope: 'profil' },
+        validation: { enabled: false, scope: 'profil' },
+      },
+      infoFields: [],
+      newFieldLabel: '', newFieldType: 'texte', newFieldRequired: false, newFieldMax: '1', newFieldCommonKey: '',
+      ccMax: '0',
+    };
+  }
+  fieldTypeLabel(t){
+    return ({ texte: 'Texte', telephone: 'Téléphone', code_postal: 'Code postal', date_passee: 'Date passée', email: 'Email' })[t] || t;
+  }
+  renderVals(){
+    const s = this.state;
+    const badgeStyle = (blocked) => "font-size:11px;font-weight:700;border-radius:100px;padding:3px 10px;background:" + (blocked ? 'var(--error-bg)' : 'var(--success-bg)') + ";color:" + (blocked ? 'var(--error)' : 'var(--success)') + ";";
+    const buttonStyle = (blocked) => "border-radius:8px;padding:10px 18px;font-weight:600;font-size:13px;white-space:nowrap;background:" + (blocked ? 'var(--primary)' : 'transparent') + ";color:" + (blocked ? 'var(--primary-ink)' : 'var(--error)') + ";border:" + (blocked ? 'none' : '1px solid var(--error)') + ";";
+    const catStyle = (active) => "flex:1;padding:8px 0;border-radius:8px;border:none;font-weight:600;font-size:12px;background:" + (active ? 'var(--primary)' : 'transparent') + ";color:" + (active ? 'var(--primary-ink)' : 'var(--ink-soft)') + ";";
+    return {
+      classifyStatusLabel: s.classifyBlocked ? 'Bloqué' : 'Actif',
+      classifyBadgeStyle: badgeStyle(s.classifyBlocked),
+      classifyButtonLabel: s.classifyBlocked ? 'Réactiver' : 'Bloquer',
+      classifyButtonStyle: buttonStyle(s.classifyBlocked),
+      classifyButtonAction: s.classifyBlocked
+        ? () => this.setState({ reactivateModalClassify: true })
+        : () => this.setState({ modalClassify: true }),
+      modalClassify: s.modalClassify,
+      confirmBlockClassify: () => this.setState({ classifyBlocked: true, modalClassify: false }),
+      cancelModalClassify: () => this.setState({ modalClassify: false }),
+      reactivateModalClassify: s.reactivateModalClassify,
+      confirmReactivateClassify: () => this.setState({ classifyBlocked: false, reactivateModalClassify: false }),
+      cancelReactivateClassify: () => this.setState({ reactivateModalClassify: false }),
+
+      libStatusLabel: s.libBlocked ? 'Bloqué' : 'Actif',
+      libBadgeStyle: badgeStyle(s.libBlocked),
+      libButtonLabel: s.libBlocked ? 'Réactiver' : 'Bloquer',
+      libButtonStyle: buttonStyle(s.libBlocked),
+      libButtonAction: s.libBlocked
+        ? () => this.setState({ reactivateModalLib: true })
+        : () => this.setState({ modalLib: true }),
+      modalLib: s.modalLib,
+      confirmBlockLib: () => this.setState({ libBlocked: true, modalLib: false }),
+      cancelModalLib: () => this.setState({ modalLib: false }),
+      reactivateModalLib: s.reactivateModalLib,
+      confirmReactivateLib: () => this.setState({ libBlocked: false, reactivateModalLib: false }),
+      cancelReactivateLib: () => this.setState({ reactivateModalLib: false }),
+
+      catLabel: ({ pro: 'Pro', perso: 'Perso', contrats: 'Agents des Contrats' })[s.cat],
+      catProStyle: catStyle(s.cat === 'pro'),
+      catPersoStyle: catStyle(s.cat === 'perso'),
+      catContratsStyle: catStyle(s.cat === 'contrats'),
+      pickCatPro: () => this.setState({ cat: 'pro' }),
+      pickCatPerso: () => this.setState({ cat: 'perso' }),
+      pickCatContrats: () => this.setState({ cat: 'contrats' }),
+      showAddAgent: s.showAddAgent,
+      toggleAddAgent: () => this.setState({
+        showAddAgent: !s.showAddAgent, agentAdded: false,
+        connectors: { drive: { enabled: false, scope: 'profil' }, agenda: { enabled: false, scope: 'profil' }, validation: { enabled: false, scope: 'profil' } },
+        infoFields: [], newFieldLabel: '', newFieldType: 'texte', newFieldRequired: false, newFieldMax: '1', newFieldCommonKey: '', ccMax: '0',
+      }),
+      publishAgent: () => this.setState({ showAddAgent: false, agentAdded: true }),
+      agentAdded: s.agentAdded,
+
+      connectorRows: [
+        { key: 'drive', label: 'Google Drive' },
+        { key: 'agenda', label: 'Google Agenda' },
+        { key: 'validation', label: 'Boîte de validation' },
+      ].map((c) => {
+        const conn = s.connectors[c.key];
+        return {
+          label: c.label,
+          enabled: conn.enabled,
+          scope: conn.scope,
+          onToggle: (e) => this.setState({ connectors: Object.assign({}, s.connectors, { [c.key]: Object.assign({}, conn, { enabled: !!e.target.value }) }) }),
+          onScope: (e) => this.setState({ connectors: Object.assign({}, s.connectors, { [c.key]: Object.assign({}, conn, { scope: e.target.value }) }) }),
+        };
+      }),
+
+      hasInfoFields: s.infoFields.length > 0,
+      infoFields: s.infoFields.map((f, i) => ({
+        label: f.label,
+        typeLabel: this.fieldTypeLabel(f.type),
+        requiredLabel: f.required ? 'Oui' : 'Non',
+        max: f.max,
+        commonKeyLabel: f.commonKey || '—',
+        remove: () => this.setState({ infoFields: s.infoFields.filter((x, k) => k !== i) }),
+      })),
+      newFieldLabel: s.newFieldLabel,
+      onNewFieldLabel: (e) => this.setState({ newFieldLabel: e.target.value }),
+      newFieldType: s.newFieldType,
+      onNewFieldType: (e) => this.setState({ newFieldType: e.target.value }),
+      newFieldRequired: s.newFieldRequired,
+      onNewFieldRequired: (e) => this.setState({ newFieldRequired: !!e.target.value }),
+      newFieldMax: s.newFieldMax,
+      onNewFieldMax: (e) => this.setState({ newFieldMax: e.target.value }),
+      newFieldCommonKey: s.newFieldCommonKey,
+      onNewFieldCommonKey: (e) => this.setState({ newFieldCommonKey: e.target.value }),
+      addInfoField: () => {
+        const label = s.newFieldLabel.trim();
+        if (!label) return;
+        const maxN = Math.max(1, parseInt(s.newFieldMax, 10) || 1);
+        this.setState({
+          infoFields: s.infoFields.concat([{ label: label, type: s.newFieldType, required: s.newFieldRequired, max: maxN, commonKey: s.newFieldCommonKey.trim() }]),
+          newFieldLabel: '', newFieldType: 'texte', newFieldRequired: false, newFieldMax: '1', newFieldCommonKey: '',
+        });
+      },
+
+      ccMax: s.ccMax,
+      onCcMax: (e) => this.setState({ ccMax: e.target.value }),
+    };
+  }
+}
+</script>
+</body>
+</html>

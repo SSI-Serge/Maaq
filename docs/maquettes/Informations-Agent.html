@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>MAAQ — Informations nécessaires à un agent</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=Karla:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --bg:#E9E1D2; --bg-raised:#F6F0E4; --bg-sunken:#DFD5C0;
+    --ink:#2B211F; --ink-soft:#6E5F58; --line:#DDCFC0;
+    --primary:#7A2E32; --primary-strong:#5E2126; --primary-soft:#EDD9D6; --primary-ink:#F7F1E6;
+    --secondary:#B4913A; --secondary-strong:#93731F; --secondary-soft:#F2E7C6;
+    --success:#5E7048; --success-bg:#E2E6D1;
+    --error:#A8502E; --error-bg:#F1DED2;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Karla',sans-serif;background:var(--bg);color:var(--ink);}
+  h1{font-family:'Newsreader',serif;font-weight:500;margin:0;color:var(--ink);}
+  a{text-decoration:none;color:inherit;}
+  button{font-family:'Karla',sans-serif;cursor:pointer;}
+  input,select{font-family:'Karla',sans-serif;}
+  label{font-size:12px;font-weight:600;color:var(--ink-soft);}
+</style>
+</helmet>
+<div style="width:390px;height:844px;box-sizing:border-box;background:var(--bg);display:flex;flex-direction:column;overflow:hidden;">
+
+  <div style="padding:44px 20px 16px;border-bottom:1px solid var(--line);background:var(--bg-raised);display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">
+    <div>
+      <h1 style="font-size:18px;margin-bottom:6px;">Informations nécessaires à {{agentName}}</h1>
+      <p style="font-size:12px;color:var(--ink-soft);margin:0;line-height:1.4;">Propres à {{agentName}}. Une valeur déjà saisie pour un autre agent peut être reprise automatiquement — vous pouvez toujours la modifier.</p>
+    </div>
+    <a href="U-Agents.html" aria-label="Fermer" style="width:28px;height:28px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:var(--ink-soft);">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    </a>
+  </div>
+
+  <div style="flex:1;overflow-y:auto;padding:20px 20px 24px;">
+
+    <sc-if value="{{showForm}}" hint-placeholder-val="{{true}}">
+      <div style="display:flex;flex-direction:column;gap:16px;">
+
+        <sc-for list="{{fieldRows}}" as="fld" hint-placeholder-count="3">
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <label>{{fld.label}}</label>
+
+            <sc-if value="{{fld.isSimple}}" hint-placeholder-val="{{true}}">
+              <input type="{{fld.inputType}}" value="{{fld.value}}" onInput="{{fld.onInput}}" placeholder="{{fld.placeholder}}" style="padding:12px 14px;border-radius:8px;border:1px solid var(--line);background:var(--bg-raised);font-size:14px;color:var(--ink);">
+            </sc-if>
+
+            <sc-if value="{{fld.isChoice}}" hint-placeholder-val="{{false}}">
+              <select value="{{fld.value}}" onInput="{{fld.onInput}}" style="padding:12px 14px;border-radius:8px;border:1px solid var(--line);background:var(--bg-raised);font-size:14px;color:var(--ink);">
+                <option value="">Choisir…</option>
+                <option value="Célibataire">Célibataire</option>
+                <option value="Marié(e)">Marié(e)</option>
+                <option value="Pacsé(e)">Pacsé(e)</option>
+                <option value="Divorcé(e)">Divorcé(e)</option>
+                <option value="Veuf(ve)">Veuf(ve)</option>
+              </select>
+            </sc-if>
+
+            <sc-if value="{{fld.isListe}}" hint-placeholder-val="{{false}}">
+              <div style="display:flex;flex-direction:column;gap:6px;">
+                <sc-for list="{{fld.entries}}" as="entry" hint-placeholder-count="1">
+                  <div style="display:flex;gap:8px;">
+                    <input type="text" value="{{entry.value}}" onInput="{{entry.onInput}}" style="flex:1;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg-raised);font-size:13px;color:var(--ink);">
+                    <button onClick="{{entry.remove}}" aria-label="Retirer cet élément" style="width:36px;flex-shrink:0;background:none;border:1px solid var(--line);border-radius:8px;color:var(--error);font-size:16px;">×</button>
+                  </div>
+                </sc-for>
+                <sc-if value="{{fld.canAddMore}}" hint-placeholder-val="{{true}}">
+                  <button onClick="{{fld.addEntry}}" style="align-self:flex-start;background:none;border:1px dashed var(--secondary);color:var(--secondary-strong);font-weight:600;font-size:12px;border-radius:8px;padding:8px 12px;">+ Ajouter un élément</button>
+                </sc-if>
+                <sc-if value="{{fld.atMax}}" hint-placeholder-val="{{false}}">
+                  <div style="font-size:11px;color:var(--ink-soft);">Maximum {{fld.max}} éléments.</div>
+                </sc-if>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{fld.prefillNote}}" hint-placeholder-val="{{false}}">
+              <div style="font-size:11px;color:var(--secondary-strong);">Valeur reprise de {{fld.prefillNote}} — à confirmer ou modifier.</div>
+            </sc-if>
+            <sc-if value="{{fld.error}}" hint-placeholder-val="{{false}}">
+              <div style="font-size:12px;color:var(--error);font-weight:600;">{{fld.error}}</div>
+            </sc-if>
+          </div>
+        </sc-for>
+
+        <button onClick="{{submit}}" style="{{submitStyle}}">{{submitLabel}}</button>
+        <a href="U-Agents.html" style="text-align:center;font-size:13px;font-weight:600;color:var(--ink-soft);">Fermer sans enregistrer</a>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{showDone}}" hint-placeholder-val="{{false}}">
+      <div style="background:var(--success-bg);border-radius:12px;padding:18px;display:flex;flex-direction:column;gap:6px;margin-bottom:16px;">
+        <div style="color:var(--success);font-weight:700;font-size:14px;">✓ Informations mises à jour</div>
+        <div style="font-size:12px;color:var(--success);">{{agentName}} peut maintenant traiter vos demandes.</div>
+      </div>
+      <a href="Tchat.html" style="display:flex;align-items:center;justify-content:center;background:var(--primary);color:var(--primary-ink);font-weight:600;font-size:14px;border-radius:8px;padding:13px;">Continuer vers le tchat</a>
+    </sc-if>
+
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"agent":{"editor":"enum","options":["Admin_Impots","Admin_lib"],"default":"Admin_Impots","section":"Contenu (Tweaks)"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props){
+    super(props);
+    this.state = {
+      values: {}, listValues: {}, errors: {}, prefillFrom: {}, commonValues: {},
+      saving: false, done: false,
+    };
+  }
+  fieldDefs(){
+    return {
+      Admin_Impots: [
+        { key: 'numFiscal', label: 'Numéro fiscal', type: 'texte', required: true, placeholder: '13 chiffres', pattern: /^[0-9]+$/, errorMsg: 'Format invalide — chiffres uniquement' },
+        { key: 'situation', label: 'Situation familiale', type: 'liste_choix', required: true },
+        { key: 'cp', label: 'Code postal', type: 'code_postal', required: true, commonKey: 'cp', placeholder: '75001', pattern: /^[0-9]{5}$/, errorMsg: 'Format invalide — 5 chiffres' },
+        { key: 'charges', label: 'Personnes à charge', type: 'liste', required: false, max: 6 },
+      ],
+      Admin_lib: [
+        { key: 'secu', label: 'Numéro de sécurité sociale', type: 'texte', required: true, commonKey: 'secu', placeholder: '15 chiffres', pattern: /^[0-9]+$/, errorMsg: 'Format invalide — chiffres uniquement' },
+        { key: 'cp', label: 'Code postal', type: 'code_postal', required: true, commonKey: 'cp', placeholder: '75001', pattern: /^[0-9]{5}$/, errorMsg: 'Format invalide — 5 chiffres' },
+        { key: 'tel', label: 'Téléphone', type: 'telephone', required: false, commonKey: 'tel', placeholder: '06 12 34 56 78', pattern: /^[0-9\s]{10,14}$/, errorMsg: 'Format invalide' },
+      ],
+    };
+  }
+  renderVals(){
+    const s = this.state;
+    const p = this.props;
+    const agent = p.agent || 'Admin_Impots';
+    const defs = this.fieldDefs()[agent] || [];
+    const avals = s.values[agent] || {};
+    const alists = s.listValues[agent] || {};
+    const aerrs = s.errors[agent] || {};
+    const aprefill = s.prefillFrom[agent] || {};
+
+    const inputTypeFor = (t) => ({ telephone: 'tel', code_postal: 'text', date_passee: 'text', email: 'email' })[t] || 'text';
+
+    const fieldRows = defs.map((f) => {
+      if (f.type === 'liste_choix') {
+        return {
+          label: f.label, isSimple: false, isChoice: true, isListe: false,
+          value: avals[f.key] || '',
+          onInput: (e) => this.setValue(agent, f, e.target.value),
+          prefillNote: null, error: aerrs[f.key] || '',
+        };
+      }
+      if (f.type === 'liste') {
+        const entries = alists[f.key] || [];
+        return {
+          label: f.label, isSimple: false, isChoice: false, isListe: true,
+          max: f.max,
+          canAddMore: entries.length < f.max,
+          atMax: entries.length >= f.max,
+          entries: entries.map((v, i) => ({
+            value: v,
+            onInput: (e) => this.setListEntry(agent, f.key, i, e.target.value),
+            remove: () => this.removeListEntry(agent, f.key, i),
+          })),
+          addEntry: () => this.addListEntry(agent, f.key, f.max),
+          prefillNote: null, error: aerrs[f.key] || '',
+        };
+      }
+      let value = avals[f.key];
+      let prefillNote = null;
+      if (value === undefined && f.commonKey && s.commonValues[f.commonKey]) {
+        value = s.commonValues[f.commonKey].value;
+        prefillNote = s.commonValues[f.commonKey].fromAgent;
+      } else if (aprefill[f.key]) {
+        prefillNote = aprefill[f.key];
+      }
+      return {
+        label: f.label, isSimple: true, isChoice: false, isListe: false,
+        inputType: inputTypeFor(f.type),
+        placeholder: f.placeholder || '',
+        value: value || '',
+        onInput: (e) => this.setValue(agent, f, e.target.value),
+        prefillNote: prefillNote,
+        error: aerrs[f.key] || '',
+      };
+    });
+
+    return {
+      agentName: agent,
+      showForm: !s.done,
+      showDone: s.done,
+      fieldRows: fieldRows,
+      submitLabel: s.saving ? 'Enregistrement…' : 'Continuer',
+      submitStyle: "background:var(--primary);color:var(--primary-ink);border:none;font-weight:600;font-size:14px;border-radius:8px;padding:13px;" + (s.saving ? "opacity:.6;" : ""),
+      submit: () => {
+        if (s.saving) return;
+        const errs = {};
+        defs.forEach((f) => {
+          if (f.type === 'liste') return;
+          const v = (avals[f.key] !== undefined ? avals[f.key] : (f.commonKey && s.commonValues[f.commonKey] ? s.commonValues[f.commonKey].value : '')) || '';
+          if (f.required && !v.trim()) { errs[f.key] = 'Ce champ est obligatoire'; return; }
+          if (v.trim() && f.pattern && !f.pattern.test(v.trim())) { errs[f.key] = f.errorMsg; }
+        });
+        if (Object.keys(errs).length) { this.setState({ errors: { ...s.errors, [agent]: errs } }); return; }
+        this.setState({ saving: true });
+        this.setState({ saving: false, done: true });
+      },
+    };
+  }
+  setValue(agent, f, v){
+    const s = this.state;
+    const avals = Object.assign({}, s.values[agent], { [f.key]: v });
+    const newValues = Object.assign({}, s.values, { [agent]: avals });
+    const newErrors = Object.assign({}, s.errors, { [agent]: Object.assign({}, s.errors[agent], { [f.key]: '' }) });
+    const newPrefill = Object.assign({}, s.prefillFrom, { [agent]: Object.assign({}, s.prefillFrom[agent], { [f.key]: null }) });
+    const patch = { values: newValues, errors: newErrors, prefillFrom: newPrefill };
+    if (f.commonKey) patch.commonValues = Object.assign({}, s.commonValues, { [f.commonKey]: { value: v, fromAgent: agent } });
+    this.setState(patch);
+  }
+  addListEntry(agent, key, max){
+    const s = this.state;
+    const current = (s.listValues[agent] && s.listValues[agent][key]) || [];
+    if (current.length >= max) return;
+    const alists = Object.assign({}, s.listValues[agent], { [key]: current.concat(['']) });
+    this.setState({ listValues: Object.assign({}, s.listValues, { [agent]: alists }) });
+  }
+  setListEntry(agent, key, i, v){
+    const s = this.state;
+    const current = (s.listValues[agent] && s.listValues[agent][key]) || [];
+    const next = current.map((x, k) => k === i ? v : x);
+    const alists = Object.assign({}, s.listValues[agent], { [key]: next });
+    this.setState({ listValues: Object.assign({}, s.listValues, { [agent]: alists }) });
+  }
+  removeListEntry(agent, key, i){
+    const s = this.state;
+    const current = (s.listValues[agent] && s.listValues[agent][key]) || [];
+    const next = current.filter((x, k) => k !== i);
+    const alists = Object.assign({}, s.listValues[agent], { [key]: next });
+    this.setState({ listValues: Object.assign({}, s.listValues, { [agent]: alists }) });
+  }
+}
+</script>
+</body>
+</html>

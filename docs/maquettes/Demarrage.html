@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>MAAQ — Démarrage</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=Karla:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --bg:#E9E1D2; --bg-raised:#F6F0E4; --bg-sunken:#DFD5C0;
+    --ink:#2B211F; --ink-soft:#6E5F58; --line:#DDCFC0;
+    --primary:#7A2E32; --primary-strong:#5E2126;
+    --error:#A8502E; --error-bg:#F1DED2;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Karla',sans-serif;background:var(--bg);color:var(--ink);}
+  h1{font-family:'Newsreader',serif;font-weight:500;margin:0;color:var(--ink);}
+  button{font-family:'Karla',sans-serif;cursor:pointer;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.45;}}
+</style>
+</helmet>
+<div style="width:390px;height:844px;box-sizing:border-box;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px;overflow:hidden;text-align:center;">
+
+  <sc-if value="{{isSplash}}" hint-placeholder-val="{{true}}">
+    <div style="width:72px;height:72px;border-radius:18px;background:var(--primary);color:#F7F1E6;display:flex;align-items:center;justify-content:center;font-family:'Newsreader',serif;font-weight:600;font-size:28px;margin-bottom:18px;animation:pulse 1.6s ease-in-out infinite;">M</div>
+    <div style="font-family:'Newsreader',serif;font-style:italic;font-size:26px;">MAAQ</div>
+  </sc-if>
+
+  <sc-if value="{{isSlow}}" hint-placeholder-val="{{false}}">
+    <div style="width:56px;height:56px;border-radius:16px;background:var(--bg-raised);border:2px solid var(--line);display:flex;align-items:center;justify-content:center;font-family:'Newsreader',serif;font-weight:600;font-size:22px;margin-bottom:18px;">M</div>
+    <p style="font-size:14px;color:var(--ink-soft);line-height:1.5;margin:0 0 18px;max-width:28ch;">La connexion semble lente. Veuillez réessayer.</p>
+    <button onClick="{{reset}}" style="background:var(--primary);color:#F7F1E6;border:none;font-weight:600;font-size:14px;border-radius:8px;padding:12px 24px;">Réessayer</button>
+  </sc-if>
+
+  <sc-if value="{{isError}}" hint-placeholder-val="{{false}}">
+    <div style="width:56px;height:56px;border-radius:16px;background:var(--error-bg);color:var(--error);display:flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:18px;">!</div>
+    <p style="font-size:14px;color:var(--ink-soft);line-height:1.5;margin:0 0 18px;max-width:28ch;">Le service est momentanément indisponible. Veuillez réessayer dans quelques instants.</p>
+    <button onClick="{{reset}}" style="background:var(--primary);color:#F7F1E6;border:none;font-weight:600;font-size:14px;border-radius:8px;padding:12px 24px;">Réessayer</button>
+  </sc-if>
+
+  <sc-if value="{{isOffline}}" hint-placeholder-val="{{false}}">
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--ink-soft)" stroke-width="1.6" style="margin-bottom:18px;"><path d="M1 9a16 16 0 0 1 22 0M5 13a10 10 0 0 1 14 0M9 17a5 5 0 0 1 6 0"/><path d="M2 2l20 20"/></svg>
+    <h1 style="font-size:19px;margin-bottom:8px;">Pas de connexion internet</h1>
+    <p style="font-size:14px;color:var(--ink-soft);line-height:1.5;margin:0 0 18px;max-width:30ch;">MAAQ nécessite une connexion pour fonctionner.</p>
+    <button onClick="{{reset}}" style="background:var(--primary);color:#F7F1E6;border:none;font-weight:600;font-size:14px;border-radius:8px;padding:12px 24px;">Réessayer</button>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"state":{"editor":"enum","default":"splash","options":["splash","slow","error","offline"],"section":"États (Tweaks)"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals(){
+    const st = this.props.state || 'splash';
+    return {
+      isSplash: st === 'splash',
+      isSlow: st === 'slow',
+      isError: st === 'error',
+      isOffline: st === 'offline',
+      reset: () => {},
+    };
+  }
+}
+</script>
+</body>
+</html>

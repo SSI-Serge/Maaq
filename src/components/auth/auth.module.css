@@ -1,0 +1,326 @@
+/* Écrans d'accès, d'après les maquettes Connexion, Vérification, Schéma, Verrouillé, Récupération. */
+
+.header {
+  margin-bottom: 36px;
+}
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--secondary-strong);
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.title {
+  font-size: 26px;
+  line-height: 1.25;
+  margin-bottom: 10px;
+}
+
+.lead {
+  font-size: 14px;
+  color: var(--ink-soft);
+  line-height: 1.5;
+  margin: 0 0 24px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.tabs {
+  display: flex;
+  gap: 6px;
+  background: var(--bg-sunken);
+  border-radius: 10px;
+  padding: 4px;
+  margin-bottom: 22px;
+}
+
+.tab {
+  flex: 1;
+  border: none;
+  border-radius: 8px;
+  padding: 9px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  background: transparent;
+  color: var(--ink-soft);
+}
+
+.tabActive {
+  background: var(--bg-raised);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgba(43, 33, 31, 0.08);
+}
+
+.tab:disabled {
+  opacity: 0.45;
+}
+
+.link {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--secondary-strong);
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+}
+
+.linkEnd {
+  align-self: flex-end;
+}
+
+.links {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
+.note {
+  font-size: 12px;
+  color: var(--ink-soft);
+  line-height: 1.5;
+  text-align: center;
+  margin-top: 4px;
+}
+
+.footer {
+  margin-top: auto;
+  padding-top: 22px;
+}
+
+.who {
+  text-align: center;
+  margin-bottom: 4px;
+}
+
+.whoName {
+  font-family: var(--font-serif);
+  font-size: 20px;
+}
+
+.whoEmail {
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.codeInput {
+  letter-spacing: 0.4em;
+  font-family: var(--font-mono);
+  font-size: 18px;
+  text-align: center;
+}
+
+.success {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--success-bg);
+  color: var(--success);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.lockIcon {
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 18px;
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.lockIconError {
+  background: var(--error-bg);
+  color: var(--error);
+}
+
+.strikes {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--error);
+  background: var(--error-bg);
+  border-radius: 8px;
+  padding: 8px 12px;
+  text-align: center;
+}
+
+/* Grille de schéma */
+.patternBox {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, 56px);
+  grid-template-rows: repeat(3, 56px);
+  gap: 14px;
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 18px;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.patternDisabled {
+  opacity: 0.55;
+}
+
+.patternLines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.line {
+  fill: none;
+  stroke: var(--primary);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.55;
+}
+
+.lineError {
+  fill: none;
+  stroke: var(--error);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.7;
+}
+
+.dot {
+  position: relative;
+  z-index: 1;
+  justify-self: center;
+  align-self: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--ink-soft);
+  background: var(--bg-raised);
+  padding: 0;
+  transition: transform 0.12s ease;
+}
+
+.dotOn {
+  background: var(--primary);
+  border-color: var(--primary);
+  transform: scale(1.25);
+}
+
+.dotError {
+  background: var(--error);
+  border-color: var(--error);
+  transform: scale(1.25);
+}
+
+/* Écran verrouillé posé au-dessus de l'application */
+.lockLayer {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: var(--bg);
+  overflow-y: auto;
+}
+
+.hiddenContent {
+  visibility: hidden;
+}
+
+/* Fenêtre de confirmation */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(43, 33, 31, 0.45);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 16px;
+}
+
+.dialog {
+  width: 100%;
+  max-width: 390px;
+  background: var(--bg-raised);
+  border-radius: 16px;
+  padding: 22px 20px 18px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dialogTitle {
+  font-size: 20px;
+}
+
+.dialogText {
+  font-size: 14px;
+  color: var(--ink-soft);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.dialogActions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+/* Guidage d'installation */
+.steps {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.step {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.stepNumber {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: var(--primary-ink);
+  font-weight: 700;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

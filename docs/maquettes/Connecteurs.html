@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>MAAQ — Connecteurs des agents</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=Karla:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --bg:#E9E1D2; --bg-raised:#F6F0E4; --bg-sunken:#DFD5C0;
+    --ink:#2B211F; --ink-soft:#6E5F58; --line:#DDCFC0;
+    --primary:#7A2E32; --primary-strong:#5E2126; --primary-soft:#EDD9D6; --primary-ink:#F7F1E6;
+    --secondary:#B4913A; --secondary-strong:#93731F; --secondary-soft:#F2E7C6;
+    --success:#5E7048; --success-bg:#E2E6D1;
+    --warning:#B67A24; --warning-bg:#F2E1C0;
+    --error:#A8502E; --error-bg:#F1DED2;
+    --radius:10px;
+    --shadow:0 1px 2px rgba(43,33,31,0.07), 0 8px 24px rgba(43,33,31,0.09);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Karla',sans-serif;background:var(--bg);color:var(--ink);}
+  h1,h2,h3,h4{font-family:'Newsreader',serif;font-weight:500;margin:0;color:var(--ink);}
+  a{text-decoration:none;color:inherit;}
+  button{font-family:'Karla',sans-serif;cursor:pointer;}
+  input{font-family:'Karla',sans-serif;}
+  label{font-size:12px;font-weight:600;color:var(--ink-soft);}
+  @keyframes spin{to{transform:rotate(360deg);}}
+</style>
+</helmet>
+<div style="width:390px;height:844px;box-sizing:border-box;background:var(--bg);display:flex;flex-direction:column;overflow:hidden;">
+
+  <div style="padding:44px 20px 14px;border-bottom:1px solid var(--line);background:var(--bg-raised);">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+      <a href="U-Agents.html" aria-label="Retour" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;color:var(--ink);flex-shrink:0;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+      </a>
+      <h1 style="font-size:18px;">Connecteurs des agents</h1>
+    </div>
+    <p style="font-size:12px;color:var(--ink-soft);margin:0 0 12px;line-height:1.4;">Propres à chaque agent, en complément de vos informations générales. Vous connectez vos propres comptes Google — votre invité connecte les siens séparément.</p>
+    <div style="display:flex;gap:6px;background:var(--bg-sunken);border-radius:10px;padding:4px;">
+      <button onClick="{{pickClassify}}" style="{{tabClassifyStyle}}">Admin_Classify</button>
+      <button onClick="{{pickLib}}" style="{{tabLibStyle}}">Admin_lib</button>
+    </div>
+  </div>
+
+  <div style="flex:1;overflow-y:auto;padding:18px 20px 24px;">
+
+    <sc-if value="{{isClassify}}" hint-placeholder-val="{{true}}">
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-soft);">Google Drive du compte</div>
+          <div style="{{classifyStatusStyle}}">{{classifyStatusLabel}}</div>
+        </div>
+        <p style="font-size:11px;color:var(--ink-soft);margin:-8px 0 0;line-height:1.5;">Une connexion unique pour tout le compte, partagée par les agents qui en ont besoin (dont les agents des Contrats) — à la différence des autres connecteurs, propres à chaque profil.</p>
+
+        <sc-if value="{{classifyNone}}" hint-placeholder-val="{{true}}">
+          <p style="font-size:13px;color:var(--ink-soft);line-height:1.5;margin:0;">Connectez le compte Google Drive à utiliser pour classer les documents de tout le compte.</p>
+          <button onClick="{{startClassify}}" style="background:var(--primary);color:var(--primary-ink);border:none;font-weight:600;font-size:13px;border-radius:8px;padding:12px;">Connecter</button>
+        </sc-if>
+
+        <sc-if value="{{classifyChoosing}}" hint-placeholder-val="{{false}}">
+          <sc-if value="{{classifySuggestion}}" hint-placeholder-val="{{true}}">
+            <div style="background:var(--bg-raised);border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px;">
+              <div style="font-size:12px;color:var(--ink-soft);">Une adresse est déjà connectée pour un autre agent :</div>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;">camille@exemple.fr</span>
+                <button onClick="{{useSuggestedClassify}}" style="background:var(--primary);color:var(--primary-ink);border:none;border-radius:8px;padding:8px 12px;font-weight:600;font-size:12px;white-space:nowrap;">Utiliser</button>
+              </div>
+            </div>
+          </sc-if>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <label for="drive-email">Adresse email de connexion</label>
+            <input id="drive-email" type="email" value="{{classifyEmail}}" onInput="{{onClassifyEmail}}" placeholder="camille@exemple.fr" style="padding:12px 14px;border-radius:8px;border:1px solid var(--line);background:var(--bg-raised);font-size:14px;">
+          </div>
+          <sc-if value="{{classifyEmailError}}" hint-placeholder-val="{{false}}">
+            <div style="font-size:12px;color:var(--error);font-weight:600;">{{classifyEmailError}}</div>
+          </sc-if>
+          <button onClick="{{continueClassify}}" style="background:var(--primary);color:var(--primary-ink);border:none;font-weight:600;font-size:13px;border-radius:8px;padding:12px;">Continuer</button>
+        </sc-if>
+
+        <sc-if value="{{classifyRequesting}}" hint-placeholder-val="{{false}}">
+          <div style="background:var(--bg-raised);border:1px solid var(--secondary);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px;">
+            <div style="font-size:13px;font-weight:700;color:var(--ink);">MAAQ demande l'accès au Google Drive du compte</div>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <div style="display:flex;gap:8px;align-items:flex-start;font-size:12px;color:var(--ink-soft);"><span style="color:var(--secondary-strong);">●</span>Lire vos documents Google Drive</div>
+              <div style="display:flex;gap:8px;align-items:flex-start;font-size:12px;color:var(--ink-soft);"><span style="color:var(--secondary-strong);">●</span>Créer et déplacer des fichiers dans les dossiers dédiés</div>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <button onClick="{{authorizeClassify}}" style="flex:1;background:var(--primary);color:var(--primary-ink);border:none;border-radius:8px;padding:10px;font-weight:600;font-size:13px;">Autoriser</button>
+              <button onClick="{{refuseClassify}}" style="flex:1;background:transparent;color:var(--ink-soft);border:1px solid var(--line);border-radius:8px;padding:10px;font-weight:600;font-size:13px;">Refuser</button>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{classifyPending}}" hint-placeholder-val="{{false}}">
+          <div style="background:var(--bg-raised);border:1px solid var(--line);border-radius:12px;padding:24px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;">
+            <div style="width:22px;height:22px;border-radius:50%;border:3px solid var(--secondary-soft);border-top-color:var(--secondary-strong);animation:spin 0.8s linear infinite;"></div>
+            <div style="font-size:13px;font-weight:600;color:var(--ink);">Finalisation de la connexion…</div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{classifyConnected}}" hint-placeholder-val="{{false}}">
+          <div style="background:var(--success-bg);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:8px;">
+            <div style="display:flex;align-items:center;gap:8px;color:var(--success);font-weight:700;font-size:13px;">✓ Connecteur actif</div>
+            <div style="font-size:12px;color:var(--success);">Les agents du compte peuvent désormais classer des documents dans Google Drive, via <span style="font-family:'IBM Plex Mono',monospace;">{{classifyConnectedEmail}}</span>.</div>
+          </div>
+          <sc-if value="{{classifyDisconnectIdle}}" hint-placeholder-val="{{true}}">
+            <button onClick="{{askDisconnectClassify}}" style="background:transparent;color:var(--error);border:1px solid var(--error);font-weight:600;font-size:13px;border-radius:8px;padding:11px;margin-top:12px;">Déconnecter</button>
+          </sc-if>
+          <sc-if value="{{classifyDisconnectConfirm}}" hint-placeholder-val="{{false}}">
+            <div style="background:var(--error-bg);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px;margin-top:12px;">
+              <p style="font-size:12px;color:var(--error);margin:0;line-height:1.5;">Les agents qui utilisent cette connexion redeviendront « À configurer ». Les documents déjà classés resteront dans le Google Drive.</p>
+              <div style="display:flex;gap:8px;">
+                <button onClick="{{cancelDisconnectClassify}}" style="flex:1;background:transparent;border:1px solid var(--line);color:var(--ink);font-weight:600;font-size:12px;border-radius:8px;padding:9px;">Annuler</button>
+                <button onClick="{{disconnectClassify}}" style="flex:1;background:var(--error);color:var(--primary-ink);border:none;font-weight:600;font-size:12px;border-radius:8px;padding:9px;">Déconnecter</button>
+              </div>
+            </div>
+          </sc-if>
+        </sc-if>
+
+        <sc-if value="{{classifyRefused}}" hint-placeholder-val="{{false}}">
+          <div style="background:var(--error-bg);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:8px;">
+            <div style="font-size:13px;font-weight:700;color:var(--error);">Autorisation refusée</div>
+            <div style="font-size:12px;color:var(--error);">Sans cette autorisation, les agents du compte ne pourront pas classer de documents.</div>
+          </div>
+          <button onClick="{{retryClassify}}" style="background:var(--primary);color:var(--primary-ink);border:none;font-weight:600;font-size:13px;border-radius:8px;padding:12px;margin-top:12px;">Réessayer</button>
+        </sc-if>
+
+        <sc-if value="{{classifyPartial}}" hint-placeholder-val="{{false}}">
+          <div style="background:var(--warning-bg);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:8px;">
+            <div style="font-size:13px;font-weight:700;color:var(--warning);">Autorisation partielle</div>
+            <div style="font-size:12px;color:var(--warning);">Certaines permissions nécessaires n'ont pas été accordées. Les agents du compte ne pourront pas classer de documents correctement.</div>
+          </div>
+          <button onClick="{{retryClassify}}" style="background:var(--primary);color:var(--primary-ink);border:none;font-weight:600;font-size:13px;border-radius:8px;padding:12px;margin-top:12px;">Réessayer</button>
+        </sc-if>
+
+        <sc-if value="{{classifyReconnect}}" hint-placeholder-val="{{false}}">
+          <div style="background:var(--warning-bg);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:8px;">
+            <div style="font-size:13px;font-weight:700;color:var(--warning);">À reconnecter</div>
+            <div style="font-size:12px;color:var(--warning);">La connexion au Google Drive du compte a expiré et doit être renouvelée.</div>
+          </div>
+          <button onClick="{{retryClassify}}" style="background:var(--primary);color:var(--primary-ink);border:none;font-weight:600;font-size:13px;border-radius:8px;padding:12px;margin-top:12px;">Reprendre la connexion</button>
+        </sc-if>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{isLib}}" hint-placeholder-val="{{false}}">
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-soft);">Connecteur — Google Agenda</div>
+          <div style="{{libStatusStyle}}">{{libStatusLabel}}</div>
+        </div>
+
+        <sc-if value="{{libNone}}" hint-placeholder-val="{{true}}">
+          <p style="font-size:13px;color:var(--ink-soft);line-height:1.5;margin:0;">Connectez le compte Google Agenda qu'<b>Admin_lib</b> doit utiliser pour vos rendez-vous.</p>
+          <button onClick="{{startLib}}" style="background:var(--primary);color:var(--primary-ink);border:none;font-weight:600;font-size:13px;border-radius:8px;padding:12px;">Connecter</button>
+        </sc-if>
+
+        <sc-if value="{{libChoosing}}" hint-placeholder-val="{{false}}">
+          <sc-if value="{{libSuggestion}}" hint-placeholder-val="{{true}}">
+            <div style="background:var(--bg-raised);border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px;">
+              <div style="font-size:12px;color:var(--ink-soft);">Une adresse est déjà connectée pour un autre agent :</div>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;">camille@exemple.fr</span>
+                <button onClick="{{useSuggestedLib}}" style="background:var(--primary);color:var(--primary-ink);border:none;border-radius:8px;padding:8px 12px;font-weight:600;font-size:12px;white-space:nowrap;">Utiliser</button>
+              </div>
+            </div>
+          </sc-if>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <label for="agenda-email">Adresse email de connexion</label>
+            <input id="agenda-email" type="email" value="{{libEmail}}" onInput="{{onLibEmail}}" placeholder="camille@exemple.fr" style="padding:12px 14px;border-radius:8px;border:1px solid var(--line);background:var(--bg-raised);font-size:14px;">
+          </div>
+          <sc-if value="{{libEmailError}}" hint-placeholder-val="{{false}}">
+            <div style="font-size:12px;color:var(--error);font-weight:600;">{{libEmailError}}</div>
+          </sc-if>
+          <button onClick="{{continueLib}}" style="background:var(--primary);color:var(--primary-ink);border:none;font-weight:600;font-size:13px;border-radius:8px;padding:12px;">Continuer</button>
+        </sc-if>
+
+        <sc-if value="{{libRequesting}}" hint-placeholder-val="{{false}}">
+          <div style="background:var(--bg-raised);border:1px solid var(--secondary);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px;">
+            <div style="font-size:13px;font-weight:700;color:var(--ink);">Admin_lib demande l'accès à votre Google Agenda</div>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <div style="display:flex;gap:8px;align-items:flex-start;font-size:12px;color:var(--ink-soft);"><span style="color:var(--secondary-strong);">●</span>Consulter et créer des événements dans votre agenda</div>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <button onClick="{{authorizeLib}}" style="flex:1;background:var(--primary);color:var(--primary-ink);border:none;border-radius:8px;padding:10px;font-weight:600;font-size:13px;">Autoriser</button>
+              <button onClick="{{refuseLib}}" style="flex:1;background:transparent;color:var(--ink-soft);border:1px solid var(--line);border-radius:8px;padding:10px;font-weight:600;font-size:13px;">Refuser</button>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{libPending}}" hint-placeholder-val="{{false}}">
+          <div style="background:var(--bg-raised);border:1px solid var(--line);border-radius:12px;padding:24px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;">
+            <div style="width:22px;height:22px;border-radius:50%;border:3px solid var(--secondary-soft);border-top-color:var(--secondary-strong);animation:spin 0.8s linear infinite;"></div>
+            <div style="font-size:13px;font-weight:600;color:var(--ink);">Finalisation de la connexion…</div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{libConnected}}" hint-placeholder-val="{{false}}">
+          <div style="background:var(--success-bg);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:8px;">
+            <div style="display:flex;align-items:center;gap:8px;color:var(--success);font-weight:700;font-size:13px;">✓ Connecteur actif</div>
+            <div style="font-size:12px;color:var(--success);">Admin_lib peut désormais gérer vos rendez-vous dans Google Agenda, via <span style="font-family:'IBM Plex Mono',monospace;">{{libConnectedEmail}}</span>.</div>
+          </div>
+          <button onClick="{{disconnectLib}}" style="background:transparent;color:var(--error);border:1px solid var(--error);font-weight:600;font-size:13px;border-radius:8px;padding:11px;margin-top:12px;">Déconnecter</button>
+        </sc-if>
+
+        <sc-if value="{{libRefused}}" hint-placeholder-val="{{false}}">
+          <div style="background:var(--error-bg);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:8px;">
+            <div style="font-size:13px;font-weight:700;color:var(--error);">Autorisation refusée</div>
+            <div style="font-size:12px;color:var(--error);">Sans cette autorisation, Admin_lib ne pourra pas gérer votre agenda.</div>
+          </div>
+          <button onClick="{{retryLib}}" style="background:var(--primary);color:var(--primary-ink);border:none;font-weight:600;font-size:13px;border-radius:8px;padding:12px;margin-top:12px;">Réessayer</button>
+        </sc-if>
+
+        <sc-if value="{{libPartial}}" hint-placeholder-val="{{false}}">
+          <div style="background:var(--warning-bg);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:8px;">
+            <div style="font-size:13px;font-weight:700;color:var(--warning);">Autorisation partielle</div>
+            <div style="font-size:12px;color:var(--warning);">Certaines permissions nécessaires n'ont pas été accordées. Admin_lib ne pourra pas gérer votre agenda correctement.</div>
+          </div>
+          <button onClick="{{retryLib}}" style="background:var(--primary);color:var(--primary-ink);border:none;font-weight:600;font-size:13px;border-radius:8px;padding:12px;margin-top:12px;">Réessayer</button>
+        </sc-if>
+
+        <sc-if value="{{libReconnect}}" hint-placeholder-val="{{false}}">
+          <div style="background:var(--warning-bg);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:8px;">
+            <div style="font-size:13px;font-weight:700;color:var(--warning);">À reconnecter</div>
+            <div style="font-size:12px;color:var(--warning);">La connexion à Google Agenda a expiré et doit être renouvelée.</div>
+          </div>
+          <button onClick="{{retryLib}}" style="background:var(--primary);color:var(--primary-ink);border:none;font-weight:600;font-size:13px;border-radius:8px;padding:12px;margin-top:12px;">Reprendre la connexion</button>
+        </sc-if>
+
+        <div style="border-top:1px dashed var(--line);margin-top:6px;padding-top:14px;display:flex;flex-direction:column;gap:10px;">
+          <div>
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:6px;">Adresses en copie systématique</div>
+            <p style="font-size:12px;color:var(--ink-soft);line-height:1.5;margin:0;">Ajouté automatiquement à vos rendez-vous. Votre invité les verra, sans pouvoir les modifier — il peut ajouter les siennes en plus.</p>
+          </div>
+          <sc-for list="{{ccList}}" as="cc" hint-placeholder-count="1">
+            <div style="display:flex;justify-content:space-between;align-items:center;background:var(--bg-raised);border:1px solid var(--line);border-radius:8px;padding:8px 10px;">
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;">{{cc.email}}</span>
+              <button onClick="{{cc.remove}}" aria-label="Retirer cette adresse" style="background:none;border:none;font-size:12px;color:var(--error);text-decoration:underline;padding:0;">Retirer</button>
+            </div>
+          </sc-for>
+          <sc-if value="{{ccEmpty}}" hint-placeholder-val="{{false}}">
+            <div style="font-size:12px;color:var(--ink-soft);">Aucune adresse en copie pour le moment.</div>
+          </sc-if>
+          <sc-if value="{{ccError}}" hint-placeholder-val="{{false}}">
+            <div style="font-size:12px;color:var(--error);font-weight:600;">{{ccError}}</div>
+          </sc-if>
+          <div style="display:flex;gap:8px;">
+            <input type="email" value="{{ccDraft}}" onInput="{{onCcDraft}}" placeholder="adresse@exemple.fr" style="flex:1;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg-raised);font-size:13px;color:var(--ink);">
+            <button onClick="{{addCc}}" style="background:var(--primary);color:var(--primary-ink);border:none;border-radius:8px;padding:10px 14px;font-weight:600;font-size:13px;white-space:nowrap;">Ajouter</button>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <div style="border-top:1px dashed var(--line);margin-top:22px;padding-top:20px;display:flex;flex-direction:column;gap:14px;">
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px;">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-soft);">Boîte mail de validation</div>
+          <sc-if value="{{validationEmpty}}" hint-placeholder-val="{{true}}"><div style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;background:var(--bg-sunken);color:var(--ink-soft);">Non configurée</div></sc-if>
+          <sc-if value="{{validationCodeStep}}" hint-placeholder-val="{{false}}"><div style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;background:var(--secondary-soft);color:var(--secondary-strong);">À vérifier</div></sc-if>
+          <sc-if value="{{validationConnected}}" hint-placeholder-val="{{false}}"><div style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;background:var(--success-bg);color:var(--success);">Active</div></sc-if>
+        </div>
+        <p style="font-size:12px;color:var(--ink-soft);line-height:1.5;margin:0;">Distincte des connecteurs Drive/Agenda ci-dessus. La validation d'un envoi (ex. un email en votre nom) se fait dans le tchat de l'agent, via une carte dédiée — cette boîte reçoit le brouillon en parallèle.</p>
+      </div>
+
+      <sc-if value="{{validationEmpty}}" hint-placeholder-val="{{true}}">
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <label for="validation-email">Adresse email de validation</label>
+          <input id="validation-email" type="email" value="{{validationEmail}}" onInput="{{onValidationEmail}}" placeholder="camille.validation@exemple.fr" style="padding:12px 14px;border-radius:8px;border:1px solid var(--line);background:var(--bg-raised);font-size:14px;">
+        </div>
+        <button onClick="{{saveValidation}}" style="background:var(--primary);color:var(--primary-ink);border:none;font-weight:600;font-size:13px;border-radius:8px;padding:12px;">Enregistrer</button>
+      </sc-if>
+
+      <sc-if value="{{validationCodeStep}}" hint-placeholder-val="{{false}}">
+        <p style="font-size:12px;color:var(--ink-soft);line-height:1.5;margin:0;">Un code de vérification a été envoyé à <span style="font-family:'IBM Plex Mono',monospace;">{{validationEmail}}</span>.</p>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <label for="validation-code">Code de vérification</label>
+          <input id="validation-code" type="text" inputmode="numeric" value="{{validationCode}}" onInput="{{onValidationCode}}" placeholder="123456" style="padding:12px 14px;border-radius:8px;border:1px solid var(--line);background:var(--bg-raised);font-size:14px;letter-spacing:.1em;">
+        </div>
+        <button onClick="{{verifyValidationCode}}" style="background:var(--primary);color:var(--primary-ink);border:none;font-weight:600;font-size:13px;border-radius:8px;padding:12px;">Vérifier</button>
+      </sc-if>
+
+      <sc-if value="{{validationConnected}}" hint-placeholder-val="{{false}}">
+        <div style="background:var(--success-bg);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:8px;">
+          <div style="display:flex;align-items:center;gap:8px;color:var(--success);font-weight:700;font-size:13px;">✓ Boîte de validation active</div>
+          <div style="font-size:12px;color:var(--success);">Les brouillons à valider seront envoyés à <span style="font-family:'IBM Plex Mono',monospace;">{{validationEmail}}</span>.</div>
+        </div>
+        <button onClick="{{editValidation}}" style="background:transparent;color:var(--ink-soft);border:1px solid var(--line);font-weight:600;font-size:13px;border-radius:8px;padding:11px;margin-top:12px;">Modifier</button>
+      </sc-if>
+    </div>
+
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"initialState":{"editor":"enum","options":["non_configure","connecte","a_reconnecter"],"default":"non_configure","section":"États (Tweaks)"},"authOutcome":{"editor":"enum","options":["connecte","partiel","refuse"],"default":"connecte","section":"États (Tweaks)"},"showInterstitial":{"editor":"boolean","default":false,"section":"États (Tweaks)"},"alreadyConnectedSuggestion":{"editor":"boolean","default":true,"section":"États (Tweaks)"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props){
+    super(props);
+    const initMap = { non_configure: 'none', connecte: 'connected', a_reconnecter: 'reconnect' };
+    const initStep = initMap[props.initialState] || 'none';
+    this.state = {
+      agent: 'classify',
+      classifyStep: initStep,
+      classifyEmail: '',
+      classifyEmailError: '',
+      classifyDiscMode: 'idle',
+      libStep: initStep,
+      libEmail: '',
+      libEmailError: '',
+      ccList: ['camille.famille@exemple.fr'],
+      ccDraft: '',
+      ccError: '',
+      validationStep: 'none',
+      validationEmail: '',
+      validationCode: '',
+    };
+  }
+  statusInfo(step){
+    const map = {
+      none: { label: 'Non configuré', bg: 'var(--bg-sunken)', color: 'var(--ink-soft)' },
+      choosing: { label: 'Non configuré', bg: 'var(--bg-sunken)', color: 'var(--ink-soft)' },
+      requesting: { label: 'Autorisation en attente', bg: 'var(--secondary-soft)', color: 'var(--secondary-strong)' },
+      pending: { label: 'Autorisation en attente', bg: 'var(--secondary-soft)', color: 'var(--secondary-strong)' },
+      connected: { label: 'Connecté', bg: 'var(--success-bg)', color: 'var(--success)' },
+      refused: { label: 'Autorisation refusée', bg: 'var(--error-bg)', color: 'var(--error)' },
+      partial: { label: 'Autorisation partielle', bg: 'var(--warning-bg)', color: 'var(--warning)' },
+      reconnect: { label: 'À reconnecter', bg: 'var(--warning-bg)', color: 'var(--warning)' },
+    };
+    return map[step] || map.none;
+  }
+  renderVals(){
+    const s = this.state;
+    const p = this.props;
+    const tabStyle = (active) => "flex:1;padding:9px 0;border-radius:8px;border:none;font-weight:600;font-size:12px;background:" + (active ? 'var(--primary)' : 'transparent') + ";color:" + (active ? 'var(--primary-ink)' : 'var(--ink-soft)') + ";";
+    const badgeStyle = (info) => "display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:700;padding:4px 10px;border-radius:999px;background:" + info.bg + ";color:" + info.color + ";white-space:nowrap;";
+    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const outcomeFromProp = () => p.authOutcome === 'partiel' ? 'partial' : (p.authOutcome === 'refuse' ? 'refused' : 'connected');
+
+    const classifyDisplayStep = p.showInterstitial ? 'pending' : s.classifyStep;
+    const libDisplayStep = p.showInterstitial ? 'pending' : s.libStep;
+    const classifyInfo = this.statusInfo(classifyDisplayStep);
+    const libInfo = this.statusInfo(libDisplayStep);
+
+    return {
+      isClassify: s.agent === 'classify',
+      isLib: s.agent === 'lib',
+      tabClassifyStyle: tabStyle(s.agent === 'classify'),
+      tabLibStyle: tabStyle(s.agent === 'lib'),
+      pickClassify: () => this.setState({ agent: 'classify' }),
+      pickLib: () => this.setState({ agent: 'lib' }),
+
+      classifyStatusLabel: classifyInfo.label,
+      classifyStatusStyle: badgeStyle(classifyInfo),
+      classifyNone: classifyDisplayStep === 'none',
+      classifyChoosing: classifyDisplayStep === 'choosing',
+      classifyRequesting: classifyDisplayStep === 'requesting',
+      classifyPending: classifyDisplayStep === 'pending',
+      classifyConnected: classifyDisplayStep === 'connected',
+      classifyRefused: classifyDisplayStep === 'refused',
+      classifyPartial: classifyDisplayStep === 'partial',
+      classifyReconnect: classifyDisplayStep === 'reconnect',
+      classifyEmail: s.classifyEmail,
+      onClassifyEmail: (e) => this.setState({ classifyEmail: e.target.value, classifyEmailError: '' }),
+      classifyEmailError: s.classifyEmailError,
+      classifySuggestion: !!p.alreadyConnectedSuggestion,
+      startClassify: () => this.setState({ classifyStep: 'choosing' }),
+      useSuggestedClassify: () => this.setState({ classifyStep: 'requesting', classifyEmail: 'camille@exemple.fr' }),
+      continueClassify: () => {
+        const v = s.classifyEmail.trim();
+        if (!emailRe.test(v)) { this.setState({ classifyEmailError: 'Adresse email invalide' }); return; }
+        this.setState({ classifyStep: 'requesting', classifyEmailError: '' });
+      },
+      authorizeClassify: () => this.setState({ classifyStep: outcomeFromProp() }),
+      refuseClassify: () => this.setState({ classifyStep: 'refused' }),
+      retryClassify: () => this.setState({ classifyStep: 'requesting' }),
+      classifyDisconnectIdle: s.classifyDiscMode === 'idle',
+      classifyDisconnectConfirm: s.classifyDiscMode === 'confirm',
+      askDisconnectClassify: () => this.setState({ classifyDiscMode: 'confirm' }),
+      cancelDisconnectClassify: () => this.setState({ classifyDiscMode: 'idle' }),
+      disconnectClassify: () => this.setState({ classifyStep: 'none', classifyEmail: '', classifyDiscMode: 'idle' }),
+      classifyConnectedEmail: s.classifyEmail || 'camille@exemple.fr',
+
+      libStatusLabel: libInfo.label,
+      libStatusStyle: badgeStyle(libInfo),
+      libNone: libDisplayStep === 'none',
+      libChoosing: libDisplayStep === 'choosing',
+      libRequesting: libDisplayStep === 'requesting',
+      libPending: libDisplayStep === 'pending',
+      libConnected: libDisplayStep === 'connected',
+      libRefused: libDisplayStep === 'refused',
+      libPartial: libDisplayStep === 'partial',
+      libReconnect: libDisplayStep === 'reconnect',
+      libEmail: s.libEmail,
+      onLibEmail: (e) => this.setState({ libEmail: e.target.value, libEmailError: '' }),
+      libEmailError: s.libEmailError,
+      libSuggestion: !!p.alreadyConnectedSuggestion,
+      startLib: () => this.setState({ libStep: 'choosing' }),
+      useSuggestedLib: () => this.setState({ libStep: 'requesting', libEmail: 'camille@exemple.fr' }),
+      continueLib: () => {
+        const v = s.libEmail.trim();
+        if (!emailRe.test(v)) { this.setState({ libEmailError: 'Adresse email invalide' }); return; }
+        this.setState({ libStep: 'requesting', libEmailError: '' });
+      },
+      authorizeLib: () => this.setState({ libStep: outcomeFromProp() }),
+      refuseLib: () => this.setState({ libStep: 'refused' }),
+      retryLib: () => this.setState({ libStep: 'requesting' }),
+      disconnectLib: () => this.setState({ libStep: 'none', libEmail: '' }),
+      libConnectedEmail: s.libEmail || 'camille@exemple.fr',
+
+      ccList: s.ccList.map((email, i) => ({ email: email, remove: () => this.setState({ ccList: s.ccList.filter((x, k) => k !== i) }) })),
+      ccEmpty: s.ccList.length === 0,
+      ccDraft: s.ccDraft,
+      ccError: s.ccError,
+      onCcDraft: (e) => this.setState({ ccDraft: e.target.value, ccError: '' }),
+      addCc: () => {
+        const v = s.ccDraft.trim();
+        if (!v) return;
+        if (s.ccList.length >= 10) { this.setState({ ccError: 'Vous avez atteint la limite de 10 adresses.' }); return; }
+        if (s.ccList.indexOf(v) !== -1) { this.setState({ ccError: 'Cette personne est déjà en copie' }); return; }
+        this.setState({ ccList: s.ccList.concat([v]), ccDraft: '', ccError: '' });
+      },
+
+      validationEmpty: s.validationStep === 'none',
+      validationCodeStep: s.validationStep === 'code',
+      validationConnected: s.validationStep === 'active',
+      validationEmail: s.validationEmail,
+      onValidationEmail: (e) => this.setState({ validationEmail: e.target.value }),
+      saveValidation: () => { if (s.validationEmail.trim()) this.setState({ validationStep: 'code' }); },
+      validationCode: s.validationCode,
+      onValidationCode: (e) => this.setState({ validationCode: e.target.value }),
+      verifyValidationCode: () => { if (s.validationCode.trim().length >= 6) this.setState({ validationStep: 'active' }); },
+      editValidation: () => this.setState({ validationStep: 'none', validationCode: '' }),
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>MAAQ Admin — Comptes</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=Karla:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --bg:#E9E1D2; --bg-raised:#F6F0E4; --bg-sunken:#DFD5C0;
+    --ink:#2B211F; --ink-soft:#6E5F58; --line:#DDCFC0;
+    --primary:#7A2E32; --primary-strong:#5E2126; --primary-soft:#EDD9D6; --primary-ink:#F7F1E6;
+    --secondary:#B4913A; --secondary-strong:#93731F; --secondary-soft:#F2E7C6;
+    --success:#5E7048; --success-bg:#E2E6D1;
+    --warning:#B67A24; --warning-bg:#F2E1C0;
+    --error:#A8502E; --error-bg:#F1DED2;
+    --radius:10px;
+    --shadow:0 1px 2px rgba(43,33,31,0.07), 0 8px 24px rgba(43,33,31,0.09);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Karla',sans-serif;background:var(--bg);color:var(--ink);}
+  h1,h2,h3,h4{font-family:'Newsreader',serif;font-weight:500;margin:0;color:var(--ink);}
+  a{text-decoration:none;color:inherit;}
+  button{font-family:'Karla',sans-serif;cursor:pointer;}
+  input,textarea{font-family:'Karla',sans-serif;}
+  table{border-collapse:collapse;width:100%;}
+  th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-soft);text-align:left;padding:0 12px 8px;font-weight:700;}
+  td{font-size:13px;padding:12px;border-top:1px solid var(--line);vertical-align:middle;}
+</style>
+</helmet>
+<div style="width:1440px;height:900px;box-sizing:border-box;background:var(--bg);display:flex;overflow:hidden;">
+
+  <div style="width:232px;flex-shrink:0;background:var(--bg-raised);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:28px 18px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:34px;padding:0 6px;">
+      <div style="width:32px;height:32px;border-radius:8px;background:var(--primary);color:var(--primary-ink);display:flex;align-items:center;justify-content:center;font-family:'Newsreader',serif;font-weight:600;font-size:13px;">M</div>
+      <div>
+        <div style="font-family:'Newsreader',serif;font-style:italic;font-size:17px;">MAAQ</div>
+        <div style="font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);">Administration</div>
+      </div>
+    </div>
+    <a href="Admin-Agents.html" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;color:var(--ink-soft);font-weight:600;font-size:13px;margin-bottom:4px;">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/></svg>
+      Agents
+    </a>
+    <a href="Admin-Contrats.html" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;color:var(--ink-soft);font-weight:600;font-size:13px;margin-bottom:4px;">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4M10 12h6M10 16h6"/></svg>
+      Contrats obligatoires
+    </a>
+    <a href="Admin-Support.html" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;color:var(--ink-soft);font-weight:600;font-size:13px;margin-bottom:4px;">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/></svg>
+      Réglages
+    </a>
+    <a href="Admin-Comptes.html" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;background:var(--primary-soft);color:var(--primary-strong);font-weight:700;font-size:13px;margin-bottom:4px;">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6"/></svg>
+      Comptes
+    </a>
+    <a href="Admin-Parametres.html" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;color:var(--ink-soft);font-weight:600;font-size:13px;margin-bottom:4px;">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10.3 3h3.4l.6 2.4a7 7 0 0 1 1.8 1l2.3-.9 1.7 3-1.8 1.6a7 7 0 0 1 0 2l1.8 1.6-1.7 3-2.3-.9a7 7 0 0 1-1.8 1L13.7 21h-3.4l-.6-2.4a7 7 0 0 1-1.8-1l-2.3.9-1.7-3 1.8-1.6a7 7 0 0 1 0-2L3.9 10l1.7-3 2.3.9a7 7 0 0 1 1.8-1z"/><circle cx="12" cy="12" r="2.6"/></svg>
+      Paramètres
+    </a>
+  </div>
+
+  <div style="flex:1;overflow-y:auto;padding:40px 48px;">
+
+    <sc-if value="{{viewList}}" hint-placeholder-val="{{true}}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;">
+        <div>
+          <h1 style="font-size:24px;margin-bottom:8px;">Comptes</h1>
+          <p style="font-size:13px;color:var(--ink-soft);margin:0;max-width:60ch;">Utilisateurs principaux de MAAQ. Chaque compte peut inviter des invités selon son plan.</p>
+        </div>
+        <button onClick="{{openCreate}}" style="display:flex;align-items:center;gap:8px;background:var(--primary);color:var(--primary-ink);border:none;border-radius:8px;padding:11px 18px;font-weight:600;font-size:13px;white-space:nowrap;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+          Créer un compte
+        </button>
+      </div>
+
+      <sc-if value="{{justCreated}}" hint-placeholder-val="{{false}}">
+        <div style="display:inline-flex;align-items:center;gap:8px;background:var(--success-bg);color:var(--success);border-radius:10px;padding:10px 16px;font-size:13px;font-weight:600;margin-bottom:18px;">✓ Compte créé, email d'activation envoyé à {{createdEmail}}</div>
+      </sc-if>
+
+      <input type="text" value="{{search}}" onInput="{{onSearch}}" placeholder="Rechercher un compte (nom, email)…" style="width:340px;padding:10px 14px;border-radius:8px;border:1px solid var(--line);background:var(--bg-raised);font-size:13px;margin-bottom:16px;">
+
+      <div style="background:var(--bg-raised);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;max-width:1040px;">
+        <table>
+          <thead><tr><th>Nom</th><th>Email</th><th>Statut</th><th>Invités</th><th></th></tr></thead>
+          <tbody>
+            <tr data-sc-for-list="{{rows}}" data-sc-for-as="acc">
+                <td style="font-weight:600;">{{acc.name}}</td>
+                <td style="font-family:'IBM Plex Mono',monospace;color:var(--ink-soft);">{{acc.email}}</td>
+                <td><span style="{{acc.badgeStyle}}">{{acc.statusLabel}}</span></td>
+                <td>{{acc.guests}}</td>
+                <td style="text-align:right;"><button onClick="{{acc.open}}" style="background:none;border:none;color:var(--secondary-strong);font-weight:700;font-size:12px;padding:0;">Voir la fiche ›</button></td>
+              </tr>
+            
+          </tbody>
+        </table>
+        <sc-if value="{{noResults}}" hint-placeholder-val="{{false}}">
+          <div style="padding:24px;text-align:center;font-size:13px;color:var(--ink-soft);">Aucun compte ne correspond à cette recherche.</div>
+        </sc-if>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{viewCreate}}" hint-placeholder-val="{{false}}">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
+        <button onClick="{{backToList}}" aria-label="Retour" style="width:30px;height:30px;display:flex;align-items:center;justify-content:center;background:none;border:none;color:var(--ink);">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <h1 style="font-size:22px;">Créer un compte</h1>
+      </div>
+
+      <div style="background:var(--bg-raised);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:24px;max-width:520px;display:flex;flex-direction:column;gap:14px;">
+        <div style="display:flex;gap:12px;">
+          <div style="flex:1;display:flex;flex-direction:column;gap:6px;">
+            <label style="font-size:12px;font-weight:600;color:var(--ink-soft);">Prénom</label>
+            <input type="text" value="{{firstName}}" onInput="{{onFirstName}}" style="padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:13px;">
+          </div>
+          <div style="flex:1;display:flex;flex-direction:column;gap:6px;">
+            <label style="font-size:12px;font-weight:600;color:var(--ink-soft);">Nom</label>
+            <input type="text" value="{{lastName}}" onInput="{{onLastName}}" style="padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:13px;">
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <label style="font-size:12px;font-weight:600;color:var(--ink-soft);">Email</label>
+          <input type="email" value="{{email}}" onInput="{{onEmail}}" style="padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:13px;">
+          <sc-if value="{{emailError}}" hint-placeholder-val="{{false}}"><div style="font-size:12px;color:var(--error);font-weight:600;">{{emailError}}</div></sc-if>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <label style="font-size:12px;font-weight:600;color:var(--ink-soft);">Téléphone (facultatif)</label>
+          <input type="tel" value="{{phone}}" onInput="{{onPhone}}" style="padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:13px;">
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <label style="font-size:12px;font-weight:600;color:var(--ink-soft);">Nombre d'invités autorisés (plan souscrit)</label>
+          <input type="number" min="0" value="{{guestQuota}}" onInput="{{onGuestQuota}}" style="width:140px;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:13px;">
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <label style="font-size:12px;font-weight:600;color:var(--ink-soft);">Plafond quotidien de demandes par profil</label>
+          <input type="number" min="1" value="{{dailyCapDraft}}" onInput="{{onDailyCapDraft}}" style="width:140px;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:13px;">
+        </div>
+        <p style="font-size:11px;color:var(--ink-soft);margin:0;line-height:1.5;">Un compte dont le lien d'activation n'a jamais été utilisé est supprimé automatiquement 30 jours après le dernier envoi.</p>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:6px;">
+          <button onClick="{{backToList}}" style="background:transparent;border:1px solid var(--line);color:var(--ink);font-weight:600;font-size:13px;border-radius:8px;padding:10px 18px;">Annuler</button>
+          <button onClick="{{submitCreate}}" style="{{submitStyle}}">{{submitLabel}}</button>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{viewFiche}}" hint-placeholder-val="{{false}}">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
+        <button onClick="{{backToList}}" aria-label="Retour" style="width:30px;height:30px;display:flex;align-items:center;justify-content:center;background:none;border:none;color:var(--ink);">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <h1 style="font-size:22px;">{{ficheAcc.name}}</h1>
+        <span style="{{ficheAcc.badgeStyle}}">{{ficheAcc.statusLabel}}</span>
+      </div>
+
+      <div style="background:var(--bg-raised);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:24px;max-width:560px;display:flex;flex-direction:column;gap:12px;">
+        <div style="display:flex;justify-content:space-between;font-size:13px;"><span style="color:var(--ink-soft);">Email</span><span style="font-family:'IBM Plex Mono',monospace;">{{ficheAcc.email}}</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;"><span style="color:var(--ink-soft);">Invités autorisés <span style="font-size:10px;color:var(--ink-soft);">(lecture seule)</span></span><span>{{ficheAcc.guests}}</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:13px;"><span style="color:var(--ink-soft);">Statut</span><span>{{ficheAcc.statusLabel}}</span></div>
+
+        <sc-if value="{{ficheIsPending}}" hint-placeholder-val="{{false}}">
+          <div style="border-top:1px dashed var(--line);margin-top:8px;padding-top:14px;">
+            <p style="font-size:12px;color:var(--ink-soft);line-height:1.5;margin:0 0 10px;">Le lien d'activation envoyé est valable 30 minutes et à usage unique. Le renvoyer invalide le lien précédent.</p>
+            <button onClick="{{resendLink}}" style="{{resendStyle}}">{{resendLabel}}</button>
+          </div>
+        </sc-if>
+
+        <div style="border-top:1px dashed var(--line);margin-top:4px;padding-top:14px;display:flex;flex-direction:column;gap:8px;">
+          <label style="font-size:12px;font-weight:600;color:var(--ink-soft);">Plafond quotidien de demandes par profil</label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="number" min="1" value="{{ficheCapDraft}}" onInput="{{onFicheCapDraft}}" style="width:120px;padding:9px 11px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:13px;">
+            <button onClick="{{saveFicheCap}}" style="{{ficheCapSaveStyle}}">{{ficheCapSaveLabel}}</button>
+          </div>
+          <sc-if value="{{ficheCapError}}" hint-placeholder-val="{{false}}">
+            <div style="font-size:12px;color:var(--error);font-weight:600;">{{ficheCapError}}</div>
+          </sc-if>
+          <sc-if value="{{ficheCapSaved}}" hint-placeholder-val="{{false}}">
+            <div style="font-size:12px;color:var(--success);font-weight:600;">✓ Plafond mis à jour — s'applique aux demandes suivantes, sans remettre à zéro celles déjà envoyées aujourd'hui.</div>
+          </sc-if>
+        </div>
+
+        <sc-if value="{{ficheCapHasHistory}}" hint-placeholder-val="{{false}}">
+          <div style="border-top:1px dashed var(--line);margin-top:4px;padding-top:14px;">
+            <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:8px;">Journal des modifications</div>
+            <sc-for list="{{ficheCapHistory}}" as="h" hint-placeholder-count="1">
+              <div style="font-size:12px;color:var(--ink-soft);margin-bottom:4px;">{{h.before}} → {{h.after}} · {{h.admin}} · {{h.date}}</div>
+            </sc-for>
+          </div>
+        </sc-if>
+      </div>
+    </sc-if>
+
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props){
+    super(props);
+    this.state = {
+      view: 'list',
+      search: '',
+      accounts: [
+        { id: 1, name: 'Camille Bernard', email: 'camille@exemple.fr', status: 'active', guests: 2, dailyCap: 50, capHistory: [] },
+        { id: 2, name: 'Nadia Ferreira', email: 'nadia.ferreira@exemple.fr', status: 'pending', guests: 0, dailyCap: 50, capHistory: [] },
+        { id: 3, name: 'Thomas Weber', email: 'thomas.weber@exemple.fr', status: 'active', guests: 1, dailyCap: 80, capHistory: [{ before: 50, after: 80, admin: 'Élise Roy', date: '18/09/2026 10:02' }] },
+        { id: 4, name: 'Sophie Marchetti', email: 'sophie.marchetti@exemple.fr', status: 'grace', guests: 3, dailyCap: 50, capHistory: [] },
+      ],
+      openId: null,
+      firstName: '', lastName: '', email: '', phone: '', guestQuota: '3', dailyCapDraft: '50',
+      emailError: '', creating: false, justCreated: false, createdEmail: '',
+      resending: false, resent: false,
+      ficheCapDraft: '50', ficheCapErrorMsg: '', ficheCapSaved: false,
+    };
+  }
+  statusInfo(status){
+    const map = {
+      pending: { label: 'Activation en attente', bg: 'var(--secondary-soft)', color: 'var(--secondary-strong)' },
+      active: { label: 'Actif', bg: 'var(--success-bg)', color: 'var(--success)' },
+      grace: { label: 'En délai de grâce', bg: 'var(--warning-bg)', color: 'var(--warning)' },
+    };
+    return map[status] || map.active;
+  }
+  renderVals(){
+    const s = this.state;
+    const badgeStyle = (info) => "font-size:11px;font-weight:700;border-radius:100px;padding:3px 10px;background:" + info.bg + ";color:" + info.color + ";";
+    const q = s.search.trim().toLowerCase();
+    const filtered = s.accounts.filter(a => !q || a.name.toLowerCase().indexOf(q) !== -1 || a.email.toLowerCase().indexOf(q) !== -1);
+    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const ficheAccRaw = s.accounts.find(a => a.id === s.openId) || s.accounts[0];
+    const ficheInfo = this.statusInfo(ficheAccRaw.status);
+
+    return {
+      viewList: s.view === 'list',
+      viewCreate: s.view === 'create',
+      viewFiche: s.view === 'fiche',
+      openCreate: () => this.setState({ view: 'create', firstName: '', lastName: '', email: '', phone: '', guestQuota: '3', dailyCapDraft: '50', emailError: '', justCreated: false }),
+      backToList: () => this.setState({ view: 'list' }),
+
+      search: s.search,
+      onSearch: (e) => this.setState({ search: e.target.value }),
+      noResults: filtered.length === 0,
+      justCreated: s.justCreated,
+      createdEmail: s.createdEmail,
+      rows: filtered.map((a) => {
+        const info = this.statusInfo(a.status);
+        return {
+          name: a.name, email: a.email, guests: a.guests,
+          statusLabel: info.label, badgeStyle: badgeStyle(info),
+          open: () => this.setState({ view: 'fiche', openId: a.id, ficheCapDraft: String(a.dailyCap), ficheCapErrorMsg: '', ficheCapSaved: false }),
+        };
+      }),
+
+      firstName: s.firstName,
+      onFirstName: (e) => this.setState({ firstName: e.target.value }),
+      lastName: s.lastName,
+      onLastName: (e) => this.setState({ lastName: e.target.value }),
+      email: s.email,
+      onEmail: (e) => this.setState({ email: e.target.value, emailError: '' }),
+      emailError: s.emailError,
+      phone: s.phone,
+      onPhone: (e) => this.setState({ phone: e.target.value }),
+      guestQuota: s.guestQuota,
+      onGuestQuota: (e) => this.setState({ guestQuota: e.target.value }),
+      dailyCapDraft: s.dailyCapDraft,
+      onDailyCapDraft: (e) => this.setState({ dailyCapDraft: e.target.value }),
+      submitLabel: s.creating ? 'Création…' : 'Créer le compte',
+      submitStyle: "background:var(--primary);color:var(--primary-ink);border:none;font-weight:600;font-size:13px;border-radius:8px;padding:10px 18px;" + (s.creating ? "opacity:.6;" : ""),
+      submitCreate: () => {
+        if (s.creating) return;
+        const v = s.email.trim();
+        const capN = parseInt(s.dailyCapDraft, 10);
+        if (!s.firstName.trim() || !s.lastName.trim() || !emailRe.test(v)) { this.setState({ emailError: 'Adresse email invalide' }); return; }
+        if (s.accounts.some(a => a.email.toLowerCase() === v.toLowerCase())) { this.setState({ emailError: 'Cette adresse est déjà associée à un compte MAAQ' }); return; }
+        if (!Number.isInteger(capN) || capN < 1) { this.setState({ emailError: 'Le plafond quotidien doit être un nombre entier positif.' }); return; }
+        this.setState({ creating: true });
+        const newAcc = { id: Date.now(), name: s.firstName.trim() + ' ' + s.lastName.trim(), email: v, status: 'pending', guests: 0, dailyCap: capN, capHistory: [] };
+        this.setState({ creating: false, view: 'list', accounts: s.accounts.concat([newAcc]), justCreated: true, createdEmail: v });
+      },
+
+      ficheAcc: { name: ficheAccRaw.name, email: ficheAccRaw.email, guests: ficheAccRaw.guests, statusLabel: ficheInfo.label, badgeStyle: badgeStyle(ficheInfo) },
+      ficheIsPending: ficheAccRaw.status === 'pending',
+      resendLabel: s.resending ? 'Envoi…' : (s.resent ? 'Nouveau lien envoyé' : 'Renvoyer le lien d’activation'),
+      resendStyle: "background:var(--primary);color:var(--primary-ink);border:none;font-weight:600;font-size:13px;border-radius:8px;padding:10px 18px;" + (s.resending ? "opacity:.6;" : ""),
+      resendLink: () => {
+        if (s.resending) return;
+        this.setState({ resending: true });
+        this.setState({ resending: false, resent: true });
+      },
+
+      ficheCapDraft: s.ficheCapDraft,
+      onFicheCapDraft: (e) => this.setState({ ficheCapDraft: e.target.value, ficheCapErrorMsg: '', ficheCapSaved: false }),
+      ficheCapError: s.ficheCapErrorMsg,
+      ficheCapSaved: s.ficheCapSaved,
+      ficheCapSaveLabel: 'Enregistrer',
+      ficheCapSaveStyle: "background:var(--primary);color:var(--primary-ink);border:none;font-weight:600;font-size:13px;border-radius:8px;padding:9px 16px;",
+      ficheCapHasHistory: ficheAccRaw.capHistory.length > 0,
+      ficheCapHistory: ficheAccRaw.capHistory.slice().reverse().map(h => ({ before: h.before, after: h.after, admin: h.admin, date: h.date })),
+      saveFicheCap: () => {
+        const capN = parseInt(s.ficheCapDraft, 10);
+        if (!Number.isInteger(capN) || capN < 1) { this.setState({ ficheCapErrorMsg: 'Le plafond doit être un nombre entier positif.' }); return; }
+        const before = ficheAccRaw.dailyCap;
+        if (capN === before) { this.setState({ ficheCapSaved: true, ficheCapErrorMsg: '' }); return; }
+        const entry = { before: before, after: capN, admin: 'Élise Roy', date: '01/10/2026 11:30' };
+        this.setState({
+          accounts: s.accounts.map(a => a.id === ficheAccRaw.id ? { ...a, dailyCap: capN, capHistory: a.capHistory.concat([entry]) } : a),
+          ficheCapErrorMsg: '', ficheCapSaved: true,
+        });
+      },
+    };
+  }
+}
+</script>
+</body>
+</html>
