@@ -1,0 +1,1366 @@
+{
+  "project": {
+    "name": "MAAQ",
+    "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
+  },
+  "updated": "2026-10-02T22:25:39Z",
+  "deploys": [
+    {
+      "at": "2026-10-02T22:25:39Z",
+      "env": "preview",
+      "what": "Zone de test en ligne sur https://test.maaq.fr : toute l'application, avec les comptes de démonstration, des emails réels (Brevo) et le reste simulé (Digitorn, Google, SMS, facturation). Pas encore en production.",
+      "storyIds": [
+        "f0s1",
+        "f0s2",
+        "f0s3",
+        "f0s4",
+        "f1s1",
+        "f1s2",
+        "f1s3",
+        "f1s4",
+        "f1s5",
+        "f1s6",
+        "f1s7",
+        "f1s8",
+        "f1s9",
+        "f1s10",
+        "f2s1",
+        "f2s2",
+        "f2s3",
+        "f2s4",
+        "f2s5",
+        "f2s6",
+        "f2s7",
+        "f3s1",
+        "f3s2",
+        "f3s3",
+        "f3s4",
+        "f3s5",
+        "f3s6",
+        "f3s7",
+        "f3s8",
+        "f3s9",
+        "f4s1",
+        "f4s2",
+        "f4s3",
+        "f4s4",
+        "f4s5",
+        "f4s6",
+        "f4s7",
+        "f5s1",
+        "f5s2",
+        "f5s3",
+        "f5s4",
+        "f5s5",
+        "f5s6",
+        "f5s7",
+        "f6s1",
+        "f6s2",
+        "f6s3",
+        "f6s4",
+        "f6s5",
+        "f6s6",
+        "f6s7",
+        "f6s8",
+        "f6s9",
+        "f6s10",
+        "f7s1",
+        "f7s2",
+        "f7s3",
+        "f7s4",
+        "f7s5",
+        "f7s6",
+        "f7s7",
+        "f8s1",
+        "f8s2",
+        "f8s3",
+        "f8s4",
+        "f8s5",
+        "f8s6",
+        "f9s1",
+        "f9s2",
+        "f9s3",
+        "f9s4",
+        "f9s5",
+        "f9s6",
+        "f9s7"
+      ]
+    }
+  ],
+  "features": [
+    {
+      "id": "f0",
+      "name": "Fondations",
+      "oneLiner": "Le squelette de l'application sur lequel tout le reste s'appuie.",
+      "stories": [
+        {
+          "id": "f0s1",
+          "title": "Ouvrir MAAQ sur son téléphone, aux couleurs des maquettes",
+          "state": "done",
+          "env": "preview",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f0s2",
+          "title": "Retrouver ses données dans une base conforme à la conception",
+          "state": "done",
+          "env": "preview",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f0s3",
+          "title": "Discuter avec un Digitorn simulé en attendant la vraie API",
+          "state": "done",
+          "env": "preview",
+          "unsure": "Le vrai Digitorn n'existe pas encore : le simulateur repose sur nos hypothèses.",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f0s4",
+          "title": "Recevoir les emails et SMS dans une boîte de test",
+          "state": "done",
+          "env": "preview",
+          "unsure": "Aucun vrai prestataire d'emails ou de SMS n'est branché.",
+          "at": "2026-10-02T22:25:39Z"
+        }
+      ],
+      "decisions": [
+        {
+          "at": "2026-10-01T14:04:21Z",
+          "what": "Une seule application Next.js pour le mobile et la console d'administration."
+        },
+        {
+          "at": "2026-10-01T14:04:21Z",
+          "what": "La base reprend le schéma SQL de la conception tel quel, sans le redessiner."
+        },
+        {
+          "at": "2026-10-01T14:04:21Z",
+          "what": "En développement, la base tourne toute seule sur le poste, sans rien installer."
+        },
+        {
+          "at": "2026-10-01T14:04:21Z",
+          "what": "Digitorn, emails, SMS et Google Drive sont simulés tant que les vrais services ne sont pas prêts."
+        },
+        {
+          "at": "2026-10-01T14:04:21Z",
+          "what": "Tout se passe sur la branche de test ; pause et démo à la fin de chaque lot avant d'envoyer le code."
+        },
+        {
+          "at": "2026-10-01T14:31:50Z",
+          "what": "Fondations validées : envoi sur la branche de test approuvé."
+        }
+      ],
+      "unsure": [
+        "Vérifié sur un téléphone simulé dans le navigateur, pas encore sur un vrai téléphone.",
+        "Les contrôles automatiques en ligne (GitHub) n'ont pas encore tourné : ils démarreront à l'envoi."
+      ],
+      "activity": [
+        {
+          "at": "2026-10-01T14:31:50Z",
+          "kind": "ok",
+          "what": "Code des fondations envoyé sur la branche de test (pas encore en production)"
+        },
+        {
+          "at": "2026-10-01T14:25:59Z",
+          "kind": "ok",
+          "what": "Fondations vérifiées : tests, compilation et démo dans le navigateur"
+        },
+        {
+          "at": "2026-10-01T14:18:48Z",
+          "kind": "work",
+          "what": "Socle écrit : base, charte, Digitorn simulé, boîte de test"
+        },
+        {
+          "at": "2026-10-01T14:04:21Z",
+          "kind": "ok",
+          "what": "Stratégie de développement validée"
+        },
+        {
+          "at": "2026-10-01T13:57:20Z",
+          "kind": "work",
+          "what": "Lecture des user stories, de la conception BDD et des 37 maquettes"
+        }
+      ]
+    },
+    {
+      "id": "f1",
+      "name": "Accès et sécurité",
+      "oneLiner": "Se connecter, se reconnecter par schéma, vérifier un appareil, se déconnecter.",
+      "stories": [
+        {
+          "id": "f1s1",
+          "title": "US-2 · Accéder à l'application depuis l'écran d'accueil",
+          "state": "done",
+          "env": "preview",
+          "unsure": "L'écran « pas de connexion » au lancement ne marche qu'en version de production : pas encore essayé.",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f1s2",
+          "title": "US-3 · Se connecter à MAAQ",
+          "state": "done",
+          "env": "preview",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f1s3",
+          "title": "US-51 · Vérifier mon identité sur un nouvel appareil",
+          "state": "done",
+          "env": "preview",
+          "unsure": "Le SMS arrive seulement dans la boîte de test : aucun vrai prestataire SMS n'est branché.",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f1s4",
+          "title": "US-6 · Se reconnecter rapidement via un schéma tactile",
+          "state": "done",
+          "env": "preview",
+          "unsure": "Tracé vérifié à la souris dans le navigateur ; pas encore au doigt sur un vrai téléphone.",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f1s5",
+          "title": "US-7 · Être verrouillé après plusieurs échecs du schéma tactile",
+          "state": "done",
+          "env": "preview",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f1s6",
+          "title": "US-8 · Récupérer l'accès après un oubli du schéma tactile",
+          "state": "done",
+          "env": "preview",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f1s7",
+          "title": "US-66 · Réinitialiser mon mot de passe oublié",
+          "state": "done",
+          "env": "preview",
+          "unsure": "Parcours vérifié par les tests automatiques, pas encore cliqué de bout en bout dans le navigateur.",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f1s8",
+          "title": "US-52 · Verrouiller automatiquement l'application après inactivité",
+          "state": "done",
+          "env": "preview",
+          "unsure": "Le verrouillage après 5 minutes est vérifié par la logique, pas en attendant 5 vraies minutes.",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f1s9",
+          "title": "US-9 · Se déconnecter de l'application",
+          "state": "done",
+          "env": "preview",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f1s10",
+          "title": "US-1 · Être guidé pour installer MAAQ sur l'écran d'accueil",
+          "state": "done",
+          "env": "preview",
+          "unsure": "Pas encore essayé sur un vrai Android ni un vrai iPhone ; le bouton « Installer MAAQ » dépend du navigateur.",
+          "at": "2026-10-02T22:25:39Z"
+        }
+      ],
+      "decisions": [
+        {
+          "at": "2026-10-01T14:35:06Z",
+          "what": "Le schéma tactile se trace au doigt sur la grille ; toucher les points un par un marche aussi."
+        },
+        {
+          "at": "2026-10-01T14:35:06Z",
+          "what": "Après 5 minutes sans activité, l'écran se verrouille sur place : on revient exactement où on était."
+        },
+        {
+          "at": "2026-10-01T14:35:06Z",
+          "what": "Après un mot de passe réinitialisé, on propose le schéma seulement sur un appareil déjà reconnu."
+        },
+        {
+          "at": "2026-10-01T14:57:40Z",
+          "what": "Un survol de souris sans clic ne relie plus de point sur la grille du schéma."
+        },
+        {
+          "at": "2026-10-01T14:58:44Z",
+          "what": "Accès et sécurité validés : envoi sur la branche de test approuvé."
+        }
+      ],
+      "unsure": [
+        "Les écrans d'arrivée (accueil, console, configuration) sont provisoires : ils seront remplacés aux lots 2, 3 et 4."
+      ],
+      "activity": [
+        {
+          "at": "2026-10-01T14:58:44Z",
+          "kind": "ok",
+          "what": "Code envoyé sur la branche de test (pas encore en production)"
+        },
+        {
+          "at": "2026-10-01T14:57:40Z",
+          "kind": "ok",
+          "what": "63 tests automatiques au vert, compilation de production réussie"
+        },
+        {
+          "at": "2026-10-01T14:57:40Z",
+          "kind": "ok",
+          "what": "Connexion, appareil, schéma, verrouillage et récupération vérifiés dans le navigateur"
+        },
+        {
+          "at": "2026-10-01T14:35:06Z",
+          "kind": "work",
+          "what": "Lecture des 10 user stories et des 10 maquettes du lot"
+        }
+      ]
+    },
+    {
+      "id": "f2",
+      "name": "Console d'administration",
+      "oneLiner": "L'administrateur crée les comptes, publie et bloque les agents, règle la plateforme.",
+      "stories": [
+        {
+          "id": "f2s1",
+          "title": "US-64 · Créer le compte d'un utilisateur principal",
+          "state": "done",
+          "env": "preview",
+          "unsure": "L'email d'activation arrive seulement dans la boîte de test : aucun vrai envoi d'email n'est branché.",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f2s2",
+          "title": "US-69 · Modifier le plafond quotidien de demandes d'un compte",
+          "state": "done",
+          "env": "preview",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f2s3",
+          "title": "US-65 · Paramétrer les délais et les limites de la plateforme",
+          "state": "done",
+          "env": "preview",
+          "unsure": "Les nouveaux réglages seront lus par les traitements automatiques, qui arrivent dans les lots suivants.",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f2s4",
+          "title": "US-45 · Mettre à disposition un agent IA",
+          "state": "done",
+          "env": "preview",
+          "unsure": "La liste des agents à publier vient du Digitorn simulé : à revérifier avec la vraie API.",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f2s5",
+          "title": "US-46 · Bloquer l'accès à un agent",
+          "state": "done",
+          "env": "preview",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f2s6",
+          "title": "US-47 · Réactiver l'accès à un agent",
+          "state": "done",
+          "env": "preview",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f2s7",
+          "title": "US-48 · Définir la liste des contrats obligatoires",
+          "state": "done",
+          "env": "preview",
+          "at": "2026-10-02T22:25:39Z"
+        }
+      ],
+      "decisions": [
+        {
+          "at": "2026-10-01T15:00:12Z",
+          "what": "L'agent à publier se choisit dans la liste des agents Digitorn pas encore publiés ; son nom reste modifiable."
+        },
+        {
+          "at": "2026-10-01T15:00:12Z",
+          "what": "Les actions soumises à validation se saisissent une par ligne, plutôt qu'une simple case à cocher."
+        },
+        {
+          "at": "2026-10-01T15:00:12Z",
+          "what": "Un champ « liste de choix » d'un contrat demande ses choix, un par ligne."
+        },
+        {
+          "at": "2026-10-01T15:00:12Z",
+          "what": "Le lien d'activation reçu par email vaut vérification de l'appareil : pas de code en plus à l'activation."
+        },
+        {
+          "at": "2026-10-01T15:19:12Z",
+          "what": "Petite table technique ajoutée pour qu'une action relancée ne s'exécute jamais deux fois (règle CC-7)."
+        }
+      ],
+      "unsure": [
+        "Console vérifiée dans le panneau navigateur réduit ; pas encore relue sur un grand écran."
+      ],
+      "activity": [
+        {
+          "at": "2026-10-01T15:43:37Z",
+          "kind": "ok",
+          "what": "Code envoyé sur la branche de test ; demande de fusion vers master préparée"
+        },
+        {
+          "at": "2026-10-01T15:19:12Z",
+          "kind": "ok",
+          "what": "78 tests automatiques au vert, compilation de production réussie"
+        },
+        {
+          "at": "2026-10-01T15:19:12Z",
+          "kind": "ok",
+          "what": "Agent bloqué, compte créé puis activé par son lien, vérifiés dans le navigateur"
+        },
+        {
+          "at": "2026-10-01T15:00:12Z",
+          "kind": "work",
+          "what": "Lecture des 7 user stories et des 5 maquettes de la console"
+        }
+      ]
+    },
+    {
+      "id": "f3",
+      "name": "Compte et invités",
+      "oneLiner": "Renseigner ses informations, inviter ses proches et gérer ses invités.",
+      "stories": [
+        {
+          "id": "f3s1",
+          "title": "US-10 · Renseigner les informations nécessaires aux agents",
+          "state": "done",
+          "env": "preview",
+          "unsure": "Le formulaire d'informations est prêt mais ne s'ouvre pas encore à l'ajout d'un agent : le dashboard arrive au lot 4.",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f3s2",
+          "title": "US-11 · Renseigner les informations concernant son invité",
+          "state": "done",
+          "env": "preview",
+          "unsure": "Idem : les champs d'un invité dépendent des agents de son dashboard, qui arrive au lot 4.",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f3s3",
+          "title": "US-12 · Modifier mes informations de configuration",
+          "state": "done",
+          "env": "preview",
+          "unsure": "Les informations sont envoyées au Digitorn simulé ; le format réel reste à valider avec Digitorn.",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f3s4",
+          "title": "US-18 · Ajouter un invité",
+          "state": "done",
+          "env": "preview",
+          "unsure": "L'envoi d'invitation se fait dans la foulée de la requête : à surveiller avec un vrai prestataire d'emails.",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f3s5",
+          "title": "US-4 · Activer son accès en tant qu'invité",
+          "state": "done",
+          "env": "preview",
+          "unsure": "Le SMS d'invitation arrive seulement dans la boîte de test ; pas encore essayé avec un vrai téléphone iPhone.",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f3s6",
+          "title": "US-5 · Renvoyer un nouveau lien d'invitation expiré",
+          "state": "done",
+          "env": "preview",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f3s7",
+          "title": "US-19 · Modifier les informations d'un invité",
+          "state": "done",
+          "env": "preview",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f3s8",
+          "title": "US-20 · Supprimer un invité",
+          "state": "done",
+          "env": "preview",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f3s9",
+          "title": "US-21 · Consulter le nombre d'invités disponibles",
+          "state": "done",
+          "env": "preview",
+          "at": "2026-10-02T22:25:39Z"
+        }
+      ],
+      "decisions": [
+        {
+          "at": "2026-10-01T15:46:55Z",
+          "what": "L'étape 2 de la configuration enregistre l'invité 1 sans l'inviter ; l'invitation part depuis « Mes invités »."
+        },
+        {
+          "at": "2026-10-01T15:46:55Z",
+          "what": "L'email de connexion reste affiché mais non modifiable à l'étape 1 (la maquette le montrait modifiable)."
+        },
+        {
+          "at": "2026-10-01T15:46:55Z",
+          "what": "Le formulaire « Informations nécessaires à un agent » est construit maintenant ; il s'ouvrira à l'ajout d'un agent au lot 4."
+        },
+        {
+          "at": "2026-10-01T15:46:55Z",
+          "what": "Barre d'onglets en bas de l'application : Agents, Invités (utilisateur principal), Réglages ; Contrats arrivera au lot 7."
+        },
+        {
+          "at": "2026-10-01T23:00:19Z",
+          "what": "Un lien d'invitation déjà utilisé affiche « Votre accès est déjà activé » ; un lien expiré ou remplacé nomme l'utilisateur principal."
+        },
+        {
+          "at": "2026-10-01T23:01:32Z",
+          "what": "Compte et invités validés : envoi sur la branche de test approuvé."
+        }
+      ],
+      "unsure": [
+        "Les écrans n'ont été essayés que dans un téléphone simulé, pas sur un vrai téléphone."
+      ],
+      "activity": [
+        {
+          "at": "2026-10-01T23:01:32Z",
+          "kind": "ok",
+          "what": "Code envoyé sur la branche de test (pas encore en production)"
+        },
+        {
+          "at": "2026-10-01T23:00:19Z",
+          "kind": "ok",
+          "what": "101 tests automatiques au vert, compilation de production réussie"
+        },
+        {
+          "at": "2026-10-01T23:00:19Z",
+          "kind": "ok",
+          "what": "Invitation, activation, retrait d'accès et informations par agent vérifiés dans le navigateur"
+        },
+        {
+          "at": "2026-10-01T15:46:55Z",
+          "kind": "work",
+          "what": "Lecture des 9 user stories et des 5 maquettes du lot"
+        }
+      ]
+    },
+    {
+      "id": "f4",
+      "name": "Catalogue et dashboard",
+      "oneLiner": "Parcourir les agents, les ajouter à son dashboard Pro ou Perso.",
+      "stories": [
+        {
+          "id": "f4s1",
+          "title": "US-23 · Parcourir le catalogue d'agents par rubrique",
+          "state": "done",
+          "env": "preview",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f4s2",
+          "title": "US-24 · Consulter la fiche descriptive d'un agent",
+          "state": "done",
+          "env": "preview",
+          "unsure": "Le bandeau de maintenance et le retour au catalogue sont vérifiés par les tests ; pas relu avec un vrai catalogue de 50 agents.",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f4s3",
+          "title": "US-25 · Rechercher un agent par mot-clé",
+          "state": "done",
+          "env": "preview",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f4s4",
+          "title": "US-26 · Ajouter un agent à mon dashboard",
+          "state": "done",
+          "env": "preview",
+          "unsure": "Le lien « Configurer maintenant » vers les connecteurs arrive avec le lot 5 ; en attendant la carte indique « À configurer ».",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f4s5",
+          "title": "US-27 · Être informé de la limite de 10 agents par rubrique",
+          "state": "done",
+          "env": "preview",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f4s6",
+          "title": "US-28 · Retirer un agent de mon dashboard",
+          "state": "done",
+          "env": "preview",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f4s7",
+          "title": "US-22 · Consulter mon dashboard par onglet (Pro / Perso)",
+          "state": "done",
+          "env": "preview",
+          "unsure": "Le lien « Ouvrir le tchat » des cartes arrive avec le tchat (lot 6). Le temps de chargement sous 2 secondes n'est pas mesuré.",
+          "at": "2026-10-02T22:25:39Z"
+        }
+      ],
+      "decisions": [
+        {
+          "at": "2026-10-01T23:02:35Z",
+          "what": "La recherche s'applique côté serveur sur tout le catalogue visible, sans tenir compte des accents ni des majuscules."
+        },
+        {
+          "at": "2026-10-01T23:02:35Z",
+          "what": "Le bouton « Ajouter » reste actif à 10 agents : c'est l'appui qui affiche le message de limite et le lien « Gérer mes agents »."
+        },
+        {
+          "at": "2026-10-01T23:02:35Z",
+          "what": "À l'ajout d'un agent qui demande des informations, le formulaire d'informations s'ouvre aussitôt."
+        },
+        {
+          "at": "2026-10-01T23:02:35Z",
+          "what": "« Ouvrir le tchat » et « Configurer maintenant » seront branchés avec le tchat (lot 6) et les connecteurs (lot 5) : pas de faux écran en attendant."
+        },
+        {
+          "at": "2026-10-01T23:18:00Z",
+          "what": "Un message d'erreur de retrait ou de suppression s'affiche dans la fenêtre de confirmation, pas derrière elle."
+        },
+        {
+          "at": "2026-10-02T04:46:15Z",
+          "what": "Catalogue et dashboard validés : envoi sur la branche de test approuvé."
+        }
+      ],
+      "unsure": [
+        "Vérifié dans un téléphone simulé, avec 4 agents de démonstration seulement."
+      ],
+      "activity": [
+        {
+          "at": "2026-10-02T04:46:15Z",
+          "kind": "ok",
+          "what": "Code envoyé sur la branche de test (pas encore en production)"
+        },
+        {
+          "at": "2026-10-01T23:18:00Z",
+          "kind": "ok",
+          "what": "115 tests automatiques au vert, compilation de production réussie"
+        },
+        {
+          "at": "2026-10-01T23:18:00Z",
+          "kind": "ok",
+          "what": "Dashboard, catalogue, recherche, ajout, limite et retrait vérifiés dans le navigateur"
+        },
+        {
+          "at": "2026-10-01T23:02:35Z",
+          "kind": "work",
+          "what": "Lecture des 7 user stories et des 3 maquettes du lot"
+        }
+      ]
+    },
+    {
+      "id": "f5",
+      "name": "Connecteurs",
+      "oneLiner": "Brancher Google Drive, boîtes mail et permissions dont les agents ont besoin.",
+      "stories": [
+        {
+          "id": "f5s1",
+          "title": "US-67 · Connecter le Google Drive du compte",
+          "state": "done",
+          "env": "preview",
+          "unsure": "Le widget Digitorn (deuxième façon de connecter le Drive) n'est pas construit : seule la connexion depuis MAAQ existe.",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f5s2",
+          "title": "US-13 · Renseigner l'adresse email de connexion d'un agent",
+          "state": "done",
+          "env": "preview",
+          "unsure": "Côté invité, l'écran Connecteurs n'a été vérifié que par les tests automatiques, pas dans le navigateur.",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f5s3",
+          "title": "US-14 · Autoriser les permissions nécessaires à un agent",
+          "state": "done",
+          "env": "preview",
+          "unsure": "Le vrai consentement Google (Digitorn) n'existe pas encore : tout passe par une page simulée. Le retour sur iPhone dans l'application installée reste à tester sur un vrai appareil.",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f5s4",
+          "title": "US-15 · Configurer la boîte mail de validation d'un agent",
+          "state": "done",
+          "env": "preview",
+          "unsure": "Le code de vérification arrive seulement dans la boîte de test. Sa durée de 30 minutes est une hypothèse (la spec ne la fixe pas).",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f5s5",
+          "title": "US-16 · Définir les adresses en copie systématique d'un agent",
+          "state": "done",
+          "env": "preview",
+          "unsure": "Les adresses en copie ne sont pas encore utilisées pour de vrais rendez-vous : cela dépend du tchat (lot 6).",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f5s6",
+          "title": "US-17 · Ajouter mes propres adresses en copie d'un agent",
+          "state": "done",
+          "env": "preview",
+          "unsure": "Vérifié par les tests pour l'invité 1 et l'invité secondaire ; pas essayé dans le navigateur.",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f5s7",
+          "title": "US-29 · Être informé qu'un agent n'est pas encore configuré",
+          "state": "done",
+          "env": "preview",
+          "at": "2026-10-02T22:25:39Z"
+        }
+      ],
+      "decisions": [
+        {
+          "at": "2026-10-02T04:58:27Z",
+          "what": "La page de consentement Google est simulée par une page de développement : autoriser, autoriser en partie, refuser, ou autoriser avec un autre compte."
+        },
+        {
+          "at": "2026-10-02T04:58:27Z",
+          "what": "Le code de vérification de la boîte de validation est valable 30 minutes, comme les autres codes de récupération (la spec ne le précise pas)."
+        },
+        {
+          "at": "2026-10-02T04:58:27Z",
+          "what": "Un agent ne voit son onglet Connecteurs que s'il demande un connecteur ou prévoit des adresses en copie."
+        },
+        {
+          "at": "2026-10-02T04:58:27Z",
+          "what": "Le lien « Configurer » apparaît sur les cartes « À configurer » du dashboard et dans la confirmation d'ajout d'un agent."
+        },
+        {
+          "at": "2026-10-02T05:21:06Z",
+          "what": "Correction du lot 3 : les informations d'un agent sont désormais bien transmises au Digitorn simulé (le profil reçoit son identifiant Digitorn à la première transmission)."
+        },
+        {
+          "at": "2026-10-02T05:22:28Z",
+          "what": "Connecteurs validés : envoi sur la branche de test approuvé."
+        }
+      ],
+      "unsure": [
+        "Le côté invité n'a pas été cliqué dans le navigateur (seulement testé automatiquement).",
+        "À la révocation d'une autorisation, le message « À reconnecter » s'affiche sur l'écran Connecteurs ; son affichage dans le tchat arrive au lot 6."
+      ],
+      "activity": [
+        {
+          "at": "2026-10-02T05:22:28Z",
+          "kind": "ok",
+          "what": "Code envoyé sur la branche de test (pas encore en production)"
+        },
+        {
+          "at": "2026-10-02T05:21:06Z",
+          "kind": "ok",
+          "what": "138 tests automatiques au vert, compilation de production réussie"
+        },
+        {
+          "at": "2026-10-02T05:21:06Z",
+          "kind": "ok",
+          "what": "Connexion Google (autorisée, partielle, compte remplacé), boîte de validation, copies et révocation vérifiées dans le navigateur"
+        },
+        {
+          "at": "2026-10-02T04:58:27Z",
+          "kind": "work",
+          "what": "Lecture des 7 user stories et de la maquette Connecteurs ; dépôt Git réparé après l'interruption"
+        }
+      ]
+    },
+    {
+      "id": "f6",
+      "name": "Tchat avec les agents",
+      "oneLiner": "Demander une action à un agent, valider ce qu'il propose.",
+      "stories": [
+        {
+          "id": "f6s1",
+          "title": "US-37 · Accéder rapidement au tchat d'un agent",
+          "state": "done",
+          "env": "preview",
+          "unsure": "Le lien vers le carnet de bord, dans l'en-tête de la maquette, n'existe pas encore : il arrive avec le carnet (lot 8).",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f6s2",
+          "title": "US-60 · Être informé que j'échange avec une IA",
+          "state": "done",
+          "env": "preview",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f6s3",
+          "title": "US-41 · Découvrir le tchat d'un agent sans historique",
+          "state": "done",
+          "env": "preview",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f6s4",
+          "title": "US-38 · Demander à un agent de réaliser une action",
+          "state": "done",
+          "env": "preview",
+          "unsure": "Le texte de la demande n'est transmis qu'à un Digitorn simulé : le format réel de l'échange reste à valider avec Digitorn. Le bouton de dictée de la maquette n'est pas construit (aucune user story du tchat ne le décrit).",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f6s5",
+          "title": "US-70 · Être limité à un nombre de demandes par jour",
+          "state": "done",
+          "env": "preview",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f6s6",
+          "title": "US-39 · Valider une action proposée par l'agent",
+          "state": "done",
+          "env": "preview",
+          "unsure": "Les cartes (rendez-vous, email) viennent du simulateur : le contenu réel envoyé par Digitorn peut différer. Le message « exécution plus longue que prévu » apparaît après 1 minute, durée choisie sans précision de la spec.",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f6s7",
+          "title": "US-42 · Être informé d'un accès agent bloqué",
+          "state": "done",
+          "env": "preview",
+          "unsure": "Le blocage est repris par relecture toutes les 15 s (3 s pendant une attente) : la spec demande « 30 s au plus ».",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f6s8",
+          "title": "US-61 · Signaler une réponse ou une action erronée d'un agent",
+          "state": "done",
+          "env": "preview",
+          "unsure": "Le texte des réponses signalées est conservé tel quel en base ; la spec recommande de le chiffrer (à voir au lot 9). Le support n'est prévenu que si son adresse est renseignée dans les paramètres.",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f6s9",
+          "title": "US-43 · Perte de l'historique du tchat à la déconnexion",
+          "state": "done",
+          "env": "preview",
+          "unsure": "L'effacement à la déconnexion est testé automatiquement ; le cas « appareil révoqué » n'a pas été cliqué dans le navigateur.",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f6s10",
+          "title": "US-44 · Expiration automatique des conversations anciennes",
+          "state": "done",
+          "env": "preview",
+          "unsure": "L'historique disparaît à l'affichage : la suppression chez Digitorn d'une conversation de plus de 4 jours dépendra de leur API.",
+          "at": "2026-10-02T22:25:39Z"
+        }
+      ],
+      "decisions": [
+        {
+          "at": "2026-10-02T05:24:43Z",
+          "what": "L'historique du tchat reste chez Digitorn (simulé) : MAAQ ne stocke aucun message, seulement les décisions d'actions et les signalements."
+        },
+        {
+          "at": "2026-10-02T05:24:43Z",
+          "what": "Le tchat se met à jour en le relisant toutes les quelques secondes : c'est ainsi que blocage, réactivation et réponses arrivent sans action de l'utilisateur."
+        },
+        {
+          "at": "2026-10-02T05:24:43Z",
+          "what": "Cette relecture ne repousse pas le verrouillage de l'application : seule l'activité de la personne le fait."
+        },
+        {
+          "at": "2026-10-02T05:24:43Z",
+          "what": "Le plafond de demandes est compté avant l'envoi à l'agent, et décompté si l'envoi échoue : un « Réessayer » ne compte qu'une fois."
+        },
+        {
+          "at": "2026-10-02T05:24:43Z",
+          "what": "Le lien vers le carnet de bord dans l'en-tête du tchat arrivera avec le carnet (lot 8)."
+        },
+        {
+          "at": "2026-10-02T05:48:50Z",
+          "what": "Quand l'agent n'a pas répondu après 2 minutes, « Réessayer » renvoie la même demande : elle n'est ni recomptée dans le plafond ni exécutée deux fois."
+        },
+        {
+          "at": "2026-10-02T05:48:50Z",
+          "what": "Un message écrit sans connexion attend jusqu'à 10 minutes et part tout seul au retour du réseau ; au-delà, il passe à « Non envoyé »."
+        },
+        {
+          "at": "2026-10-02T05:48:50Z",
+          "what": "Quand le plafond du jour est atteint, la personne peut encore valider ou refuser une action déjà proposée ; son texte reste dans la zone de saisie."
+        },
+        {
+          "at": "2026-10-02T05:48:50Z",
+          "what": "Mots-clés de démonstration du simulateur : « échec » fait échouer une action, « silence » empêche toute réponse (voir docs/comptes-de-test.md)."
+        },
+        {
+          "at": "2026-10-02T05:50:46Z",
+          "what": "Tchat validé : envoi sur la branche de test approuvé."
+        }
+      ],
+      "unsure": [
+        "Les relectures du tchat se font par interrogation régulière du serveur ; une vraie notification instantanée n'est pas prévue.",
+        "Le tchat n'a été cliqué que du côté utilisateur principal ; le côté invité est couvert par les tests automatiques."
+      ],
+      "activity": [
+        {
+          "at": "2026-10-02T05:50:46Z",
+          "kind": "ok",
+          "what": "Code envoyé sur la branche de test (pas encore en production)"
+        },
+        {
+          "at": "2026-10-02T05:48:50Z",
+          "kind": "ok",
+          "what": "Dernier contrôle : types, règles de style et compilation de production sans erreur"
+        },
+        {
+          "at": "2026-10-02T05:48:50Z",
+          "kind": "ok",
+          "what": "171 tests automatiques au vert (33 pour le tchat)"
+        },
+        {
+          "at": "2026-10-02T05:48:50Z",
+          "kind": "ok",
+          "what": "Tchat vérifié dans le navigateur : suggestions, envoi, réponse, carte d'action, validation, signalement, blocage en direct, plafond, attente de 30 s et 2 min, coupure de connexion"
+        },
+        {
+          "at": "2026-10-02T05:24:43Z",
+          "kind": "work",
+          "what": "Lecture des 10 user stories et de la maquette du tchat ; lot 5 envoyé sur la branche de test"
+        }
+      ],
+      "building": false
+    },
+    {
+      "id": "f7",
+      "name": "Contrats",
+      "oneLiner": "Décrire ses contrats, déposer les documents, consentir au challenge.",
+      "stories": [
+        {
+          "id": "f7s1",
+          "title": "US-30 · Accéder à la page Contrats",
+          "state": "done",
+          "env": "preview",
+          "unsure": "La navigation reprend la maquette (Agents, Contrats, Invités, Réglages) ; le Catalogue reste accessible depuis le dashboard, alors que la user story le place dans la barre du bas.",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f7s2",
+          "title": "US-31 · Consulter les agents des Contrats",
+          "state": "done",
+          "env": "preview",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f7s3",
+          "title": "US-32 · Consulter la liste de mes contrats",
+          "state": "done",
+          "env": "preview",
+          "unsure": "L'invité 1 et l'invité secondaire n'ont pas été cliqués dans le navigateur (seulement testés automatiquement). Le texte de consentement contient « [nom du partenaire] » en attendant le nom réel.",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f7s4",
+          "title": "US-33 · Renseigner les détails d'un contrat",
+          "state": "done",
+          "env": "preview",
+          "unsure": "Les détails s'ouvrent sous la carte du contrat, comme sur la maquette, et non sur un écran séparé comme le dit la user story.",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f7s5",
+          "title": "US-34 · Ajouter les documents scannés d'un contrat",
+          "state": "done",
+          "env": "preview",
+          "unsure": "Le classement dans le Drive est simulé (Digitorn et Google Drive fictifs) ; l'antivirus ne reconnaît que le fichier de test EICAR. Après une coupure réseau, l'envoi recommence depuis le début (trois fois) au lieu de reprendre là où il s'était arrêté.",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f7s6",
+          "title": "US-35 · Modifier ou supprimer les détails et documents d'un contrat",
+          "state": "done",
+          "env": "preview",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f7s7",
+          "title": "US-36 · Donner ou retirer mon consentement au challenge d'un contrat",
+          "state": "done",
+          "env": "preview",
+          "unsure": "La preuve de consentement est enregistrée avec une empreinte de l'email ; sa valeur juridique reste à confirmer avec le DPO (la spec le signale).",
+          "at": "2026-10-02T22:25:39Z"
+        }
+      ],
+      "decisions": [
+        {
+          "at": "2026-10-02T06:10:17Z",
+          "what": "La page Contrats est réservée au noyau du compte (utilisateur principal et invité 1) : l'entrée disparaît de la barre du bas pour un invité secondaire et le serveur refuse l'accès."
+        },
+        {
+          "at": "2026-10-02T06:10:17Z",
+          "what": "Les détails d'un contrat s'ouvrent sous sa carte, comme sur la maquette ; le formulaire repart des valeurs enregistrées quand l'autre profil modifie le contrat (dernière modification retenue)."
+        },
+        {
+          "at": "2026-10-02T06:10:17Z",
+          "what": "Un document est d'abord gardé en stockage provisoire, puis classé en arrière-plan dans le Drive du compte par un Admin_Classify simulé (trois essais, jamais de doublon). Un Drive non connecté échoue aussitôt, réessayer n'y changerait rien."
+        },
+        {
+          "at": "2026-10-02T06:10:17Z",
+          "what": "Les envois de documents vivent hors de l'écran : on peut quitter la page, un message « Document ajouté à [contrat] » apparaît à la fin sur n'importe quel écran."
+        },
+        {
+          "at": "2026-10-02T06:10:17Z",
+          "what": "Le bouton retour du tchat ramène à l'onglet d'origine (dashboard ou Agents des Contrats)."
+        },
+        {
+          "at": "2026-10-02T06:10:17Z",
+          "what": "Le consentement est inscrit au journal des preuves à chaque changement, avec la version du texte et une empreinte de l'email ; la suppression complète d'un contrat le remet à « désactivé » et l'inscrit aussi."
+        },
+        {
+          "at": "2026-10-02T06:12:12Z",
+          "what": "Contrats validé : envoi sur la branche de test approuvé."
+        }
+      ],
+      "unsure": [
+        "Les cartes de la page Contrats n'ont été cliquées que du côté utilisateur principal ; le côté invité 1 est couvert par les tests automatiques.",
+        "Le téléphone (appareil photo, envoi réel d'une photo) n'a pas été essayé : seul l'envoi d'un fichier depuis l'ordinateur l'a été."
+      ],
+      "activity": [
+        {
+          "at": "2026-10-02T06:12:12Z",
+          "kind": "ok",
+          "what": "Code envoyé sur la branche de test (pas encore en production)"
+        },
+        {
+          "at": "2026-10-02T06:10:17Z",
+          "kind": "ok",
+          "what": "215 tests automatiques au vert (dont 37 sur les contrats et 7 sur les envois en arrière-plan), compilation de production réussie"
+        },
+        {
+          "at": "2026-10-02T06:10:17Z",
+          "kind": "ok",
+          "what": "Page Contrats vérifiée dans le navigateur : détails et erreurs de format, ajout et aperçu d'un document, classement en échec puis réussi, consentement, retrait, suppression complète, onglet Agents des Contrats"
+        },
+        {
+          "at": "2026-10-02T06:10:17Z",
+          "kind": "ok",
+          "what": "Un bug trouvé par les tests et corrigé : un envoi bloqué 30 s restait « en cours » au lieu de proposer « Réessayer »"
+        }
+      ],
+      "building": false
+    },
+    {
+      "id": "f8",
+      "name": "Réglages, carnet et support",
+      "oneLiner": "Retrouver ses réglages, ses carnets de bord et contacter le support.",
+      "stories": [
+        {
+          "id": "f8s1",
+          "title": "US-49 · Accéder aux Réglages",
+          "state": "done",
+          "env": "preview",
+          "unsure": "Les rubriques Confidentialité, Exporter mes données et Désabonnement / suppression du compte n'y figurent pas encore : elles arrivent avec le lot 9.",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f8s2",
+          "title": "US-50 · Accéder aux carnets de bord depuis les Réglages",
+          "state": "done",
+          "env": "preview",
+          "unsure": "Le carnet affiche le prénom de la personne pour chaque entrée, y compris pour les actions ; la maquette montre parfois le nom de l'agent comme auteur.",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f8s3",
+          "title": "US-40 · Consulter le carnet de bord d'un agent",
+          "state": "done",
+          "env": "preview",
+          "unsure": "Le carnet est alimenté par un Digitorn simulé : l'API réelle (annoncée vers le 14/10/2026) peut différer. Chaque synchronisation relit aussi les dernières 24 h pour ne rien perdre si Digitorn livre en retard (hypothèse). Les nettoyages sont lancés avec la synchronisation, au moins une fois par jour.",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f8s4",
+          "title": "US-53 · Révoquer l'accès d'un appareil",
+          "state": "done",
+          "env": "preview",
+          "unsure": "Pas essayé avec un vrai second appareil : seuls des appareils de démonstration ont été révoqués. Côté administrateur, l'écran ajouté à la fiche du compte n'est pas maquetté.",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f8s5",
+          "title": "US-62 · Contacter le support par message écrit",
+          "state": "done",
+          "env": "preview",
+          "unsure": "Le support n'est joignable que si son adresse est renseignée dans les paramètres (sinon message « support indisponible »). La maquette limite le message à 1 000 caractères ; j'ai suivi la user story (10 à 2 000).",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f8s6",
+          "title": "US-63 · Contacter le support par message dicté",
+          "state": "done",
+          "env": "preview",
+          "unsure": "Le micro n'a pas pu être essayé dans le navigateur de test : la dictée a été vérifiée avec un micro simulé. La transcription passe par le navigateur (selon l'appareil, ses serveurs ne sont pas forcément en Union européenne) : un service de transcription européen reste à choisir. Le fonctionnement dans l'application installée sur iPhone est à tester sur un vrai appareil.",
+          "at": "2026-10-02T22:25:39Z"
+        }
+      ],
+      "decisions": [
+        {
+          "at": "2026-10-02T06:36:20Z",
+          "what": "Le carnet suit la règle D3 : l'utilisateur principal et l'invité 1 voient tout le compte ; un invité secondaire voit ses demandes et celles du noyau où il est participant."
+        },
+        {
+          "at": "2026-10-02T06:36:20Z",
+          "what": "La synchronisation du carnet tourne seule toutes les X heures (réglable) ; un échec est enregistré, signalé par email à l'adresse d'alerte, et réessayé à l'échéance suivante. Un planificateur externe peut la déclencher par une adresse protégée."
+        },
+        {
+          "at": "2026-10-02T06:36:20Z",
+          "what": "Les entrées du carnet plus anciennes que la durée de rétention disparaissent aussitôt de l'écran, avant même le nettoyage quotidien."
+        },
+        {
+          "at": "2026-10-02T06:36:20Z",
+          "what": "Révoquer un appareil ferme ses sessions, prévient la personne par email, journalise l'action avec son auteur et efface les tchats comme une déconnexion."
+        },
+        {
+          "at": "2026-10-02T06:36:20Z",
+          "what": "Le message dicté part en arrière-plan : on peut quitter l'écran, une confirmation « message dicté transmis » s'affiche à la fin sur n'importe quel écran."
+        },
+        {
+          "at": "2026-10-02T06:36:20Z",
+          "what": "Le même nettoyage couvre désormais les tables techniques (clés d'idempotence, demandes du tchat, compteurs de demandes) en plus du carnet et des signalements."
+        },
+        {
+          "at": "2026-10-02T06:51:36Z",
+          "what": "Réglages, carnet et support validés : envoi sur la branche de test approuvé."
+        }
+      ],
+      "unsure": [
+        "Côté invité, les écrans Réglages, Carnet et Support n'ont été cliqués que du côté utilisateur principal ; l'invité est couvert par les tests automatiques.",
+        "Le carnet n'a pas été essayé avec beaucoup d'entrées dans le navigateur (pagination vérifiée par les tests)."
+      ],
+      "activity": [
+        {
+          "at": "2026-10-02T06:51:36Z",
+          "kind": "ok",
+          "what": "Code envoyé sur la branche de test (pas encore en production)"
+        },
+        {
+          "at": "2026-10-02T06:36:20Z",
+          "kind": "ok",
+          "what": "242 tests automatiques au vert (27 nouveaux pour les appareils, le carnet, le support et les traitements périodiques), compilation de production réussie"
+        },
+        {
+          "at": "2026-10-02T06:36:20Z",
+          "kind": "ok",
+          "what": "Vérifié dans le navigateur : menu Réglages dans l'ordre, appareils et révocation, carnet avec sélecteur à saisie, support écrit (emails reçus dans la boîte de test), dictée avec micro simulé et envoi en arrière-plan, écrans de la console"
+        },
+        {
+          "at": "2026-10-02T06:36:20Z",
+          "kind": "ok",
+          "what": "Un défaut trouvé par les tests et corrigé : une entrée livrée en retard par Digitorn aurait pu être perdue à la synchronisation"
+        }
+      ],
+      "building": false
+    },
+    {
+      "id": "f9",
+      "name": "Conformité RGPD",
+      "oneLiner": "Exporter ou supprimer ses données, délais de grâce, purges automatiques.",
+      "stories": [
+        {
+          "id": "f9s1",
+          "title": "US-54 · Consulter la politique de confidentialité et les conditions d'utilisation",
+          "state": "done",
+          "env": "preview",
+          "unsure": "Les textes actuels sont des textes de démonstration : les textes définitifs sont à fournir. Il n'y a pas d'écran de console pour publier une nouvelle version : elle s'ajoute en base (le contrôle avant mise en production, `npm run check:release`, bloque tant que les textes sont provisoires).",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f9s2",
+          "title": "US-55 · Exporter mes données",
+          "state": "done",
+          "env": "preview",
+          "unsure": "L'email de l'export contient un lien vers une page de l'application (connexion demandée, puis retour à cette page). Les documents de contrats sont inclus dans l'archive ; le détail des données de Digitorn dépend de leur API, simulée ici.",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f9s3",
+          "title": "US-56 · Supprimer mes données et mon compte",
+          "state": "done",
+          "env": "preview",
+          "unsure": "Le mot de passe est contrôlé avec la même protection que la connexion (blocage après 5 échecs). La suppression chez Digitorn est simulée.",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f9s4",
+          "title": "US-57 · Anonymiser les demandes d'un invité supprimé dans le carnet partagé",
+          "state": "done",
+          "env": "preview",
+          "unsure": "Les noms et numéros sont retirés du texte des entrées de l'invité, par recherche de son nom, de son email, de son téléphone et de tout numéro ou adresse qui y ressemble. Un nom cité dans la demande d'une autre personne n'est pas touché.",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f9s5",
+          "title": "US-58 · Supprimer automatiquement un compte après désabonnement",
+          "state": "done",
+          "env": "preview",
+          "unsure": "Les sauvegardes sont purgées au bout de 2 ans en dehors de l'application : cela relève de l'hébergement, à mettre en place au déploiement et à citer dans la politique de confidentialité (point DPO de la spec). L'outil de facturation réel n'est pas branché : le point d'entrée existe (désabonnement, réabonnement) et attend leur format.",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f9s6",
+          "title": "US-68 · Supprimer automatiquement les comptes et invités jamais activés",
+          "state": "done",
+          "env": "preview",
+          "unsure": "Après la suppression, un ancien lien d'activation affiche un message de lien expiré générique (le nom de la personne qui a invité n'est plus connu).",
+          "at": "2026-10-02T22:25:39Z"
+        },
+        {
+          "id": "f9s7",
+          "title": "US-59 · Reprendre mon compte pendant le délai de grâce",
+          "state": "done",
+          "env": "preview",
+          "unsure": "Côté invité, l'écran de reprise a été vérifié par les tests automatiques mais pas cliqué dans le navigateur.",
+          "at": "2026-10-02T22:25:39Z"
+        }
+      ],
+      "decisions": [
+        {
+          "at": "2026-10-02T07:18:17Z",
+          "what": "Une nouvelle version des textes légaux est demandée à la connexion suivante, avant tout accès : le serveur refuse toute autre action tant qu'elle n'est pas acceptée. L'administrateur n'a rien à accepter."
+        },
+        {
+          "at": "2026-10-02T07:18:17Z",
+          "what": "L'export est un fichier ZIP chiffré sur le serveur (document lisible, données structurées, documents de contrats), préparé en arrière-plan ; le lien arrive par email, valable 7 jours, et le téléchargement demande d'être connecté."
+        },
+        {
+          "at": "2026-10-02T07:18:17Z",
+          "what": "Un compte en délai de grâce coupe l'accès de tous ses profils ; seul l'utilisateur principal peut le reprendre. Après un désabonnement par la facturation, la reprise demande un nouvel abonnement, signalé par la facturation."
+        },
+        {
+          "at": "2026-10-02T07:18:17Z",
+          "what": "À la suppression définitive d'un invité, ses demandes du carnet sont masquées pendant leur anonymisation, nettoyées de ses données personnelles, puis réaffichées sous « Invité supprimé ». Si l'anonymisation échoue, elles restent masquées et l'opération est reprise."
+        },
+        {
+          "at": "2026-10-02T07:18:17Z",
+          "what": "Une suppression définitive laisse seulement une trace non nominative (date et identifiants techniques) ; la preuve des consentements aux contrats est gardée 5 ans après la fin de l'abonnement."
+        },
+        {
+          "at": "2026-10-02T07:18:17Z",
+          "what": "Les suppressions arrivées à échéance, les rappels et les comptes jamais activés sont traités à chaque passage du planificateur (toutes les 5 minutes) ; un échec chez Digitorn alerte l'administrateur et est réessayé chaque jour."
+        },
+        {
+          "at": "2026-10-02T07:18:17Z",
+          "what": "Un script de contrôle (`npm run check:release`) bloque la mise en production tant que les textes juridiques, le nom du partenaire et les boîtes du support et des alertes sont provisoires."
+        },
+        {
+          "at": "2026-10-02T07:23:52Z",
+          "what": "Conformité validée : envoi sur la branche de test approuvé. Les 9 lots sont construits."
+        },
+        {
+          "at": "2026-10-02T22:25:39Z",
+          "what": "Zone de test hébergée sur Google Cloud Run (base Supabase en Europe, domaine test.maaq.fr). Les outils de test (boîte de test) y sont réservés à qui détient une clé."
+        },
+        {
+          "at": "2026-10-02T22:25:39Z",
+          "what": "Les emails partent réellement par Brevo avec le domaine maaq.fr authentifié ; les SMS restent simulés. La zone de test garde aussi une copie des emails dans la boîte de test."
+        }
+      ],
+      "unsure": [
+        "Les purges définitives n'ont été vérifiées que par les tests automatiques et sur des données de démonstration : à surveiller de près à la première mise en ligne.",
+        "Côté invité, les écrans d'acceptation, d'export et de suppression n'ont été cliqués que du côté utilisateur principal.",
+        "La zone de test a été essayée pour la connexion et l'envoi d'un email d'activation ; le reste de l'application n'y a pas encore été parcouru en entier.",
+        "Le Digitorn simulé garde ses conversations en mémoire d'une seule instance : après une pause du service, l'historique des tchats repart de zéro."
+      ],
+      "activity": [
+        {
+          "at": "2026-10-02T22:25:39Z",
+          "kind": "live",
+          "what": "Zone de test en ligne ouverte sur https://test.maaq.fr (aperçu, pas la production)"
+        },
+        {
+          "at": "2026-10-02T07:23:52Z",
+          "kind": "ok",
+          "what": "Code envoyé sur la branche de test (pas encore en production)"
+        },
+        {
+          "at": "2026-10-02T07:18:17Z",
+          "kind": "ok",
+          "what": "277 tests automatiques au vert (35 nouveaux pour la conformité), compilation de production réussie"
+        },
+        {
+          "at": "2026-10-02T07:18:17Z",
+          "kind": "ok",
+          "what": "Vérifié dans le navigateur : textes légaux (public et à l'acceptation), blocage tant que non acceptés, export de bout en bout (email, téléchargement), mot de passe erroné puis suppression, écran de reprise et annulation avec email aux invités"
+        },
+        {
+          "at": "2026-10-02T07:18:17Z",
+          "kind": "ok",
+          "what": "Contrôle avant mise en production ajouté : il liste ce qui manque (textes définitifs, partenaire, boîtes support et alertes)"
+        }
+      ],
+      "building": false
+    }
+  ],
+  "parkingLot": [
+    {
+      "name": "Mise en ligne de l'application (production)",
+      "tag": "Proposed, not built",
+      "note": "La zone de test est ouverte. Pour la production : textes juridiques et nom du partenaire définitifs, boîtes support et alertes réelles, vraie API Digitorn, Google Drive et Agenda réels, antivirus, SMS, outil de facturation, sauvegardes. `npm run check:release` liste ce qui manque."
+    },
+    {
+      "name": "Widget Digitorn pour connecter le Drive du compte",
+      "tag": "Proposed, not built",
+      "note": "Dépend du format de retour de Digitorn (à confirmer). La connexion depuis MAAQ fonctionne déjà. Rien n'est perdu."
+    },
+    {
+      "name": "Entrée « Catalogue » dans la barre du bas",
+      "tag": "Proposed, not built",
+      "note": "La user story US-30 la place dans la navigation ; la maquette garde Invités à sa place et le Catalogue derrière un bouton du dashboard. À trancher avec toi."
+    },
+    {
+      "name": "Vrai classement dans le Google Drive et vrai antivirus",
+      "tag": "Proposed, not built",
+      "note": "Dépendent de l'API Digitorn et d'un service d'analyse à choisir ; tout est simulé en attendant. Rien n'est perdu."
+    },
+    {
+      "name": "Reprise d'un envoi de document là où il s'était arrêté",
+      "tag": "Proposed, not built",
+      "note": "Aujourd'hui l'envoi recommence depuis le début après une coupure. Cela demande un envoi par morceaux, à voir si les gros scans posent problème."
+    },
+    {
+      "name": "Lien « Carnet de bord » dans l'en-tête du tchat",
+      "tag": "Proposed, not built",
+      "note": "Le carnet existe maintenant ; il reste à ajouter le lien dans l'en-tête du tchat, comme sur la maquette. Rien n'est perdu."
+    },
+    {
+      "name": "Choix d'un service de transcription vocale européen",
+      "tag": "Proposed, not built",
+      "note": "La dictée utilise pour l'instant la reconnaissance du navigateur ; la user story demande un service hébergé dans l'Union européenne (US-63 RT2)."
+    },
+    {
+      "name": "Bouton de dictée dans la zone de saisie du tchat",
+      "tag": "Proposed, not built",
+      "note": "Présent sur la maquette du tchat mais décrit par aucune user story du tchat ; la dictée existe pour le support (US-63). À trancher avec toi."
+    },
+    {
+      "name": "Publication des textes légaux depuis la console",
+      "tag": "Proposed, not built",
+      "note": "Aujourd'hui une nouvelle version s'ajoute en base. Un écran de la console n'est décrit par aucune user story."
+    },
+    {
+      "name": "Anonymisation des noms cités dans les demandes des autres profils",
+      "tag": "Proposed, not built",
+      "note": "Seules les entrées de l'invité supprimé sont nettoyées ; une demande d'un autre profil qui le cite par son nom ne l'est pas."
+    },
+    {
+      "name": "Purge des sauvegardes à 2 ans",
+      "tag": "Proposed, not built",
+      "note": "À mettre en place avec l'hébergement, et à mentionner dans la politique de confidentialité (point DPO de la spec)."
+    },
+    {
+      "name": "Envoi de SMS réels",
+      "tag": "Proposed, not built",
+      "note": "Aucun fournisseur de SMS n'est branché : les codes de vérification passent par l'email et les invitations par SMS ne partent pas. Rien n'est perdu."
+    },
+    {
+      "name": "Emails mis en forme (logo, couleurs)",
+      "tag": "Proposed, not built",
+      "note": "Les emails sont en texte brut pour l'instant. Rien n'est perdu."
+    }
+  ]
+}

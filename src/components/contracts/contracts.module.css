@@ -1,0 +1,322 @@
+/* Page Contrats, d'après les maquettes U-Contrats et I-Contrats. */
+
+.card {
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.name {
+  font-family: "Newsreader", serif;
+  font-size: 17px;
+  line-height: 1.25;
+}
+
+.state {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 2px 8px;
+  background: var(--bg-sunken);
+  color: var(--ink-soft);
+}
+
+.stateOn {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.switch {
+  position: relative;
+  width: 46px;
+  height: 26px;
+  border-radius: 999px;
+  border: none;
+  background: var(--line);
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.switch[aria-checked="true"] {
+  background: var(--success);
+}
+
+.switch:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--bg-raised);
+  box-shadow: 0 1px 2px rgba(43, 33, 31, 0.3);
+  transition: transform 0.15s;
+}
+
+.switch[aria-checked="true"] .knob {
+  transform: translateX(20px);
+}
+
+.consentLine {
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.audit {
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+
+.openButton {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--secondary-strong);
+}
+
+.details {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-top: 1px dashed var(--line);
+  padding-top: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.input {
+  min-height: 42px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.inputError {
+  border-color: var(--error);
+}
+
+.error {
+  font-size: 12px;
+  color: var(--error);
+  font-weight: 600;
+}
+
+.docs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.doc {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.docTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.docName {
+  font-size: 13px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.docMeta {
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+
+.pill {
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 999px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
+.pillPending {
+  background: var(--warning-bg);
+  color: var(--warning);
+}
+
+.pillOk {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.pillFailed {
+  background: var(--error-bg);
+  color: var(--error);
+}
+
+.docActions {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+
+.progress {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--line);
+  overflow: hidden;
+  flex: 1;
+}
+
+.progressBar {
+  height: 100%;
+  background: var(--primary);
+  transition: width 0.2s;
+}
+
+.uploading {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.uploadRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.choices {
+  display: flex;
+  gap: 8px;
+}
+
+.choices > * {
+  flex: 1;
+}
+
+.note {
+  font-size: 11px;
+  color: var(--ink-soft);
+}
+
+.banner {
+  background: var(--warning-bg);
+  color: var(--ink);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.bannerTitle {
+  font-weight: 700;
+  color: var(--warning);
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 84px;
+  width: calc(100% - 32px);
+  max-width: 358px;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.toastItem {
+  border-radius: 10px;
+  padding: 11px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  box-shadow: var(--shadow);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.toastOk {
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.toastError {
+  background: var(--error-bg);
+  color: var(--error);
+}
+
+.toastItem button {
+  background: none;
+  border: none;
+  font-weight: 700;
+  color: inherit;
+  text-decoration: underline;
+  padding: 0;
+}
+
+.danger {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--error);
+}
+
+.hint {
+  font-size: 12px;
+  color: var(--ink-soft);
+  line-height: 1.5;
+  margin: 0;
+}
