@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { drive } from "@/server/adapters/drive";
+import type { AgentBrain, AgentHistoryItem, BrainReply } from "@/server/agents/types";
 import { env } from "@/server/env";
 import type {
   ActionProposal,
@@ -22,7 +23,14 @@ export interface MockOptions {
   /** Délai d'exécution d'une action validée. 0 = immédiat. */
   executionDelayMs?: number;
   now?: () => Date;
+  /** Agents exécutés par MAAQ : ils répondent à la place des réponses figées du simulateur. */
+  brains?: AgentBrain[];
 }
+
+/** Message affiché quand un agent local n'a pas pu répondre. */
+export const BRAIN_FAILURE_MESSAGE = "Je n'ai pas réussi à répondre. Réessayez dans un instant.";
+/** Nombre de messages récents transmis à un agent local comme contexte. */
+const BRAIN_HISTORY = 20;
 
 /** Agents fictifs hébergés par le simulateur. */
 export const MOCK_HOSTED_AGENTS: HostedAgent[] = [
@@ -32,6 +40,7 @@ export const MOCK_HOSTED_AGENTS: HostedAgent[] = [
   { ref: "admin_impots", name: "Admin_Impots" },
   { ref: "perso_courses", name: "Perso_Courses" },
   { ref: "contrats_challenge", name: "Contrats_Challenge" },
+  { ref: "kdo_help", name: "kdo_help" },
 ];
 
 /** Permissions non accordées lors d'une autorisation partielle. */
@@ -54,13 +63,15 @@ const SILENCE_PATTERN = /silence/i;
  */
 export class MockDigitorn implements DigitornClient {
   private readonly conversations = new Map<string, ChatEvent[]>();
-  private readonly proposals = new Map<string, { proposal: ActionProposal; userRef: string; agentRef: string; willFail: boolean }>();
+  private readonly proposals = new Map<string, { proposal: ActionProposal; userRef: string; agentRef: string; willFail: boolean; execute?: () => Promise<void> }>();
   private readonly requests = new Set<string>();
   private readonly logbook: LogbookItem[] = [];
   private readonly profileInfo = new Map<string, Record<string, string | string[]>>();
   private readonly authorizations = new Map<string, { connector: GoogleConnector; email: string; profileRef: string; result: AuthorizationResult }>();
   private readonly agentConfigurations = new Map<string, AgentConfiguration>();
   readonly revocations: { profileRef: string; connector: GoogleConnector; email: string }[] = [];
+  private readonly brains: Map<string, AgentBrain>;
+  private readonly inFlight = new Set<Promise<void>>();
   private readonly replyDelayMs: number;
   private readonly executionDelayMs: number;
   private readonly now: () => Date;
@@ -69,6 +80,20 @@ export class MockDigitorn implements DigitornClient {
     this.replyDelayMs = options.replyDelayMs ?? 1500;
     this.executionDelayMs = options.executionDelayMs ?? 1000;
     this.now = options.now ?? (() => new Date());
+    this.brains = new Map((options.brains ?? []).map((brain) => [brain.ref, brain]));
+  }
+
+  /**
+   * Message d'un agent hors de toute demande (rappel d'occasion), visible dans le tchat de l'application.
+   * Hypothèse d'API à confirmer avec Digitorn : hors simulateur, ce message devra passer par leur plateforme.
+   */
+  postAgentMessage(userRef: string, agentRef: string, text: string): void {
+    this.push(userRef, agentRef, { type: "agent_message", id: randomUUID(), requestId: "", text, at: this.now().toISOString() });
+  }
+
+  /** Attend les réponses d'agents locaux encore en cours (tests). */
+  async settle(): Promise<void> {
+    while (this.inFlight.size) await Promise.all([...this.inFlight]);
   }
 
   async listHostedAgents(): Promise<HostedAgent[]> {
@@ -132,9 +157,60 @@ export class MockDigitorn implements DigitornClient {
       requestId: input.requestId,
       text: input.text,
       at: this.now().toISOString(),
+      channel: input.channel ?? "web",
     });
     this.log(input.userRef, input.agentRef, "request", input.text, input.context.autoParticipants);
-    if (!SILENCE_PATTERN.test(input.text)) this.later(this.replyDelayMs, () => this.reply(input));
+    const brain = this.brains.get(input.agentRef);
+    if (brain) this.later(this.replyDelayMs, () => this.track(this.replyWithBrain(input, brain)));
+    else if (!SILENCE_PATTERN.test(input.text)) this.later(this.replyDelayMs, () => this.reply(input));
+  }
+
+  private track(task: Promise<void>): void {
+    const tracked: Promise<void> = task.finally(() => this.inFlight.delete(tracked));
+    this.inFlight.add(tracked);
+  }
+
+  /** Réponse d'un agent local, avec l'historique récent de la conversation comme contexte. */
+  private async replyWithBrain(input: SubmitRequestInput, brain: AgentBrain): Promise<void> {
+    const history: AgentHistoryItem[] = (this.conversations.get(key(input.userRef, input.agentRef)) ?? [])
+      .filter((event): event is Extract<ChatEvent, { type: "user_message" | "agent_message" }> => event.type !== "action_proposal" && event.requestId !== input.requestId)
+      .slice(-BRAIN_HISTORY)
+      .map((event) => ({ role: event.type === "user_message" ? "user" : "agent", text: event.text }));
+    let reply: BrainReply;
+    try {
+      reply = await brain.respond({
+        userRef: input.userRef,
+        text: input.text,
+        context: input.context,
+        history,
+        today: this.now(),
+        timezone: input.timezone ?? "Europe/Paris",
+        channel: input.channel ?? "web",
+      });
+    } catch (error) {
+      console.error(`[agents] ${brain.ref} n'a pas pu répondre :`, error);
+      reply = { text: BRAIN_FAILURE_MESSAGE, proposals: [] };
+    }
+    const at = this.now().toISOString();
+    this.push(input.userRef, input.agentRef, { type: "agent_message", id: randomUUID(), requestId: input.requestId, text: reply.text, at });
+    // Actions sensibles de l'agent local : une carte à valider chacune, exécutée seulement après accord (US-39).
+    for (const pending of reply.proposals) {
+      const proposal: ActionProposal = { proposalId: randomUUID(), kind: "other", summary: pending.summary, participants: [], status: "pending" };
+      this.proposals.set(proposal.proposalId, { proposal, userRef: input.userRef, agentRef: input.agentRef, willFail: false, execute: pending.execute });
+      this.push(input.userRef, input.agentRef, { type: "action_proposal", id: randomUUID(), requestId: input.requestId, proposal, at });
+    }
+  }
+
+  /** Exécution d'une action d'agent local validée par la personne. */
+  private async runExecution(entry: { proposal: ActionProposal; userRef: string; agentRef: string; execute?: () => Promise<void> }): Promise<void> {
+    try {
+      await entry.execute?.();
+      entry.proposal.status = "succeeded";
+      this.log(entry.userRef, entry.agentRef, "action_done", entry.proposal.summary, entry.proposal.participants);
+    } catch (error) {
+      console.error(`[agents] action « ${entry.proposal.summary} » échouée :`, error);
+      entry.proposal.status = "failed";
+    }
   }
 
   async getConversation(userRef: string, agentRef: string): Promise<ChatEvent[]> {
@@ -164,6 +240,10 @@ export class MockDigitorn implements DigitornClient {
 
     proposal.status = "executing";
     this.log(entry.userRef, entry.agentRef, "action_validated", proposal.summary, proposal.participants);
+    if (entry.execute) {
+      this.later(this.executionDelayMs, () => this.track(this.runExecution(entry)));
+      return { ...proposal };
+    }
     this.later(this.executionDelayMs, () => {
       if (entry.willFail) {
         proposal.status = "failed";
@@ -197,6 +277,7 @@ export class MockDigitorn implements DigitornClient {
   }
 
   async eraseConversation(userRef: string, agentRef: string): Promise<void> {
+    this.brains.get(agentRef)?.forget(userRef);
     const k = key(userRef, agentRef);
     for (const [id, entry] of this.proposals) {
       if (key(entry.userRef, entry.agentRef) !== k) continue;
@@ -235,6 +316,7 @@ export class MockDigitorn implements DigitornClient {
 
   async deleteProfile(userRef: string): Promise<void> {
     this.deletedProfiles.push(userRef);
+    for (const brain of this.brains.values()) brain.forget(userRef);
     for (const k of [...this.agentConfigurations.keys()]) {
       if (k.startsWith(`${userRef}|`)) this.agentConfigurations.delete(k);
     }

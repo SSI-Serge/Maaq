@@ -14,6 +14,18 @@ const schema = z.object({
   DIGITORN_MODE: z.enum(["mock", "live"]).default("mock"),
   DIGITORN_API_URL: z.string().url().optional(),
   DIGITORN_API_KEY: z.string().optional(),
+  /** Agents exécutés par MAAQ en attendant Digitorn : « off » = réponses simulées ; « anthropic » = modèle Claude (ANTHROPIC_API_KEY ou profil `ant auth login`). */
+  LOCAL_AGENTS_MODE: z.enum(["off", "anthropic"]).default("off"),
+  LOCAL_AGENTS_MODEL: z.string().min(1).default("claude-opus-5-5"),
+  /** WhatsApp : « dev » = boîte de test (/dev/whatsapp), rien ne part ; « cloud » = WhatsApp Business Platform (Cloud API de Meta). */
+  WHATSAPP_MODE: z.enum(["dev", "cloud"]).default("dev"),
+  WHATSAPP_ACCESS_TOKEN: z.string().min(1).optional(),
+  WHATSAPP_PHONE_NUMBER_ID: z.string().min(1).optional(),
+  WHATSAPP_APP_SECRET: z.string().min(1).optional(),
+  WHATSAPP_VERIFY_TOKEN: z.string().min(8).optional(),
+  /** Numéro affiché aux utilisateurs (chiffres seuls, ex. 33612345678) : sert au lien wa.me de la liaison. */
+  WHATSAPP_BUSINESS_NUMBER: z.string().regex(/^\d{8,15}$/).default("33600000000"),
+  WHATSAPP_API_VERSION: z.string().min(1).default("v21.0"),
   /** « dev » : boîte de test, rien ne part. « smtp » : les emails partent réellement (SMTP_*), les SMS restent simulés. */
   MESSAGING_MODE: z.enum(["dev", "smtp"]).default("dev"),
   SMTP_HOST: z.string().min(1).optional(),
@@ -29,9 +41,15 @@ const schema = z.object({
 });
 
 const checked = schema.superRefine((value, ctx) => {
-  if (value.MESSAGING_MODE !== "smtp") return;
-  for (const name of ["SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD", "MAIL_FROM"] as const) {
-    if (!value[name]) ctx.addIssue({ code: "custom", path: [name], message: "obligatoire avec MESSAGING_MODE=smtp" });
+  if (value.MESSAGING_MODE === "smtp") {
+    for (const name of ["SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD", "MAIL_FROM"] as const) {
+      if (!value[name]) ctx.addIssue({ code: "custom", path: [name], message: "obligatoire avec MESSAGING_MODE=smtp" });
+    }
+  }
+  if (value.WHATSAPP_MODE === "cloud") {
+    for (const name of ["WHATSAPP_ACCESS_TOKEN", "WHATSAPP_PHONE_NUMBER_ID", "WHATSAPP_APP_SECRET", "WHATSAPP_VERIFY_TOKEN"] as const) {
+      if (!value[name]) ctx.addIssue({ code: "custom", path: [name], message: "obligatoire avec WHATSAPP_MODE=cloud" });
+    }
   }
 });
 

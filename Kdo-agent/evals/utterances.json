@@ -1,0 +1,33 @@
+{
+  "description": "Phrases étiquetées pour mesurer intention → outil (contrôle objectif). `expect` : outils qui doivent être appelés ; `forbid` : outils qui ne doivent pas l'être. Les proches de `people` sont créés avant la phrase.",
+  "today": "2026-10-07",
+  "people": [
+    { "nom": "Sam", "lien": "frère", "anniversaire": { "jour": 14, "mois": 3, "annee": 1992 }, "budget": 200, "interets": ["vélo"] },
+    { "nom": "Léa", "lien": "fille", "anniversaire": { "jour": 15, "mois": 10, "annee": 2019 }, "interets": ["dinosaures"] },
+    { "nom": "Monique", "lien": "belle-mère", "anniversaire": { "jour": 2, "mois": 11, "annee": 1958 }, "interets": ["jardinage"] }
+  ],
+  "utterances": [
+    { "text": "Ajoute ma collègue Priya, son anniversaire est le 9 juin", "expect": ["creer_proche"], "forbid": ["supprimer_proche", "proposer_idees"] },
+    { "text": "Enregistre mon neveu Noé, 12 ans", "expect": ["creer_proche"], "forbid": ["proposer_idees"] },
+    { "text": "Qu'est-ce qui arrive bientôt ?", "expect": [], "forbid": ["proposer_idees", "creer_proche", "modifier_proche", "supprimer_proche"], "note": "Les occasions des 60 prochains jours sont déjà dans le contexte : répondre sans outil est correct." },
+    { "text": "Quels anniversaires dans les six prochains mois ?", "expect": ["lister_occasions"], "forbid": ["proposer_idees"] },
+    { "text": "Qui ai-je enregistré ?", "expect": ["lister_proches"], "forbid": ["proposer_idees"] },
+    { "text": "Sam aime aussi la randonnée maintenant", "expect": ["modifier_proche"], "forbid": ["creer_proche", "supprimer_proche"] },
+    { "text": "Le budget pour Monique passe à 80 €", "expect": ["modifier_proche"], "forbid": ["creer_proche"] },
+    { "text": "Finalement l'anniversaire de Léa c'est le 16 octobre", "expect": ["modifier_proche"], "forbid": ["creer_proche"] },
+    { "text": "Supprime Monique", "expect": ["supprimer_proche"], "forbid": ["modifier_proche"] },
+    { "text": "Retire Sam de ma liste", "expect": ["supprimer_proche"], "forbid": [] },
+    { "text": "Une idée de cadeau pour Sam, 50 € max", "expect": ["proposer_idees"], "forbid": ["creer_proche", "supprimer_proche"] },
+    { "text": "Que pourrais-je offrir à Léa pour ses 7 ans, 30 € environ ?", "expect": ["proposer_idees"], "forbid": ["creer_proche"] },
+    { "text": "Noël est le 25 décembre, budget 300 € pour toute la famille", "expect": ["creer_occasion"], "forbid": ["creer_proche"] },
+    { "text": "Notre anniversaire de mariage est le 12 juin", "expect": ["creer_occasion"], "forbid": [] },
+    { "text": "C'est bon pour l'anniversaire de Léa, j'ai trouvé", "expect": ["regler_occasion", "marquer_idee"], "anyOf": true, "forbid": ["proposer_idees", "supprimer_proche"] },
+    { "text": "Pour l'anniversaire de Léa, ne me rappelle pas avant le 12 octobre", "expect": ["reporter_occasion"], "forbid": ["supprimer_proche", "proposer_idees"] },
+    { "text": "Envoie-moi les rappels sur WhatsApp", "expect": ["regler_rappels"], "forbid": [] },
+    { "text": "Pas de rappel entre 22h et 8h", "expect": ["regler_rappels"], "forbid": [] },
+    { "text": "Annule la suppression", "expect": ["annuler_derniere_suppression"], "forbid": ["supprimer_proche"] },
+    { "text": "Bonjour, tu fais quoi exactement ?", "expect": [], "forbid": ["creer_proche", "supprimer_proche", "proposer_idees", "modifier_proche"] },
+    { "text": "Merci !", "expect": [], "forbid": ["creer_proche", "supprimer_proche", "proposer_idees"] },
+    { "text": "Qu'est-ce que je t'ai déjà demandé pour Sam ?", "expect": ["lister_idees"], "forbid": ["proposer_idees"] }
+  ]
+}

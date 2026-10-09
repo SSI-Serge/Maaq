@@ -86,6 +86,15 @@ export default function SettingsPage() {
               <span aria-hidden>›</span>
             </Link>
           )}
+          <Link href="/reglages/whatsapp" className={s.navItem}>
+            <span>
+              WhatsApp et rappels
+              <span className={s.muted} style={{ display: "block", fontWeight: 400, fontSize: 12 }}>
+                Écrire à kdo_help depuis WhatsApp, rappels d&apos;occasions
+              </span>
+            </span>
+            <span aria-hidden>›</span>
+          </Link>
           <Link href="/reglages/support" className={s.navItem}>
             Aide et support <span aria-hidden>›</span>
           </Link>

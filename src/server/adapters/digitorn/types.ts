@@ -17,6 +17,9 @@ export interface RequestContext {
   info: Record<string, string | string[]>;
 }
 
+/** Canal d'où vient une demande : l'application, ou WhatsApp (même fil de conversation). */
+export type MessageChannel = "web" | "whatsapp";
+
 export interface SubmitRequestInput {
   /** Identifiant choisi par MAAQ : une même demande renvoyée n'est exécutée qu'une fois (US-38 RT2). */
   requestId: string;
@@ -24,13 +27,18 @@ export interface SubmitRequestInput {
   agentRef: string;
   text: string;
   context: RequestContext;
+  /** Fuseau de la personne (dates relatives, jour civil) ; Europe/Paris si absent. */
+  timezone?: string;
+  /** « web » si absent. */
+  channel?: MessageChannel;
 }
 
 export type ActionStatus = "pending" | "executing" | "succeeded" | "failed" | "refused" | "abandoned";
 
 export interface ActionProposal {
   proposalId: string;
-  kind: "appointment" | "email";
+  /** « other » : action d'un agent local (ex. suppression), décrite par `summary` seul. */
+  kind: "appointment" | "email" | "other";
   summary: string;
   when?: string;
   place?: string;
@@ -43,7 +51,7 @@ export interface ActionProposal {
 }
 
 export type ChatEvent =
-  | { type: "user_message"; id: string; requestId: string; text: string; at: string }
+  | { type: "user_message"; id: string; requestId: string; text: string; at: string; channel?: MessageChannel }
   | { type: "agent_message"; id: string; requestId: string; text: string; at: string }
   | { type: "action_proposal"; id: string; requestId: string; proposal: ActionProposal; at: string };
 

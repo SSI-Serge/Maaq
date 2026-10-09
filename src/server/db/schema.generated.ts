@@ -15,6 +15,8 @@ export type AnonymizationStatus = "done" | "none" | "pending";
 
 export type AuditAction = "account_created" | "account_updated" | "activation_link_resent" | "agent_blocked" | "agent_published" | "agent_reactivated" | "contract_archived" | "contract_created" | "contract_field_changed" | "contract_updated" | "device_revoked_by_admin";
 
+export type ChannelKind = "web" | "whatsapp";
+
 export type ChatErasureReason = "agent_removed" | "device_revoked" | "logout";
 
 export type ClassificationStatus = "classified" | "failed" | "pending";
@@ -47,6 +49,8 @@ export type Generated<T> = T extends ColumnType<infer S, infer I, infer U>
   ? ColumnType<S, I | undefined, U>
   : ColumnType<T, T | undefined, T>;
 
+export type GiftIdeaStatus = "dismissed" | "purchased" | "saved" | "suggested";
+
 export type GraceOrigin = "billing_unsubscribe" | "in_app_request";
 
 export type GuestRank = "core" | "secondary";
@@ -72,6 +76,8 @@ export type JsonValue = JsonArray | JsonObject | JsonPrimitive;
 export type LegalDocumentType = "contract_challenge_consent" | "privacy_policy" | "terms_of_use";
 
 export type LogbookEntryType = "action_done" | "action_refused" | "action_validated" | "request";
+
+export type MessageDirection = "inbound" | "outbound";
 
 export type Numeric = ColumnType<string, number | string, number | string>;
 
@@ -138,6 +144,10 @@ export interface Accounts {
    * in_app_request = bouton Désabonnement (annulable immédiatement) ; billing_unsubscribe = outil de facturation (reprise = nouvel abonnement hors app) — US-59 RF2/RF3
    */
   grace_origin: GraceOrigin | null;
+  /**
+   * Date d'envoi du rappel « suppression dans 7 jours » : un seul rappel par délai de grâce (US-58 RF3). Remis à vide quand le compte est repris
+   */
+  grace_reminder_sent_at: Timestamp | null;
   grace_started_at: Timestamp | null;
   /**
    * Nombre maximum d'invités du plan. Une réduction du plan n'expulse personne (US-21 RF6) : seuls les ajouts sont bloqués
@@ -157,7 +167,6 @@ export interface Accounts {
    */
   subscription_ended_at: Timestamp | null;
   updated_at: Generated<Timestamp>;
-  grace_reminder_sent_at: Timestamp | null;
 }
 
 export interface ActionDecisions {
@@ -326,6 +335,39 @@ export interface CcAddresses {
   user_id: string;
 }
 
+export interface ChannelIdentities {
+  channel: ChannelKind;
+  consent_version: string | null;
+  external_id: string;
+  id: Generated<string>;
+  last_inbound_at: Timestamp | null;
+  linked_at: Generated<Timestamp>;
+  opt_in: Generated<boolean>;
+  opt_in_at: Timestamp | null;
+  user_id: string;
+}
+
+export interface ChannelLinkCodes {
+  channel: ChannelKind;
+  code: string;
+  created_at: Generated<Timestamp>;
+  expires_at: Timestamp;
+  used_at: Timestamp | null;
+  user_id: string;
+}
+
+export interface ChannelMessages {
+  channel: ChannelKind;
+  created_at: Generated<Timestamp>;
+  direction: MessageDirection;
+  external_id: string;
+  id: Generated<string>;
+  request_id: string | null;
+  status: string | null;
+  updated_at: Generated<Timestamp>;
+  user_id: string | null;
+}
+
 export interface ChatErasureRequests {
   agent_id: Int8 | null;
   alerted_at: Timestamp | null;
@@ -337,6 +379,14 @@ export interface ChatErasureRequests {
   reason: ChatErasureReason;
   requested_at: Generated<Timestamp>;
   status: Generated<ErasureStatus>;
+  user_id: string;
+}
+
+export interface ChatRequests {
+  agent_id: Int8;
+  counted_date: Timestamp;
+  created_at: Generated<Timestamp>;
+  request_id: string;
   user_id: string;
 }
 
@@ -529,12 +579,71 @@ export interface ErrorReports {
   user_comment: string | null;
 }
 
-export interface ChatRequests {
-  agent_id: Int8;
-  counted_date: Timestamp;
+export interface GiftEvents {
+  budget_amount: Numeric | null;
   created_at: Generated<Timestamp>;
-  request_id: string;
+  deleted_at: Timestamp | null;
+  event_day: number;
+  event_month: number;
+  event_year: number | null;
+  id: Generated<string>;
+  kind: string;
+  person_id: string | null;
+  title: string;
+  updated_at: Generated<Timestamp>;
   user_id: string;
+  version: Generated<number>;
+}
+
+export interface GiftIdeas {
+  id: Generated<string>;
+  occasion_key: string | null;
+  person_id: string | null;
+  price_max: Numeric | null;
+  price_min: Numeric | null;
+  status: Generated<GiftIdeaStatus>;
+  suggested_at: Generated<Timestamp>;
+  title: string;
+  updated_at: Generated<Timestamp>;
+  user_id: string;
+  why: Generated<string>;
+}
+
+export interface GiftNotifications {
+  channel: ChannelKind;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  occasion_key: string;
+  reminder_point: string;
+  scheduled_for: Timestamp;
+  sent_at: Timestamp | null;
+  status: string;
+  template_name: string | null;
+  user_id: string;
+}
+
+export interface GiftOccasionStates {
+  occasion_key: string;
+  snoozed_until: Timestamp | null;
+  sorted_at: Timestamp | null;
+  updated_at: Generated<Timestamp>;
+  user_id: string;
+}
+
+export interface GiftPeople {
+  birth_day: number | null;
+  birth_month: number | null;
+  birth_year: number | null;
+  budget_amount: Numeric | null;
+  created_at: Generated<Timestamp>;
+  deleted_at: Timestamp | null;
+  details: Generated<Json>;
+  id: Generated<string>;
+  name: string;
+  relationship: string | null;
+  updated_at: Generated<Timestamp>;
+  user_id: string;
+  version: Generated<number>;
 }
 
 export interface IdempotencyKeys {
@@ -733,12 +842,16 @@ export interface Users {
    * Date de suppression définitive des données du profil : délai de grâce de 30 jours (auto-suppression, durée unique décidée le 01/10/2026) ou X jours après retrait (US-20 RT2, paramètre de la console)
    */
   purge_scheduled_at: Timestamp | null;
+  quiet_hours_end: Generated<string>;
+  quiet_hours_start: Generated<string>;
+  reminder_channel: Generated<string>;
   removed_at: Timestamp | null;
   role: UserRole;
   /**
    * pending_activation = invitation/activation en attente ; active ; grace_period = suppression demandée par le profil ; removed = invité retiré, données purgées après X jours
    */
   status: Generated<UserStatus>;
+  timezone: Generated<string>;
   updated_at: Generated<Timestamp>;
 }
 
@@ -827,6 +940,9 @@ export interface DB {
   agent_validated_actions: AgentValidatedActions;
   agents: Agents;
   cc_addresses: CcAddresses;
+  channel_identities: ChannelIdentities;
+  channel_link_codes: ChannelLinkCodes;
+  channel_messages: ChannelMessages;
   chat_erasure_requests: ChatErasureRequests;
   chat_requests: ChatRequests;
   connector_types: ConnectorTypes;
@@ -841,6 +957,11 @@ export interface DB {
   devices: Devices;
   erasure_traces: ErasureTraces;
   error_reports: ErrorReports;
+  gift_events: GiftEvents;
+  gift_ideas: GiftIdeas;
+  gift_notifications: GiftNotifications;
+  gift_occasion_states: GiftOccasionStates;
+  gift_people: GiftPeople;
   idempotency_keys: IdempotencyKeys;
   legal_acceptances: LegalAcceptances;
   legal_document_versions: LegalDocumentVersions;

@@ -60,11 +60,9 @@ async function seedProfiles(client: PoolClient): Promise<boolean> {
   return true;
 }
 
-/** Deux agents publiés, comme dans la maquette Administration des agents. */
+/** Agents publiés : les deux de la maquette Administration des agents, plus kdo_help (agent local). Chaque agent manquant est ajouté. */
 async function seedCatalog(client: PoolClient): Promise<boolean> {
-  const { rowCount } = await client.query("SELECT 1 FROM agents LIMIT 1");
-  if (rowCount) return false;
-
+  let added = false;
   const agents = [
     {
       ref: "admin_classify",
@@ -99,9 +97,26 @@ async function seedCatalog(client: PoolClient): Promise<boolean> {
       ] as [string, string, boolean, number, string | null][],
       cc: 10,
     },
+    {
+      ref: "kdo_help",
+      name: "kdo_help",
+      category: "perso",
+      short: "Idées de cadeaux et budget cadeaux, au bon moment.",
+      full: "kdo_help propose des idées de cadeaux adaptées à l'âge, aux goûts et à votre budget, suit les anniversaires de vos proches et vous aide à tenir votre budget cadeaux de l'année.",
+      examples: ["Une idée de cadeau pour un garçon de 7 ans, 20 € maximum", "Quels anniversaires arrivent dans les prochaines semaines ?", "Un cadeau pour ma belle-mère qui a déjà tout, 60 €"],
+      suggestions: ["Trouver un cadeau", "Voir les anniversaires à venir", "Mon budget cadeaux"],
+      actions: [] as string[],
+      connectors: [] as [string, string][],
+      // Les proches et occasions se gèrent dans le tchat (tables gift_*), pas par le formulaire d'informations.
+      fields: [] as [string, string, boolean, number, string | null][],
+      cc: 0,
+    },
   ];
 
   for (const agent of agents) {
+    const existing = await client.query("SELECT 1 FROM agents WHERE digitorn_agent_ref = $1", [agent.ref]);
+    if (existing.rowCount) continue;
+    added = true;
     const {
       rows: [row],
     } = await client.query<{ id: string }>(
@@ -131,7 +146,7 @@ async function seedCatalog(client: PoolClient): Promise<boolean> {
       );
     }
   }
-  return true;
+  return added;
 }
 
 /** Contrats obligatoires et leurs champs, comme dans la maquette Contrats obligatoires. */

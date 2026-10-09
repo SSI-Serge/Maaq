@@ -107,6 +107,11 @@ interface Collected {
   contractDocuments: unknown[];
   consents: unknown[];
   devices: unknown[];
+  /** kdo_help : proches, occasions, idées ; canaux reliés (WhatsApp). */
+  giftPeople: unknown[];
+  giftEvents: unknown[];
+  giftIdeas: unknown[];
+  channels: unknown[];
   digitorn: unknown;
 }
 
@@ -257,6 +262,15 @@ async function collect(db: Kysely<DB>, userId: string, now: Date): Promise<{ dat
   let digitornData: unknown = null;
   if (user.digitorn_user_ref) digitornData = await digitorn().exportUserData(user.digitorn_user_ref);
 
+  // kdo_help : proches (y compris effacés en attente de purge), occasions, idées ; numéro WhatsApp relié.
+  const [giftPeople, giftEvents, giftIdeas, channels] = await Promise.all([
+    db.selectFrom("gift_people").selectAll().where("user_id", "=", userId).orderBy("created_at").execute(),
+    db.selectFrom("gift_events as e").leftJoin("gift_people as p", "p.id", "e.person_id").select(["e.title", "e.kind", "e.event_day", "e.event_month", "e.event_year", "e.budget_amount", "p.name as person", "e.created_at", "e.deleted_at"]).where("e.user_id", "=", userId).orderBy("e.created_at").execute(),
+    db.selectFrom("gift_ideas as i").leftJoin("gift_people as p", "p.id", "i.person_id").select(["i.title", "i.why", "i.price_min", "i.price_max", "i.status", "p.name as person", "i.suggested_at"]).where("i.user_id", "=", userId).orderBy("i.suggested_at").execute(),
+    db.selectFrom("channel_identities").select(["channel", "external_id", "opt_in", "opt_in_at", "consent_version", "linked_at", "last_inbound_at"]).where("user_id", "=", userId).execute(),
+  ]);
+  const birthday = (d: number | null, m: number | null, y: number | null) => (d && m ? `${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}${y ? `/${y}` : ""}` : null);
+
   const data: Collected = {
     generatedAt: now.toISOString(),
     profile: {
@@ -287,6 +301,10 @@ async function collect(db: Kysely<DB>, userId: string, now: Date): Promise<{ dat
     contractDocuments: documentRows,
     consents: consents.map((c) => ({ contrat: c.contract, action: c.action_type === "granted" ? "Consentement donné" : "Consentement retiré", origine: c.trigger_reason, date: date(c.occurred_at), versionDuTexte: c.version_label })),
     devices: devices.map((d) => ({ type: d.device_type, navigateur: d.browser, premiereConnexion: date(d.first_connected_at), derniereActivite: date(d.last_activity_at), revoqueLe: date(d.revoked_at) })),
+    giftPeople: giftPeople.map((p) => ({ nom: p.name, lien: p.relationship, anniversaire: birthday(p.birth_day, p.birth_month, p.birth_year), budget: p.budget_amount, details: JSON.stringify(p.details), creeLe: date(p.created_at), effaceLe: date(p.deleted_at) })),
+    giftEvents: giftEvents.map((e) => ({ titre: e.title, type: e.kind, date: birthday(e.event_day, e.event_month, e.event_year), budget: e.budget_amount, proche: e.person, creeLe: date(e.created_at), effaceLe: date(e.deleted_at) })),
+    giftIdeas: giftIdeas.map((i) => ({ idee: i.title, pourquoi: i.why, prixMin: i.price_min, prixMax: i.price_max, statut: i.status, proche: i.person, proposeeLe: date(i.suggested_at) })),
+    channels: channels.map((c) => ({ canal: c.channel, identifiant: c.external_id, consentement: c.opt_in, consentiLe: date(c.opt_in_at), versionDuTexte: c.consent_version, relieLe: date(c.linked_at), dernierMessageRecu: date(c.last_inbound_at) })),
     digitorn: digitornData,
   };
   return { data, documents };
@@ -304,6 +322,10 @@ const SECTIONS: [keyof Collected, string][] = [
   ["contractDocuments", "Documents de contrats que j'ai ajoutés"],
   ["consents", "Mes consentements"],
   ["devices", "Mes appareils"],
+  ["giftPeople", "kdo_help : mes proches"],
+  ["giftEvents", "kdo_help : mes occasions"],
+  ["giftIdeas", "kdo_help : idées proposées"],
+  ["channels", "Canaux reliés (WhatsApp)"],
 ];
 
 /** Document lisible par une personne : les mêmes données que le fichier structuré (RF4). */

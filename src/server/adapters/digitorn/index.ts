@@ -1,3 +1,4 @@
+import { localBrains } from "@/server/agents";
 import { env } from "@/server/env";
 import { MockDigitorn } from "./mock";
 import type { DigitornClient } from "./types";
@@ -12,7 +13,7 @@ export function digitorn(): DigitornClient {
   if (env().DIGITORN_MODE === "live") {
     throw new Error("L'API Digitorn n'est pas encore disponible : utiliser DIGITORN_MODE=mock.");
   }
-  globalThis.__maaqDigitorn ??= new MockDigitorn();
+  globalThis.__maaqDigitorn ??= new MockDigitorn({ brains: localBrains() });
   return globalThis.__maaqDigitorn;
 }
 

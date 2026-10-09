@@ -2,6 +2,8 @@
 
 Vos agents IA pour l'administratif et le quotidien, en toute transparence.
 
+> **Pas développeur ?** Lisez plutôt [Kdo-agent/GUIDE-DEMARRAGE.md](Kdo-agent/GUIDE-DEMARRAGE.md) : installation pas à pas, où mettre les clés, et quelles clés sont nécessaires. Le dossier [Kdo-agent/](Kdo-agent/) regroupe la documentation et les évaluations de l'agent kdo_help.
+
 Application web mobile installable (PWA) avec sa console d'administration, construite à partir de :
 
 - `docs/specs/MAAQ_US_Detaillees_BA.md` — les 70 user stories détaillées ;

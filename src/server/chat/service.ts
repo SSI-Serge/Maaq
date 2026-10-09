@@ -1,5 +1,5 @@
 import { sql } from "kysely";
-import { digitorn, type ActionProposal, type ChatEvent, type RequesterRank } from "@/server/adapters/digitorn";
+import { digitorn, type ActionProposal, type ChatEvent, type MessageChannel, type RequesterRank } from "@/server/adapters/digitorn";
 import { messenger } from "@/server/adapters/messaging";
 import type { Ctx, SessionContext } from "@/server/auth/service";
 import { autoParticipants } from "@/server/connectors/service";
@@ -29,7 +29,7 @@ export interface ChatGate {
 }
 
 export type ChatItem =
-  | { kind: "user"; id: string; requestId: string; text: string; at: string }
+  | { kind: "user"; id: string; requestId: string; text: string; at: string; channel: MessageChannel }
   | { kind: "agent"; id: string; requestId: string; text: string; at: string; reported: boolean }
   | {
       kind: "action";
@@ -226,7 +226,7 @@ export async function getChat(ctx: Ctx, session: SessionContext, agentId: string
   const items: ChatItem[] = [];
   for (const event of events) {
     if (event.type === "user_message") {
-      items.push({ kind: "user", id: event.id, requestId: event.requestId, text: event.text, at: event.at });
+      items.push({ kind: "user", id: event.id, requestId: event.requestId, text: event.text, at: event.at, channel: event.channel ?? "web" });
     } else if (event.type === "agent_message") {
       items.push({ kind: "agent", id: event.id, requestId: event.requestId, text: event.text, at: event.at, reported: reported.has(event.id) });
     } else {
@@ -281,7 +281,7 @@ export function capReachedMessage(limit: number): string {
 export async function sendMessage(
   ctx: Ctx,
   session: SessionContext,
-  input: { agentId: string; requestId: string; text: string },
+  input: { agentId: string; requestId: string; text: string; channel?: MessageChannel },
 ): Promise<SendResult> {
   const agent = await loadAgent(ctx, session, input.agentId);
   const blockedText = blockedMessage(agent);
@@ -322,6 +322,8 @@ export async function sendMessage(
       userRef,
       agentRef: agent.digitorn_agent_ref,
       text,
+      timezone: session.device.timezone,
+      channel: input.channel ?? "web",
       context: {
         rank: rankOf(session),
         autoParticipants: autoPeople.map((p) => p.email),

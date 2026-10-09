@@ -22,9 +22,11 @@
     "db:reset": "tsx scripts/db-reset.ts",
     "deploy:secrets": "tsx scripts/gen-secrets.ts",
     "check:release": "tsx scripts/check-release.ts",
+    "eval:kdo-help": "tsx scripts/eval-kdo-help.ts",
     "db:types": "kysely-codegen --dialect postgres --out-file src/server/db/schema.generated.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.131.0",
     "@node-rs/argon2": "^2.2.1",
     "kysely": "^0.29.6",
     "next": "^16.3.8",

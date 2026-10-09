@@ -110,7 +110,7 @@ export function ActionCard({
       )}
       {status === "succeeded" && (
         <div className={`${styles.notice} ${styles.noticeSuccess}`} role="status">
-          {isEmail ? "✓ Email envoyé" : "✓ Rendez-vous créé"}
+          {isEmail ? "✓ Email envoyé" : proposal.kind === "appointment" ? "✓ Rendez-vous créé" : "✓ Action effectuée"}
         </div>
       )}
       {status === "failed" && (

@@ -378,7 +378,7 @@ export function ChatScreen({ agentId, backHref = "/accueil" }: { agentId: string
                   <div className={styles.bubbleUser}>{item.text}</div>
                 </div>
                 <div className={styles.rowEnd}>
-                  <span className={styles.status}>Envoyé</span>
+                  <span className={styles.status}>{item.channel === "whatsapp" ? "Envoyé depuis WhatsApp" : "Envoyé"}</span>
                 </div>
               </div>
             );

@@ -1,0 +1,90 @@
+{
+  "description": "Jeu d'évaluation de kdo_help : profils français, avec ce qu'une bonne et une mauvaise réponse contiennent. Noter chaque idée de 1 à 10 sur pertinence, réflexion, convenance, faisabilité et créativité ; sur WhatsApp, ajouter la concision.",
+  "today": "2026-10-07",
+  "cases": [
+    {
+      "id": "frere-cycliste-jeune-papa",
+      "request": "Une idée de cadeau pour mon frère, entre 150 et 200 €",
+      "people": [{ "nom": "Thomas", "lien": "frère", "anniversaire": { "jour": 28, "mois": 10, "annee": 1992 }, "budget": 200, "interets": ["vélo"], "moments_de_vie": ["premier enfant né en août 2026"] }],
+      "good": "Relie le vélo et sa nouvelle vie de père (siège enfant, remorque, sortie vélo à deux plus tard). Classe cette idée en premier. Mentionne que son anniversaire est dans 3 semaines. Prix réalistes, pas des fourchettes qui recopient le budget.",
+      "bad": "Matériel bébé générique ; carte cadeau ; idée qui suppose beaucoup de temps libre ; prix hors de la fourchette."
+    },
+    {
+      "id": "copain-de-classe-7-ans",
+      "request": "Léa est invitée à l'anniversaire de son copain Noah samedi, il a 7 ans et adore les dinosaures. 20 € max.",
+      "people": [{ "nom": "Léa", "lien": "fille", "anniversaire": { "jour": 15, "mois": 10, "annee": 2019 }, "interets": ["dinosaures", "dessin"] }],
+      "good": "Trois idées à 20 € ou moins, liées aux dinosaures mais pas une figurine banale. Peut proposer d'enregistrer Noah (copain de Léa) sans l'imposer. Type de magasin au besoin, pas de lien.",
+      "bad": "Idée au-dessus de 20 € ; cadeau pour Léa au lieu de Noah ; carte cadeau ; demande d'informations déjà données."
+    },
+    {
+      "id": "collegue-qui-part",
+      "request": "Un cadeau de départ pour une collègue, on est 6 à se cotiser 40 € en tout. On se connaît peu, elle part vivre à Lyon.",
+      "people": [],
+      "good": "Reste sobre et collectif : quelque chose qui accompagne le déménagement ou la découverte de Lyon, sans rien d'intime. Propose quand même, même sans fiche enregistrée.",
+      "bad": "Cadeau trop personnel (bijou, parfum, vêtement) ; dépasse 40 € ; suppose des goûts non donnés."
+    },
+    {
+      "id": "neveu-ado-gouts-inconnus",
+      "request": "Mon neveu a 15 ans, je ne sais pas du tout ce qui lui plaît. 50 €.",
+      "people": [],
+      "good": "Soit une question courte et précise (jeux vidéo, sport, musique ?), soit des idées qui laissent le choix sans être une carte cadeau (expérience, kit à monter). Ton sans condescendance.",
+      "bad": "Suppose qu'il aime les jeux vidéo ; carte cadeau en premier ; cadeau d'enfant."
+    },
+    {
+      "id": "belle-mere-qui-a-tout",
+      "request": "Ma belle-mère a déjà tout. Environ 60 €.",
+      "people": [{ "nom": "Monique", "lien": "belle-mère", "anniversaire": { "jour": 2, "mois": 11, "annee": 1958 }, "interets": ["jardinage", "romans policiers"] }],
+      "good": "Retrouve Monique dans les proches sans redemander ses goûts. Privilégie l'expérience ou le consommable lié au jardin ou à la lecture. Note l'anniversaire du 2 novembre.",
+      "bad": "Objet générique ; outil de jardin basique qu'elle a sûrement ; prix très au-dessus de 60 € ; redemande ses centres d'intérêt."
+    },
+    {
+      "id": "information-manquante",
+      "request": "Un cadeau pour Sam",
+      "people": [],
+      "good": "Pose une seule question courte (qui est Sam, âge, budget) et ne propose rien. Peut proposer de l'enregistrer.",
+      "bad": "Propose des idées sans savoir qui est Sam ; invente un proche."
+    },
+    {
+      "id": "deux-homonymes",
+      "request": "Change l'anniversaire de Sam : c'est le 15 mars",
+      "people": [
+        { "nom": "Sam", "lien": "frère", "anniversaire": { "jour": 14, "mois": 3, "annee": 1992 } },
+        { "nom": "Sam", "lien": "collègue" }
+      ],
+      "good": "Demande lequel des deux Sam avant toute écriture ; n'appelle pas modifier_proche.",
+      "bad": "Modifie l'un des deux au hasard."
+    },
+    {
+      "id": "creation-langage-naturel",
+      "request": "Ajoute ma belle-sœur Inès, son anniversaire est le 3 juillet, elle adore la céramique et le thé, budget 60 €",
+      "people": [],
+      "good": "Appelle creer_proche avec le lien, le 03/07, les deux centres d'intérêt et le budget ; confirme en une ligne avec la date absolue.",
+      "bad": "Pose des questions déjà répondues ; oublie un champ ; ne confirme pas."
+    },
+    {
+      "id": "suppression-confirmee",
+      "request": "Retire Priya de ma liste",
+      "people": [{ "nom": "Priya", "lien": "collègue" }],
+      "good": "Appelle supprimer_proche puis explique que la carte est à valider ; ne dit pas que c'est fait.",
+      "bad": "Annonce la suppression comme effectuée ; supprime sans passer par l'outil."
+    },
+    {
+      "id": "anniversaires-a-venir",
+      "request": "Quels anniversaires arrivent bientôt ?",
+      "people": [
+        { "nom": "Léa", "lien": "fille", "anniversaire": { "jour": 15, "mois": 10, "annee": 2019 }, "interets": ["dinosaures"] },
+        { "nom": "Thomas", "lien": "frère", "anniversaire": { "jour": 28, "mois": 10, "annee": 1992 } },
+        { "nom": "Papa", "anniversaire": { "jour": 25, "mois": 12, "annee": 1958 } }
+      ],
+      "good": "Liste Léa (15 octobre, 7 ans) et Thomas (28 octobre, 34 ans), dans l'ordre, sans idée de cadeau. Peut signaler que Noël et l'anniversaire de Papa sont plus loin.",
+      "bad": "Invente des dates ; propose des cadeaux non demandés ; oublie l'âge."
+    },
+    {
+      "id": "bilan-depenses",
+      "request": "Combien ai-je dépensé en cadeaux cette année ?",
+      "people": [{ "nom": "Léa", "lien": "fille", "budget": 50 }],
+      "good": "Dit clairement que MAAQ ne suit que les idées marquées achetées, et propose une estimation ou de les marquer.",
+      "bad": "Invente un montant dépensé."
+    }
+  ]
+}
