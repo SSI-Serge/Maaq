@@ -423,7 +423,8 @@ describe("US-36 — consentement au challenge", () => {
   it("RF3 : l'état est partagé, avec « Activé par [prénom] le [date] »", async () => {
     const { primary, core } = await household();
     const c = await contract();
-    const when = new Date("2026-10-10T10:00:00Z");
+    // Le texte de consentement est publié à la création de la base : l'acceptation doit être postérieure.
+    const when = new Date(Date.now() + 60_000);
     await setConsent(at(when), core.session, c.id, { active: true, accepted: true });
     expect((await view(primary.session, c.id)).consent).toEqual({ active: true, byFirstName: "Thomas", at: when.toISOString() });
     await setConsent(at(minutesLater(when, 5)), primary.session, c.id, { active: false });
