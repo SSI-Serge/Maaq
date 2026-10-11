@@ -199,7 +199,8 @@ function useInactivityLock(active: boolean, onIdle: () => void) {
       }
     };
     const onVisible = () => document.visibilityState === "visible" && check();
-    const events = ["pointerdown", "keydown", "touchstart", "wheel", "scroll"] as const;
+    // « maaq:activity » : signal envoyé par le cadre du tchat de Digitorn, dont les touchers ne remontent pas jusqu'ici.
+    const events = ["pointerdown", "keydown", "touchstart", "wheel", "scroll", "maaq:activity"] as const;
     events.forEach((name) => window.addEventListener(name, touch, { passive: true, capture: true }));
     document.addEventListener("visibilitychange", onVisible);
     const timer = setInterval(check, CHECK_EVERY_MS);

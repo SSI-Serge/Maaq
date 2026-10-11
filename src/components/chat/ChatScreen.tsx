@@ -9,6 +9,7 @@ import { Loading } from "@/components/ui";
 import { LOW_CAP_THRESHOLD, MAX_REQUEST_LENGTH } from "@/server/chat/rules";
 import type { ChatItem, ChatView } from "@/server/chat/service";
 import { ActionCard } from "./ActionCard";
+import { EmbeddedChat } from "./EmbeddedChat";
 import styles from "./chat.module.css";
 import { ReportForm } from "./ReportForm";
 
@@ -225,6 +226,8 @@ export function ChatScreen({ agentId, backHref = "/accueil" }: { agentId: string
   const remaining = data?.cap.remaining ?? Infinity;
   const showLowCap = data !== undefined && remaining > 0 && remaining <= LOW_CAP_THRESHOLD;
   const agentName = data?.agent.name ?? "L'agent";
+  // Tchat de Digitorn embarqué : le cadre remplace le fil de messages, sauf si l'agent est bloqué ou à configurer.
+  const showEmbed = data?.embedded === true && !data.gate && !data.blocked;
 
   function renderReport(item: Extract<ChatItem, { kind: "agent" | "action" }>) {
     const justThanked = thanked.includes(item.id);
@@ -277,12 +280,14 @@ export function ChatScreen({ agentId, backHref = "/accueil" }: { agentId: string
           <div className={styles.agentName}>{data?.agent.name ?? "Tchat"}</div>
           {data && <div className={styles.agentSub}>{data.agent.shortDescription}</div>}
         </div>
-        <Link href={`/connecteurs?agent=${agentId}`} className={styles.iconLink} aria-label="Configurer les connecteurs">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
-            <circle cx="12" cy="12" r="3" />
-            <path d="M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4" />
-          </svg>
-        </Link>
+        {!data?.embedded && (
+          <Link href={`/connecteurs?agent=${agentId}`} className={styles.iconLink} aria-label="Configurer les connecteurs">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+              <circle cx="12" cy="12" r="3" />
+              <path d="M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4" />
+            </svg>
+          </Link>
+        )}
       </header>
 
       {/* Bannière permanente, sans croix ni masquage (US-60). */}
@@ -294,7 +299,9 @@ export function ChatScreen({ agentId, backHref = "/accueil" }: { agentId: string
         <span>Vous échangez avec une IA. Ses réponses peuvent contenir des erreurs.</span>
       </div>
 
-      <div className={styles.thread} aria-live="polite">
+      {showEmbed && data && <EmbeddedChat agentId={agentId} agentName={data.agent.name} />}
+
+      <div className={styles.thread} aria-live="polite" style={showEmbed ? { display: "none" } : undefined}>
         {!data && !error && <Loading />}
         {!data && error && (
           <div className={styles.welcome}>
@@ -351,7 +358,7 @@ export function ChatScreen({ agentId, backHref = "/accueil" }: { agentId: string
           </div>
         )}
 
-        {data && !data.gate && items.length === 0 && waitingOutbox.length === 0 && (
+        {data && !data.embedded && !data.gate && items.length === 0 && waitingOutbox.length === 0 && (
           <div className={styles.welcome}>
             <div className={styles.avatar} aria-hidden>
               {data.agent.name.charAt(0).toUpperCase()}
@@ -431,7 +438,7 @@ export function ChatScreen({ agentId, backHref = "/accueil" }: { agentId: string
         <div ref={endRef} />
       </div>
 
-      {data && !data.gate && (
+      {data && !data.embedded && !data.gate && (
         <div className={styles.composer}>
           {rejection && (
             <div className={rejection.code === "daily_cap_reached" ? styles.capReached : styles.statusError} role="alert" style={{ fontSize: 12, lineHeight: 1.4 }}>

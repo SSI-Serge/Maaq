@@ -660,6 +660,8 @@ export async function processChatErasure(ctx: Ctx, requestId: string): Promise<v
       for (const agent of await agents.execute()) {
         await digitorn().eraseConversation(request.digitorn_user_ref, agent.digitorn_agent_ref);
       }
+      // Déconnexion ou appareil révoqué : tous les accès du profil chez Digitorn sont aussi fermés, cadre du tchat embarqué compris.
+      if (request.agent_id === null) await digitorn().closeAccess(request.digitorn_user_ref, null);
     }
     await ctx.db
       .updateTable("chat_erasure_requests")

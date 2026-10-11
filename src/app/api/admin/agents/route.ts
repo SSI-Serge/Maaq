@@ -17,7 +17,9 @@ export const GET = handler(async (request: Request) => {
 const lines = z.array(z.string().trim().min(1).max(500)).max(20);
 
 const schema = z.object({
-  digitornRef: z.string().min(1).max(100),
+  digitornRef: z.string().min(1).max(200),
+  digitornApiKey: z.string().trim().max(200).nullish(),
+  digitornAppUrl: z.string().trim().max(300).nullish(),
   name: z.string().trim().min(1).max(100),
   category: z.enum(["pro", "perso", "contracts"]),
   shortDescription: z.string().trim().min(1).max(200),
