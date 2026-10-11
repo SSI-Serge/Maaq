@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>MAAQ Admin — Application verrouillée</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=Karla:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --bg:#E9E1D2; --bg-raised:#F6F0E4; --bg-sunken:#DFD5C0;
+    --ink:#2B211F; --ink-soft:#6E5F58; --line:#DDCFC0;
+    --primary:#7A2E32; --primary-strong:#5E2126; --primary-soft:#EDD9D6; --primary-ink:#F7F1E6;
+    --error:#A8502E; --error-bg:#F1DED2;
+    --radius:10px;
+    --shadow:0 1px 2px rgba(43,33,31,0.07), 0 8px 24px rgba(43,33,31,0.09);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Karla',sans-serif;background:var(--bg);color:var(--ink);}
+  h1,h2{font-family:'Newsreader',serif;font-weight:500;margin:0;color:var(--ink);}
+  button{font-family:'Karla',sans-serif;cursor:pointer;}
+  input{font-family:'Karla',sans-serif;}
+  label{font-size:12px;font-weight:600;color:var(--ink-soft);}
+</style>
+</helmet>
+<div style="width:1440px;height:900px;box-sizing:border-box;background:var(--bg-sunken);display:flex;align-items:center;justify-content:center;overflow:hidden;">
+
+  <div style="width:380px;background:var(--bg-raised);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:36px 32px;display:flex;flex-direction:column;align-items:center;gap:16px;text-align:center;">
+
+    <div style="width:44px;height:44px;border-radius:12px;background:var(--primary);color:var(--primary-ink);display:flex;align-items:center;justify-content:center;font-family:'Newsreader',serif;font-weight:600;font-size:18px;">M</div>
+
+    <div>
+      <h1 style="font-size:20px;margin-bottom:6px;">Application verrouillée</h1>
+      <p style="font-size:13px;color:var(--ink-soft);line-height:1.5;margin:0;">Votre session a été verrouillée après 5 minutes d'inactivité.</p>
+    </div>
+
+    <div style="width:100%;display:flex;flex-direction:column;gap:6px;text-align:left;">
+      <label>Email</label>
+      <input type="email" value="elise.roy@maaq.fr" disabled style="padding:11px 13px;border-radius:8px;border:1px solid var(--line);background:var(--bg-sunken);color:var(--ink-soft);font-size:13px;">
+    </div>
+
+    <div style="width:100%;display:flex;flex-direction:column;gap:6px;text-align:left;">
+      <label for="admin-pwd">Mot de passe</label>
+      <input id="admin-pwd" type="password" value="{{pwd}}" onInput="{{onPwd}}" placeholder="••••••••" style="padding:11px 13px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-size:13px;color:var(--ink);">
+    </div>
+
+    <sc-if value="{{showError}}" hint-placeholder-val="{{false}}">
+      <div style="width:100%;background:var(--error-bg);color:var(--error);font-size:13px;font-weight:600;border-radius:8px;padding:9px 14px;text-align:left;">Mot de passe incorrect</div>
+    </sc-if>
+
+    <sc-if value="{{unlocked}}" hint-placeholder-val="{{false}}">
+      <div style="width:100%;background:var(--success-bg);color:var(--success);font-size:13px;font-weight:600;border-radius:8px;padding:10px 14px;">✓ Déverrouillé</div>
+      <a href="Admin-Agents.html" style="width:100%;display:flex;align-items:center;justify-content:center;background:var(--primary);color:var(--primary-ink);font-weight:600;font-size:14px;border-radius:8px;padding:12px;">Continuer</a>
+    </sc-if>
+    <sc-if value="{{stillLocked}}" hint-placeholder-val="{{true}}">
+      <button onClick="{{unlock}}" style="{{unlockStyle}}">{{unlockLabel}}</button>
+    </sc-if>
+    <a href="Main.html" style="font-size:12px;font-weight:600;color:var(--ink-soft);">Se déconnecter</a>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props){
+    super(props);
+    this.state = { pwd: '', checking: false, showError: false, unlocked: false };
+  }
+  renderVals(){
+    const s = this.state;
+    return {
+      pwd: s.pwd,
+      onPwd: (e) => this.setState({ pwd: e.target.value, showError: false }),
+      showError: s.showError,
+      unlocked: s.unlocked,
+      stillLocked: !s.unlocked,
+      unlockLabel: s.checking ? 'Vérification…' : 'Déverrouiller',
+      unlockStyle: "width:100%;background:var(--primary);color:var(--primary-ink);border:none;font-weight:600;font-size:14px;border-radius:8px;padding:12px;" + (s.checking ? "opacity:.6;" : ""),
+      unlock: () => {
+        if (s.checking) return;
+        if (!s.pwd.trim()) { this.setState({ showError: true }); return; }
+        this.setState({ checking: true });
+        this.setState({ checking: false, unlocked: true });
+      },
+    };
+  }
+}
+</script>
+</body>
+</html>

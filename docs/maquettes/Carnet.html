@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>MAAQ — Carnet de bord</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=Karla:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --bg:#E9E1D2; --bg-raised:#F6F0E4; --bg-sunken:#DFD5C0;
+    --ink:#2B211F; --ink-soft:#6E5F58; --line:#DDCFC0;
+    --primary:#7A2E32; --primary-strong:#5E2126; --primary-soft:#EDD9D6; --primary-ink:#F7F1E6;
+    --secondary:#B4913A; --secondary-strong:#93731F; --secondary-soft:#F2E7C6;
+    --success:#5E7048; --success-bg:#E2E6D1;
+    --warning:#B67A24; --warning-bg:#F2E1C0;
+    --error:#A8502E; --error-bg:#F1DED2;
+    --radius:10px;
+    --shadow:0 1px 2px rgba(43,33,31,0.07), 0 8px 24px rgba(43,33,31,0.09);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Karla',sans-serif;background:var(--bg);color:var(--ink);}
+  h1,h2,h3,h4{font-family:'Newsreader',serif;font-weight:500;margin:0;color:var(--ink);}
+  a{text-decoration:none;color:inherit;}
+  button{font-family:'Karla',sans-serif;cursor:pointer;}
+</style>
+</helmet>
+<div style="width:390px;height:844px;box-sizing:border-box;background:var(--bg);display:flex;flex-direction:column;overflow:hidden;">
+
+  <div style="padding:44px 20px 14px;border-bottom:1px solid var(--line);background:var(--bg-raised);">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+      <a href="U-Reglages.html" aria-label="Retour aux Réglages"style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;color:var(--ink);flex-shrink:0;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+      </a>
+      <h1 style="font-size:19px;">Carnet de bord</h1>
+    </div>
+    <p style="font-size:12px;color:var(--ink-soft);margin:0 0 10px;line-height:1.4;">Demandes et actions partagées entre vous et votre invité, pour un agent donné. Historique conservé 14 mois, même si l'agent est retiré d'un dashboard.</p>
+
+    <div style="position:relative;margin-bottom:8px;">
+      <input type="text" value="{{agentQuery}}" onInput="{{onAgentQuery}}" onFocus="{{openAgentDropdown}}" placeholder="Choisir un agent…" style="width:100%;padding:11px 14px;border-radius:8px;border:1px solid var(--line);background:var(--bg-raised);font-size:13px;color:var(--ink);">
+      <sc-if value="{{agentOpen}}" hint-placeholder-val="{{false}}">
+        <div style="position:absolute;top:100%;left:0;right:0;margin-top:4px;background:var(--bg-raised);border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow);z-index:5;overflow:hidden;">
+          <sc-for list="{{agentOptions}}" as="opt" hint-placeholder-count="2">
+            <button onClick="{{opt.pick}}" style="display:block;width:100%;text-align:left;background:none;border:none;padding:10px 14px;font-size:13px;color:var(--ink);">{{opt.name}}</button>
+          </sc-for>
+          <sc-if value="{{agentNoMatch}}" hint-placeholder-val="{{false}}">
+            <div style="padding:10px 14px;font-size:12px;color:var(--ink-soft);">Aucun agent ne correspond.</div>
+          </sc-if>
+        </div>
+      </sc-if>
+    </div>
+    <div style="font-size:11px;color:var(--ink-soft);">Dernière mise à jour : {{lastSync}}</div>
+  </div>
+
+  <div style="flex:1;overflow-y:auto;padding:16px 20px 24px;display:flex;flex-direction:column;gap:10px;">
+
+    <sc-if value="{{emptyClassify}}" hint-placeholder-val="{{false}}">
+      <div style="text-align:center;padding:40px 20px;">
+        <p style="font-size:13px;color:var(--ink-soft);line-height:1.6;margin:0 0 10px;">Aucune entrée pour cet agent pour le moment. Les demandes apparaissent ici après la prochaine mise à jour.</p>
+        <button onClick="{{retryClassify}}" style="background:transparent;border:1px solid var(--line);color:var(--ink);font-weight:600;font-size:13px;border-radius:8px;padding:9px 16px;">Réessayer</button>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{entriesClassify}}" hint-placeholder-val="{{true}}">
+      <div style="display:flex;flex-direction:column;gap:10px;">
+
+        <div style="background:var(--bg-raised);border:1px solid var(--line);border-radius:10px;padding:12px 14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+            <span style="font-size:12px;font-weight:700;color:var(--ink);">Camille — utilisateur</span>
+            <span class="mono" style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--ink-soft);">18/09 · 09:14</span>
+          </div>
+          <div style="font-size:13px;color:var(--ink-soft);">Demande — classer le relevé mutuelle</div>
+        </div>
+
+        <div style="background:var(--bg-raised);border:1px solid var(--line);border-radius:10px;padding:12px 14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+            <span style="font-size:12px;font-weight:700;color:var(--secondary-strong);">Admin_Classify</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--ink-soft);">18/09 · 09:15</span>
+          </div>
+          <div style="font-size:13px;color:var(--ink-soft);">Action — document classé dans Santé › Mutuelle › 2026</div>
+        </div>
+
+        <div style="background:var(--success-bg);border:1px solid var(--line);border-radius:10px;padding:12px 14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+            <span style="font-size:12px;font-weight:700;color:var(--success);">Camille — utilisateur</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--success);">18/09 · 09:15</span>
+          </div>
+          <div style="font-size:13px;color:var(--success);">Validation confirmée</div>
+        </div>
+
+        <div style="background:var(--bg-raised);border:1px solid var(--line);border-radius:10px;padding:12px 14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+            <span style="font-size:12px;font-weight:700;color:var(--ink);">Julien — invité</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--ink-soft);">17/09 · 19:02</span>
+          </div>
+          <div style="font-size:13px;color:var(--ink-soft);">Demande — classer la facture d'électricité</div>
+        </div>
+
+        <div style="background:var(--bg-raised);border:1px solid var(--line);border-radius:10px;padding:12px 14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+            <span style="font-size:12px;font-weight:700;color:var(--secondary-strong);">Admin_Classify</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--ink-soft);">17/09 · 19:03</span>
+          </div>
+          <div style="font-size:13px;color:var(--ink-soft);">Action — document classé dans Logement › Énergie</div>
+        </div>
+
+        <div style="background:var(--bg-raised);border:1px solid var(--line);border-radius:10px;padding:12px 14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+            <span style="font-size:11px;font-weight:700;color:var(--ink-soft);background:var(--bg-sunken);border-radius:100px;padding:2px 9px;">Invité supprimé</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--ink-soft);">02/08 · 10:41</span>
+          </div>
+          <div style="font-size:13px;color:var(--ink-soft);">Demande — classer un justificatif de domicile</div>
+        </div>
+
+        <sc-if value="{{showMoreClassify}}" hint-placeholder-val="{{false}}">
+          <div style="background:var(--bg-raised);border:1px solid var(--line);border-radius:10px;padding:12px 14px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+              <span style="font-size:12px;font-weight:700;color:var(--ink);">Camille — utilisateur</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--ink-soft);">28/07 · 08:50</span>
+            </div>
+            <div style="font-size:13px;color:var(--ink-soft);">Demande — classer l'attestation d'assurance habitation</div>
+          </div>
+        </sc-if>
+        <sc-if value="{{voirPlusClassify}}" hint-placeholder-val="{{true}}">
+          <button onClick="{{onVoirPlusClassify}}" style="background:transparent;border:1px solid var(--line);color:var(--ink);font-weight:600;font-size:13px;border-radius:8px;padding:10px;">Voir plus</button>
+        </sc-if>
+
+      </div>
+    </sc-if>
+
+    <sc-if value="{{emptyLib}}" hint-placeholder-val="{{false}}">
+      <div style="text-align:center;padding:40px 20px;">
+        <p style="font-size:13px;color:var(--ink-soft);line-height:1.6;margin:0 0 10px;">Aucune entrée pour cet agent pour le moment. Les demandes apparaissent ici après la prochaine mise à jour.</p>
+        <button onClick="{{retryLib}}" style="background:transparent;border:1px solid var(--line);color:var(--ink);font-weight:600;font-size:13px;border-radius:8px;padding:9px 16px;">Réessayer</button>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{entriesLib}}" hint-placeholder-val="{{false}}">
+      <div style="display:flex;flex-direction:column;gap:10px;">
+
+        <div style="background:var(--warning-bg);border:1px solid var(--line);border-radius:10px;padding:12px 14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+            <span style="font-size:12px;font-weight:700;color:var(--warning);">Système</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--warning);">16/09 · 08:00</span>
+          </div>
+          <div style="font-size:13px;color:var(--warning);">Agent bloqué par l'administrateur pour maintenance</div>
+        </div>
+
+        <div style="background:var(--bg-raised);border:1px solid var(--line);border-radius:10px;padding:12px 14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+            <span style="font-size:12px;font-weight:700;color:var(--ink);">Camille — utilisateur</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--ink-soft);">14/09 · 11:20</span>
+          </div>
+          <div style="font-size:13px;color:var(--ink-soft);">Demande — prendre RDV assurance emprunteur</div>
+        </div>
+
+        <div style="background:var(--bg-raised);border:1px solid var(--line);border-radius:10px;padding:12px 14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+            <span style="font-size:12px;font-weight:700;color:var(--secondary-strong);">Admin_lib</span>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--ink-soft);">14/09 · 11:22</span>
+          </div>
+          <div style="font-size:13px;color:var(--ink-soft);">Action — rendez-vous proposé le 30/09 à 10h</div>
+        </div>
+
+        <sc-if value="{{showMoreLib}}" hint-placeholder-val="{{false}}">
+          <div style="background:var(--bg-raised);border:1px solid var(--line);border-radius:10px;padding:12px 14px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+              <span style="font-size:12px;font-weight:700;color:var(--ink);">Julien — invité</span>
+              <span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--ink-soft);">02/09 · 15:10</span>
+            </div>
+            <div style="font-size:13px;color:var(--ink-soft);">Demande — prendre RDV dentiste</div>
+          </div>
+        </sc-if>
+        <sc-if value="{{voirPlusLib}}" hint-placeholder-val="{{true}}">
+          <button onClick="{{onVoirPlusLib}}" style="background:transparent;border:1px solid var(--line);color:var(--ink);font-weight:600;font-size:13px;border-radius:8px;padding:10px;">Voir plus</button>
+        </sc-if>
+
+      </div>
+    </sc-if>
+
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"emptyState":{"editor":"boolean","default":false,"section":"États (Tweaks)"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props){
+    super(props);
+    this.state = { agent: 'classify', agentQuery: 'Admin_Classify', agentOpen: false, showMoreClassify: false, showMoreLib: false };
+  }
+  renderVals(){
+    const s = this.state;
+    const p = this.props;
+    const a = s.agent;
+    const tabStyle = (active) => "flex:1;padding:9px 0;border-radius:8px;border:none;font-weight:600;font-size:12px;background:" + (active ? 'var(--primary)' : 'transparent') + ";color:" + (active ? 'var(--primary-ink)' : 'var(--ink-soft)') + ";";
+    const allAgents = [{ key: 'classify', name: 'Admin_Classify' }, { key: 'lib', name: 'Admin_lib' }];
+    const q = s.agentQuery.trim().toLowerCase();
+    const filtered = allAgents.filter(ag => !q || ag.name.toLowerCase().indexOf(q) !== -1);
+    const showEmpty = !!p.emptyState;
+
+    return {
+      isClassify: a === 'classify',
+      isLib: a === 'lib',
+      emptyClassify: a === 'classify' && showEmpty,
+      entriesClassify: a === 'classify' && !showEmpty,
+      emptyLib: a === 'lib' && showEmpty,
+      entriesLib: a === 'lib' && !showEmpty,
+      retryClassify: () => {},
+      retryLib: () => {},
+      lastSync: '30/09/2026 · 07:00',
+
+      agentQuery: s.agentQuery,
+      onAgentQuery: (e) => this.setState({ agentQuery: e.target.value, agentOpen: true }),
+      openAgentDropdown: () => this.setState({ agentOpen: true }),
+      agentOpen: s.agentOpen,
+      agentNoMatch: filtered.length === 0,
+      agentOptions: filtered.map(ag => ({
+        name: ag.name,
+        pick: () => this.setState({ agent: ag.key, agentQuery: ag.name, agentOpen: false }),
+      })),
+
+      showMoreClassify: s.showMoreClassify,
+      voirPlusClassify: !s.showMoreClassify,
+      onVoirPlusClassify: () => this.setState({ showMoreClassify: true }),
+      showMoreLib: s.showMoreLib,
+      voirPlusLib: !s.showMoreLib,
+      onVoirPlusLib: () => this.setState({ showMoreLib: true }),
+
+      tabClassifyStyle: tabStyle(a === 'classify'),
+      tabLibStyle: tabStyle(a === 'lib'),
+      pickClassify: () => this.setState({ agent: 'classify' }),
+      pickLib: () => this.setState({ agent: 'lib' }),
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#7a2e32">
+<title>MAAQ — Pas de connexion</title>
+<style>
+  :root { --bg:#E9E1D2; --ink:#2B211F; --ink-soft:#6E5F58; --primary:#7A2E32; --primary-ink:#F7F1E6; }
+  html, body { margin:0; min-height:100%; background:var(--bg); color:var(--ink); font-family:Karla, system-ui, sans-serif; }
+  main { max-width:390px; min-height:100dvh; margin:0 auto; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:40px; box-sizing:border-box; }
+  h1 { font-family:Newsreader, Georgia, serif; font-weight:500; font-size:19px; margin:0 0 8px; }
+  p { font-size:14px; color:var(--ink-soft); line-height:1.5; margin:0 0 18px; max-width:30ch; }
+  button { background:var(--primary); color:var(--primary-ink); border:none; font-weight:600; font-size:14px; border-radius:8px; padding:12px 24px; font-family:inherit; }
+</style>
+</head>
+<body>
+<main>
+  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#6E5F58" stroke-width="1.6" style="margin-bottom:18px" aria-hidden="true"><path d="M1 9a16 16 0 0 1 22 0M5 13a10 10 0 0 1 14 0M9 17a5 5 0 0 1 6 0"/><path d="M2 2l20 20"/></svg>
+  <h1>Pas de connexion internet</h1>
+  <p>MAAQ nécessite une connexion pour fonctionner.</p>
+  <button type="button" onclick="location.reload()">Réessayer</button>
+</main>
+</body>
+</html>

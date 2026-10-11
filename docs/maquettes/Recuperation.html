@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>MAAQ — Récupérer mon accès</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=Karla:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --bg:#E9E1D2; --bg-raised:#F6F0E4; --bg-sunken:#DFD5C0;
+    --ink:#2B211F; --ink-soft:#6E5F58; --line:#DDCFC0;
+    --primary:#7A2E32; --primary-strong:#5E2126; --primary-soft:#EDD9D6; --primary-ink:#F7F1E6;
+    --secondary:#B4913A; --secondary-strong:#93731F; --secondary-soft:#F2E7C6;
+    --success:#5E7048; --success-bg:#E2E6D1;
+    --error:#A8502E; --error-bg:#F1DED2;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Karla',sans-serif;background:var(--bg);color:var(--ink);}
+  h1{font-family:'Newsreader',serif;font-weight:500;margin:0;color:var(--ink);}
+  a{text-decoration:none;color:inherit;}
+  button{font-family:'Karla',sans-serif;cursor:pointer;}
+  input{font-family:'Karla',sans-serif;}
+</style>
+</helmet>
+<div style="width:390px;height:844px;box-sizing:border-box;background:var(--bg);display:flex;flex-direction:column;padding:48px 28px 32px;overflow:hidden;">
+
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:32px;">
+    <div style="width:38px;height:38px;border-radius:10px;background:var(--primary);color:var(--primary-ink);display:flex;align-items:center;justify-content:center;font-family:'Newsreader',serif;font-weight:600;font-size:15px;">M</div>
+    <div style="font-family:'Newsreader',serif;font-style:italic;font-size:22px;">MAAQ</div>
+  </div>
+
+  <sc-if value="{{formShown}}" hint-placeholder-val="{{true}}">
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--primary);margin-bottom:8px;">Schéma tactile oublié</div>
+    <h1 style="font-size:24px;line-height:1.25;margin-bottom:10px;">Recréer mon schéma tactile</h1>
+    <p style="font-size:14px;color:var(--ink-soft);line-height:1.5;margin:0 0 22px;">Ce parcours ne concerne que votre schéma tactile sur cet appareil — votre mot de passe ne change pas. Indiquez l'adresse email de connexion de votre compte MAAQ, nous vous enverrons un code pour redéfinir votre schéma.</p>
+
+    <label for="email" style="font-size:12px;font-weight:600;color:var(--ink-soft);margin-bottom:6px;">Adresse email de connexion</label>
+    <input id="email" type="email" value="{{email}}" onInput="{{onEmail}}" placeholder="vous@exemple.fr" style="padding:12px 14px;border-radius:8px;border:1px solid var(--line);background:var(--bg-raised);font-size:14px;color:var(--ink);margin-bottom:16px;">
+
+    <button onClick="{{send}}" style="display:flex;align-items:center;justify-content:center;background:var(--primary);color:var(--primary-ink);font-weight:600;font-size:14px;border-radius:8px;padding:13px;border:none;">Envoyer le code de récupération</button>
+    <a href="Main.html" style="margin-top:14px;font-size:13px;font-weight:600;color:var(--secondary-strong);text-align:center;">Retour à la connexion</a>
+  </sc-if>
+
+  <sc-if value="{{codeShown}}" hint-placeholder-val="{{false}}">
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--primary);margin-bottom:8px;">Code de récupération</div>
+    <h1 style="font-size:22px;line-height:1.25;margin-bottom:10px;">Saisissez le code reçu</h1>
+    <p style="font-size:13px;color:var(--ink-soft);line-height:1.5;margin:0 0 20px;">Si un compte existe pour cette adresse, un code vient de vous être envoyé par email.</p>
+
+    <label for="code" style="font-size:12px;font-weight:600;color:var(--ink-soft);margin-bottom:6px;">Code à 6 chiffres</label>
+    <input id="code" type="text" inputmode="numeric" maxlength="6" value="{{code}}" onInput="{{onCode}}" placeholder="000000" style="padding:14px;border-radius:8px;border:1px solid var(--line);background:var(--bg-raised);font-size:22px;letter-spacing:.4em;text-align:center;color:var(--ink);margin-bottom:12px;font-family:'IBM Plex Mono',monospace;">
+
+    <sc-if value="{{codeError}}" hint-placeholder-val="{{false}}">
+      <div style="background:var(--error-bg);color:var(--error);font-size:12px;font-weight:600;border-radius:8px;padding:8px 12px;margin-bottom:12px;">{{codeError}}</div>
+    </sc-if>
+    <sc-if value="{{resent}}" hint-placeholder-val="{{false}}">
+      <div style="background:var(--success-bg);color:var(--success);font-size:12px;font-weight:600;border-radius:8px;padding:8px 12px;margin-bottom:12px;">✓ Un nouveau code vient d'être envoyé.</div>
+    </sc-if>
+
+    <button onClick="{{confirmCode}}" style="display:flex;align-items:center;justify-content:center;background:var(--primary);color:var(--primary-ink);font-weight:600;font-size:14px;border-radius:8px;padding:13px;border:none;">Confirmer</button>
+    <button onClick="{{resend}}" style="{{resendStyle}}">{{resendLabel}}</button>
+  </sc-if>
+
+  <sc-if value="{{doneShown}}" hint-placeholder-val="{{false}}">
+    <div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:14px;margin-top:40px;">
+      <div style="width:52px;height:52px;border-radius:50%;background:var(--success-bg);color:var(--success);display:flex;align-items:center;justify-content:center;font-size:22px;">✓</div>
+      <h1 style="font-size:20px;">Code confirmé</h1>
+      <p style="font-size:13px;color:var(--ink-soft);margin:0;line-height:1.5;max-width:30ch;">Vous pouvez maintenant redéfinir votre schéma tactile pour cet appareil.</p>
+      <a href="Creation-Schema.html" style="margin-top:6px;background:var(--primary);color:var(--primary-ink);font-weight:600;font-size:14px;border-radius:8px;padding:13px;width:100%;display:flex;align-items:center;justify-content:center;">Créer mon nouveau schéma</a>
+    </div>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"codeOutcome":{"editor":"enum","options":["valide","incorrect","expire"],"default":"valide","section":"États (Tweaks)"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props){
+    super(props);
+    this.state = { step: 'form', email: '', code: '', error: '', resent: false };
+  }
+  renderVals(){
+    const s = this.state;
+    const p = this.props;
+    return {
+      formShown: s.step === 'form',
+      codeShown: s.step === 'code',
+      doneShown: s.step === 'done',
+      email: s.email,
+      onEmail: (e) => this.setState({ email: e.target.value }),
+      send: () => this.setState({ step: 'code', error: '', resent: false }),
+      code: s.code,
+      onCode: (e) => this.setState({ code: e.target.value, error: '' }),
+      codeError: s.error,
+      resent: s.resent,
+      resendLabel: 'Recevoir un nouveau code',
+      resendStyle: "background:none;border:none;font-size:13px;font-weight:600;color:var(--secondary-strong);margin-top:14px;padding:0;",
+      resend: () => this.setState({ resent: true, error: '' }),
+      confirmCode: () => {
+        if (p.codeOutcome === 'incorrect') { this.setState({ error: 'Code incorrect' }); return; }
+        if (p.codeOutcome === 'expire') { this.setState({ error: 'Ce code a expiré' }); return; }
+        this.setState({ step: 'done' });
+      },
+    };
+  }
+}
+</script>
+</body>
+</html>

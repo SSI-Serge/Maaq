@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>MAAQ — Appareils connectés</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=Karla:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --bg:#E9E1D2; --bg-raised:#F6F0E4; --bg-sunken:#DFD5C0;
+    --ink:#2B211F; --ink-soft:#6E5F58; --line:#DDCFC0;
+    --primary:#7A2E32; --primary-strong:#5E2126; --primary-soft:#EDD9D6; --primary-ink:#F7F1E6;
+    --secondary:#B4913A; --secondary-strong:#93731F; --secondary-soft:#F2E7C6;
+    --success:#5E7048; --success-bg:#E2E6D1;
+    --warning:#B67A24; --warning-bg:#F2E1C0;
+    --error:#A8502E; --error-bg:#F1DED2;
+    --radius:10px;
+    --shadow:0 1px 2px rgba(43,33,31,0.07), 0 8px 24px rgba(43,33,31,0.09);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Karla',sans-serif;background:var(--bg);color:var(--ink);}
+  h1,h2{font-family:'Newsreader',serif;font-weight:500;margin:0;color:var(--ink);}
+  a{text-decoration:none;color:inherit;}
+  button{font-family:'Karla',sans-serif;cursor:pointer;}
+</style>
+</helmet>
+<div style="width:390px;height:844px;box-sizing:border-box;background:var(--bg);display:flex;flex-direction:column;overflow:hidden;">
+
+  <div style="display:flex;align-items:center;gap:10px;padding:44px 20px 16px;border-bottom:1px solid var(--line);background:var(--bg-raised);">
+    <a href="U-Reglages.html" aria-label="Retour aux Réglages" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;color:var(--ink);flex-shrink:0;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+    </a>
+    <h1 style="font-size:19px;">Appareils connectés</h1>
+  </div>
+
+  <div style="flex:1;overflow-y:auto;padding:18px 20px 24px;display:flex;flex-direction:column;gap:12px;">
+    <p style="font-size:12px;color:var(--ink-soft);margin:0;line-height:1.5;">En cas de perte ou de vol, révoquez l'accès d'un appareil, le vôtre ou celui d'un invité. Un appareil révoqué devra repasser par la vérification d'identité.</p>
+
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-soft);margin-top:4px;">Mes appareils</div>
+
+    <div style="background:var(--bg-raised);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;display:flex;justify-content:space-between;align-items:center;gap:8px;">
+      <div>
+        <div style="font-family:'Newsreader',serif;font-size:15px;">iPhone de Camille</div>
+        <div style="font-size:11px;color:var(--ink-soft);">Actif maintenant</div>
+      </div>
+      <span style="font-size:10px;font-weight:700;color:var(--success);background:var(--success-bg);border-radius:100px;padding:3px 9px;white-space:nowrap;">Cet appareil</span>
+    </div>
+
+    <div style="background:var(--bg-raised);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;">
+      <sc-if value="{{lapView}}" hint-placeholder-val="{{true}}">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+          <div>
+            <div style="font-family:'Newsreader',serif;font-size:15px;">Ordinateur portable de Camille</div>
+            <div style="font-size:11px;color:var(--ink-soft);">Dernière connexion : hier, 18:42</div>
+          </div>
+          <button onClick="{{lapAsk}}" style="background:transparent;border:1px solid var(--error);color:var(--error);border-radius:8px;padding:7px 12px;font-weight:600;font-size:12px;white-space:nowrap;">Révoquer</button>
+        </div>
+      </sc-if>
+      <sc-if value="{{lapConfirm}}" hint-placeholder-val="{{false}}">
+        <div style="font-size:13px;font-weight:700;color:var(--error);margin-bottom:6px;">Révoquer l'ordinateur portable de Camille ?</div>
+        <div style="display:flex;gap:8px;">
+          <button onClick="{{lapCancel}}" style="flex:1;background:transparent;border:1px solid var(--line);color:var(--ink);font-weight:600;font-size:13px;border-radius:8px;padding:10px;">Annuler</button>
+          <button onClick="{{lapRevoke}}" style="flex:1;background:var(--error);color:var(--primary-ink);border:none;font-weight:600;font-size:13px;border-radius:8px;padding:10px;">Révoquer</button>
+        </div>
+      </sc-if>
+      <sc-if value="{{lapRevoked}}" hint-placeholder-val="{{false}}">
+        <div style="font-family:'Newsreader',serif;font-size:15px;margin-bottom:6px;">Ordinateur portable de Camille</div>
+        <div style="background:var(--warning-bg);color:var(--warning);font-size:12px;font-weight:600;border-radius:8px;padding:8px 10px;line-height:1.4;">Accès révoqué — une nouvelle vérification sera demandée.</div>
+      </sc-if>
+    </div>
+
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-soft);margin-top:8px;">Appareils de mes invités</div>
+
+    <div style="background:var(--bg-raised);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;">
+      <sc-if value="{{julView}}" hint-placeholder-val="{{true}}">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+          <div>
+            <div style="font-family:'Newsreader',serif;font-size:15px;">Android de Julien</div>
+            <div style="font-size:11px;color:var(--ink-soft);">Invité — dernière connexion : aujourd'hui, 08:15</div>
+          </div>
+          <button onClick="{{julAsk}}" style="background:transparent;border:1px solid var(--error);color:var(--error);border-radius:8px;padding:7px 12px;font-weight:600;font-size:12px;white-space:nowrap;">Révoquer</button>
+        </div>
+      </sc-if>
+      <sc-if value="{{julConfirm}}" hint-placeholder-val="{{false}}">
+        <div style="font-size:13px;font-weight:700;color:var(--error);margin-bottom:6px;">Révoquer l'Android de Julien ?</div>
+        <div style="display:flex;gap:8px;">
+          <button onClick="{{julCancel}}" style="flex:1;background:transparent;border:1px solid var(--line);color:var(--ink);font-weight:600;font-size:13px;border-radius:8px;padding:10px;">Annuler</button>
+          <button onClick="{{julRevoke}}" style="flex:1;background:var(--error);color:var(--primary-ink);border:none;font-weight:600;font-size:13px;border-radius:8px;padding:10px;">Révoquer</button>
+        </div>
+      </sc-if>
+      <sc-if value="{{julRevoked}}" hint-placeholder-val="{{false}}">
+        <div style="font-family:'Newsreader',serif;font-size:15px;margin-bottom:6px;">Android de Julien</div>
+        <div style="background:var(--warning-bg);color:var(--warning);font-size:12px;font-weight:600;border-radius:8px;padding:8px 10px;line-height:1.4;">Accès révoqué — Julien devra repasser par la vérification d'identité.</div>
+      </sc-if>
+    </div>
+
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props){
+    super(props);
+    this.state = { lap: 'view', jul: 'view' };
+  }
+  renderVals(){
+    const s = this.state;
+    return {
+      lapView: s.lap === 'view', lapConfirm: s.lap === 'confirm', lapRevoked: s.lap === 'revoked',
+      lapAsk: () => this.setState({ lap: 'confirm' }),
+      lapCancel: () => this.setState({ lap: 'view' }),
+      lapRevoke: () => this.setState({ lap: 'revoked' }),
+      julView: s.jul === 'view', julConfirm: s.jul === 'confirm', julRevoked: s.jul === 'revoked',
+      julAsk: () => this.setState({ jul: 'confirm' }),
+      julCancel: () => this.setState({ jul: 'view' }),
+      julRevoke: () => this.setState({ jul: 'revoked' }),
+    };
+  }
+}
+</script>
+</body>
+</html>

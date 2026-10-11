@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>MAAQ — Contacter le support</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=Karla:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --bg:#E9E1D2; --bg-raised:#F6F0E4; --bg-sunken:#DFD5C0;
+    --ink:#2B211F; --ink-soft:#6E5F58; --line:#DDCFC0;
+    --primary:#7A2E32; --primary-strong:#5E2126; --primary-soft:#EDD9D6; --primary-ink:#F7F1E6;
+    --secondary:#B4913A; --secondary-strong:#93731F; --secondary-soft:#F2E7C6;
+    --success:#5E7048; --success-bg:#E2E6D1;
+    --warning:#B67A24; --warning-bg:#F2E1C0;
+    --error:#A8502E; --error-bg:#F1DED2;
+    --radius:10px;
+    --shadow:0 1px 2px rgba(43,33,31,0.07), 0 8px 24px rgba(43,33,31,0.09);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Karla',sans-serif;background:var(--bg);color:var(--ink);}
+  h1,h2,h3,h4{font-family:'Newsreader',serif;font-weight:500;margin:0;color:var(--ink);}
+  a{text-decoration:none;color:inherit;}
+  button{font-family:'Karla',sans-serif;cursor:pointer;}
+  textarea{font-family:'Karla',sans-serif;}
+  @keyframes indet{0%{transform:translateX(-60%);}100%{transform:translateX(160%);}}
+</style>
+</helmet>
+<div style="width:390px;height:844px;box-sizing:border-box;background:var(--bg);display:flex;flex-direction:column;overflow:hidden;">
+
+  <div style="display:flex;align-items:center;gap:10px;padding:44px 20px 16px;border-bottom:1px solid var(--line);background:var(--bg-raised);">
+    <a href="U-Reglages.html" aria-label="Retour" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;color:var(--ink);flex-shrink:0;">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+    </a>
+    <h1 style="font-size:19px;">Contacter le support</h1>
+  </div>
+
+  <div style="flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:16px;">
+
+    <sc-if value="{{notSent}}" hint-placeholder-val="{{true}}">
+      <p style="font-size:13px;color:var(--ink-soft);line-height:1.5;margin:0;">Décrivez le dysfonctionnement rencontré : votre message sera transmis directement à la boîte mail du support MAAQ.</p>
+
+      <div style="display:flex;gap:6px;background:var(--bg-sunken);border-radius:10px;padding:4px;">
+        <button onClick="{{pickWritten}}" style="{{tabWrittenStyle}}">Écrit</button>
+        <button onClick="{{pickSpoken}}" style="{{tabSpokenStyle}}">Dicté</button>
+      </div>
+
+      <sc-if value="{{isWritten}}" hint-placeholder-val="{{true}}">
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <textarea maxlength="1000" value="{{text}}" onInput="{{onText}}" placeholder="Ex : l'agent Admin_lib n'ouvre plus son tchat depuis ce matin…" style="width:100%;min-height:160px;padding:14px;border-radius:10px;border:1px solid var(--line);background:var(--bg-raised);font-size:14px;color:var(--ink);resize:none;"></textarea>
+          <div style="text-align:right;font-size:11px;color:var(--ink-soft);font-family:'IBM Plex Mono',monospace;">{{charCount}}/1000</div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{isSpoken}}" hint-placeholder-val="{{false}}">
+
+        <sc-if value="{{micUnavailable}}" hint-placeholder-val="{{false}}">
+          <div style="background:var(--error-bg);color:var(--error);border-radius:10px;padding:16px;font-size:13px;line-height:1.5;text-align:center;">La dictée n'est pas disponible sur cet appareil</div>
+        </sc-if>
+
+        <sc-if value="{{spokenIdle}}" hint-placeholder-val="{{true}}">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:14px;background:var(--bg-raised);border:1px solid var(--line);border-radius:12px;padding:28px 20px;">
+            <button onClick="{{startRecording}}" aria-label="Dicter mon message" style="width:64px;height:64px;border-radius:50%;background:var(--primary);color:var(--primary-ink);border:none;display:flex;align-items:center;justify-content:center;">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4"/></svg>
+            </button>
+            <p style="font-size:12px;color:var(--ink-soft);text-align:center;margin:0;">Démarrer l'enregistrement</p>
+          </div>
+          <sc-if value="{{micDenied}}" hint-placeholder-val="{{false}}">
+            <div style="background:var(--error-bg);color:var(--error);border-radius:10px;padding:12px 14px;font-size:12px;line-height:1.5;">MAAQ n'a pas accès à votre micro. Autorisez-le dans les réglages de votre téléphone, ou utilisez l'onglet Écrit.</div>
+          </sc-if>
+        </sc-if>
+
+        <sc-if value="{{spokenRecording}}" hint-placeholder-val="{{false}}">
+          <div style="display:flex;flex-direction:column;align-items:center;gap:14px;background:var(--bg-raised);border:1px solid var(--line);border-radius:12px;padding:28px 20px;">
+            <button onClick="{{stopRecording}}" aria-label="Arrêter" style="width:64px;height:64px;border-radius:50%;background:var(--error);color:var(--primary-ink);border:none;display:flex;align-items:center;justify-content:center;">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+            </button>
+            <div style="display:flex;gap:3px;align-items:flex-end;height:20px;">
+              <div style="width:3px;height:8px;background:var(--secondary);border-radius:2px;"></div>
+              <div style="width:3px;height:18px;background:var(--secondary);border-radius:2px;"></div>
+              <div style="width:3px;height:12px;background:var(--secondary);border-radius:2px;"></div>
+              <div style="width:3px;height:20px;background:var(--secondary);border-radius:2px;"></div>
+              <div style="width:3px;height:10px;background:var(--secondary);border-radius:2px;"></div>
+            </div>
+            <p style="font-size:12px;color:var(--ink-soft);text-align:center;margin:0;">Arrêter</p>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{spokenTranscribed}}" hint-placeholder-val="{{false}}">
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <label style="font-size:11px;font-weight:600;color:var(--ink-soft);">Texte transcrit — modifiable avant l'envoi</label>
+            <textarea maxlength="1000" value="{{text}}" onInput="{{onText}}" style="width:100%;min-height:120px;padding:14px;border-radius:10px;border:1px solid var(--line);background:var(--bg-raised);font-size:14px;color:var(--ink);resize:none;"></textarea>
+            <div style="text-align:right;font-size:11px;color:var(--ink-soft);font-family:'IBM Plex Mono',monospace;">{{charCount}}/1000</div>
+          </div>
+          <button onClick="{{restartRecording}}" style="background:transparent;border:1px solid var(--line);color:var(--ink);font-weight:600;font-size:13px;border-radius:8px;padding:10px;">Recommencer</button>
+        </sc-if>
+      </sc-if>
+
+      <sc-if value="{{sending}}" hint-placeholder-val="{{false}}">
+        <div style="height:4px;border-radius:2px;background:var(--bg-sunken);overflow:hidden;position:relative;">
+          <div style="position:absolute;top:0;left:0;width:40%;height:100%;background:var(--primary);border-radius:2px;animation:indet 1.1s ease-in-out infinite;"></div>
+        </div>
+      </sc-if>
+
+      <button onClick="{{sendMessage}}" style="{{sendStyle}}">{{sendLabel}}</button>
+    </sc-if>
+
+    <sc-if value="{{sent}}" hint-placeholder-val="{{false}}">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:14px;text-align:center;padding:40px 10px;">
+        <div style="width:52px;height:52px;border-radius:50%;background:var(--success-bg);color:var(--success);display:flex;align-items:center;justify-content:center;font-size:22px;">✓</div>
+        <h2 style="font-size:18px;">Message transmis</h2>
+        <p style="font-size:13px;color:var(--ink-soft);margin:0;max-width:26ch;">Votre message a été transmis au support. L'équipe MAAQ reviendra vers vous rapidement.</p>
+      </div>
+    </sc-if>
+
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"micState":{"editor":"enum","options":["ok","denied","unavailable"],"default":"ok","section":"États (Tweaks)"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props){
+    super(props);
+    this.state = { mode: 'written', text: '', spokenStep: 'idle', sending: false, sent: false };
+  }
+  renderVals(){
+    const s = this.state;
+    const p = this.props;
+    const tabStyle = (active) => "flex:1;padding:9px 0;border-radius:8px;border:none;font-weight:600;font-size:12px;background:" + (active ? 'var(--primary)' : 'transparent') + ";color:" + (active ? 'var(--primary-ink)' : 'var(--ink-soft)') + ";";
+    const canSend = (s.mode === 'written' && s.text.trim().length > 0) || (s.mode === 'spoken' && s.spokenStep === 'transcribed');
+    return {
+      notSent: !s.sent,
+      sent: s.sent,
+      isWritten: s.mode === 'written',
+      isSpoken: s.mode === 'spoken',
+      tabWrittenStyle: tabStyle(s.mode === 'written'),
+      tabSpokenStyle: tabStyle(s.mode === 'spoken'),
+      pickWritten: () => this.setState({ mode: 'written' }),
+      pickSpoken: () => this.setState({ mode: 'spoken' }),
+
+      text: s.text,
+      onText: (e) => this.setState({ text: e.target.value }),
+      charCount: s.text.length,
+
+      micUnavailable: p.micState === 'unavailable',
+      spokenIdle: p.micState !== 'unavailable' && s.spokenStep === 'idle',
+      spokenRecording: p.micState !== 'unavailable' && s.spokenStep === 'recording',
+      spokenTranscribed: p.micState !== 'unavailable' && s.spokenStep === 'transcribed',
+      micDenied: s.spokenStep === 'idle' && p.micState === 'denied',
+      startRecording: () => {
+        if (p.micState === 'denied') return;
+        this.setState({ spokenStep: 'recording' });
+      },
+      stopRecording: () => this.setState({ spokenStep: 'transcribed', text: "L'agent Admin_lib n'ouvre plus son tchat depuis ce matin." }),
+      restartRecording: () => this.setState({ spokenStep: 'idle', text: '' }),
+
+      sending: s.sending,
+      sendLabel: s.sending ? 'Envoi…' : 'Envoyer au support',
+      sendStyle: "width:100%;border:none;font-weight:600;font-size:14px;border-radius:8px;padding:13px;background:var(--primary);color:var(--primary-ink);" + (canSend && !s.sending ? "" : "opacity:.5;"),
+      sendMessage: () => {
+        if (!canSend || s.sending) return;
+        this.setState({ sending: true });
+        this.setState({ sending: false, sent: true });
+      },
+    };
+  }
+}
+</script>
+</body>
+</html>

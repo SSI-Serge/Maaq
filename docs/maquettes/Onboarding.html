@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>MAAQ — Configuration initiale</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=Karla:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --bg:#E9E1D2; --bg-raised:#F6F0E4; --bg-sunken:#DFD5C0;
+    --ink:#2B211F; --ink-soft:#6E5F58; --line:#DDCFC0;
+    --primary:#7A2E32; --primary-strong:#5E2126; --primary-soft:#EDD9D6; --primary-ink:#F7F1E6;
+    --secondary:#B4913A; --secondary-strong:#93731F; --secondary-soft:#F2E7C6;
+    --success:#5E7048; --success-bg:#E2E6D1;
+    --warning:#B67A24; --warning-bg:#F2E1C0;
+    --error:#A8502E; --error-bg:#F1DED2;
+    --radius:10px;
+    --shadow:0 1px 2px rgba(43,33,31,0.07), 0 8px 24px rgba(43,33,31,0.09);
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Karla',sans-serif;background:var(--bg);color:var(--ink);}
+  h1,h2,h3,h4{font-family:'Newsreader',serif;font-weight:500;margin:0;color:var(--ink);}
+  a{text-decoration:none;color:inherit;}
+  button{font-family:'Karla',sans-serif;cursor:pointer;}
+  input{font-family:'Karla',sans-serif;}
+  label{font-size:12px;font-weight:600;color:var(--ink-soft);}
+</style>
+</helmet>
+<div style="width:390px;height:844px;box-sizing:border-box;background:var(--bg);display:flex;flex-direction:column;overflow:hidden;">
+
+  <div style="padding:44px 24px 18px;">
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--primary);margin-bottom:8px;">Configuration initiale</div>
+    <h1 style="font-size:22px;margin-bottom:6px;">{{stepTitle}}</h1>
+    <p style="font-size:13px;color:var(--ink-soft);margin:0 0 14px;">Étape {{stepLabel}} sur 2 — modifiable à tout moment depuis Réglages</p>
+    <div style="height:6px;border-radius:3px;background:var(--bg-sunken);overflow:hidden;">
+      <div style="{{progressStyle}}"></div>
+    </div>
+  </div>
+
+  <div style="flex:1;overflow-y:auto;padding:6px 24px 24px;display:flex;flex-direction:column;gap:14px;">
+
+    <sc-if value="{{isStep1}}" hint-placeholder-val="{{true}}">
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <label for="prenom">Prénom</label>
+        <input id="prenom" type="text" value="{{prenom}}" onInput="{{onPrenom}}" placeholder="Camille" style="padding:12px 14px;border-radius:8px;border:1px solid var(--line);background:var(--bg-raised);font-size:14px;">
+        <sc-if value="{{prenomError}}" hint-placeholder-val="{{false}}"><div style="font-size:12px;color:var(--error);font-weight:600;">{{prenomError}}</div></sc-if>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <label for="nom">Nom</label>
+        <input id="nom" type="text" value="{{nom}}" onInput="{{onNom}}" placeholder="Faucher" style="padding:12px 14px;border-radius:8px;border:1px solid var(--line);background:var(--bg-raised);font-size:14px;">
+        <sc-if value="{{nomError}}" hint-placeholder-val="{{false}}"><div style="font-size:12px;color:var(--error);font-weight:600;">{{nomError}}</div></sc-if>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <label for="email1">Email de connexion</label>
+        <input id="email1" type="email" value="{{email}}" onInput="{{onEmail}}" placeholder="camille@exemple.fr" style="padding:12px 14px;border-radius:8px;border:1px solid var(--line);background:var(--bg-raised);font-size:14px;">
+        <sc-if value="{{emailError}}" hint-placeholder-val="{{false}}"><div style="font-size:12px;color:var(--error);font-weight:600;">{{emailError}}</div></sc-if>
+      </div>
+      <p style="font-size:12px;color:var(--ink-soft);line-height:1.5;margin:4px 0 0;">Les autres informations (adresse, téléphone, situation…) vous seront demandées au fil de l'eau, à l'ajout d'un agent qui en a besoin.</p>
+    </sc-if>
+
+    <sc-if value="{{isStep2}}" hint-placeholder-val="{{false}}">
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <label for="nom2">Nom de votre invité</label>
+        <input id="nom2" type="text" placeholder="Julien Martin" style="padding:12px 14px;border-radius:8px;border:1px solid var(--line);background:var(--bg-raised);font-size:14px;">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <label for="email2">Email de l'invité</label>
+        <input id="email2" type="email" placeholder="julien@exemple.fr" style="padding:12px 14px;border-radius:8px;border:1px solid var(--line);background:var(--bg-raised);font-size:14px;">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <label for="tel2">Téléphone de l'invité</label>
+        <input id="tel2" type="tel" placeholder="06 98 76 54 32" style="padding:12px 14px;border-radius:8px;border:1px solid var(--line);background:var(--bg-raised);font-size:14px;">
+      </div>
+      <div style="background:var(--secondary-soft);border-radius:10px;padding:12px 14px;font-size:12px;color:var(--secondary-strong);line-height:1.5;">Optionnel à cette étape — vous pourrez ajouter d'autres invités ensuite, dans la limite prévue par votre plan.</div>
+      <a href="U-Agents.html" style="text-align:center;font-size:13px;font-weight:600;color:var(--ink-soft);">Passer cette étape</a>
+    </sc-if>
+
+  </div>
+
+  <div style="display:flex;gap:10px;padding:16px 24px 28px;border-top:1px solid var(--line);background:var(--bg-raised);">
+    <sc-if value="{{isStep2}}" hint-placeholder-val="{{false}}">
+      <button onClick="{{goBack}}" style="flex:1;background:transparent;border:1px solid var(--line);color:var(--ink);font-weight:600;font-size:14px;border-radius:8px;padding:13px;">Retour</button>
+    </sc-if>
+    <sc-if value="{{isStep1}}" hint-placeholder-val="{{true}}">
+      <button onClick="{{goNext}}" style="flex:1;background:var(--primary);color:var(--primary-ink);border:none;font-weight:600;font-size:14px;border-radius:8px;padding:13px;">Suivant</button>
+    </sc-if>
+    <sc-if value="{{isStep2}}" hint-placeholder-val="{{false}}">
+      <a href="U-Agents.html" style="flex:1;display:flex;align-items:center;justify-content:center;background:var(--primary);color:var(--primary-ink);font-weight:600;font-size:14px;border-radius:8px;padding:13px;">Terminer</a>
+    </sc-if>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props){
+    super(props);
+    this.state = { step: 1, prenom: '', nom: '', email: '', prenomError: '', nomError: '', emailError: '' };
+  }
+  renderVals(){
+    const s = this.state;
+    const step = s.step;
+    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return {
+      isStep1: step === 1,
+      isStep2: step === 2,
+      stepLabel: String(step),
+      stepTitle: step === 1 ? 'Vos informations' : 'Votre invité',
+      progressStyle: "height:100%;border-radius:3px;background:var(--primary);width:" + (step === 1 ? '50%' : '100%') + ";",
+      prenom: s.prenom,
+      onPrenom: (e) => this.setState({ prenom: e.target.value, prenomError: '' }),
+      prenomError: s.prenomError,
+      nom: s.nom,
+      onNom: (e) => this.setState({ nom: e.target.value, nomError: '' }),
+      nomError: s.nomError,
+      email: s.email,
+      onEmail: (e) => this.setState({ email: e.target.value, emailError: '' }),
+      emailError: s.emailError,
+      goNext: () => {
+        const errs = {};
+        if (!s.prenom.trim()) errs.prenomError = 'Ce champ est obligatoire';
+        if (!s.nom.trim()) errs.nomError = 'Ce champ est obligatoire';
+        if (!emailRe.test(s.email.trim())) errs.emailError = 'Adresse email invalide';
+        if (Object.keys(errs).length) { this.setState(errs); return; }
+        this.setState({ step: 2 });
+      },
+      goBack: () => this.setState({ step: 1 }),
+    };
+  }
+}
+</script>
+</body>
+</html>

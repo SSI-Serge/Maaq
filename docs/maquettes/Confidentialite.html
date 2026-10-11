@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>MAAQ — Confidentialité et conditions</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=Karla:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --bg:#E9E1D2; --bg-raised:#F6F0E4; --bg-sunken:#DFD5C0;
+    --ink:#2B211F; --ink-soft:#6E5F58; --line:#DDCFC0;
+    --primary:#7A2E32; --primary-strong:#5E2126; --primary-soft:#EDD9D6; --primary-ink:#F7F1E6;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Karla',sans-serif;background:var(--bg);color:var(--ink);}
+  h1,h2{font-family:'Newsreader',serif;font-weight:500;margin:0;color:var(--ink);}
+  a{text-decoration:none;color:inherit;}
+  button{font-family:'Karla',sans-serif;cursor:pointer;}
+</style>
+</helmet>
+<div style="width:390px;height:844px;box-sizing:border-box;background:var(--bg);display:flex;flex-direction:column;overflow:hidden;">
+
+  <div style="padding:44px 20px 14px;border-bottom:1px solid var(--line);background:var(--bg-raised);">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+      <a href="U-Reglages.html" aria-label="Retour aux Réglages" style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;color:var(--ink);flex-shrink:0;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+      </a>
+      <h1 style="font-size:19px;">Confidentialité et conditions</h1>
+    </div>
+    <div style="display:flex;gap:6px;background:var(--bg-sunken);border-radius:10px;padding:4px;">
+      <button onClick="{{pickPrivacy}}" style="{{tabPrivacyStyle}}">Confidentialité</button>
+      <button onClick="{{pickTerms}}" style="{{tabTermsStyle}}">Conditions d'utilisation</button>
+    </div>
+  </div>
+
+  <div style="flex:1;overflow-y:auto;padding:20px;">
+    <sc-if value="{{isPrivacy}}" hint-placeholder-val="{{true}}">
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <h2 style="font-size:18px;">Politique de confidentialité</h2>
+        <div style="background:var(--bg-raised);border:1px dashed var(--line);border-radius:var(--radius);padding:16px;font-size:13px;color:var(--ink-soft);line-height:1.6;">[Texte de la politique de confidentialité — à fournir par MAAQ]</div>
+      </div>
+    </sc-if>
+    <sc-if value="{{isTerms}}" hint-placeholder-val="{{false}}">
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        <h2 style="font-size:18px;">Conditions d'utilisation</h2>
+        <div style="background:var(--bg-raised);border:1px dashed var(--line);border-radius:var(--radius);padding:16px;font-size:13px;color:var(--ink-soft);line-height:1.6;">[Texte des conditions d'utilisation — à fournir par MAAQ]</div>
+      </div>
+    </sc-if>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props){
+    super(props);
+    this.state = { tab: 'privacy' };
+  }
+  renderVals(){
+    const t = this.state.tab;
+    const tabStyle = (active) => "flex:1;padding:9px 0;border-radius:8px;border:none;font-weight:600;font-size:12px;background:" + (active ? 'var(--primary)' : 'transparent') + ";color:" + (active ? 'var(--primary-ink)' : 'var(--ink-soft)') + ";";
+    return {
+      isPrivacy: t === 'privacy',
+      isTerms: t === 'terms',
+      tabPrivacyStyle: tabStyle(t === 'privacy'),
+      tabTermsStyle: tabStyle(t === 'terms'),
+      pickPrivacy: () => this.setState({ tab: 'privacy' }),
+      pickTerms: () => this.setState({ tab: 'terms' }),
+    };
+  }
+}
+</script>
+</body>
+</html>
