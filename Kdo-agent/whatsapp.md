@@ -62,7 +62,7 @@ Alternative : un BSP (Twilio…) en implémentant `WhatsAppTransport` (`src/serv
 | Proches, occasions, idées, préférences, rappels | `src/server/gifts/` |
 | Outils de l'agent et cerveau | `src/server/agents/kdo-help-tools.ts`, `src/server/agents/kdo-help.ts` |
 | Écran Réglages | `src/app/(app)/reglages/whatsapp/page.tsx` |
-| Base | `db/migrations/0006_gifts_and_channels.sql` |
+| Base | `db/migrations/0007_gifts_and_channels.sql` |
 
 ## Évaluations
 

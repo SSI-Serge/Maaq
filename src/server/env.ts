@@ -11,9 +11,13 @@ const schema = z.object({
   ENCRYPTION_KEY: base64Key,
   HMAC_KEY: base64Key,
   AUTH_SECRET: base64Key,
+  /**
+   * « mock » : simulateur seul. « live » : appels réels pour tout ce que l'API de Digitorn documente (agents, tchat
+   * embarqué, utilisateurs) ; le reste reste simulé tant que Digitorn ne l'a pas livré. Les clés secrètes sont par
+   * agent, dans la base (console d'administration), pas dans l'environnement.
+   */
   DIGITORN_MODE: z.enum(["mock", "live"]).default("mock"),
-  DIGITORN_API_URL: z.string().url().optional(),
-  DIGITORN_API_KEY: z.string().optional(),
+  DIGITORN_API_URL: z.string().url().default("https://api.digitorn.ai/v1"),
   /** Agents exécutés par MAAQ en attendant Digitorn : « off » = réponses simulées ; « anthropic » = modèle Claude (ANTHROPIC_API_KEY ou profil `ant auth login`). */
   LOCAL_AGENTS_MODE: z.enum(["off", "anthropic"]).default("off"),
   LOCAL_AGENTS_MODEL: z.string().min(1).default("claude-opus-5-5"),

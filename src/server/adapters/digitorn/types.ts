@@ -74,10 +74,33 @@ export interface LogbookItem {
   participants: string[];
 }
 
-/** Agent hébergé chez Digitorn, qui peut être publié dans le catalogue MAAQ (US-45 RT2). */
-export interface HostedAgent {
+/** Agent hébergé chez Digitorn, tel que renvoyé par la recherche par nom (US-45 RF2, RT2). */
+export interface AgentCard {
+  /**
+   * Identifiant de l'agent côté MAAQ. Avec l'API réelle (un projet Digitorn par agent) c'est « <projet>:<agent> », ce qui
+   * évite toute collision entre deux projets ; avec le simulateur, un identifiant simple.
+   */
   ref: string;
   name: string;
+  description: string;
+  kind: string;
+  /** Projet Digitorn qui porte l'agent ; null avec le simulateur. */
+  project: { name: string; mode: "test" | "production" } | null;
+}
+
+/** Ouverture du tchat embarqué d'un agent pour un profil (lien de lancement à usage unique). */
+export interface OpenChatInput {
+  userRef: string;
+  agentRef: string;
+  /** Prénom seulement : l'email n'est pas transmis (minimisation). */
+  name: string;
+  /** Faits vérifiés posés par MAAQ (1 000 octets au plus) : rang du demandeur, membres du compte. */
+  claims: Record<string, unknown>;
+}
+
+export interface OpenedChat {
+  url: string;
+  expiresAt: string;
 }
 
 export type GoogleConnector = "google_drive" | "google_calendar";
@@ -111,7 +134,25 @@ export interface DigitornUserData {
 }
 
 export interface DigitornClient {
-  listHostedAgents(): Promise<HostedAgent[]>;
+  /** Vrai quand le tchat des agents qui ont un projet Digitorn est celui de Digitorn, embarqué dans MAAQ. */
+  readonly embeddedChat: boolean;
+  /**
+   * Cherche un agent par son nom (sans tenir compte des majuscules ni des accents). Avec l'API réelle, la clé secrète du
+   * projet de l'agent est nécessaire. Échoue avec `agent_not_found` ou `agent_ambiguous` (DigitornError).
+   */
+  lookupAgent(input: { name: string; apiKey?: string }): Promise<AgentCard>;
+  /** Relit la fiche d'un agent par son identifiant, avant de le publier ; null s'il n'existe pas ou n'est pas dans ce projet. */
+  getAgent(input: { ref: string; apiKey?: string }): Promise<AgentCard | null>;
+  /**
+   * Ouvre le tchat embarqué : renvoie le lien à placer dans le cadre intégré, valable une seule fois et très peu de temps.
+   * Renvoie null quand l'agent n'a pas de tchat embarqué (le tchat construit par MAAQ reste utilisé).
+   */
+  openChat(input: OpenChatInput): Promise<OpenedChat | null>;
+  /**
+   * Ferme tous les accès d'un profil à Digitorn, sur tous ses appareils (déconnexion, appareil révoqué). Avec un agent,
+   * seul le projet de cet agent est concerné ; sans agent, tous les projets.
+   */
+  closeAccess(userRef: string, agentRef: string | null): Promise<void>;
   /**
    * Démarre un consentement Google. `state` revient tel quel avec l'utilisateur (US-14 RF3) ;
    * MAAQ ne reçoit que le résultat, jamais de mot de passe (US-13 RT1).

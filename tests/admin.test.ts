@@ -2,7 +2,7 @@ import type { Kysely } from "kysely";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { activate, inspectActivation } from "@/server/accounts/activate";
 import { createAccount, getAccount, listAccounts, resendActivation, updateDailyLimit } from "@/server/admin/accounts";
-import { blockAgent, listAgents, listPublishableAgents, publishAgent, reactivateAgent, type PublishInput } from "@/server/admin/agents";
+import { blockAgent, listAgents, lookupAgent, publishAgent, reactivateAgent, type PublishInput } from "@/server/admin/agents";
 import {
   addContract,
   addContractField,
@@ -18,6 +18,7 @@ import { getSession, type Ctx } from "@/server/auth/service";
 import type { DB } from "@/server/db/schema.generated";
 import { Rejection } from "@/server/http";
 import { idempotent } from "@/server/idempotency";
+import { decrypt } from "@/server/security/crypto";
 import { createProfile, messagesTo, minutesLater, testDb } from "./helpers/fixtures";
 
 let db: Kysely<DB>;
@@ -74,12 +75,13 @@ function agentInput(overrides: Partial<PublishInput> = {}): PublishInput {
 
 describe("US-45 — mettre un agent à disposition", () => {
   it("RF2-RF4, RT1 : publie l'agent avec sa configuration et le journalise", async () => {
-    expect((await listPublishableAgents(now())).map((a) => a.ref)).toContain("admin_rdv");
+    expect(await lookupAgent(now(), { name: "Admin_RDV" })).toMatchObject({ agent: { ref: "admin_rdv", name: "Admin_RDV" }, alreadyPublished: false });
     const id = await publishAgent(now(), adminId, agentInput());
 
     const agent = (await listAgents(now(), "Admin_RDV")).find((a) => a.id === id)!;
     expect(agent).toMatchObject({ status: "available", category: "perso", categoryLabel: "Perso" });
-    expect((await listPublishableAgents(now())).map((a) => a.ref)).not.toContain("admin_rdv");
+    expect((await lookupAgent(now(), { name: "Admin_RDV" })).alreadyPublished).toBe(true);
+    expect(agent.digitornProject).toBe(false);
 
     const requirements = await db.selectFrom("agent_requirements").select("owner_scope").where("agent_id", "=", id).execute();
     expect(requirements.map((r) => r.owner_scope).sort()).toEqual(["account", "each_profile"]);
@@ -95,6 +97,53 @@ describe("US-45 — mettre un agent à disposition", () => {
     await publishAgent(now(), adminId, agentInput({ digitornRef: "admin_impots", name: "Admin_Impots" }));
     expect((await rejectionOf(publishAgent(now(), adminId, agentInput({ digitornRef: "admin_impots" })))).code).toBe("agent_unavailable");
     expect((await rejectionOf(publishAgent(now(), adminId, agentInput({ digitornRef: "inconnu" })))).code).toBe("agent_unavailable");
+  });
+
+  it("RF2 : l'agent se cherche par son nom, sans tenir compte des majuscules ni des accents", async () => {
+    expect((await lookupAgent(now(), { name: "  admin_rdv  " })).agent.ref).toBe("admin_rdv");
+    expect((await lookupAgent(now(), { name: "ADMIN_IMPOTS" })).agent.ref).toBe("admin_impots");
+    expect((await rejectionOf(lookupAgent(now(), { name: "Agent-introuvable" }))).code).toBe("agent_not_found");
+    expect((await rejectionOf(lookupAgent(now(), { name: "   " }))).code).toBe("invalid_name");
+  });
+
+  it("une clé publique ou mal formée est refusée avant tout appel à Digitorn", async () => {
+    expect((await rejectionOf(lookupAgent(now(), { name: "Admin_RDV", apiKey: "pk_abcdefghij" }))).code).toBe("invalid_key");
+    expect((await rejectionOf(lookupAgent(now(), { name: "Admin_RDV", apiKey: "cle-quelconque" }))).code).toBe("invalid_key");
+    expect((await rejectionOf(publishAgent(now(), adminId, agentInput({ digitornRef: "perso_courses", digitornApiKey: "pk_abcdefghij" })))).code).toBe("invalid_key");
+  });
+
+  it("la clé secrète du projet Digitorn de l'agent est rangée chiffrée, et l'adresse personnalisée doit être en https", async () => {
+    const secret = "sk_test_cle-secrete-0123456789";
+    expect((await rejectionOf(publishAgent(now(), adminId, agentInput({ digitornRef: "contrats_challenge", name: "Contrats_Challenge", digitornApiKey: secret, digitornAppUrl: "http://agent.exemple.fr" })))).code).toBe(
+      "invalid_app_url",
+    );
+
+    const id = await publishAgent(now(), adminId, agentInput({ digitornRef: "contrats_challenge", name: "Contrats_Challenge", digitornApiKey: secret, digitornAppUrl: "https://agent.exemple.fr" }));
+    const row = await db.selectFrom("agents").select(["digitorn_api_key_encrypted", "digitorn_app_url"]).where("id", "=", id).executeTakeFirstOrThrow();
+    expect(row.digitorn_app_url).toBe("https://agent.exemple.fr");
+    expect(Buffer.from(row.digitorn_api_key_encrypted!).includes(Buffer.from(secret))).toBe(false);
+    expect(decrypt(Buffer.from(row.digitorn_api_key_encrypted!), Buffer.from(process.env.ENCRYPTION_KEY!, "base64"))).toBe(secret);
+    expect((await listAgents(now(), "Contrats_Challenge")).find((a) => a.id === id)?.digitornProject).toBe(true);
+    // La clé ne ressort nulle part dans la liste des agents.
+    expect(JSON.stringify(await listAgents(now(), "Contrats_Challenge"))).not.toContain(secret);
+  });
+
+  it("l'adresse de l'application publiée suffit, sans clé : l'agent est alors un visiteur anonyme pour Digitorn", async () => {
+    const url = "https://bcac-qx42y7yq112zy-d600d2.digitorn.app";
+    const ref = "app:bcac-qx42y7yq112zy-d600d2.digitorn.app";
+    const id = await publishAgent(now(), adminId, agentInput({ digitornRef: ref, name: "Admin_Visiteur", digitornAppUrl: url }));
+    const row = await db.selectFrom("agents").select(["digitorn_agent_ref", "digitorn_api_key_encrypted", "digitorn_app_url"]).where("id", "=", id).executeTakeFirstOrThrow();
+    expect(row).toMatchObject({ digitorn_agent_ref: ref, digitorn_api_key_encrypted: null, digitorn_app_url: url });
+    expect((await listAgents(now(), "Admin_Visiteur")).find((a) => a.id === id)).toMatchObject({ chat: "visitor", digitornProject: false });
+
+    // Déjà publié, adresse absente ou qui ne correspond pas, clé jointe : refusés.
+    expect((await rejectionOf(publishAgent(now(), adminId, agentInput({ digitornRef: ref, digitornAppUrl: url })))).code).toBe("agent_unavailable");
+    expect((await rejectionOf(publishAgent(now(), adminId, agentInput({ digitornRef: ref })))).code).toBe("agent_unavailable");
+    expect((await rejectionOf(publishAgent(now(), adminId, agentInput({ digitornRef: ref, digitornAppUrl: "https://autre.digitorn.app" })))).code).toBe("agent_unavailable");
+    expect((await rejectionOf(publishAgent(now(), adminId, agentInput({ digitornRef: "app:autre.digitorn.app", digitornAppUrl: "https://autre.digitorn.app", digitornApiKey: "sk_test_cle-secrete-0123456789" })))).code).toBe(
+      "agent_unavailable",
+    );
+    expect((await rejectionOf(publishAgent(now(), adminId, agentInput({ digitornRef: "app:x", digitornAppUrl: "ftp://x" })))).code).toBe("invalid_app_url");
   });
 
   it("refuse deux champs d'information de même libellé", async () => {

@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useApiAction, useApiQuery } from "@/client/hooks";
+import { useApiAction } from "@/client/hooks";
 import { ErrorLine } from "@/components/auth/parts";
-import { Button, Loading, Notice } from "@/components/ui";
+import { cleanAppUrl, refFromAppUrl } from "@/server/admin/agent-ref";
+import { Button, Notice } from "@/components/ui";
 import { adminStyles as s } from "./AdminShell";
 
 type Category = "pro" | "perso" | "contracts";
@@ -37,6 +38,14 @@ const DATA_TYPES: { code: DataType; label: string }[] = [
   { code: "email", label: "Email" },
 ];
 
+interface FoundAgent {
+  ref: string;
+  name: string;
+  description: string;
+  kind: string;
+  project: { name: string; mode: "test" | "production" } | null;
+}
+
 interface InfoField {
   label: string;
   dataType: DataType;
@@ -57,9 +66,15 @@ const toLines = (text: string) =>
  * adresses en copie, actions soumises à validation.
  */
 export function PublishAgentForm({ onCancel, onPublished }: { onCancel: () => void; onPublished: (categoryLabel: string) => void }) {
-  const hosted = useApiQuery<{ agents: { ref: string; name: string }[] }>("/api/admin/agents/publishable");
+  const lookup = useApiAction<{ name: string; apiKey: string | null }, { agent: FoundAgent; alreadyPublished: boolean }>("/api/admin/agents/lookup");
   const publish = useApiAction<unknown, { id: string }>("/api/admin/agents");
 
+  // Un projet Digitorn par agent : on cherche l'agent par son nom, avec la clé secrète de son projet.
+  const [searchName, setSearchName] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [appUrl, setAppUrl] = useState("");
+  const [found, setFound] = useState<{ agent: FoundAgent; alreadyPublished: boolean } | null>(null);
+  const [addressError, setAddressError] = useState<string>();
   const [ref, setRef] = useState("");
   const [name, setName] = useState("");
   const [category, setCategory] = useState<Category | null>(null);
@@ -90,9 +105,40 @@ export function PublishAgentForm({ onCancel, onPublished }: { onCancel: () => vo
     setFieldError(undefined);
   }
 
+  async function search() {
+    setFound(null);
+    setRef("");
+    setAddressError(undefined);
+    // Sans clé secrète, MAAQ ne peut pas interroger Digitorn : l'adresse de l'application publiée suffit (visiteur anonyme).
+    if (!apiKey.trim() && appUrl.trim()) {
+      const url = cleanAppUrl(appUrl);
+      if (!url) return setAddressError("L'adresse de l'application doit commencer par https://.");
+      const agent: FoundAgent = { ref: refFromAppUrl(url), name: searchName.trim(), description: "", kind: "chat", project: null };
+      setFound({ agent, alreadyPublished: false });
+      setRef(agent.ref);
+      if (!name.trim()) setName(agent.name);
+      return;
+    }
+    const result = await lookup.run({ name: searchName.trim(), apiKey: apiKey.trim() || null });
+    if (!result) return;
+    setFound(result);
+    if (result.alreadyPublished) return;
+    setRef(result.agent.ref);
+    // Préremplit ce que Digitorn sait de l'agent, sans écraser ce que l'administrateur a déjà écrit.
+    if (!name.trim()) setName(result.agent.name);
+    if (!shortDescription.trim() && result.agent.description) setShortDescription(result.agent.description.slice(0, 200));
+    if (!fullDescription.trim() && result.agent.description) setFullDescription(result.agent.description);
+  }
+
+  /** Une nouvelle recherche est nécessaire dès que le nom, la clé ou l'adresse changent. */
+  function forget() {
+    setFound(null);
+    setRef("");
+  }
+
   async function submit() {
     const missing: string[] = [];
-    if (!ref) missing.push("Choisissez l'agent Digitorn à publier.");
+    if (!ref) missing.push("Recherchez d'abord l'agent chez Digitorn à partir de son nom.");
     if (!name.trim()) missing.push("Le nom de l'agent est obligatoire.");
     if (!category) missing.push("Choisissez une rubrique.");
     if (!shortDescription.trim()) missing.push("La description courte est obligatoire.");
@@ -104,6 +150,8 @@ export function PublishAgentForm({ onCancel, onPublished }: { onCancel: () => vo
 
     const result = await publish.run({
       digitornRef: ref,
+      digitornApiKey: apiKey.trim() || null,
+      digitornAppUrl: appUrl.trim() || null,
       name: name.trim(),
       category,
       shortDescription: shortDescription.trim(),
@@ -122,30 +170,91 @@ export function PublishAgentForm({ onCancel, onPublished }: { onCancel: () => vo
     <section className={s.panel}>
       <div className={s.panelTitle}>Nouvel agent</div>
       <div className={s.grid2}>
-        <div>
-          <label className={s.label} htmlFor="agent-ref">
-            Agent hébergé chez Digitorn
-          </label>
-          {hosted.loading && <Loading slow={hosted.slow} />}
-          <ErrorLine error={hosted.error} onRetry={hosted.reload} />
-          {hosted.data && (
-            <select
-              id="agent-ref"
-              className={s.select}
-              value={ref}
-              onChange={(e) => {
-                setRef(e.target.value);
-                const picked = hosted.data?.agents.find((a) => a.ref === e.target.value);
-                if (picked && !name.trim()) setName(picked.name);
-              }}
-            >
-              <option value="">{hosted.data.agents.length ? "Choisir un agent…" : "Aucun agent à publier"}</option>
-              {hosted.data.agents.map((a) => (
-                <option key={a.ref} value={a.ref}>
-                  {a.name}
-                </option>
-              ))}
-            </select>
+        <div className={s.full}>
+          <span className={s.label}>Agent hébergé chez Digitorn (un projet Digitorn par agent)</span>
+          <div className={s.grid2}>
+            <div>
+              <label className={s.label} htmlFor="agent-search">
+                Nom de l&apos;agent chez Digitorn
+              </label>
+              <input
+                id="agent-search"
+                className={s.input}
+                maxLength={100}
+                value={searchName}
+                onChange={(e) => {
+                  setSearchName(e.target.value);
+                  forget();
+                }}
+                placeholder="Ex. Admin_lib"
+              />
+            </div>
+            <div>
+              <label className={s.label} htmlFor="agent-key">
+                Clé secrète du projet Digitorn (sk_…)
+              </label>
+              <input
+                id="agent-key"
+                className={s.input}
+                type="password"
+                autoComplete="off"
+                maxLength={200}
+                value={apiKey}
+                onChange={(e) => {
+                  setApiKey(e.target.value);
+                  forget();
+                }}
+                placeholder="Facultative : Digitorn reconnaît alors l'utilisateur"
+              />
+            </div>
+            <div className={s.full}>
+              <label className={s.label} htmlFor="agent-app-url">
+                Adresse de l&apos;application publiée chez Digitorn (iframe)
+              </label>
+              <input
+                id="agent-app-url"
+                className={s.input}
+                maxLength={300}
+                value={appUrl}
+                onChange={(e) => {
+                  setAppUrl(e.target.value);
+                  forget();
+                }}
+                placeholder="https://mon-agent-1a2b.digitorn.app"
+              />
+              <div className={s.hint}>
+                Adresse de l&apos;application publiée, donnée par Digitorn (Project → Embed). Sans clé secrète, elle suffit : l&apos;utilisateur reste un visiteur anonyme pour Digitorn.
+                Avec la clé, Digitorn reconnaît l&apos;utilisateur. La clé est conservée chiffrée et n&apos;est jamais réaffichée.
+              </div>
+            </div>
+          </div>
+          <div style={{ marginTop: 10 }}>
+            <Button variant="secondary" loading={lookup.pending} disabled={!searchName.trim()} onClick={search}>
+              {!apiKey.trim() && appUrl.trim() ? "Utiliser l'adresse de l'application" : "Rechercher l'agent"}
+            </Button>
+          </div>
+          <ErrorLine error={lookup.error} onRetry={search} />
+          {addressError && (
+            <div style={{ marginTop: 10 }}>
+              <Notice tone="error">{addressError}</Notice>
+            </div>
+          )}
+          {found && !found.alreadyPublished && (
+            <div style={{ marginTop: 10 }}>
+              <Notice tone="success">
+                ✓ Agent trouvé : {found.agent.name}
+                {found.agent.project
+                  ? ` — projet « ${found.agent.project.name} » (mode ${found.agent.project.mode === "test" ? "test" : "production"})`
+                  : found.agent.ref.startsWith("app:")
+                    ? " — adresse de l'application seule (visiteur anonyme)"
+                    : " — simulateur"}
+              </Notice>
+            </div>
+          )}
+          {found?.alreadyPublished && (
+            <div style={{ marginTop: 10 }}>
+              <Notice tone="error">Cet agent est déjà publié dans le catalogue.</Notice>
+            </div>
           )}
         </div>
         <div>

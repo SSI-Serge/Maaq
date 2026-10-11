@@ -12,10 +12,12 @@ import type {
   DecideActionInput,
   DigitornClient,
   DigitornUserData,
-  HostedAgent,
+  AgentCard,
   LogbookItem,
+  OpenedChat,
   SubmitRequestInput,
 } from "./types";
+import { DigitornError } from "./errors";
 
 export interface MockOptions {
   /** Délai avant la réponse de l'agent (traitement asynchrone, CC-10). 0 = immédiat. */
@@ -33,7 +35,7 @@ export const BRAIN_FAILURE_MESSAGE = "Je n'ai pas réussi à répondre. Réessay
 const BRAIN_HISTORY = 20;
 
 /** Agents fictifs hébergés par le simulateur. */
-export const MOCK_HOSTED_AGENTS: HostedAgent[] = [
+export const MOCK_HOSTED_AGENTS: { ref: string; name: string }[] = [
   { ref: "admin_classify", name: "Admin_Classify" },
   { ref: "admin_rdv", name: "Admin_RDV" },
   { ref: "admin_lib", name: "Admin_lib" },
@@ -96,8 +98,30 @@ export class MockDigitorn implements DigitornClient {
     while (this.inFlight.size) await Promise.all([...this.inFlight]);
   }
 
-  async listHostedAgents(): Promise<HostedAgent[]> {
-    return MOCK_HOSTED_AGENTS.map((agent) => ({ ...agent }));
+  /** Le simulateur n'a pas de tchat embarqué : le tchat construit par MAAQ reste utilisé. */
+  readonly embeddedChat = false;
+  /** Accès fermés (contrôle dans les tests). */
+  readonly closedAccess: { userRef: string; agentRef: string | null }[] = [];
+
+  async lookupAgent(input: { name: string; apiKey?: string }): Promise<AgentCard> {
+    const wanted = normalizeName(input.name);
+    const found = MOCK_HOSTED_AGENTS.filter((agent) => normalizeName(agent.name) === wanted || agent.ref === wanted);
+    if (found.length === 0) throw new DigitornError("agent_not_found", "Aucun agent ne porte ce nom.", 404, false);
+    if (found.length > 1) throw new DigitornError("agent_ambiguous", "Plusieurs agents portent ce nom.", 409, false);
+    return cardOf(found[0]);
+  }
+
+  async getAgent(input: { ref: string; apiKey?: string }): Promise<AgentCard | null> {
+    const found = MOCK_HOSTED_AGENTS.find((agent) => agent.ref === input.ref);
+    return found ? cardOf(found) : null;
+  }
+
+  async openChat(): Promise<OpenedChat | null> {
+    return null;
+  }
+
+  async closeAccess(userRef: string, agentRef: string | null): Promise<void> {
+    this.closedAccess.push({ userRef, agentRef });
   }
 
   async beginAuthorization(input: { state: string; profileRef: string; connector: GoogleConnector; email: string; returnUrl: string }) {
@@ -417,6 +441,15 @@ export class MockDigitorn implements DigitornClient {
     if (delayMs <= 0) task();
     else setTimeout(task, delayMs);
   }
+}
+
+function cardOf(agent: { ref: string; name: string }): AgentCard {
+  return { ref: agent.ref, name: agent.name, description: `Agent simulé « ${agent.name} ».`, kind: "chat", project: null };
+}
+
+/** Nom comparé sans tenir compte des majuscules ni des accents, comme la recherche de Digitorn. */
+function normalizeName(name: string): string {
+  return name.normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toLowerCase();
 }
 
 function key(userRef: string, agentRef: string): string {

@@ -288,6 +288,14 @@ export interface Agents {
    * Identifiant de l'agent chez Digitorn, choisi parmi ceux hébergés et non encore publiés (US-45 RF2)
    */
   digitorn_agent_ref: string;
+  /**
+   * Clé secrète (sk_…) du projet Digitorn de cet agent, chiffrée avec la clé de l'application ; jamais affichée ni journalisée. Null = agent sans projet Digitorn réel (simulateur)
+   */
+  digitorn_api_key_encrypted: Buffer | null;
+  /**
+   * Domaine personnalisé de l'application Digitorn publiée, facultatif : transmis au lien de lancement du tchat embarqué. Null = adresse publiée par défaut
+   */
+  digitorn_app_url: string | null;
   full_description: string;
   id: Generated<Int8>;
   /**

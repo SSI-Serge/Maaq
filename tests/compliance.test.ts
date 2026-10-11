@@ -284,7 +284,7 @@ describe("US-55 — export des données", () => {
     expect(row.status).toBe("ready");
     expect(Math.round((new Date(row.download_expires_at!).getTime() - Date.now()) / 86_400_000)).toBe(7);
     const raw = await (await import("node:fs/promises")).readFile(path.join(dataDir(), "exports", `${id}.bin`));
-    expect(raw.includes(Buffer.from("PK"))).toBe(false); // pas une archive en clair
+    expect(raw.subarray(0, 2).toString("latin1")).not.toBe("PK"); // pas une archive en clair (en-tête d'un zip)
     expect(raw.includes(Buffer.from("Nantes"))).toBe(false);
   });
 

@@ -50,6 +50,11 @@ export interface DailyCap {
 
 export interface ChatView {
   agent: { id: string; name: string; shortDescription: string };
+  /**
+   * Le tchat de cet agent est celui de Digitorn, embarqué : l'écran affiche le cadre de Digitorn au lieu du fil de messages
+   * construit par MAAQ. MAAQ ne voit plus passer les demandes, les cartes d'action ni le plafond quotidien.
+   */
+  embedded: boolean;
   /** Message de maintenance quand l'agent est bloqué (US-42). */
   blocked: { message: string } | null;
   gate: ChatGate | null;
@@ -63,12 +68,21 @@ function requireProfile(session: SessionContext): void {
   if (session.user.role === "admin") throw new Rejection("forbidden", "Un administrateur n'a pas de tchat.", 403);
 }
 
-async function loadAgent(ctx: Ctx, session: SessionContext, agentId: string) {
+export async function loadAgent(ctx: Ctx, session: SessionContext, agentId: string) {
   requireProfile(session);
   const agent = await ctx.db
     .selectFrom("profile_agents as pa")
     .innerJoin("agents as a", "a.id", "pa.agent_id")
-    .select(["a.id", "a.name", "a.short_description", "a.status", "a.maintenance_message", "a.digitorn_agent_ref"])
+    .select([
+      "a.id",
+      "a.name",
+      "a.short_description",
+      "a.status",
+      "a.maintenance_message",
+      "a.digitorn_agent_ref",
+      "a.digitorn_app_url",
+      sql<boolean>`a.digitorn_api_key_encrypted is not null`.as("has_project"),
+    ])
     .where("pa.user_id", "=", session.user.id)
     .where("pa.agent_id", "=", agentId)
     .where("pa.removed_at", "is", null)
@@ -79,7 +93,20 @@ async function loadAgent(ctx: Ctx, session: SessionContext, agentId: string) {
 
 type LoadedAgent = Awaited<ReturnType<typeof loadAgent>>;
 
-function blockedMessage(agent: LoadedAgent): string | null {
+/**
+ * Le tchat de l'agent est celui de Digitorn, embarqué, dès que l'agent a l'adresse de son application publiée (visiteur
+ * anonyme) ou, avec le client réel, son projet Digitorn (utilisateur identifié par un lien de lancement).
+ */
+export function isEmbedded(agent: LoadedAgent): boolean {
+  return agent.digitorn_app_url !== null || (agent.has_project && digitorn().embeddedChat);
+}
+
+/** Les demandes, les cartes d'action et les signalements du tchat construit par MAAQ ne servent plus avec le tchat embarqué. */
+function requireLegacyChat(agent: LoadedAgent): void {
+  if (isEmbedded(agent)) throw new Rejection("embedded_chat", "Le tchat de cet agent est celui de Digitorn, intégré à l'application.", 409);
+}
+
+export function blockedMessage(agent: LoadedAgent): string | null {
   return agent.status === "blocked" ? (agent.maintenance_message ?? "Cet agent est temporairement indisponible.") : null;
 }
 
@@ -100,13 +127,19 @@ async function dailyCap(ctx: Ctx, session: SessionContext): Promise<DailyCap> {
   return { limit: account.daily_request_limit, used, remaining: Math.max(account.daily_request_limit - used, 0) };
 }
 
-async function gateOf(ctx: Ctx, session: SessionContext, agentId: string): Promise<ChatGate | null> {
-  const rows = await ctx.db
-    .selectFrom("v_profile_agent_missing_items")
-    .select(["item_kind", "item_code", "responsible"])
-    .where("user_id", "=", session.user.id)
-    .where("agent_id", "=", agentId)
-    .execute();
+/**
+ * Éléments qui manquent avant d'écrire à l'agent (US-29). Avec le tchat embarqué, c'est Digitorn qui guide le
+ * branchement des connecteurs : seules les informations de profil, que MAAQ détient, restent à vérifier (`infoOnly`).
+ */
+export async function gateOf(ctx: Ctx, session: SessionContext, agentId: string, options: { infoOnly?: boolean } = {}): Promise<ChatGate | null> {
+  const rows = (
+    await ctx.db
+      .selectFrom("v_profile_agent_missing_items")
+      .select(["item_kind", "item_code", "responsible"])
+      .where("user_id", "=", session.user.id)
+      .where("agent_id", "=", agentId)
+      .execute()
+  ).filter((row) => !options.infoOnly || row.item_kind === "info");
   if (rows.length === 0) return null;
 
   const connectorLabels = new Map(
@@ -158,6 +191,7 @@ function recent(events: ChatEvent[], now: Date): ChatEvent[] {
 }
 
 async function conversationOf(ctx: Ctx, session: SessionContext, agent: LoadedAgent): Promise<ChatEvent[]> {
+  requireLegacyChat(agent);
   const userRef = await ensureDigitornRef(ctx.db, session.user.id);
   return recent(await digitorn().getConversation(userRef, agent.digitorn_agent_ref), ctx.now);
 }
@@ -183,13 +217,15 @@ function describeProposal(proposal: ActionProposal): string {
  */
 export async function getChat(ctx: Ctx, session: SessionContext, agentId: string): Promise<ChatView> {
   const agent = await loadAgent(ctx, session, agentId);
+  const embedded = isEmbedded(agent);
   const base = {
     agent: { id: agent.id, name: agent.name, shortDescription: agent.short_description },
+    embedded,
     cap: await dailyCap(ctx, session),
     now: ctx.now.toISOString(),
   };
   const blockedText = blockedMessage(agent);
-  const gate = blockedText === null ? await gateOf(ctx, session, agentId) : null;
+  const gate = blockedText === null ? await gateOf(ctx, session, agentId, { infoOnly: embedded }) : null;
 
   const suggestions = (
     await ctx.db
@@ -203,7 +239,7 @@ export async function getChat(ctx: Ctx, session: SessionContext, agentId: string
   ).map((p) => p.content);
 
   // Un agent à configurer n'ouvre pas de conversation (US-29) ; un agent bloqué garde son historique lisible (US-42).
-  const events = gate ? [] : await conversationOf(ctx, session, agent);
+  const events = gate || embedded ? [] : await conversationOf(ctx, session, agent);
 
   const reported = new Set(
     (await ctx.db.selectFrom("error_reports").select("message_ref").where("reporter_user_id", "=", session.user.id).where("agent_id", "=", agentId).execute()).map((r) => r.message_ref),
@@ -264,7 +300,7 @@ export interface SendResult {
   cap: DailyCap;
 }
 
-function rankOf(session: SessionContext): RequesterRank {
+export function rankOf(session: SessionContext): RequesterRank {
   if (session.user.role === "primary_user") return "primary_user";
   return session.user.guestRank === "core" ? "core_guest" : "secondary_guest";
 }
@@ -284,6 +320,7 @@ export async function sendMessage(
   input: { agentId: string; requestId: string; text: string; channel?: MessageChannel },
 ): Promise<SendResult> {
   const agent = await loadAgent(ctx, session, input.agentId);
+  requireLegacyChat(agent);
   const blockedText = blockedMessage(agent);
   if (blockedText !== null) throw new Rejection("agent_blocked", `Cet agent est en maintenance : ${blockedText}`, 409);
   if (await gateOf(ctx, session, input.agentId)) throw new Rejection("agent_to_configure", "Cet agent doit d'abord être configuré.", 409);
@@ -368,6 +405,7 @@ export async function decideAction(
   input: { agentId: string; proposalId: string; decision: "validate" | "refuse" },
 ): Promise<DecisionResult> {
   const agent = await loadAgent(ctx, session, input.agentId);
+  requireLegacyChat(agent);
   if (blockedMessage(agent) !== null) {
     throw new Rejection("agent_blocked", "Cet agent est en maintenance : vous pourrez valider ou refuser dès sa remise en service.", 409);
   }
@@ -451,6 +489,7 @@ export async function reportError(
   input: { agentId: string; messageRef: string; category: ReportCategory; comment?: string },
 ): Promise<{ alreadyReported: boolean }> {
   const agent = await loadAgent(ctx, session, input.agentId);
+  requireLegacyChat(agent);
   const comment = input.comment?.trim() || null;
   if (comment && comment.length > MAX_REPORT_COMMENT) throw new Rejection("comment_too_long", `Le commentaire dépasse ${MAX_REPORT_COMMENT} caractères.`, 422);
 

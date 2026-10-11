@@ -56,9 +56,11 @@ export async function runGiftJobs(ctx: Ctx): Promise<JobsResult["gifts"]> {
     prefs: prefsStore(ctx.db),
     transport: whatsapp(),
     postInApp: async (userId, text) => {
-      const client = digitorn() as Partial<MockDigitorn>;
-      if (typeof client.postAgentMessage !== "function") throw new Error("Message proactif d'agent : pas encore disponible hors simulateur Digitorn.");
-      client.postAgentMessage(await ensureDigitornRef(ctx.db, userId), "kdo_help", text);
+      // En mode « live », le client réel expose le simulateur qui porte les agents locaux.
+      const client = digitorn() as { simulator?: unknown };
+      const simulator = (client.simulator ?? client) as Partial<MockDigitorn>;
+      if (typeof simulator.postAgentMessage !== "function") throw new Error("Message proactif d'agent : pas encore disponible hors simulateur Digitorn.");
+      simulator.postAgentMessage(await ensureDigitornRef(ctx.db, userId), "kdo_help", text);
     },
   });
   const purged = await store.purgeDeleted(new Date(ctx.now.getTime() - GIFT_UNDO_DAYS * 86_400_000));

@@ -16,6 +16,7 @@ interface Agent {
   maintenanceMessage: string | null;
   blockedAt: string | null;
   blockedBy: string | null;
+  chat: "identified" | "visitor" | "simulated";
 }
 
 /** Administration des agents : publication, blocage, réactivation (US-45, US-46, US-47). */
@@ -94,6 +95,7 @@ export default function AdminAgentsPage() {
                 <td>
                   <div style={{ fontWeight: 700 }}>{agent.name}</div>
                   <div className={`${s.muted} ${s.small}`}>{agent.shortDescription}</div>
+                  <div className={`${s.muted} ${s.small}`}>{agent.chat === "identified" ? "Tchat Digitorn embarqué, utilisateur reconnu (clé du projet enregistrée)" : agent.chat === "visitor" ? "Tchat Digitorn embarqué, visiteur anonyme (adresse seule)" : "Tchat simulé (aucune adresse Digitorn enregistrée)"}</div>
                   {agent.status === "blocked" && (
                     <div className={s.small} style={{ marginTop: 6, color: "var(--error)" }}>
                       « {agent.maintenanceMessage} » — bloqué par {agent.blockedBy}, le {formatDate(agent.blockedAt!)}
