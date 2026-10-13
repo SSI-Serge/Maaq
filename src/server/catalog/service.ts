@@ -123,6 +123,8 @@ export async function listCatalog(
 export interface AgentSheet {
   id: string;
   name: string;
+  /** Identifiant de l'agent chez Digitorn ; « kdo_help » affiche en plus le calendrier des occasions. */
+  digitornRef: string;
   category: CategoryCode;
   categoryLabel: string;
   shortDescription: string;
@@ -144,7 +146,7 @@ export async function getAgentSheet(ctx: Ctx, session: SessionContext, agentId: 
   const agent = await ctx.db
     .selectFrom("agents as a")
     .innerJoin("agent_categories as c", "c.id", "a.category_id")
-    .select(["a.id", "a.name", "a.short_description", "a.full_description", "a.status", "c.code", "c.label", "c.id as category_id"])
+    .select(["a.id", "a.name", "a.digitorn_agent_ref", "a.short_description", "a.full_description", "a.status", "c.code", "c.label", "c.id as category_id"])
     .where("a.id", "=", agentId)
     .where("c.code", "in", visibleCategories(session))
     .executeTakeFirst();
@@ -174,6 +176,7 @@ export async function getAgentSheet(ctx: Ctx, session: SessionContext, agentId: 
   return {
     id: agent.id,
     name: agent.name,
+    digitornRef: agent.digitorn_agent_ref,
     category: agent.code as CategoryCode,
     categoryLabel: agent.label,
     shortDescription: agent.short_description,

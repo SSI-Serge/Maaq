@@ -137,7 +137,7 @@ Par défaut, aucun email ne part : tout arrive sur http://localhost:3000/dev/boi
 ## 7. Essayer l'agent kdo_help
 
 Une fois connecté comme Camille :
-1. **Catalogue** › onglet **Perso** › **kdo_help** › **Ajouter à mon dashboard**.
+1. **Catalogue** › onglet **Perso** › **kdo_help** › **Ajouter à mon dashboard**. Sur cette même fiche, le **calendrier des occasions** permet d'ajouter un anniversaire ou une occasion en appuyant sur un jour puis sur **+** ; le tchat connaît tout ce qui y est inscrit.
 2. Dashboard › onglet **Perso** › **Ouvrir le tchat**.
 3. Essayez : « Ajoute mon frère Thomas, né le 28 octobre 1992, fan de vélo, budget 150 € », puis « Une idée de cadeau pour Thomas », puis « Quels anniversaires arrivent bientôt ? ». Une demande de suppression (« Supprime Thomas ») affiche une carte à valider : rien n'est supprimé tant que vous ne validez pas.
 4. **Réglages** › **WhatsApp et rappels** : cochez le consentement, cliquez **Connecter WhatsApp**, puis sur http://localhost:3000/dev/whatsapp envoyez le code affiché. Vous pouvez ensuite écrire à l'agent depuis cette page comme depuis WhatsApp ; la conversation apparaît aussi dans le tchat de l'application.

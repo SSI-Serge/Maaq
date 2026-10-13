@@ -1,0 +1,257 @@
+.calendar {
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px;
+}
+
+.monthBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.monthName {
+  font-family: var(--font-serif);
+  font-size: 18px;
+  text-transform: capitalize;
+}
+
+.monthNav {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.navButton {
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--ink);
+  border-radius: 999px;
+  width: 32px;
+  height: 32px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.todayButton {
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--secondary-strong);
+  border-radius: 999px;
+  padding: 0 10px;
+  height: 32px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.weekdays,
+.grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.weekday {
+  text-align: center;
+  font-size: 11px;
+  color: var(--ink-soft);
+  padding: 4px 0;
+  text-transform: uppercase;
+}
+
+.day {
+  position: relative;
+  aspect-ratio: 1;
+  border: 0;
+  background: transparent;
+  border-radius: 10px;
+  font-size: 14px;
+  color: var(--ink);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+}
+
+.day:hover {
+  background: var(--bg-sunken);
+}
+
+.dayOutside {
+  color: var(--ink-soft);
+  opacity: 0.45;
+}
+
+.dayToday .dayNumber {
+  color: var(--primary-ink);
+  background: var(--primary);
+  border-radius: 999px;
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.daySelected {
+  background: var(--secondary-soft);
+}
+
+.dots {
+  display: flex;
+  gap: 2px;
+  height: 5px;
+}
+
+.dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--primary);
+}
+
+.dotBirthday {
+  background: var(--secondary-strong);
+}
+
+.dayPanel {
+  margin-top: 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+.dayHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.dayTitle {
+  font-weight: 600;
+  font-size: 14px;
+  text-transform: capitalize;
+}
+
+.addButton {
+  border: 0;
+  background: var(--primary);
+  color: var(--primary-ink);
+  border-radius: 999px;
+  width: 32px;
+  height: 32px;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.item {
+  width: 100%;
+  text-align: left;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  border: 0;
+  background: var(--bg);
+  border-radius: 10px;
+  padding: 10px;
+  margin-bottom: 6px;
+  cursor: pointer;
+  color: var(--ink);
+  font: inherit;
+}
+
+.itemBar {
+  width: 4px;
+  align-self: stretch;
+  border-radius: 2px;
+  background: var(--primary);
+}
+
+.itemBarBirthday {
+  background: var(--secondary-strong);
+}
+
+.itemTitle {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.itemMeta {
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.segments {
+  display: flex;
+  background: var(--bg-sunken);
+  border-radius: 999px;
+  padding: 3px;
+}
+
+.segment {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  border-radius: 999px;
+  padding: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.segmentOn {
+  background: var(--bg-raised);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.select {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--ink);
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 14px;
+}
+
+.checkbox {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 14px;
+}
+
+.formActions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.danger {
+  color: var(--error);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}

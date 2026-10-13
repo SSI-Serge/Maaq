@@ -36,6 +36,7 @@ Le texte des demandes transite alors par les serveurs de MAAQ puis d'Anthropic :
 - **Proches et occasions en langage naturel** : créer, retrouver, modifier, supprimer (avec confirmation, annulable 30 jours) ; occasions autres que les anniversaires (Noël, fête…) ; dates relatives résolues à partir de la date du jour et répétées en absolu ; homonymes levés avant toute écriture.
 - **Idées de cadeaux** : raisonne d'abord sur la personne, puis au plus 3 idées classées avec une fourchette de prix constatée ; retire lui-même une idée hors du budget de la demande ou du proche, ou déjà proposée ; les idées sont gardées avec leur statut (proposée, gardée, achetée, écartée).
 - **Occasions à venir** : anniversaires déduits des proches et occasions enregistrées, avec l'âge atteint ; réglées ou reportées à la demande.
+- **Calendrier sur la fiche de l'agent** (Catalogue › kdo_help) : vue par mois façon calendrier du téléphone, un jour sélectionné avec ses entrées, ajout, modification et suppression d'un anniversaire (proche) ou d'une occasion, chaque année ou une seule fois. Mêmes données que le tchat (`src/components/gifts/GiftCalendar.tsx`, routes `/api/gifts/*`).
 - **Rappels** : 21, 7 et 2 jours avant, dans l'application et/ou sur WhatsApp (voir `whatsapp.md`, même dossier).
 - Ne propose ni lien, ni boutique précise, ni promotion.
 

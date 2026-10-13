@@ -6,6 +6,7 @@ import { Suspense, useState } from "react";
 import { useApiMutation, useApiQuery } from "@/client/hooks";
 import { AppShell, Section, appStyles as s } from "@/components/app/AppShell";
 import { ErrorLine } from "@/components/auth/parts";
+import { GiftCalendar } from "@/components/gifts/GiftCalendar";
 import { Button, Loading, Notice, RetryNotice } from "@/components/ui";
 
 type Category = "pro" | "perso" | "contracts";
@@ -14,6 +15,7 @@ type Scope = "each_profile" | "primary_user" | "account";
 interface Sheet {
   id: string;
   name: string;
+  digitornRef: string;
   category: Category;
   categoryLabel: string;
   shortDescription: string;
@@ -110,6 +112,13 @@ function SheetBody({ sheet, onChanged }: { sheet: Sheet; onChanged: () => void }
           {sheet.description}
         </p>
       </Section>
+
+      {sheet.digitornRef === "kdo_help" && (
+        <Section title="Calendrier des occasions">
+          <p className={s.muted}>Anniversaires de vos proches et occasions à venir. Appuyez sur un jour pour voir ou ajouter ; le tchat de kdo_help connaît tout ce qui est ici.</p>
+          <GiftCalendar />
+        </Section>
+      )}
 
       {sheet.examples.length > 0 && (
         <Section title="Exemples de demandes">

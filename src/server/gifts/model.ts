@@ -201,6 +201,77 @@ export function upcomingOccasions(
   return found.sort((a, b) => a.daysRemaining - b.daysRemaining || a.title.localeCompare(b.title, "fr"));
 }
 
+/** Entrée du calendrier : une occurrence d'anniversaire ou d'occasion dans un mois donné. */
+export interface CalendarItem {
+  /** Même clé que pour les rappels : « person:<id>:<année> » ou « event:<id>:<année> ». */
+  key: string;
+  /** AAAA-MM-JJ. */
+  date: string;
+  kind: "birthday" | string;
+  title: string;
+  personId: string | null;
+  personName: string | null;
+  age: number | null;
+  budgetAmount: number | null;
+  sorted: boolean;
+  /** Ce qui est modifié quand on édite l'entrée. */
+  source: { type: "person"; id: string } | { type: "event"; id: string };
+  /** Se répète chaque année. */
+  recurring: boolean;
+}
+
+function isoDate(year: number, month: number, day: number): string {
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+/** Anniversaires et occasions d'un mois civil (calendrier), triés par jour. */
+export function occurrencesInMonth(input: { people: Person[]; events: GiftEvent[]; states: OccasionState[] }, year: number, month: number): CalendarItem[] {
+  const states = new Map(input.states.map((s) => [s.occasionKey, s]));
+  const people = new Map(input.people.filter((p) => !p.deletedAt).map((p) => [p.id, p]));
+  const items: CalendarItem[] = [];
+
+  for (const person of people.values()) {
+    if (person.birthDay === null || person.birthMonth !== month) continue;
+    if (person.birthYear !== null && person.birthYear > year) continue;
+    const key = `person:${person.id}:${year}`;
+    items.push({
+      key,
+      date: isoDate(year, month, person.birthDay),
+      kind: "birthday",
+      title: `Anniversaire de ${person.name}`,
+      personId: person.id,
+      personName: person.name,
+      age: person.birthYear ? year - person.birthYear : null,
+      budgetAmount: person.budgetAmount,
+      sorted: Boolean(states.get(key)?.sortedAt),
+      source: { type: "person", id: person.id },
+      recurring: true,
+    });
+  }
+
+  for (const event of input.events) {
+    if (event.deletedAt || event.eventMonth !== month) continue;
+    if (event.eventYear !== null && event.eventYear !== year) continue;
+    const person = event.personId ? (people.get(event.personId) ?? null) : null;
+    const key = `event:${event.id}:${year}`;
+    items.push({
+      key,
+      date: isoDate(year, month, event.eventDay),
+      kind: event.kind,
+      title: event.title,
+      personId: person?.id ?? null,
+      personName: person?.name ?? null,
+      age: null,
+      budgetAmount: event.budgetAmount ?? person?.budgetAmount ?? null,
+      sorted: Boolean(states.get(key)?.sortedAt),
+      source: { type: "event", id: event.id },
+      recurring: event.eventYear === null,
+    });
+  }
+
+  return items.sort((a, b) => a.date.localeCompare(b.date) || a.title.localeCompare(b.title, "fr"));
+}
+
 /** Échéances de rappel (jours avant l'occasion). La plus proche atteinte est envoyée, une seule fois chacune. */
 export const REMINDER_POINTS = [21, 7, 2] as const;
 
