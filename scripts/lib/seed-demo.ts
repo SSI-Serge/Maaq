@@ -60,7 +60,7 @@ async function seedProfiles(client: PoolClient): Promise<boolean> {
   return true;
 }
 
-/** Agents publiés : les deux de la maquette Administration des agents, plus kdo_help et vitrine (agents locaux). Chaque agent manquant est ajouté. */
+/** Agents publiés : les deux de la maquette Administration des agents, plus kdo_help, vitrine et coup_de_main (agents locaux). Chaque agent manquant est ajouté. */
 async function seedCatalog(client: PoolClient): Promise<boolean> {
   let added = false;
   const agents = [
@@ -122,6 +122,20 @@ async function seedCatalog(client: PoolClient): Promise<boolean> {
       actions: [] as string[],
       connectors: [] as [string, string][],
       // La vitrine se construit dans le tchat (table storefronts) et se relit sur la fiche de l'agent.
+      fields: [] as [string, string, boolean, number, string | null][],
+      cc: 0,
+    },
+    {
+      ref: "coup_de_main",
+      name: "coup_de_main",
+      category: "perso",
+      short: "Un coup de main près de chez vous, parmi les membres.",
+      full: "coup_de_main cherche, parmi les vitrines publiées par d'autres membres, un fournisseur pour le service que vous décrivez (coiffure, ménage, cours, bricolage, traiteur…) et vous dit pourquoi il le propose. Rien n'est envoyé à un fournisseur sans votre validation, et il ne promet jamais une disponibilité ou un prix que la vitrine ne donne pas.",
+      examples: ["Je cherche quelqu'un pour des tresses à Lyon samedi", "Un cours de maths pour ma fille, à distance", "Où en est ma demande ?"],
+      suggestions: ["Décrire ce que je cherche", "Où en sont mes demandes", "Couper les suggestions"],
+      actions: ["Envoyer une présentation à un fournisseur"],
+      connectors: [] as [string, string][],
+      // Les demandes et suggestions vivent dans le tchat (tables service_requests, suggestions, introductions).
       fields: [] as [string, string, boolean, number, string | null][],
       cc: 0,
     },

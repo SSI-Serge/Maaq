@@ -70,7 +70,9 @@ export function ActionCard({
         </>
       ) : (
         <>
-          <div className={styles.cardText}>{proposal.summary}</div>
+          <div className={styles.cardText} style={{ whiteSpace: "pre-wrap" }}>
+            {proposal.summary}
+          </div>
           {proposal.when && (
             <div className={styles.cardText}>
               <b>Quand :</b> {DATE_FORMAT.format(new Date(proposal.when))}

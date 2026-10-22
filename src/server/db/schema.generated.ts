@@ -61,6 +61,8 @@ export type InitialSetupStep = "completed" | "step_1_my_info" | "step_2_guest_in
 
 export type Int8 = ColumnType<string, bigint | number | string, bigint | number | string>;
 
+export type IntroductionStatus = "accepted" | "connected" | "declined" | "expired" | "question" | "requested";
+
 export type Json = JsonValue;
 
 export type JsonArray = JsonValue[];
@@ -91,6 +93,8 @@ export type ScanStatus = "clean" | "infected" | "pending";
 
 export type SecurityEventType = "device_revoked" | "device_verified" | "login_email_changed" | "login_locked" | "password_changed" | "pattern_locked" | "pattern_recovered";
 
+export type ServiceRequestStatus = "closed" | "open" | "suggested";
+
 export type SessionEndReason = "account_grace_period" | "device_revoked" | "expired" | "guest_removed" | "logout";
 
 export type SettingValueType = "email" | "integer";
@@ -98,6 +102,8 @@ export type SettingValueType = "email" | "integer";
 export type StorefrontContact = "maaq_intro" | "whatsapp";
 
 export type StorefrontStatus = "draft" | "paused" | "published";
+
+export type SuggestionStatus = "dismissed" | "expired" | "interested" | "muted" | "shown";
 
 export type SyncStatus = "failed" | "running" | "succeeded";
 
@@ -667,6 +673,25 @@ export interface IdempotencyKeys {
   user_id: string;
 }
 
+export interface Introductions {
+  answered_at: Timestamp | null;
+  buyer_user_id: string;
+  channel: Generated<string>;
+  connected_at: Timestamp | null;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  requested_at: Generated<Timestamp>;
+  /**
+   * Texte approuvé par l'acheteur, transmis tel quel au fournisseur
+   */
+  shared_text: string;
+  status: Generated<IntroductionStatus>;
+  storefront_id: string;
+  suggestion_id: string | null;
+  supplier_message: string | null;
+  updated_at: Generated<Timestamp>;
+}
+
 export interface LegalAcceptances {
   accepted_at: Generated<Timestamp>;
   id: Generated<Int8>;
@@ -801,6 +826,26 @@ export interface ServiceCategories {
   sort_order: Generated<number>;
 }
 
+export interface ServiceRequests {
+  category_code: string | null;
+  closed_at: Timestamp | null;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  last_matched_at: Timestamp | null;
+  /**
+   * Pourquoi chaque vitrine candidate a été retenue ou écartée au dernier passage, pour l'opérateur. [US-17]
+   */
+  match_log: Generated<Json>;
+  notify_later: Generated<boolean>;
+  postcode: string | null;
+  remote_ok: Generated<boolean>;
+  status: Generated<ServiceRequestStatus>;
+  text: string;
+  timing_text: string | null;
+  updated_at: Generated<Timestamp>;
+  user_id: string;
+}
+
 export interface Sessions {
   created_at: Generated<Timestamp>;
   device_id: string;
@@ -853,6 +898,24 @@ export interface Storefronts {
   updated_at: Generated<Timestamp>;
   user_id: string;
   version: Generated<number>;
+}
+
+export interface Suggestions {
+  buyer_user_id: string;
+  created_at: Generated<Timestamp>;
+  decided_at: Timestamp | null;
+  fit: string;
+  id: Generated<string>;
+  /**
+   * Règles d'éligibilité et pertinence, lisibles sans ouvrir le tchat
+   */
+  internal_reason: string;
+  reason: string;
+  request_id: string | null;
+  score: Numeric | null;
+  shown_at: Generated<Timestamp>;
+  status: Generated<SuggestionStatus>;
+  storefront_id: string;
 }
 
 export interface UserAgentInfoValues {
@@ -1056,6 +1119,7 @@ export interface DB {
   gift_occasion_states: GiftOccasionStates;
   gift_people: GiftPeople;
   idempotency_keys: IdempotencyKeys;
+  introductions: Introductions;
   legal_acceptances: LegalAcceptances;
   legal_document_versions: LegalDocumentVersions;
   logbook_entries: LogbookEntries;
@@ -1068,8 +1132,10 @@ export interface DB {
   schema_migrations: SchemaMigrations;
   security_events: SecurityEvents;
   service_categories: ServiceCategories;
+  service_requests: ServiceRequests;
   sessions: Sessions;
   storefronts: Storefronts;
+  suggestions: Suggestions;
   user_agent_info_values: UserAgentInfoValues;
   users: Users;
   v_account_guest_quota: VAccountGuestQuota;

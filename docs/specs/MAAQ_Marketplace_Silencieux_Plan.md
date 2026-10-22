@@ -1,6 +1,6 @@
 # Maaq silent marketplace — implementation plan
 
-Status: **confirmed on 2026-10-21**; Phase 1 built on `ulrichagents` (see `Vitrine-agent/README.md`). Based on the user stories US-01 to US-17 and on the way MAAQ runs agents today (kdo_help). The decisions in section 3 were confirmed with the clickable mock.
+Status: **confirmed on 2026-10-21**; Phase 1 built on `ulrichagents` (see `Vitrine-agent/README.md`); Phase 2 built on 2026-10-22 (buyer agent `coup_de_main`, matcher, consent screen, periodic re-match, migration `0009_marketplace_matching.sql`; see `Coup-de-main-agent/README.md`). Phases 3 and 4 pending. Based on the user stories US-01 to US-17 and on the way MAAQ runs agents today (kdo_help). The decisions in section 3 were confirmed with the clickable mock.
 
 ## 1. The feature in one paragraph
 
@@ -103,7 +103,7 @@ Both chats can ask for status at any time; every transition is a row, never a fr
 
 ### Phase 2 — Controlled matching pilot (US-09 to 12, US-14)
 
-- Tables `service_requests`, `suggestions`, `introductions` (part of 0008 or a 0009 if phase 1 ships first).
+- Tables `service_requests`, `suggestions`, `introductions` (migration `0009_marketplace_matching.sql`, since phase 1 shipped first).
 - `matching.ts` with eligibility + relevance + explanations; thresholds as constants in `rules.ts`.
 - Buyer agent brain + tools; seeded in Perso.
 - Consent screen Réglages › Suggestions de services (opt in/out, mute, agenda switch inactive); link from the buyer agent's gate when not opted in.

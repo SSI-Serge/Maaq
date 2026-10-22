@@ -35,6 +35,10 @@ Même réglage que kdo_help (`LOCAL_AGENTS_MODE=anthropic`, voir [Kdo-agent/agen
 
 Le bouton micro du tchat utilise la reconnaissance vocale du navigateur (Chrome, Android, Safari récent) : le texte reconnu remplit le champ de saisie, corrigeable avant envoi ; aucun enregistrement n'est conservé ni envoyé. Sans reconnaissance disponible, le bouton n'apparaît pas et le texte fonctionne à l'identique. Les messages vocaux WhatsApp ne sont pas transcrits.
 
+## Côté acheteur
+
+La suggestion d'une vitrine à un membre, la carte de mise en relation et le message reçu dans ce tchat (« Nouvelle demande de mise en relation pour votre vitrine… ») sont décrits dans [Coup-de-main-agent/README.md](../Coup-de-main-agent/README.md) (phase 2).
+
 ## Pas encore
 
-Suggestion à un acheteur, mise en relation, agent acheteur (phases 2 et 3 du plan), photos, recherche publique, transcription côté serveur, évaluations avec le vrai modèle.
+Réponse du fournisseur à une mise en relation et échange des coordonnées (phase 3 du plan), photos, recherche publique, transcription côté serveur, évaluations avec le vrai modèle.

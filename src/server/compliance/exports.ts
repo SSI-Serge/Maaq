@@ -115,6 +115,10 @@ interface Collected {
   channels: unknown[];
   /** Vitrine de service (agent vitrine), publiée ou non. */
   storefront: unknown;
+  /** Besoins exprimés à coup_de_main, suggestions reçues et mises en relation demandées. */
+  serviceRequests: unknown[];
+  suggestions: unknown[];
+  introductions: unknown[];
   digitorn: unknown;
 }
 
@@ -274,6 +278,11 @@ async function collect(db: Kysely<DB>, userId: string, now: Date): Promise<{ dat
   ]);
   // Vitrine de service : telle qu'enregistrée, contact déchiffré car c'est la donnée de la personne.
   const storefront = await new DbStorefrontStore(db).get(userId);
+  const [serviceRequests, suggestions, introductions] = await Promise.all([
+    db.selectFrom("service_requests").select(["text", "category_code", "postcode", "remote_ok", "timing_text", "status", "notify_later", "created_at", "closed_at"]).where("user_id", "=", userId).orderBy("created_at").execute(),
+    db.selectFrom("suggestions as s").leftJoin("storefronts as sf", "sf.id", "s.storefront_id").select(["sf.display_name", "s.reason", "s.fit", "s.status", "s.shown_at", "s.decided_at"]).where("s.buyer_user_id", "=", userId).orderBy("s.shown_at").execute(),
+    db.selectFrom("introductions as i").leftJoin("storefronts as sf", "sf.id", "i.storefront_id").select(["sf.display_name", "i.shared_text", "i.status", "i.requested_at", "i.answered_at", "i.connected_at"]).where("i.buyer_user_id", "=", userId).orderBy("i.requested_at").execute(),
+  ]);
   const birthday = (d: number | null, m: number | null, y: number | null) => (d && m ? `${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}${y ? `/${y}` : ""}` : null);
 
   const data: Collected = {
@@ -334,6 +343,9 @@ async function collect(db: Kysely<DB>, userId: string, now: Date): Promise<{ dat
           confirmeeLe: storefront.lastConfirmedAt,
         }
       : null,
+    serviceRequests: serviceRequests.map((r) => ({ besoin: r.text, categorie: r.category_code, codePostal: r.postcode, aDistance: r.remote_ok, quand: r.timing_text, statut: r.status, prevenirPlusTard: r.notify_later, creeLe: date(r.created_at), closLe: date(r.closed_at) })),
+    suggestions: suggestions.map((s) => ({ vitrine: s.display_name, raison: s.reason, certitude: s.fit, statut: s.status, montreeLe: date(s.shown_at), decideeLe: date(s.decided_at) })),
+    introductions: introductions.map((i) => ({ vitrine: i.display_name, texteTransmis: i.shared_text, statut: i.status, demandeeLe: date(i.requested_at), repondueLe: date(i.answered_at), miseEnRelationLe: date(i.connected_at) })),
     channels: channels.map((c) => ({ canal: c.channel, identifiant: c.external_id, consentement: c.opt_in, consentiLe: date(c.opt_in_at), versionDuTexte: c.consent_version, relieLe: date(c.linked_at), dernierMessageRecu: date(c.last_inbound_at) })),
     digitorn: digitornData,
   };

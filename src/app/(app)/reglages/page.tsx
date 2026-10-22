@@ -95,6 +95,15 @@ export default function SettingsPage() {
             </span>
             <span aria-hidden>›</span>
           </Link>
+          <Link href="/reglages/suggestions" className={s.navItem}>
+            <span>
+              Suggestions de services
+              <span className={s.muted} style={{ display: "block", fontWeight: 400, fontSize: 12 }}>
+                Vitrines de membres proposées par coup_de_main, catégories coupées
+              </span>
+            </span>
+            <span aria-hidden>›</span>
+          </Link>
           <Link href="/reglages/support" className={s.navItem}>
             Aide et support <span aria-hidden>›</span>
           </Link>

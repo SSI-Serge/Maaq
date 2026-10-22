@@ -1,14 +1,17 @@
 import { sql } from "kysely";
-import { digitorn } from "@/server/adapters/digitorn";
-import type { MockDigitorn } from "@/server/adapters/digitorn/mock";
 import { whatsapp } from "@/server/adapters/whatsapp";
 import type { Ctx } from "@/server/auth/service";
 import { cleanupExports } from "@/server/compliance/exports";
 import { runLifecycle, type LifecycleResult } from "@/server/compliance/lifecycle";
+import { anthropicLlm } from "@/server/agents/llm";
+import { postToAgentChat } from "@/server/agents/proactive";
+import { env } from "@/server/env";
+import { localDate } from "@/server/gifts/model";
 import { runGiftReminders, type ReminderResult } from "@/server/gifts/reminders";
 import { giftStore, prefsStore } from "@/server/gifts/service";
+import { matchStore } from "@/server/marketplace/buyer-service";
+import { runRematch, type RematchResult } from "@/server/marketplace/rematch";
 import { syncLogbook, type SyncResult } from "@/server/logbook/service";
-import { ensureDigitornRef } from "@/server/profile/digitorn-ref";
 import { integerSetting } from "@/server/settings";
 
 /**
@@ -28,6 +31,8 @@ export interface JobsResult {
   exports: { expired: number; failed: number };
   /** Rappels d'occasions de kdo_help et purge de ses effacements doux. */
   gifts: { reminders: ReminderResult; purged: number };
+  /** Demandes de service à réexaminer (marketplace silencieux) ; « off » sans modèle local. */
+  marketplace: RematchResult | "off";
 }
 
 /** Synchronise le carnet toutes les X heures (US-40 RT2) puis nettoie les données expirées (US-40 RT6, US-61 RT2, US-70 RT3). */
@@ -40,10 +45,28 @@ export async function runDueJobs(ctx: Ctx, options: { force?: boolean } = {}): P
   const lifecycle = await runLifecycle(ctx);
   const exports = await cleanupExports(ctx);
   const gifts = await runGiftJobs(ctx);
-  if (!due) return { logbook: "not_due", purged: null, lifecycle, exports, gifts };
+  const marketplace = await runMarketplaceJobs(ctx);
+  if (!due) return { logbook: "not_due", purged: null, lifecycle, exports, gifts, marketplace };
 
   const logbook = await syncLogbook(ctx);
-  return { logbook, purged: await purgeExpired(ctx), lifecycle, exports, gifts };
+  return { logbook, purged: await purgeExpired(ctx), lifecycle, exports, gifts, marketplace };
+}
+
+/** Réexamen des demandes de service « me prévenir » contre les vitrines publiées depuis ; sans modèle local, rien ne tourne. */
+export async function runMarketplaceJobs(ctx: Ctx): Promise<JobsResult["marketplace"]> {
+  const { LOCAL_AGENTS_MODE, LOCAL_AGENTS_MODEL } = env();
+  if (LOCAL_AGENTS_MODE === "off") return "off";
+  const firstNameOf = async (userId: string) => (await ctx.db.selectFrom("users").select("first_name").where("id", "=", userId).executeTakeFirst())?.first_name ?? null;
+  return runRematch(
+    {
+      store: matchStore(ctx.db),
+      llm: anthropicLlm({ model: LOCAL_AGENTS_MODEL }),
+      now: ctx.now,
+      today: localDate(ctx.now, "Europe/Paris"),
+      postInApp: (userId, text) => postToAgentChat(ctx.db, userId, "coup_de_main", text),
+    },
+    firstNameOf,
+  );
 }
 
 /** Rappels d'occasions (dans l'application via le tchat de kdo_help, et sur WhatsApp) puis purge des effacements doux. */
@@ -55,13 +78,7 @@ export async function runGiftJobs(ctx: Ctx): Promise<JobsResult["gifts"]> {
     store,
     prefs: prefsStore(ctx.db),
     transport: whatsapp(),
-    postInApp: async (userId, text) => {
-      // En mode « live », le client réel expose le simulateur qui porte les agents locaux.
-      const client = digitorn() as { simulator?: unknown };
-      const simulator = (client.simulator ?? client) as Partial<MockDigitorn>;
-      if (typeof simulator.postAgentMessage !== "function") throw new Error("Message proactif d'agent : pas encore disponible hors simulateur Digitorn.");
-      simulator.postAgentMessage(await ensureDigitornRef(ctx.db, userId), "kdo_help", text);
-    },
+    postInApp: (userId, text) => postToAgentChat(ctx.db, userId, "kdo_help", text),
   });
   const purged = await store.purgeDeleted(new Date(ctx.now.getTime() - GIFT_UNDO_DAYS * 86_400_000));
   return { reminders, purged };

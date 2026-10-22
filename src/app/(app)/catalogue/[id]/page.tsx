@@ -121,6 +121,16 @@ function SheetBody({ sheet, onChanged }: { sheet: Sheet; onChanged: () => void }
         </Section>
       )}
 
+      {sheet.digitornRef === "coup_de_main" && (
+        <Section title="Suggestions de services">
+          <p className={s.muted}>
+            Décrivez ce que vous cherchez dans le tchat : coup_de_main propose au plus trois vitrines de membres, avec la raison de chacune, et vous demande votre validation avant toute mise en relation. Pour être prévenu quand une vitrine correspondante arrive, activez les suggestions.
+          </p>
+          <Link href="/reglages/suggestions" className={s.smallButton}>
+            Réglages › Suggestions de services
+          </Link>
+        </Section>
+      )}
       {sheet.digitornRef === "vitrine" && (
         <Section title="Ma vitrine">
           <p className={s.muted}>Tout ce qu&apos;un membre peut voir de votre service. Modifiez une ligne sans recommencer la conversation ; rien n&apos;est visible tant que vous n&apos;avez pas publié.</p>
