@@ -1,3 +1,4 @@
+import { placesDirectory } from "@/server/adapters/places";
 import { db } from "@/server/db/client";
 import { env } from "@/server/env";
 import { giftStore, prefsStore, userIdOfRef } from "@/server/gifts/service";
@@ -32,6 +33,6 @@ export function localBrains(): AgentBrain[] {
   return [
     kdoHelpBrain(llm, { store: giftStore(), prefs: prefsStore(), userIdOf }),
     vitrineBrain(llm, { store: storefrontStore(), userIdOf }),
-    coupDeMainBrain(llm, { store: matchStore(), profileOf, notifySupplier }),
+    coupDeMainBrain(llm, { store: matchStore(), profileOf, notifySupplier, directory: placesDirectory() }),
   ];
 }

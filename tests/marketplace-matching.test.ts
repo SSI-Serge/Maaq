@@ -272,7 +272,7 @@ describe("coup_de_main — agent avec faux modèle", () => {
     const { store, brain, steps, relevance } = setup();
     steps.push({ calls: [{ tool: "demander_service", input: { texte: "un plombier", categorie: "bricolage", code_postal: "69007" } }, { tool: "chercher", input: {} }], text: (r) => r[1] });
     const search = await brain.generate(turn("Un plombier à Lyon"));
-    expect(search.reply.text).toContain("Aucun fournisseur à proposer pour l'instant : aucune vitrine publiée dans cette catégorie");
+    expect(search.reply.text).toContain("Aucune vitrine de membre à proposer pour l'instant : aucune vitrine publiée dans cette catégorie");
     expect(search.reply.text).toContain("N'inventez rien");
     expect(relevance.calls).toHaveLength(0);
     const request = (await store.listRequests("camille"))[0];

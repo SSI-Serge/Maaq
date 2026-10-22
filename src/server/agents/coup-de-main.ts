@@ -1,9 +1,11 @@
+import type { PlacesDirectory } from "@/server/adapters/places/types";
 import { localDate } from "@/server/gifts/model";
 import type { MatchStore } from "@/server/marketplace/match-store";
 import { SERVICE_CATEGORIES } from "@/server/marketplace/model";
 import { coupDeMainTools, describeRequest, INTRODUCTION_STATUS_TEXT, newCollector, SUGGESTION_STATUS_TEXT, type TurnCollector } from "./coup-de-main-tools";
 import { buildMessages } from "./messages";
 import type { AgentBrain, AgentTurnInput, BrainReply, LlmClient } from "./types";
+import type { ExternalBlock } from "@/server/marketplace/external";
 import type { MatchOutcome } from "@/server/marketplace/matching";
 
 /**
@@ -29,6 +31,7 @@ Démarche :
 Règles :
 - Disponibilité « à convenir » signifie non confirmée : ne dis jamais que le fournisseur est disponible. Un tarif « sur devis » n'est pas un prix.
 - Une vitrine « à distance » n'est pas près de chez la personne : dis-le ainsi.
+- Le bloc « Hors MAAQ » liste des établissements qui ne sont pas membres : présente-le à part, avec la note et le nombre d'avis tels quels, et dis que la personne les contacte elle-même. Jamais de mise en relation pour eux.
 - Les coordonnées du fournisseur ne sont jamais transmises avant son accord ; les coordonnées de la personne ne le sont jamais par toi.
 - Ne crée pas de nouvelle demande pour une précision sur la demande en cours : complète-la (demande_id).
 - Catégories possibles (code : libellé) : ${SERVICE_CATEGORIES.map((c) => `${c.code} : ${c.label}`).join(" ; ")}.
@@ -50,6 +53,8 @@ export interface BrainDeps {
   profileOf?: (userRef: string) => Promise<Profile | null>;
   /** Dépose un message dans le tchat vitrine d'un fournisseur ; par défaut, rien (tests sans simulateur). */
   notifySupplier?: (supplierUserId: string, text: string) => Promise<void>;
+  /** Annuaire externe (phase 2c) ; absent = jamais de bloc « Hors MAAQ ». */
+  directory?: PlacesDirectory | null;
   now?: () => Date;
 }
 
@@ -98,6 +103,7 @@ export interface CoupDeMainGeneration {
   calls: string[];
   problems: string[];
   outcomes: MatchOutcome[];
+  external: ExternalBlock[];
 }
 
 export interface CoupDeMainBrain extends AgentBrain {
@@ -114,14 +120,14 @@ export function coupDeMainBrain(llm: LlmClient, deps: BrainDeps): CoupDeMainBrai
 
     async generate(input) {
       const profile = await profileOf(input.userRef);
-      if (!profile) return { reply: { text: "Je ne retrouve pas votre profil. Reconnectez-vous à MAAQ.", proposals: [] }, calls: [], problems: ["profil inconnu"], outcomes: [] };
+      if (!profile) return { reply: { text: "Je ne retrouve pas votre profil. Reconnectez-vous à MAAQ.", proposals: [] }, calls: [], problems: ["profil inconnu"], outcomes: [], external: [] };
 
       const today = localDate(input.today, input.timezone);
       const collector: TurnCollector = newCollector();
-      const tools = coupDeMainTools({ store: deps.store, llm, userId: profile.id, firstName: profile.firstName, postcode: profile.postcode ?? null, today, now, notifySupplier }, collector);
+      const tools = coupDeMainTools({ store: deps.store, llm, userId: profile.id, firstName: profile.firstName, postcode: profile.postcode ?? null, today, now, notifySupplier, directory: deps.directory ?? null }, collector);
       const context = await contextBlock(deps, profile.id, input, today);
       const { text } = await llm.runTools({ system: SYSTEM_PROMPT, messages: buildMessages(input, context), tools, maxIterations: 8 });
-      return { reply: { text: text || COUP_DE_MAIN_FAILURE_MESSAGE, proposals: collector.proposals }, calls: collector.calls, problems: collector.problems, outcomes: collector.outcomes };
+      return { reply: { text: text || COUP_DE_MAIN_FAILURE_MESSAGE, proposals: collector.proposals }, calls: collector.calls, problems: collector.problems, outcomes: collector.outcomes, external: collector.external };
     },
 
     async respond(input) {

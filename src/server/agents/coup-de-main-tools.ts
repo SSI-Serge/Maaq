@@ -1,6 +1,8 @@
 import { betaZodTool } from "@anthropic-ai/sdk/helpers/beta/zod";
 import type { BetaRunnableTool } from "@anthropic-ai/sdk/lib/tools/BetaRunnableTool";
 import { z } from "zod";
+import type { PlacesDirectory } from "@/server/adapters/places/types";
+import { renderExternal, searchExternal, type ExternalBlock } from "@/server/marketplace/external";
 import { draftSharedText, proposalSummary, supplierNotice } from "@/server/marketplace/introduction";
 import { IntroductionOpen, type EligibleStorefront, type Introduction, type MatchStore, type ServiceRequest, type Suggestion } from "@/server/marketplace/match-store";
 import { matchRequest, renderSuggestions, viewOf, type MatchOutcome } from "@/server/marketplace/matching";
@@ -25,6 +27,8 @@ export interface ToolDeps {
   now: () => Date;
   /** Dépose un message dans le tchat vitrine du fournisseur (après validation de la carte). */
   notifySupplier: (supplierUserId: string, text: string) => Promise<void>;
+  /** Annuaire externe quand l'offre des membres est mince ; null = aucun. */
+  directory?: PlacesDirectory | null;
 }
 
 export interface TurnCollector {
@@ -33,10 +37,12 @@ export interface TurnCollector {
   /** Refus des contrôles objectifs et résultats de recherche, pour les évaluations. */
   problems: string[];
   outcomes: MatchOutcome[];
+  /** Blocs d'annuaire externe montrés (tests). */
+  external: ExternalBlock[];
 }
 
 export function newCollector(): TurnCollector {
-  return { calls: [], proposals: [], problems: [], outcomes: [] };
+  return { calls: [], proposals: [], problems: [], outcomes: [], external: [] };
 }
 
 const CATEGORY_CODES = SERVICE_CATEGORIES.map((c) => c.code) as [string, ...string[]];
@@ -138,7 +144,7 @@ export function coupDeMainTools(deps: ToolDeps, collector: TurnCollector): BetaR
   const chercher = betaZodTool({
     name: "chercher",
     description:
-      "Cherche des vitrines pour une demande enregistrée et montre au plus trois suggestions, avec la raison de chacune. Recopie le résultat tel quel (il ne promet rien que la vitrine ne dise). Sans résultat, dis-le honnêtement et proposez d'être prévenu si un fournisseur apparaît (prevenir_plus_tard).",
+      "Cherche des vitrines pour une demande enregistrée et montre au plus trois suggestions, avec la raison de chacune. Recopie le résultat tel quel (il ne promet rien que la vitrine ne dise). Quand les vitrines manquent, un bloc « Hors MAAQ » peut compléter avec des établissements trouvés dans un annuaire : recopie-le aussi, à part, sans jamais proposer de mise en relation pour eux. Sans aucun résultat, dis-le honnêtement et proposez d'être prévenu si un fournisseur apparaît (prevenir_plus_tard).",
     inputSchema: z.object({ demande_id: z.string().uuid().optional().describe("Par défaut, la demande la plus récente") }),
     run: async ({ demande_id }) => {
       note("chercher");
@@ -157,11 +163,22 @@ export function coupDeMainTools(deps: ToolDeps, collector: TurnCollector): BetaR
         return "Échec : la recherche n'a pas abouti (service momentanément indisponible). Dites-le simplement et proposez de réessayer plus tard.";
       }
       collector.outcomes.push(outcome);
+      // Vitrines de membres d'abord ; hors MAAQ seulement pour compléter, et seulement une catégorie et un code postal sortent.
+      let external: ExternalBlock | null = null;
+      if (deps.directory) {
+        try {
+          external = await searchExternal(deps.directory, request, await categoryLabel(), outcome.suggestions.length);
+        } catch (error) {
+          collector.problems.push(`annuaire externe indisponible : ${(error as Error).message}`);
+        }
+      }
+      if (external) collector.external.push(external);
+      const externalText = external ? `\n\n${renderExternal(external)}` : "";
       if (outcome.suggestions.length === 0) {
         const why = outcome.candidates === 0 ? "aucune vitrine publiée dans cette catégorie" : outcome.eligible === 0 ? "aucune vitrine ne dessert cette zone (ni à distance), ou toutes ont déjà été proposées ou écartées" : "les vitrines trouvées ne correspondent pas assez au besoin";
-        return `Aucun fournisseur à proposer pour l'instant : ${why}. N'inventez rien. Proposez à la personne d'être prévenue si un fournisseur apparaît (prevenir_plus_tard).`;
+        return `Aucune vitrine de membre à proposer pour l'instant : ${why}. N'inventez rien. Proposez à la personne d'être prévenue si un membre publie une vitrine (prevenir_plus_tard).${externalText}`;
       }
-      return `${outcome.suggestions.length} suggestion(s) pour la demande ${request.id}. Présentez-les telles quelles, puis demandez si l'une l'intéresse (interesse), ou s'il faut en écarter (ignorer) :\n\n${renderSuggestions(outcome.suggestions)}`;
+      return `${outcome.suggestions.length} suggestion(s) pour la demande ${request.id}. Présentez-les telles quelles, puis demandez si l'une l'intéresse (interesse), ou s'il faut en écarter (ignorer) :\n\n${renderSuggestions(outcome.suggestions)}${externalText}`;
     },
   });
 

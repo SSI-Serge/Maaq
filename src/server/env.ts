@@ -41,8 +41,8 @@ const schema = z.object({
   DRIVE_MODE: z.enum(["local"]).default("local"),
   /** Agenda lu par le marketplace silencieux : « none » = aucun ; « dev » = agenda de démonstration (/dev/agenda). Le calendrier maître de MAAQ se branchera ici. */
   CALENDAR_MODE: z.enum(["none", "dev"]).default("dev"),
-  /** Annuaire externe quand l'offre des membres est mince : « off », « dev » (résultats fictifs) ou « google » (Google Places API (New), clé requise). */
-  PLACES_MODE: z.enum(["off", "dev", "google"]).default("dev"),
+  /** Annuaire externe quand l'offre des membres est mince : « off », « dev » (résultats fictifs), « sirene » (registre public, sans clé) ou « google » (Google Places API (New) puis Sirene, clé requise). */
+  PLACES_MODE: z.enum(["off", "dev", "sirene", "google"]).default("dev"),
   GOOGLE_PLACES_API_KEY: z.string().min(1).optional(),
   CRON_SECRET: z.string().min(16, "au moins 16 caractères"),
   /** Secret de l'outil de facturation qui signale désabonnements et réabonnements (US-58 RT2). Sans lui, ce point d'entrée est fermé. */
