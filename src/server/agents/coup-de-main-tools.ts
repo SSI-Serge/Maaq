@@ -18,6 +18,8 @@ export interface ToolDeps {
   llm: Pick<LlmClient, "complete">;
   userId: string;
   firstName: string;
+  /** Code postal du profil : zone par défaut d'une demande qui n'en donne pas. */
+  postcode: string | null;
   /** Jour civil de l'acheteur, AAAA-MM-JJ. */
   today: string;
   now: () => Date;
@@ -40,7 +42,7 @@ export function newCollector(): TurnCollector {
 const CATEGORY_CODES = SERVICE_CATEGORIES.map((c) => c.code) as [string, ...string[]];
 const POSTCODE = /^\d{5}$/;
 
-export const REQUEST_STATUS_TEXT: Record<ServiceRequest["status"], string> = { open: "ouverte", suggested: "suggestions envoyées", closed: "close" };
+export const REQUEST_STATUS_TEXT: Record<ServiceRequest["status"], string> = { proposed: "issue de votre agenda, en attente de votre réponse", open: "ouverte", suggested: "suggestions envoyées", closed: "close" };
 export const SUGGESTION_STATUS_TEXT: Record<Suggestion["status"], string> = { shown: "proposée", interested: "intéressé(e), mise en relation demandée", dismissed: "écartée", muted: "catégorie coupée", expired: "expirée" };
 export const INTRODUCTION_STATUS_TEXT: Record<Introduction["status"], string> = {
   requested: "demandée, en attente du fournisseur",
@@ -60,7 +62,7 @@ export function missingBeforeSearch(request: ServiceRequest): string[] {
 
 export function describeRequest(r: ServiceRequest, categoryLabel: (code: string) => string): string {
   const dep = r.postcode ? departementOf(r.postcode) : null;
-  return `[demande ${r.id}] « ${r.text} » — catégorie ${r.categoryCode ? categoryLabel(r.categoryCode) : "non précisée"}, zone ${dep ? `département ${dep}` : r.remoteOk ? "à distance" : "non précisée"}, quand : ${r.timingText ?? "non précisé"}, état ${REQUEST_STATUS_TEXT[r.status]}${r.notifyLater ? ", à prévenir si un fournisseur apparaît" : ""}`;
+  return `[demande ${r.id}] « ${r.text} » — catégorie ${r.categoryCode ? categoryLabel(r.categoryCode) : "non précisée"}, zone ${dep ? `département ${dep}` : r.remoteOk ? "à distance" : "non précisée"}, quand : ${r.timingText ?? "non précisé"}, état ${REQUEST_STATUS_TEXT[r.status]}${r.notifyLater ? ", à prévenir si un fournisseur apparaît" : ""}${r.source === "agenda" && r.status === "proposed" ? " (oui → chercher ; non → clore_demande)" : ""}`;
 }
 
 export function coupDeMainTools(deps: ToolDeps, collector: TurnCollector): BetaRunnableTool[] {
@@ -123,10 +125,13 @@ export function coupDeMainTools(deps: ToolDeps, collector: TurnCollector): BetaR
         });
       } else {
         if (!input.texte) return refuse("le texte du besoin est indispensable pour une nouvelle demande.");
-        request = await store.createRequest(userId, { text: input.texte, categoryCode: input.categorie ?? null, postcode: input.code_postal ?? null, remoteOk: input.a_distance ?? false, timingText: input.quand ?? null });
+        // Sans code postal dans la demande, celui du profil sert de zone par défaut.
+        const postcode = input.code_postal ?? (input.a_distance ? null : deps.postcode);
+        request = await store.createRequest(userId, { text: input.texte, categoryCode: input.categorie ?? null, postcode, remoteOk: input.a_distance ?? false, timingText: input.quand ?? null });
       }
       const missing = missingBeforeSearch(request);
-      return `${describeRequest(request, label)}\n${missing.length ? `Avant de chercher, il manque : ${missing.join(" ; ")}. Demandez-le en une question courte.` : "Prête : appelez chercher."}`;
+      const fromProfile = !input.code_postal && request.postcode && request.postcode === deps.postcode ? " Zone prise sur le profil (code postal des Réglages) : dites-le si la personne cherche ailleurs." : "";
+      return `${describeRequest(request, label)}\n${missing.length ? `Avant de chercher, il manque : ${missing.join(" ; ")}. Demandez-le en une question courte.` : `Prête : appelez chercher.${fromProfile}`}`;
     },
   });
 
@@ -142,6 +147,8 @@ export function coupDeMainTools(deps: ToolDeps, collector: TurnCollector): BetaR
       if (request.status === "closed") return refuse("cette demande est close.");
       const missing = missingBeforeSearch(request);
       if (missing.length) return refuse(`avant de chercher, il manque ${missing.join(" ; ")} (demander_service avec demande_id).`);
+      // Une demande issue de l'agenda ne se cherche que sur le oui de la personne : c'est cet appel.
+      if (request.status === "proposed") await store.updateRequest(userId, request.id, { status: "open" });
       let outcome: MatchOutcome;
       try {
         outcome = await matchRequest({ store, llm: deps.llm, now: deps.now, today: deps.today }, request);
@@ -275,6 +282,19 @@ export function coupDeMainTools(deps: ToolDeps, collector: TurnCollector): BetaR
     },
   });
 
+  const clore = betaZodTool({
+    name: "clore_demande",
+    description: "Clôt une demande : la personne n'en veut plus (par exemple « non » à une demande issue de son agenda). Rien ne sera plus cherché ni proposé pour elle.",
+    inputSchema: z.object({ demande_id: z.string().uuid().optional().describe("Par défaut, la demande la plus récente") }),
+    run: async ({ demande_id }) => {
+      note("clore_demande");
+      const request = await requestOf(demande_id);
+      if (typeof request === "string") return request;
+      await store.updateRequest(userId, request.id, { status: "closed", notifyLater: false, closedAt: deps.now().toISOString() });
+      return "Demande close : je n'en reparlerai pas.";
+    },
+  });
+
   const statut = betaZodTool({
     name: "statut",
     description: "État des demandes, suggestions en cours et mises en relation de la personne.",
@@ -304,7 +324,7 @@ export function coupDeMainTools(deps: ToolDeps, collector: TurnCollector): BetaR
     },
   });
 
-  return [demander, chercher, prevenir, voir, interesse, ignorer, couper, statut];
+  return [demander, chercher, prevenir, voir, interesse, ignorer, couper, clore, statut];
 }
 
 export { viewOf };

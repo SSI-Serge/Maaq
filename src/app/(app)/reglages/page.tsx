@@ -16,6 +16,7 @@ interface Profile {
   id: string;
   firstName: string;
   lastName: string;
+  postcode: string | null;
   email: string;
   role: "primary_user" | "guest" | "admin";
   guestRank: "core" | "secondary" | null;
@@ -147,12 +148,12 @@ function MyInformation({ profile }: { profile: Profile }) {
   const reloadSession = useSessionReload();
   const [current, setCurrent] = useState(profile);
   const [editing, setEditing] = useState(false);
-  const [form, setForm] = useState({ firstName: profile.firstName, lastName: profile.lastName });
+  const [form, setForm] = useState({ firstName: profile.firstName, lastName: profile.lastName, postcode: profile.postcode ?? "" });
   const [abandoning, setAbandoning] = useState(false);
   const [saved, setSaved] = useState(false);
   const mutation = useApiMutation();
   const errors = mutation.error?.body?.code === "invalid_info" ? (mutation.error.body.details as Record<string, string>) : {};
-  const dirty = form.firstName !== current.firstName || form.lastName !== current.lastName;
+  const dirty = form.firstName !== current.firstName || form.lastName !== current.lastName || form.postcode !== (current.postcode ?? "");
 
   async function save() {
     const result = await mutation.run<Profile>("/api/profile", { method: "PATCH", body: form });
@@ -185,6 +186,7 @@ function MyInformation({ profile }: { profile: Profile }) {
         <div className={s.form}>
           <Field label="Prénom" value={form.firstName} error={errors.firstName} maxLength={100} onChange={(e) => setForm({ ...form, firstName: e.target.value })} />
           <Field label="Nom" value={form.lastName} error={errors.lastName} maxLength={100} onChange={(e) => setForm({ ...form, lastName: e.target.value })} />
+          <Field label="Code postal" value={form.postcode} error={errors.postcode} maxLength={5} inputMode="numeric" hint="Facultatif. Sert de zone par défaut aux suggestions de services de coup_de_main ; jamais une adresse." onChange={(e) => setForm({ ...form, postcode: e.target.value })} />
           <Field label="Email de connexion" value={current.email} disabled readOnly hint="L'email de connexion n'est pas modifiable ici." />
           {mutation.error?.body?.code !== "invalid_info" && <ErrorLine error={mutation.error} onRetry={save} />}
           <div className={s.row}>
@@ -200,6 +202,7 @@ function MyInformation({ profile }: { profile: Profile }) {
         <>
           <p className={s.text}>
             {current.firstName} {current.lastName} · {current.email}
+            {current.postcode && ` · ${current.postcode}`}
           </p>
           {saved && <Notice tone="success">✓ Informations mises à jour</Notice>}
         </>
@@ -210,7 +213,7 @@ function MyInformation({ profile }: { profile: Profile }) {
           confirmLabel="Abandonner"
           onConfirm={() => {
             setAbandoning(false);
-            setForm({ firstName: current.firstName, lastName: current.lastName });
+            setForm({ firstName: current.firstName, lastName: current.lastName, postcode: current.postcode ?? "" });
             setEditing(false);
           }}
           onCancel={() => setAbandoning(false)}

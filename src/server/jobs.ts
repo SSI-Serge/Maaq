@@ -5,10 +5,12 @@ import { cleanupExports } from "@/server/compliance/exports";
 import { runLifecycle, type LifecycleResult } from "@/server/compliance/lifecycle";
 import { anthropicLlm } from "@/server/agents/llm";
 import { postToAgentChat } from "@/server/agents/proactive";
+import { calendarSource } from "@/server/adapters/calendar";
 import { env } from "@/server/env";
 import { localDate } from "@/server/gifts/model";
 import { runGiftReminders, type ReminderResult } from "@/server/gifts/reminders";
 import { giftStore, prefsStore } from "@/server/gifts/service";
+import { runAgendaScan, type AgendaScanResult } from "@/server/marketplace/agenda";
 import { matchStore } from "@/server/marketplace/buyer-service";
 import { runRematch, type RematchResult } from "@/server/marketplace/rematch";
 import { syncLogbook, type SyncResult } from "@/server/logbook/service";
@@ -31,8 +33,8 @@ export interface JobsResult {
   exports: { expired: number; failed: number };
   /** Rappels d'occasions de kdo_help et purge de ses effacements doux. */
   gifts: { reminders: ReminderResult; purged: number };
-  /** Demandes de service à réexaminer (marketplace silencieux) ; « off » sans modèle local. */
-  marketplace: RematchResult | "off";
+  /** Demandes de service à réexaminer et agenda examiné (marketplace silencieux) ; « off » sans modèle local. */
+  marketplace: { rematch: RematchResult; agenda: AgendaScanResult } | "off";
 }
 
 /** Synchronise le carnet toutes les X heures (US-40 RT2) puis nettoie les données expirées (US-40 RT6, US-61 RT2, US-70 RT3). */
@@ -57,16 +59,13 @@ export async function runMarketplaceJobs(ctx: Ctx): Promise<JobsResult["marketpl
   const { LOCAL_AGENTS_MODE, LOCAL_AGENTS_MODEL } = env();
   if (LOCAL_AGENTS_MODE === "off") return "off";
   const firstNameOf = async (userId: string) => (await ctx.db.selectFrom("users").select("first_name").where("id", "=", userId).executeTakeFirst())?.first_name ?? null;
-  return runRematch(
-    {
-      store: matchStore(ctx.db),
-      llm: anthropicLlm({ model: LOCAL_AGENTS_MODEL }),
-      now: ctx.now,
-      today: localDate(ctx.now, "Europe/Paris"),
-      postInApp: (userId, text) => postToAgentChat(ctx.db, userId, "coup_de_main", text),
-    },
-    firstNameOf,
-  );
+  const store = matchStore(ctx.db);
+  const llm = anthropicLlm({ model: LOCAL_AGENTS_MODEL });
+  const today = localDate(ctx.now, "Europe/Paris");
+  const postInApp = (userId: string, text: string) => postToAgentChat(ctx.db, userId, "coup_de_main", text);
+  const rematch = await runRematch({ store, llm, now: ctx.now, today, postInApp }, firstNameOf);
+  const agenda = await runAgendaScan({ store, calendar: calendarSource(), llm, now: ctx.now, today, postInApp });
+  return { rematch, agenda };
 }
 
 /** Rappels d'occasions (dans l'application via le tchat de kdo_help, et sur WhatsApp) puis purge des effacements doux. */

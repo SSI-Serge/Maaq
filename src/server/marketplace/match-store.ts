@@ -9,7 +9,9 @@ import type { StorefrontStore } from "./store";
  * une version en mémoire pour les tests et les évaluations sans base.
  */
 
-export type RequestStatus = "open" | "suggested" | "closed";
+/** proposed : déduite de l'agenda, en attente du oui de la personne avant toute recherche. */
+export type RequestStatus = "proposed" | "open" | "suggested" | "closed";
+export type RequestSource = "chat" | "agenda";
 export type SuggestionStatus = "shown" | "interested" | "dismissed" | "muted" | "expired";
 export type SuggestionFit = "strong" | "possible";
 export type IntroductionStatus = "requested" | "accepted" | "declined" | "question" | "connected" | "expired";
@@ -39,6 +41,10 @@ export interface ServiceRequest {
   /** L'acheteur accepte un service à distance : la zone n'est alors pas indispensable. */
   remoteOk: boolean;
   timingText: string | null;
+  source: RequestSource;
+  /** Clé opaque de l'événement d'agenda à l'origine de la demande, et sa date (jamais le titre). */
+  agendaEventKey: string | null;
+  agendaEventDate: string | null;
   status: RequestStatus;
   notifyLater: boolean;
   lastMatchedAt: string | null;
@@ -54,9 +60,14 @@ export interface RequestInput {
   postcode?: string | null;
   remoteOk?: boolean;
   timingText?: string | null;
+  source?: RequestSource;
+  agendaEventKey?: string | null;
+  agendaEventDate?: string | null;
+  /** « proposed » pour une demande issue de l'agenda ; « open » par défaut. */
+  status?: "proposed" | "open";
 }
 
-export interface RequestPatch extends Partial<RequestInput> {
+export interface RequestPatch extends Omit<Partial<RequestInput>, "status" | "source" | "agendaEventKey" | "agendaEventDate"> {
   status?: RequestStatus;
   notifyLater?: boolean;
   lastMatchedAt?: string | null;
@@ -112,8 +123,10 @@ export interface IntroductionInput {
 
 export interface MarketplacePrefs {
   suggestionsOptIn: boolean;
-  /** Stocké dès maintenant, inactif tant que la lecture d'agenda n'est pas construite. */
+  /** Lecture de l'agenda pour repérer un besoin : consentement propre, texte et version distincts. */
   agendaOptIn: boolean;
+  agendaOptInAt: string | null;
+  agendaConsentVersion: string | null;
   mutedCategories: string[];
   optInAt: string | null;
   consentVersion: string | null;
@@ -123,9 +136,18 @@ export interface PrefsPatch {
   suggestionsOptIn?: boolean;
   mutedCategories?: string[];
   consentVersion?: string;
+  agendaOptIn?: boolean;
+  agendaConsentVersion?: string;
 }
 
-export const DEFAULT_PREFS: MarketplacePrefs = { suggestionsOptIn: false, agendaOptIn: false, mutedCategories: [], optInAt: null, consentVersion: null };
+export const DEFAULT_PREFS: MarketplacePrefs = { suggestionsOptIn: false, agendaOptIn: false, agendaOptInAt: null, agendaConsentVersion: null, mutedCategories: [], optInAt: null, consentVersion: null };
+
+/** Profil lu par le marketplace : prénom et zone par défaut. */
+export interface BuyerProfile {
+  userId: string;
+  firstName: string;
+  postcode: string | null;
+}
 
 export interface EligibleFilter {
   /** Catégorie demandée ; null = toutes. */
@@ -152,6 +174,11 @@ export interface MatchStore {
   updateRequest(userId: string, id: string, patch: RequestPatch): Promise<ServiceRequest>;
   /** Demandes ouvertes à réexaminer plus tard, tous profils confondus, avec le consentement de chacun. */
   listNotifyLaterRequests(): Promise<{ request: ServiceRequest; prefs: MarketplacePrefs }[]>;
+  /** Profils actifs qui ont consenti à la lecture de l'agenda (et aux suggestions). */
+  listAgendaProfiles(): Promise<BuyerProfile[]>;
+  /** Parmi des clés d'événements, celles jamais examinées pour ce profil. */
+  unseenAgendaKeys(userId: string, keys: string[]): Promise<string[]>;
+  markAgendaSeen(userId: string, keys: string[]): Promise<void>;
 
   addSuggestions(inputs: SuggestionInput[]): Promise<Suggestion[]>;
   getSuggestion(buyerUserId: string, id: string): Promise<Suggestion | null>;
@@ -230,11 +257,35 @@ export class MemoryMatchStore implements MatchStore {
   private readonly suggestions = new Map<string, Suggestion>();
   private readonly introductions = new Map<string, Introduction>();
   private readonly prefs = new Map<string, MarketplacePrefs>();
+  private readonly seen = new Map<string, Set<string>>();
+  /** Profils connus de la version en mémoire (tests) : prénom et code postal. */
+  readonly profiles = new Map<string, { firstName: string; postcode: string | null }>();
 
   constructor(
     private readonly storefronts: StorefrontStore,
     private readonly now: () => Date = () => new Date(),
   ) {}
+
+  async listAgendaProfiles(): Promise<BuyerProfile[]> {
+    const out: BuyerProfile[] = [];
+    for (const [userId, prefs] of this.prefs) {
+      if (!prefs.agendaOptIn || !prefs.suggestionsOptIn) continue;
+      const profile = this.profiles.get(userId);
+      out.push({ userId, firstName: profile?.firstName ?? userId, postcode: profile?.postcode ?? null });
+    }
+    return out;
+  }
+
+  async unseenAgendaKeys(userId: string, keys: string[]): Promise<string[]> {
+    const seen = this.seen.get(userId) ?? new Set();
+    return keys.filter((key) => !seen.has(key));
+  }
+
+  async markAgendaSeen(userId: string, keys: string[]): Promise<void> {
+    const seen = this.seen.get(userId) ?? new Set();
+    for (const key of keys) seen.add(key);
+    this.seen.set(userId, seen);
+  }
 
   async listEligible(today: string, filter: EligibleFilter): Promise<EligibleStorefront[]> {
     const all = await this.storefronts.listEligible(today);
@@ -264,7 +315,10 @@ export class MemoryMatchStore implements MatchStore {
       postcode: input.postcode ?? null,
       remoteOk: input.remoteOk ?? false,
       timingText: input.timingText ?? null,
-      status: "open",
+      source: input.source ?? "chat",
+      agendaEventKey: input.agendaEventKey ?? null,
+      agendaEventDate: input.agendaEventDate ?? null,
+      status: input.status ?? "open",
       notifyLater: false,
       lastMatchedAt: null,
       matchLog: [],
@@ -272,6 +326,7 @@ export class MemoryMatchStore implements MatchStore {
       createdAt: at,
       updatedAt: at,
     };
+    if (request.agendaEventKey && [...this.requests.values()].some((r) => r.userId === userId && r.agendaEventKey === request.agendaEventKey)) throw new Error("Une demande existe déjà pour cet événement d'agenda.");
     this.requests.set(request.id, request);
     return structuredClone(request);
   }
@@ -407,6 +462,11 @@ export class MemoryMatchStore implements MatchStore {
       next.optInAt = patch.suggestionsOptIn ? this.now().toISOString() : null;
       next.consentVersion = patch.suggestionsOptIn ? (patch.consentVersion ?? current.consentVersion) : null;
     } else if (patch.consentVersion !== undefined && next.suggestionsOptIn) next.consentVersion = patch.consentVersion;
+    if (patch.agendaOptIn !== undefined && patch.agendaOptIn !== current.agendaOptIn) {
+      next.agendaOptIn = patch.agendaOptIn;
+      next.agendaOptInAt = patch.agendaOptIn ? this.now().toISOString() : null;
+      next.agendaConsentVersion = patch.agendaOptIn ? (patch.agendaConsentVersion ?? current.agendaConsentVersion) : null;
+    }
     this.prefs.set(userId, next);
     return structuredClone(next);
   }

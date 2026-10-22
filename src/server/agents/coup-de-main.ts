@@ -24,6 +24,7 @@ Démarche :
 3. Sans résultat, dis-le honnêtement, sans inventer de fournisseur, et propose d'être prévenu si une vitrine correspondante arrive (prevenir_plus_tard). Cela demande que les suggestions soient activées dans Réglages › Suggestions de services : indique-le si l'outil le signale.
 4. Si la personne est intéressée par une suggestion, appelle interesse : l'outil affiche une carte avec le texte exact qui serait envoyé au fournisseur (son besoin, le moment, la zone approximative et son prénom, rien d'autre). Rien n'est envoyé tant qu'elle n'a pas validé la carte : dis-le, et ne présente jamais la mise en relation comme faite. Si elle veut modifier le texte, rappelle interesse avec ses précisions.
 5. Pour écarter une suggestion : ignorer. Pour couper des suggestions d'une catégorie ou toutes : couper_suggestions. Pour faire le point : statut.
+6. Une demande « issue de votre agenda, en attente de votre réponse » vient d'une question que tu as posée après avoir vu un événement de l'agenda de la personne. Si elle répond oui, appelle chercher sur cette demande ; si elle répond non, appelle clore_demande. Ne cherche jamais sans son oui.
 
 Règles :
 - Disponibilité « à convenir » signifie non confirmée : ne dis jamais que le fournisseur est disponible. Un tarif « sur devis » n'est pas un prix.
@@ -39,6 +40,8 @@ export const COUP_DE_MAIN_FAILURE_MESSAGE = "Je n'ai pas réussi à répondre. R
 export interface Profile {
   id: string;
   firstName: string;
+  /** Code postal du profil, zone par défaut des demandes. */
+  postcode?: string | null;
 }
 
 export interface BrainDeps {
@@ -68,6 +71,8 @@ export async function contextBlock(deps: BrainDeps, userId: string, input: Agent
     `Suggestions proactives : ${prefs.suggestionsOptIn ? "activées" : "non activées (la personne peut les activer dans Réglages › Suggestions de services ; une demande explicite fonctionne sans)"}${prefs.mutedCategories.length ? ` ; catégories coupées : ${prefs.mutedCategories.map(label).join(", ")}` : ""}`,
   ];
   const open = requests.filter((r) => r.status !== "closed").slice(0, 5);
+  const profile = await (deps.profileOf ?? (async () => null))(input.userRef);
+  if (profile?.postcode) lines.push(`Code postal du profil : ${profile.postcode} (zone par défaut des demandes)`);
   lines.push(open.length ? "Demandes en cours :" : "Aucune demande en cours.");
   for (const r of open) lines.push(`- ${describeRequest(r, label)}`);
   if (suggestions.length) {
@@ -113,7 +118,7 @@ export function coupDeMainBrain(llm: LlmClient, deps: BrainDeps): CoupDeMainBrai
 
       const today = localDate(input.today, input.timezone);
       const collector: TurnCollector = newCollector();
-      const tools = coupDeMainTools({ store: deps.store, llm, userId: profile.id, firstName: profile.firstName, today, now, notifySupplier }, collector);
+      const tools = coupDeMainTools({ store: deps.store, llm, userId: profile.id, firstName: profile.firstName, postcode: profile.postcode ?? null, today, now, notifySupplier }, collector);
       const context = await contextBlock(deps, profile.id, input, today);
       const { text } = await llm.runTools({ system: SYSTEM_PROMPT, messages: buildMessages(input, context), tools, maxIterations: 8 });
       return { reply: { text: text || COUP_DE_MAIN_FAILURE_MESSAGE, proposals: collector.proposals }, calls: collector.calls, problems: collector.problems, outcomes: collector.outcomes };

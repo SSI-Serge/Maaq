@@ -21,8 +21,8 @@ export function localBrains(): AgentBrain[] {
   const llm = anthropicLlm({ model: LOCAL_AGENTS_MODEL });
   const userIdOf = (ref: string) => userIdOfRef(db(), ref);
   const profileOf = async (ref: string) => {
-    const row = await db().selectFrom("users").select(["id", "first_name"]).where("digitorn_user_ref", "=", ref).executeTakeFirst();
-    return row ? { id: row.id, firstName: row.first_name } : null;
+    const row = await db().selectFrom("users").select(["id", "first_name", "postcode"]).where("digitorn_user_ref", "=", ref).executeTakeFirst();
+    return row ? { id: row.id, firstName: row.first_name, postcode: row.postcode } : null;
   };
   // Import différé : le module des adaptateurs Digitorn importe lui-même localBrains().
   const notifySupplier = async (supplierUserId: string, text: string) => {

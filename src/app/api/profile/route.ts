@@ -12,7 +12,7 @@ export const GET = handler(async () => {
   return NextResponse.json(await getMyProfile(ctx, session));
 });
 
-const schema = z.object({ firstName: z.string().max(200), lastName: z.string().max(200) });
+const schema = z.object({ firstName: z.string().max(200), lastName: z.string().max(200), postcode: z.string().max(10).nullable().optional() });
 
 export const PATCH = handler(async (request: Request) => {
   const { session, ctx } = await requireProfile();

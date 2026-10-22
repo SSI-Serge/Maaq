@@ -32,3 +32,18 @@ export function isStrong(score: number): boolean {
 export function isWithheld(score: number): boolean {
   return score < SCORE_LOW;
 }
+
+/** Agenda (phase 2b) : fenêtre d'examen des événements à venir, en jours. */
+export const AGENDA_LOOKAHEAD_DAYS = 14;
+
+/** Confiance minimale de la classification d'un titre d'agenda en besoin de service ; en dessous, rien ne se passe. */
+export const AGENDA_MIN_CONFIDENCE = 0.6;
+
+/** Version du texte de consentement à la lecture de l'agenda, distinct de celui des suggestions. */
+export const AGENDA_CONSENT_VERSION = "2026-10";
+
+export const AGENDA_CONSENT_TEXT =
+  "J'autorise MAAQ à lire les titres et dates de mes événements d'agenda à venir pour repérer un besoin de service (par exemple « coiffeur pour les enfants ») et me demander, dans le tchat de coup_de_main, si je souhaite qu'il cherche quelqu'un. Les titres ne sont ni conservés ni transmis à un fournisseur ou à un annuaire, et je peux retirer cette autorisation à tout moment.";
+
+/** Annuaire externe (phase 2c) : résultats montrés au plus, en complément des vitrines de membres. */
+export const MAX_EXTERNAL = 3;

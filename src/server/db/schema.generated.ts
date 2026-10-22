@@ -93,7 +93,7 @@ export type ScanStatus = "clean" | "infected" | "pending";
 
 export type SecurityEventType = "device_revoked" | "device_verified" | "login_email_changed" | "login_locked" | "password_changed" | "pattern_locked" | "pattern_recovered";
 
-export type ServiceRequestStatus = "closed" | "open" | "suggested";
+export type ServiceRequestStatus = "closed" | "open" | "proposed" | "suggested";
 
 export type SessionEndReason = "account_grace_period" | "device_revoked" | "expired" | "guest_removed" | "logout";
 
@@ -231,6 +231,12 @@ export interface AdminAuditLog {
   entity_type: string;
   id: Generated<Int8>;
   occurred_at: Generated<Timestamp>;
+}
+
+export interface AgendaEventsSeen {
+  event_key: string;
+  seen_at: Generated<Timestamp>;
+  user_id: string;
 }
 
 export interface AgentCategories {
@@ -756,7 +762,9 @@ export interface LogbookSyncRuns {
 }
 
 export interface MarketplacePrefs {
+  agenda_consent_version: string | null;
   agenda_opt_in: Generated<boolean>;
+  agenda_opt_in_at: Timestamp | null;
   consent_version: string | null;
   muted_categories: Generated<Json>;
   opt_in_at: Timestamp | null;
@@ -827,6 +835,8 @@ export interface ServiceCategories {
 }
 
 export interface ServiceRequests {
+  agenda_event_date: Timestamp | null;
+  agenda_event_key: string | null;
   category_code: string | null;
   closed_at: Timestamp | null;
   created_at: Generated<Timestamp>;
@@ -839,6 +849,10 @@ export interface ServiceRequests {
   notify_later: Generated<boolean>;
   postcode: string | null;
   remote_ok: Generated<boolean>;
+  /**
+   * chat : écrite par la personne ; agenda : déduite d'un événement de son agenda, avec son consentement propre
+   */
+  source: Generated<string>;
   status: Generated<ServiceRequestStatus>;
   text: string;
   timing_text: string | null;
@@ -970,6 +984,10 @@ export interface Users {
    */
   phone: string | null;
   /**
+   * Code postal du profil, jamais une adresse : zone par défaut des suggestions de services. [US-09, phase 2b]
+   */
+  postcode: string | null;
+  /**
    * Date de suppression définitive des données du profil : délai de grâce de 30 jours (auto-suppression, durée unique décidée le 01/10/2026) ou X jours après retrait (US-20 RT2, paramètre de la console)
    */
   purge_scheduled_at: Timestamp | null;
@@ -1088,6 +1106,7 @@ export interface DB {
   action_decisions: ActionDecisions;
   activation_links: ActivationLinks;
   admin_audit_log: AdminAuditLog;
+  agenda_events_seen: AgendaEventsSeen;
   agent_categories: AgentCategories;
   agent_connections: AgentConnections;
   agent_info_fields: AgentInfoFields;

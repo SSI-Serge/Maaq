@@ -9,6 +9,7 @@ import {
   RequestNotFound,
   SuggestionNotFound,
   type BlockedStorefronts,
+  type BuyerProfile,
   type EligibleFilter,
   type EligibleStorefront,
   type Introduction,
@@ -92,6 +93,9 @@ type RequestRow = {
   postcode: string | null;
   remote_ok: boolean;
   timing_text: string | null;
+  source: string;
+  agenda_event_key: string | null;
+  agenda_event_date: Date | string | null;
   status: RequestStatus;
   notify_later: boolean;
   last_matched_at: Date | null;
@@ -110,6 +114,9 @@ function toRequest(row: RequestRow): ServiceRequest {
     postcode: row.postcode,
     remoteOk: row.remote_ok,
     timingText: row.timing_text,
+    source: row.source as ServiceRequest["source"],
+    agendaEventKey: row.agenda_event_key,
+    agendaEventDate: row.agenda_event_date ? (typeof row.agenda_event_date === "string" ? row.agenda_event_date.slice(0, 10) : row.agenda_event_date.toISOString().slice(0, 10)) : null,
     status: row.status,
     notifyLater: row.notify_later,
     lastMatchedAt: iso(row.last_matched_at),
@@ -180,9 +187,19 @@ function toIntroduction(row: IntroductionRow): Introduction {
   };
 }
 
-function toPrefs(row: { suggestions_opt_in: boolean; agenda_opt_in: boolean; muted_categories: unknown; opt_in_at: Date | null; consent_version: string | null } | undefined): MarketplacePrefs {
+type PrefsRow = { suggestions_opt_in: boolean; agenda_opt_in: boolean; agenda_opt_in_at: Date | null; agenda_consent_version: string | null; muted_categories: unknown; opt_in_at: Date | null; consent_version: string | null };
+
+function toPrefs(row: PrefsRow | undefined): MarketplacePrefs {
   if (!row) return { ...DEFAULT_PREFS };
-  return { suggestionsOptIn: row.suggestions_opt_in, agendaOptIn: row.agenda_opt_in, mutedCategories: strings(row.muted_categories), optInAt: iso(row.opt_in_at), consentVersion: row.consent_version };
+  return {
+    suggestionsOptIn: row.suggestions_opt_in,
+    agendaOptIn: row.agenda_opt_in,
+    agendaOptInAt: iso(row.agenda_opt_in_at),
+    agendaConsentVersion: row.agenda_consent_version,
+    mutedCategories: strings(row.muted_categories),
+    optInAt: iso(row.opt_in_at),
+    consentVersion: row.consent_version,
+  };
 }
 
 const json = (value: unknown) => sql<string>`${JSON.stringify(value)}::jsonb`;
@@ -238,6 +255,10 @@ export class DbMatchStore implements MatchStore {
         postcode: input.postcode ?? null,
         remote_ok: input.remoteOk ?? false,
         timing_text: input.timingText ?? null,
+        source: input.source ?? "chat",
+        agenda_event_key: input.agendaEventKey ?? null,
+        agenda_event_date: input.agendaEventDate ?? null,
+        status: input.status ?? "open",
         created_at: at,
         updated_at: at,
       })
@@ -288,7 +309,7 @@ export class DbMatchStore implements MatchStore {
       .innerJoin("users as u", "u.id", "r.user_id")
       .leftJoin("marketplace_prefs as p", "p.user_id", "r.user_id")
       .selectAll("r")
-      .select(["p.suggestions_opt_in", "p.agenda_opt_in", "p.muted_categories", "p.opt_in_at", "p.consent_version"])
+      .select(["p.suggestions_opt_in", "p.agenda_opt_in", "p.agenda_opt_in_at", "p.agenda_consent_version", "p.muted_categories", "p.opt_in_at", "p.consent_version"])
       .where("r.status", "=", "open")
       .where("r.notify_later", "=", true)
       .where("u.status", "=", "active")
@@ -296,8 +317,41 @@ export class DbMatchStore implements MatchStore {
       .execute();
     return rows.map((row) => ({
       request: toRequest(row as unknown as RequestRow),
-      prefs: toPrefs(row.suggestions_opt_in === null ? undefined : { suggestions_opt_in: row.suggestions_opt_in!, agenda_opt_in: row.agenda_opt_in!, muted_categories: row.muted_categories, opt_in_at: row.opt_in_at, consent_version: row.consent_version }),
+      prefs: toPrefs(
+        row.suggestions_opt_in === null
+          ? undefined
+          : { suggestions_opt_in: row.suggestions_opt_in!, agenda_opt_in: row.agenda_opt_in!, agenda_opt_in_at: row.agenda_opt_in_at, agenda_consent_version: row.agenda_consent_version, muted_categories: row.muted_categories, opt_in_at: row.opt_in_at, consent_version: row.consent_version },
+      ),
     }));
+  }
+
+  async listAgendaProfiles(): Promise<BuyerProfile[]> {
+    const rows = await this.db
+      .selectFrom("marketplace_prefs as p")
+      .innerJoin("users as u", "u.id", "p.user_id")
+      .select(["u.id", "u.first_name", "u.postcode"])
+      .where("p.agenda_opt_in", "=", true)
+      .where("p.suggestions_opt_in", "=", true)
+      .where("u.status", "=", "active")
+      .orderBy("u.id")
+      .execute();
+    return rows.map((row) => ({ userId: row.id, firstName: row.first_name, postcode: row.postcode }));
+  }
+
+  async unseenAgendaKeys(userId: string, keys: string[]): Promise<string[]> {
+    if (keys.length === 0) return [];
+    const seen = await this.db.selectFrom("agenda_events_seen").select("event_key").where("user_id", "=", userId).where("event_key", "in", keys).execute();
+    const set = new Set(seen.map((r) => r.event_key));
+    return keys.filter((key) => !set.has(key));
+  }
+
+  async markAgendaSeen(userId: string, keys: string[]): Promise<void> {
+    if (keys.length === 0) return;
+    await this.db
+      .insertInto("agenda_events_seen")
+      .values(keys.map((key) => ({ user_id: userId, event_key: key, seen_at: this.now() })))
+      .onConflict((oc) => oc.columns(["user_id", "event_key"]).doNothing())
+      .execute();
   }
 
   async addSuggestions(inputs: SuggestionInput[]): Promise<Suggestion[]> {
@@ -402,11 +456,16 @@ export class DbMatchStore implements MatchStore {
     const at = this.now();
     const optInChanged = patch.suggestionsOptIn !== undefined && patch.suggestionsOptIn !== current.suggestionsOptIn;
     const optIn = patch.suggestionsOptIn ?? current.suggestionsOptIn;
+    const agendaChanged = patch.agendaOptIn !== undefined && patch.agendaOptIn !== current.agendaOptIn;
+    const agenda = patch.agendaOptIn ?? current.agendaOptIn;
     const values = {
       suggestions_opt_in: optIn,
       muted_categories: json(patch.mutedCategories !== undefined ? [...new Set(patch.mutedCategories)] : current.mutedCategories),
       opt_in_at: optInChanged ? (optIn ? at : null) : current.optInAt ? new Date(current.optInAt) : null,
-      consent_version: optIn ? (optInChanged ? (patch.consentVersion ?? current.consentVersion) : (patch.consentVersion ?? current.consentVersion)) : null,
+      consent_version: optIn ? (patch.consentVersion ?? current.consentVersion) : null,
+      agenda_opt_in: agenda,
+      agenda_opt_in_at: agendaChanged ? (agenda ? at : null) : current.agendaOptInAt ? new Date(current.agendaOptInAt) : null,
+      agenda_consent_version: agenda ? (patch.agendaConsentVersion ?? current.agendaConsentVersion) : null,
       updated_at: at,
     };
     await this.db

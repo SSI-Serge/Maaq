@@ -39,6 +39,11 @@ const schema = z.object({
   /** Expéditeur des emails, par exemple « MAAQ <ne-pas-repondre@maaq.fr> ». */
   MAIL_FROM: z.string().min(3).optional(),
   DRIVE_MODE: z.enum(["local"]).default("local"),
+  /** Agenda lu par le marketplace silencieux : « none » = aucun ; « dev » = agenda de démonstration (/dev/agenda). Le calendrier maître de MAAQ se branchera ici. */
+  CALENDAR_MODE: z.enum(["none", "dev"]).default("dev"),
+  /** Annuaire externe quand l'offre des membres est mince : « off », « dev » (résultats fictifs) ou « google » (Google Places API (New), clé requise). */
+  PLACES_MODE: z.enum(["off", "dev", "google"]).default("dev"),
+  GOOGLE_PLACES_API_KEY: z.string().min(1).optional(),
   CRON_SECRET: z.string().min(16, "au moins 16 caractères"),
   /** Secret de l'outil de facturation qui signale désabonnements et réabonnements (US-58 RT2). Sans lui, ce point d'entrée est fermé. */
   BILLING_WEBHOOK_SECRET: z.string().min(16, "au moins 16 caractères").optional(),
@@ -50,6 +55,7 @@ const checked = schema.superRefine((value, ctx) => {
       if (!value[name]) ctx.addIssue({ code: "custom", path: [name], message: "obligatoire avec MESSAGING_MODE=smtp" });
     }
   }
+  if (value.PLACES_MODE === "google" && !value.GOOGLE_PLACES_API_KEY) ctx.addIssue({ code: "custom", path: ["GOOGLE_PLACES_API_KEY"], message: "obligatoire avec PLACES_MODE=google" });
   if (value.WHATSAPP_MODE === "cloud") {
     for (const name of ["WHATSAPP_ACCESS_TOKEN", "WHATSAPP_PHONE_NUMBER_ID", "WHATSAPP_APP_SECRET", "WHATSAPP_VERIFY_TOKEN"] as const) {
       if (!value[name]) ctx.addIssue({ code: "custom", path: [name], message: "obligatoire avec WHATSAPP_MODE=cloud" });

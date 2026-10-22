@@ -25,7 +25,7 @@ export default function SuggestionsSettingsPage() {
       <ErrorLine error={view.error} onRetry={view.reload} />
       {view.data && (
         <PrefsForm
-          key={`${view.data.prefs.optInAt ?? "none"}-${view.data.prefs.mutedCategories.join(",")}`}
+          key={`${view.data.prefs.optInAt ?? "none"}-${view.data.prefs.agendaOptInAt ?? "none"}-${view.data.prefs.mutedCategories.join(",")}`}
           view={view.data}
           saved={saved}
           onChanged={() => {
@@ -57,16 +57,20 @@ function Switch({ checked, disabled, label, hint, onChange }: { checked: boolean
 function PrefsForm({ view, saved, onChanged }: { view: PrefsView; saved: boolean; onChanged: () => void }) {
   const [optIn, setOptIn] = useState(view.prefs.suggestionsOptIn);
   const [consent, setConsent] = useState(view.prefs.suggestionsOptIn);
+  const [agenda, setAgenda] = useState(view.prefs.agendaOptIn);
+  const [agendaConsent, setAgendaConsent] = useState(view.prefs.agendaOptIn);
   const [muted, setMuted] = useState<string[]>(view.prefs.mutedCategories);
   const save = useApiMutation();
 
+  // L'agenda n'a de sens qu'avec les suggestions : couper celles-ci coupe aussi l'agenda.
+  const agendaOn = optIn && agenda;
   const sameMuted = muted.length === view.prefs.mutedCategories.length && muted.every((code) => view.prefs.mutedCategories.includes(code));
-  const dirty = optIn !== view.prefs.suggestionsOptIn || !sameMuted;
-  // Activer exige d'avoir lu et coché le texte de consentement ; couper des catégories ou désactiver, non.
-  const canSave = dirty && (!optIn || view.prefs.suggestionsOptIn || consent);
+  const dirty = optIn !== view.prefs.suggestionsOptIn || agendaOn !== view.prefs.agendaOptIn || !sameMuted;
+  // Activer exige d'avoir lu et coché le texte de consentement correspondant ; couper des catégories ou désactiver, non.
+  const canSave = dirty && (!optIn || view.prefs.suggestionsOptIn || consent) && (!agendaOn || view.prefs.agendaOptIn || agendaConsent);
 
   async function submit() {
-    const result = await save.run<PrefsView>("/api/marketplace/prefs", { method: "PATCH", body: { suggestionsOptIn: optIn, mutedCategories: muted } });
+    const result = await save.run<PrefsView>("/api/marketplace/prefs", { method: "PATCH", body: { suggestionsOptIn: optIn, agendaOptIn: agendaOn, mutedCategories: muted } });
     if (result) onChanged();
   }
 
@@ -88,7 +92,34 @@ function PrefsForm({ view, saved, onChanged }: { view: PrefsView; saved: boolean
               <span>{view.consentText}</span>
             </label>
           )}
-          <Switch checked={false} disabled label="Utiliser mon agenda pour trouver le bon moment" hint="Bientôt : MAAQ pourra proposer un service à l'approche d'un événement de votre agenda. Rien n'est lu pour l'instant." />
+          {view.agendaAvailable ? (
+            <>
+              <Switch
+                checked={agendaOn}
+                disabled={!optIn}
+                label="Utiliser mon agenda pour trouver le bon moment"
+                hint={!optIn ? "Activez d'abord les suggestions." : view.prefs.agendaOptIn ? `Activé le ${new Date(view.prefs.agendaOptInAt!).toLocaleDateString("fr-FR")} (texte version ${view.prefs.agendaConsentVersion})` : "coup_de_main vous demandera d'abord si vous voulez qu'il cherche ; il ne propose jamais quelqu'un sans votre oui."}
+                onChange={setAgenda}
+              />
+              {agendaOn && !view.prefs.agendaOptIn && (
+                <label style={{ display: "flex", gap: 10, alignItems: "flex-start", fontSize: 14, lineHeight: 1.45, padding: 10, background: "var(--primary-soft)", borderRadius: 10 }}>
+                  <input type="checkbox" checked={agendaConsent} onChange={(e) => setAgendaConsent(e.target.checked)} style={{ marginTop: 3 }} />
+                  <span>{view.agendaConsentText}</span>
+                </label>
+              )}
+              {agendaOn && !view.postcode && (
+                <p className={s.muted}>
+                  Pour chercher près de chez vous, indiquez votre code postal dans{" "}
+                  <Link href="/reglages" className={s.smallButton}>
+                    Réglages › Mes informations
+                  </Link>
+                  .
+                </p>
+              )}
+            </>
+          ) : (
+            <Switch checked={false} disabled label="Utiliser mon agenda pour trouver le bon moment" hint="Bientôt : MAAQ pourra proposer un service à l'approche d'un événement de votre agenda. Rien n'est lu pour l'instant." />
+          )}
         </div>
       </Section>
 
