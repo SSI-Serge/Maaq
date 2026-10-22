@@ -60,7 +60,7 @@ async function seedProfiles(client: PoolClient): Promise<boolean> {
   return true;
 }
 
-/** Agents publiés : les deux de la maquette Administration des agents, plus kdo_help (agent local). Chaque agent manquant est ajouté. */
+/** Agents publiés : les deux de la maquette Administration des agents, plus kdo_help et vitrine (agents locaux). Chaque agent manquant est ajouté. */
 async function seedCatalog(client: PoolClient): Promise<boolean> {
   let added = false;
   const agents = [
@@ -108,6 +108,20 @@ async function seedCatalog(client: PoolClient): Promise<boolean> {
       actions: [] as string[],
       connectors: [] as [string, string][],
       // Les proches et occasions se gèrent dans le tchat (tables gift_*), pas par le formulaire d'informations.
+      fields: [] as [string, string, boolean, number, string | null][],
+      cc: 0,
+    },
+    {
+      ref: "vitrine",
+      name: "vitrine",
+      category: "pro",
+      short: "Votre vitrine de service, créée en parlant.",
+      full: "vitrine rédige avec vous la description de votre service (coiffure à domicile, traiteur, ménage, cours…), à l'oral ou à l'écrit. Une fois publiée depuis l'écran « Ma vitrine », MAAQ peut la proposer discrètement aux membres qui cherchent ce service ; personne n'est mis en relation sans votre accord.",
+      examples: ["Je fais des tresses et des twists à Lyon, chez moi, et je me déplace le samedi", "Qu'est-ce qu'il manque à ma vitrine ?", "Mets ma vitrine en pause jusqu'à la fin du mois"],
+      suggestions: ["Décrire mon activité", "Reprendre ma vitrine", "Ce qu'il me manque"],
+      actions: [] as string[],
+      connectors: [] as [string, string][],
+      // La vitrine se construit dans le tchat (table storefronts) et se relit sur la fiche de l'agent.
       fields: [] as [string, string, boolean, number, string | null][],
       cc: 0,
     },

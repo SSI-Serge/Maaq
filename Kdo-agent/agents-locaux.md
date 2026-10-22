@@ -28,6 +28,7 @@ Le texte des demandes transite alors par les serveurs de MAAQ puis d'Anthropic :
 | Agent | Rubrique | Connecteurs | Données |
 |---|---|---|---|
 | `kdo_help` | Perso | aucun | Proches, occasions, idées et préférences de rappel du profil (tables `gift_*`, `users`) |
+| `vitrine` | Pro | aucun | Vitrine de service du profil (table `storefronts`), voir [Vitrine-agent/README.md](../Vitrine-agent/README.md) |
 
 `kdo_help` est créé par `npm run dev` ou `npm run db:seed` dans la base de développement ; en ligne, l'administrateur le met à disposition depuis la console (il figure dans la liste des agents hébergés).
 

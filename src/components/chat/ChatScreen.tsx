@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, apiRequest } from "@/client/api";
 import { useDraft } from "@/client/hooks";
+import { useSpeechInput } from "@/client/speech";
 import { useSessionUser } from "@/components/auth/AuthGate";
 import { Loading } from "@/components/ui";
 import { LOW_CAP_THRESHOLD, MAX_REQUEST_LENGTH } from "@/server/chat/rules";
@@ -94,6 +95,8 @@ export function ChatScreen({ agentId, backHref = "/accueil" }: { agentId: string
   const [thanked, setThanked] = useState<string[]>([]);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  // Dictée par la reconnaissance du navigateur : aucun son n'est enregistré ni envoyé.
+  const speech = useSpeechInput({ lang: "fr-FR", maxSeconds: 120 });
 
   useEffect(() => {
     draftRef.current = draft;
@@ -220,6 +223,19 @@ export function ChatScreen({ agentId, backHref = "/accueil" }: { agentId: string
   function pick(suggestion: string) {
     setDraft(suggestion);
     inputRef.current?.focus();
+  }
+
+  /** Dictée : le texte reconnu s'ajoute à ce qui était déjà saisi au moment du démarrage ; on peut continuer à écrire ou envoyer à tout moment. */
+  function toggleDictation() {
+    if (speech.listening) {
+      speech.stop();
+      return;
+    }
+    const base = draft;
+    if (rejection) setRejection(null);
+    speech.start((transcript) => {
+      setDraft(`${base}${base ? " " : ""}${transcript}`.slice(0, MAX_REQUEST_LENGTH));
+    });
   }
 
   const blocked = data?.blocked ?? null;
@@ -471,12 +487,37 @@ export function ChatScreen({ agentId, backHref = "/accueil" }: { agentId: string
                 }
               }}
             />
+            {speech.available && blocked === null && (
+              <button
+                type="button"
+                className={`${styles.mic} ${speech.listening ? styles.micListening : ""}`}
+                aria-label={speech.listening ? "Arrêter la dictée" : "Dicter ma demande"}
+                aria-pressed={speech.listening}
+                onClick={toggleDictation}
+              >
+                {speech.listening ? (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                    <rect x="6" y="6" width="12" height="12" rx="2" />
+                  </svg>
+                ) : (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+                    <rect x="9" y="3" width="6" height="11" rx="3" />
+                    <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
+                  </svg>
+                )}
+              </button>
+            )}
             <button type="button" className={styles.send} aria-label="Envoyer" disabled={blocked !== null || draft.trim().length === 0} onClick={submit}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
                 <path d="M4 12l16-8-6 16-2-6-8-2z" />
               </svg>
             </button>
           </div>
+          {speech.denied && (
+            <div className={styles.micStatus} role="status">
+              MAAQ n&apos;a pas accès à votre micro. Autorisez-le dans les réglages de votre téléphone, ou écrivez votre demande.
+            </div>
+          )}
           {draft.length > 0 && <div className={styles.inputCount}>{draft.length} caractères</div>}
         </div>
       )}

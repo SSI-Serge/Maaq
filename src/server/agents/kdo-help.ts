@@ -2,7 +2,8 @@ import { frenchDate, localDate, upcomingOccasions } from "@/server/gifts/model";
 import type { PrefsStore } from "@/server/gifts/prefs";
 import type { GiftStore, IdeaInput } from "@/server/gifts/store";
 import { giftTools, MAX_IDEAS, newCollector, OCCASION_WINDOW_DAYS, type TurnCollector } from "./kdo-help-tools";
-import type { AgentBrain, AgentTurnInput, BrainReply, LlmClient, LlmMessage } from "./types";
+import { buildMessages } from "./messages";
+import type { AgentBrain, AgentTurnInput, BrainReply, LlmClient } from "./types";
 
 /**
  * kdo_help — idées de cadeaux, proches, occasions et budget (ligne « kdo_help » de la liste des agents).
@@ -112,14 +113,7 @@ export async function contextBlock(deps: BrainDeps, userId: string, input: Agent
   return lines.join("\n");
 }
 
-/** Historique récent puis la demande, précédée de son contexte. Le premier message est toujours celui de la personne. */
-export function buildMessages(input: AgentTurnInput, context: string): LlmMessage[] {
-  const firstUser = input.history.findIndex((item) => item.role === "user");
-  const history = firstUser === -1 ? [] : input.history.slice(firstUser);
-  const messages: LlmMessage[] = history.map((item) => ({ role: item.role === "user" ? "user" : "assistant", content: item.text }));
-  messages.push({ role: "user", content: `${context}\n\n[Demande]\n${input.text}` });
-  return messages;
-}
+export { buildMessages };
 
 export interface KdoGeneration {
   reply: BrainReply;

@@ -10,6 +10,7 @@ import { dataDir } from "@/server/data-dir";
 import type { DB } from "@/server/db/schema.generated";
 import { env } from "@/server/env";
 import { Rejection } from "@/server/http";
+import { DbStorefrontStore } from "@/server/marketplace/db-store";
 import { decrypt, decryptBytes, encryptBytes } from "@/server/security/crypto";
 import { createZip, type ZipEntry } from "./zip";
 import type { Kysely } from "kysely";
@@ -112,6 +113,8 @@ interface Collected {
   giftEvents: unknown[];
   giftIdeas: unknown[];
   channels: unknown[];
+  /** Vitrine de service (agent vitrine), publiée ou non. */
+  storefront: unknown;
   digitorn: unknown;
 }
 
@@ -269,6 +272,8 @@ async function collect(db: Kysely<DB>, userId: string, now: Date): Promise<{ dat
     db.selectFrom("gift_ideas as i").leftJoin("gift_people as p", "p.id", "i.person_id").select(["i.title", "i.why", "i.price_min", "i.price_max", "i.status", "p.name as person", "i.suggested_at"]).where("i.user_id", "=", userId).orderBy("i.suggested_at").execute(),
     db.selectFrom("channel_identities").select(["channel", "external_id", "opt_in", "opt_in_at", "consent_version", "linked_at", "last_inbound_at"]).where("user_id", "=", userId).execute(),
   ]);
+  // Vitrine de service : telle qu'enregistrée, contact déchiffré car c'est la donnée de la personne.
+  const storefront = await new DbStorefrontStore(db).get(userId);
   const birthday = (d: number | null, m: number | null, y: number | null) => (d && m ? `${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}${y ? `/${y}` : ""}` : null);
 
   const data: Collected = {
@@ -304,6 +309,31 @@ async function collect(db: Kysely<DB>, userId: string, now: Date): Promise<{ dat
     giftPeople: giftPeople.map((p) => ({ nom: p.name, lien: p.relationship, anniversaire: birthday(p.birth_day, p.birth_month, p.birth_year), budget: p.budget_amount, details: JSON.stringify(p.details), creeLe: date(p.created_at), effaceLe: date(p.deleted_at) })),
     giftEvents: giftEvents.map((e) => ({ titre: e.title, type: e.kind, date: birthday(e.event_day, e.event_month, e.event_year), budget: e.budget_amount, proche: e.person, creeLe: date(e.created_at), effaceLe: date(e.deleted_at) })),
     giftIdeas: giftIdeas.map((i) => ({ idee: i.title, pourquoi: i.why, prixMin: i.price_min, prixMax: i.price_max, statut: i.status, proche: i.person, proposeeLe: date(i.suggested_at) })),
+    storefront: storefront
+      ? {
+          statut: storefront.status,
+          nomAffiche: storefront.displayName,
+          categorie: storefront.categoryCode,
+          services: storefront.services,
+          description: storefront.description,
+          codePostal: storefront.postcode,
+          ville: storefront.city,
+          modes: storefront.modes,
+          zonesDeplacement: storefront.travelAreas,
+          precisionDeplacement: storefront.travelNote,
+          disponibilite: storefront.availabilityMode,
+          horaires: storefront.availabilityText,
+          tarif: { mode: storefront.priceMode, min: storefront.priceMin, max: storefront.priceMax },
+          langues: storefront.languages,
+          delai: storefront.noticeText,
+          qualifications: storefront.qualificationsText,
+          contact: { methode: storefront.contactMethod, valeur: storefront.contactValue },
+          indisponibleJusquAu: storefront.pausedUntil,
+          provenance: storefront.provenance,
+          publieeLe: storefront.publishedAt,
+          confirmeeLe: storefront.lastConfirmedAt,
+        }
+      : null,
     channels: channels.map((c) => ({ canal: c.channel, identifiant: c.external_id, consentement: c.opt_in, consentiLe: date(c.opt_in_at), versionDuTexte: c.consent_version, relieLe: date(c.linked_at), dernierMessageRecu: date(c.last_inbound_at) })),
     digitorn: digitornData,
   };

@@ -95,6 +95,10 @@ export type SessionEndReason = "account_grace_period" | "device_revoked" | "expi
 
 export type SettingValueType = "email" | "integer";
 
+export type StorefrontContact = "maaq_intro" | "whatsapp";
+
+export type StorefrontStatus = "draft" | "paused" | "published";
+
 export type SyncStatus = "failed" | "running" | "succeeded";
 
 export type Timestamp = ColumnType<Date, Date | string, Date | string>;
@@ -726,6 +730,16 @@ export interface LogbookSyncRuns {
   status: Generated<SyncStatus>;
 }
 
+export interface MarketplacePrefs {
+  agenda_opt_in: Generated<boolean>;
+  consent_version: string | null;
+  muted_categories: Generated<Json>;
+  opt_in_at: Timestamp | null;
+  suggestions_opt_in: Generated<boolean>;
+  updated_at: Generated<Timestamp>;
+  user_id: string;
+}
+
 export interface PlatformSettingChanges {
   changed_at: Generated<Timestamp>;
   changed_by_user_id: string | null;
@@ -780,6 +794,13 @@ export interface SecurityEvents {
   user_id: string | null;
 }
 
+export interface ServiceCategories {
+  code: string;
+  is_active: Generated<boolean>;
+  label: string;
+  sort_order: Generated<number>;
+}
+
 export interface Sessions {
   created_at: Generated<Timestamp>;
   device_id: string;
@@ -793,6 +814,45 @@ export interface Sessions {
    */
   token_hash: Buffer;
   user_id: string;
+}
+
+export interface Storefronts {
+  availability_mode: string | null;
+  availability_text: string | null;
+  category_code: string | null;
+  city: string | null;
+  contact_method: StorefrontContact | null;
+  /**
+   * Contact révélé après une mise en relation acceptée : jamais affiché dans une suggestion
+   */
+  contact_value_encrypted: Buffer | null;
+  created_at: Generated<Timestamp>;
+  description: string | null;
+  display_name: string | null;
+  id: Generated<string>;
+  languages: Generated<Json>;
+  last_confirmed_at: Timestamp | null;
+  modes: Generated<Json>;
+  notice_text: string | null;
+  paused_until: Timestamp | null;
+  postcode: string | null;
+  price_max: Numeric | null;
+  price_min: Numeric | null;
+  price_mode: string | null;
+  /**
+   * Origine de chaque groupe de champs : dit par le fournisseur, proposé par l'agent, ou confirmé. Les groupes proposés ne se publient pas
+   */
+  provenance: Generated<Json>;
+  published_at: Timestamp | null;
+  qualifications_text: string | null;
+  searchable: Generated<boolean>;
+  services: Generated<Json>;
+  status: Generated<StorefrontStatus>;
+  travel_areas: Generated<Json>;
+  travel_note: string | null;
+  updated_at: Generated<Timestamp>;
+  user_id: string;
+  version: Generated<number>;
 }
 
 export interface UserAgentInfoValues {
@@ -877,6 +937,31 @@ export interface VDashboardAgents {
   display_status: string | null;
   name: string | null;
   short_description: string | null;
+  user_id: string | null;
+}
+
+export interface VEligibleStorefronts {
+  availability_mode: string | null;
+  availability_text: string | null;
+  category_code: string | null;
+  city: string | null;
+  contact_method: StorefrontContact | null;
+  description: string | null;
+  display_name: string | null;
+  id: string | null;
+  languages: Json | null;
+  last_confirmed_at: Timestamp | null;
+  modes: Json | null;
+  notice_text: string | null;
+  postcode: string | null;
+  price_max: Numeric | null;
+  price_min: Numeric | null;
+  price_mode: string | null;
+  published_at: Timestamp | null;
+  qualifications_text: string | null;
+  services: Json | null;
+  travel_areas: Json | null;
+  travel_note: string | null;
   user_id: string | null;
 }
 
@@ -976,16 +1061,20 @@ export interface DB {
   logbook_entries: LogbookEntries;
   logbook_entry_participants: LogbookEntryParticipants;
   logbook_sync_runs: LogbookSyncRuns;
+  marketplace_prefs: MarketplacePrefs;
   platform_setting_changes: PlatformSettingChanges;
   platform_settings: PlatformSettings;
   profile_agents: ProfileAgents;
   schema_migrations: SchemaMigrations;
   security_events: SecurityEvents;
+  service_categories: ServiceCategories;
   sessions: Sessions;
+  storefronts: Storefronts;
   user_agent_info_values: UserAgentInfoValues;
   users: Users;
   v_account_guest_quota: VAccountGuestQuota;
   v_dashboard_agents: VDashboardAgents;
+  v_eligible_storefronts: VEligibleStorefronts;
   v_guest_display_status: VGuestDisplayStatus;
   v_info_prefill_suggestions: VInfoPrefillSuggestions;
   v_never_activated_purge_candidates: VNeverActivatedPurgeCandidates;

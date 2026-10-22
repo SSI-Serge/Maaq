@@ -1,0 +1,177 @@
+/* Vitrine d'un fournisseur : écran de relecture sur la fiche de l'agent vitrine (Catalogue › vitrine). */
+
+.review {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.groups {
+  display: flex;
+  flex-direction: column;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+
+.group:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.groupHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.groupLabel {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+
+.groupValue {
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.groupEmpty {
+  color: var(--ink-soft);
+  font-style: italic;
+}
+
+.groupActions {
+  display: flex;
+  gap: 14px;
+}
+
+.editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 6px;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--bg-sunken);
+}
+
+.editorRow {
+  display: flex;
+  gap: 8px;
+}
+
+.editorRow > * {
+  flex: 1;
+  min-width: 0;
+}
+
+.selectLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.select,
+.textarea,
+.dateInput {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--ink);
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 14px;
+}
+
+.textarea {
+  min-height: 90px;
+  resize: vertical;
+}
+
+.checkbox {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 14px;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.preview {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg-raised);
+}
+
+.previewTitle {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--secondary-strong);
+}
+
+.previewName {
+  font-family: "Newsreader", serif;
+  font-size: 18px;
+  line-height: 1.25;
+}
+
+.previewLine {
+  font-size: 13px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.previewNote {
+  margin: 4px 0 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--ink-soft);
+}
+
+.statusBox {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dateRow {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.dateRow .selectLabel {
+  flex: 1;
+  min-width: 160px;
+}
+
+.issueList {
+  margin: 4px 0 0;
+  padding-left: 18px;
+}

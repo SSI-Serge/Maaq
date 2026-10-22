@@ -475,6 +475,45 @@
   cursor: not-allowed;
 }
 
+/* Dictée : même taille que le bouton d'envoi, couleur secondaire ; en écoute, même pulsation que la dictée des réglages. */
+.mic {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.micListening {
+  background: var(--error);
+  border-color: var(--error);
+  color: var(--primary-ink);
+  animation: micPulse 1.4s infinite;
+}
+
+@keyframes micPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(168, 80, 46, 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 12px rgba(168, 80, 46, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(168, 80, 46, 0);
+  }
+}
+
+.micStatus {
+  font-size: 11px;
+  color: var(--ink-soft);
+  line-height: 1.4;
+}
+
 .inputCount {
   font-size: 10px;
   color: var(--ink-soft);

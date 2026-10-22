@@ -2,7 +2,7 @@
 
 Vos agents IA pour l'administratif et le quotidien, en toute transparence.
 
-> **Pas développeur ?** Lisez plutôt [Kdo-agent/GUIDE-DEMARRAGE.md](Kdo-agent/GUIDE-DEMARRAGE.md) : installation pas à pas, où mettre les clés, et quelles clés sont nécessaires. Le dossier [Kdo-agent/](Kdo-agent/) regroupe la documentation et les évaluations de l'agent kdo_help.
+> **Pas développeur ?** Lisez plutôt [Kdo-agent/GUIDE-DEMARRAGE.md](Kdo-agent/GUIDE-DEMARRAGE.md) : installation pas à pas, où mettre les clés, et quelles clés sont nécessaires. Le dossier [Kdo-agent/](Kdo-agent/) regroupe la documentation et les évaluations de l'agent kdo_help. Le dossier [Vitrine-agent/](Vitrine-agent/) documente l'agent vitrine (marketplace silencieux).
 
 Application web mobile installable (PWA) avec sa console d'administration, construite à partir de :
 

@@ -7,6 +7,7 @@ import { useApiMutation, useApiQuery } from "@/client/hooks";
 import { AppShell, Section, appStyles as s } from "@/components/app/AppShell";
 import { ErrorLine } from "@/components/auth/parts";
 import { GiftCalendar } from "@/components/gifts/GiftCalendar";
+import { StorefrontReview } from "@/components/marketplace/StorefrontReview";
 import { Button, Loading, Notice, RetryNotice } from "@/components/ui";
 
 type Category = "pro" | "perso" | "contracts";
@@ -117,6 +118,13 @@ function SheetBody({ sheet, onChanged }: { sheet: Sheet; onChanged: () => void }
         <Section title="Calendrier des occasions">
           <p className={s.muted}>Anniversaires de vos proches et occasions à venir. Appuyez sur un jour pour voir ou ajouter ; le tchat de kdo_help connaît tout ce qui est ici.</p>
           <GiftCalendar />
+        </Section>
+      )}
+
+      {sheet.digitornRef === "vitrine" && (
+        <Section title="Ma vitrine">
+          <p className={s.muted}>Tout ce qu&apos;un membre peut voir de votre service. Modifiez une ligne sans recommencer la conversation ; rien n&apos;est visible tant que vous n&apos;avez pas publié.</p>
+          <StorefrontReview agentId={sheet.id} added={added} />
         </Section>
       )}
 
