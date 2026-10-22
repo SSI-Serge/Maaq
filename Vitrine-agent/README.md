@@ -35,10 +35,10 @@ Même réglage que kdo_help (`LOCAL_AGENTS_MODE=anthropic`, voir [Kdo-agent/agen
 
 Le bouton micro du tchat utilise la reconnaissance vocale du navigateur (Chrome, Android, Safari récent) : le texte reconnu remplit le champ de saisie, corrigeable avant envoi ; aucun enregistrement n'est conservé ni envoyé. Sans reconnaissance disponible, le bouton n'apparaît pas et le texte fonctionne à l'identique. Les messages vocaux WhatsApp ne sont pas transcrits.
 
-## Côté acheteur
+## Mises en relation
 
-La suggestion d'une vitrine à un membre, la carte de mise en relation et le message reçu dans ce tchat (« Nouvelle demande de mise en relation pour votre vitrine… ») sont décrits dans [Coup-de-main-agent/README.md](../Coup-de-main-agent/README.md) (phase 2).
+Quand un membre valide une demande, son texte approuvé arrive dans ce tchat (« Nouvelle demande de mise en relation pour votre vitrine… ») et, si le fournisseur a relié WhatsApp avec consentement, par le modèle `maaq_mise_en_relation` avec les boutons Accepter / Refuser / Question. Dans le tchat, `lister_introductions` montre les demandes et `repondre_introduction` (accepter, refuser, question avec message) affiche une carte à valider : accepter transmet au membre le contact de la vitrine et apporte au fournisseur le prénom, l'email et le téléphone du membre ; refuser ne transmet rien ; une question est relayée telle quelle. Les boutons WhatsApp font la même transition. L'écran « Ma vitrine » rappelle, sous le contact, ce qui circule à chaque étape. Détails et côté acheteur : [Coup-de-main-agent/README.md](../Coup-de-main-agent/README.md).
 
 ## Pas encore
 
-Réponse du fournisseur à une mise en relation et échange des coordonnées (phase 3 du plan), photos, recherche publique, transcription côté serveur, évaluations avec le vrai modèle.
+Photos, recherche publique, transcription côté serveur, évaluations avec le vrai modèle, signalement et console d'administration (phase 4).

@@ -3,6 +3,8 @@ import { db } from "@/server/db/client";
 import { env } from "@/server/env";
 import { giftStore, prefsStore, userIdOfRef } from "@/server/gifts/service";
 import { matchStore } from "@/server/marketplace/buyer-service";
+import { appHandoffDeps } from "@/server/marketplace/handoff-app";
+import { notifySupplierOfIntroduction } from "@/server/marketplace/handoff";
 import { storefrontStore } from "@/server/marketplace/service";
 import { coupDeMainBrain } from "./coup-de-main";
 import { kdoHelpBrain } from "./kdo-help";
@@ -25,14 +27,14 @@ export function localBrains(): AgentBrain[] {
     const row = await db().selectFrom("users").select(["id", "first_name", "postcode"]).where("digitorn_user_ref", "=", ref).executeTakeFirst();
     return row ? { id: row.id, firstName: row.first_name, postcode: row.postcode } : null;
   };
-  // Import différé : le module des adaptateurs Digitorn importe lui-même localBrains().
-  const notifySupplier = async (supplierUserId: string, text: string) => {
-    const { postToAgentChat } = await import("./proactive");
-    await postToAgentChat(db(), supplierUserId, "vitrine", text);
+  // Les dépôts dans les tchats passent par un import différé (le module des adaptateurs Digitorn importe localBrains()).
+  const handoff = appHandoffDeps(db());
+  const notifySupplier = async (introduction: Parameters<typeof notifySupplierOfIntroduction>[1], storefront: Parameters<typeof notifySupplierOfIntroduction>[2]) => {
+    await notifySupplierOfIntroduction(handoff, introduction, storefront);
   };
   return [
     kdoHelpBrain(llm, { store: giftStore(), prefs: prefsStore(), userIdOf }),
-    vitrineBrain(llm, { store: storefrontStore(), userIdOf }),
-    coupDeMainBrain(llm, { store: matchStore(), profileOf, notifySupplier, directory: placesDirectory() }),
+    vitrineBrain(llm, { store: storefrontStore(), userIdOf, matches: matchStore(), handoff }),
+    coupDeMainBrain(llm, { store: matchStore(), profileOf, notifySupplier, directory: placesDirectory(), handoff }),
   ];
 }

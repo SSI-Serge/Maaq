@@ -12,6 +12,8 @@ import { runGiftReminders, type ReminderResult } from "@/server/gifts/reminders"
 import { giftStore, prefsStore } from "@/server/gifts/service";
 import { runAgendaScan, type AgendaScanResult } from "@/server/marketplace/agenda";
 import { matchStore } from "@/server/marketplace/buyer-service";
+import { expireIntroductions } from "@/server/marketplace/handoff";
+import { appHandoffDeps } from "@/server/marketplace/handoff-app";
 import { runRematch, type RematchResult } from "@/server/marketplace/rematch";
 import { syncLogbook, type SyncResult } from "@/server/logbook/service";
 import { integerSetting } from "@/server/settings";
@@ -33,8 +35,8 @@ export interface JobsResult {
   exports: { expired: number; failed: number };
   /** Rappels d'occasions de kdo_help et purge de ses effacements doux. */
   gifts: { reminders: ReminderResult; purged: number };
-  /** Demandes de service à réexaminer et agenda examiné (marketplace silencieux) ; « off » sans modèle local. */
-  marketplace: { rematch: RematchResult; agenda: AgendaScanResult } | "off";
+  /** Marketplace silencieux : mises en relation expirées, puis (avec un modèle local) demandes réexaminées et agenda. */
+  marketplace: { expired: number; rematch: RematchResult | "off"; agenda: AgendaScanResult | "off" };
 }
 
 /** Synchronise le carnet toutes les X heures (US-40 RT2) puis nettoie les données expirées (US-40 RT6, US-61 RT2, US-70 RT3). */
@@ -54,10 +56,11 @@ export async function runDueJobs(ctx: Ctx, options: { force?: boolean } = {}): P
   return { logbook, purged: await purgeExpired(ctx), lifecycle, exports, gifts, marketplace };
 }
 
-/** Réexamen des demandes de service « me prévenir » contre les vitrines publiées depuis ; sans modèle local, rien ne tourne. */
+/** Expiration des mises en relation sans réponse, puis réexamen des demandes « me prévenir » et lecture des agendas (ces deux-là exigent un modèle local). */
 export async function runMarketplaceJobs(ctx: Ctx): Promise<JobsResult["marketplace"]> {
+  const expired = await expireIntroductions(appHandoffDeps(ctx.db, () => ctx.now));
   const { LOCAL_AGENTS_MODE, LOCAL_AGENTS_MODEL } = env();
-  if (LOCAL_AGENTS_MODE === "off") return "off";
+  if (LOCAL_AGENTS_MODE === "off") return { expired, rematch: "off", agenda: "off" };
   const firstNameOf = async (userId: string) => (await ctx.db.selectFrom("users").select("first_name").where("id", "=", userId).executeTakeFirst())?.first_name ?? null;
   const store = matchStore(ctx.db);
   const llm = anthropicLlm({ model: LOCAL_AGENTS_MODEL });
@@ -65,7 +68,7 @@ export async function runMarketplaceJobs(ctx: Ctx): Promise<JobsResult["marketpl
   const postInApp = (userId: string, text: string) => postToAgentChat(ctx.db, userId, "coup_de_main", text);
   const rematch = await runRematch({ store, llm, now: ctx.now, today, postInApp }, firstNameOf);
   const agenda = await runAgendaScan({ store, calendar: calendarSource(), llm, now: ctx.now, today, postInApp });
-  return { rematch, agenda };
+  return { expired, rematch, agenda };
 }
 
 /** Rappels d'occasions (dans l'application via le tchat de kdo_help, et sur WhatsApp) puis purge des effacements doux. */

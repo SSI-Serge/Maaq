@@ -1,9 +1,11 @@
 import { localDate } from "@/server/gifts/model";
+import type { HandoffDeps } from "@/server/marketplace/handoff";
+import type { MatchStore } from "@/server/marketplace/match-store";
 import { SERVICE_CATEGORIES } from "@/server/marketplace/model";
 import type { StorefrontStore } from "@/server/marketplace/store";
 import { buildMessages } from "./messages";
 import type { AgentBrain, AgentTurnInput, BrainReply, LlmClient } from "./types";
-import { describeStorefront, newCollector, vitrineTools, type TurnCollector } from "./vitrine-tools";
+import { describeIntroductions, describeStorefront, newCollector, vitrineTools, type TurnCollector } from "./vitrine-tools";
 
 /**
  * vitrine — l'agent de la rubrique Pro qui crée et entretient la vitrine d'un fournisseur par la conversation
@@ -23,6 +25,7 @@ Démarche :
 3. Demande ensuite ce qui manque, une question courte à la fois, dans cet ordre : nom affiché, services, zone (ville et code postal, et si les clients viennent, si elle se déplace, ou à distance), disponibilité (horaires ou « à convenir »), contact (présentation par MAAQ avec un email, ou WhatsApp avec un numéro). Le tarif est facultatif : propose « sur devis » si la personne ne sait pas.
 4. Les détails critiques se relisent avant d'être confirmés : zone, tarif, contact. Répète la valeur comprise et demande « c'est bien ça ? ». N'appelle confirmer_champs que lorsque la personne a explicitement approuvé. Ne confirme jamais à sa place.
 5. Quand tout est renseigné et confirmé, dis-le et indique où publier : l'écran « Ma vitrine ».
+6. Les mises en relation : quand un membre demande à être mis en relation, son texte arrive dans ce tchat et dans lister_introductions. Le fournisseur répond avec repondre_introduction (accepter, refuser, ou question avec un message) : l'outil affiche une carte à valider, car accepter transmet son contact. Ne dis jamais qu'une réponse est partie avant la validation de la carte. Dis clairement ce qu'accepter transmet : le contact de la vitrine au membre, et les coordonnées du membre au fournisseur.
 
 Règles :
 - N'invente ni service, ni zone, ni horaire, ni prix. « Je peux me déplacer le samedi » donne un déplacement avec la précision « le samedi seulement », pas un service mobile tous les jours.
@@ -40,6 +43,9 @@ export interface BrainDeps {
   store: StorefrontStore;
   /** Profil MAAQ d'une référence Digitorn ; par défaut, la référence sert d'identifiant (tests). */
   userIdOf?: (userRef: string) => Promise<string | null>;
+  /** Mises en relation reçues et transfert des réponses (phase 3). */
+  matches?: MatchStore | null;
+  handoff?: HandoffDeps | null;
 }
 
 /** Bloc de contexte joint à la demande : date, canal, état de la vitrine. */
@@ -53,6 +59,10 @@ export async function contextBlock(deps: BrainDeps, userId: string, input: Agent
     "Vitrine actuelle :",
     describeStorefront(storefront, (code) => labels.get(code) ?? code),
   ];
+  if (deps.matches && storefront) {
+    const pending = (await deps.matches.listIntroductionsForStorefront(storefront.id)).filter((i) => i.status === "requested" || i.status === "question");
+    if (pending.length) lines.push("Mises en relation en attente de votre réponse :", describeIntroductions(pending));
+  }
   if (input.context.rank !== "primary_user") lines.push("La personne qui écrit est un invité du compte, pas l'utilisateur principal.");
   return lines.join("\n");
 }
@@ -79,10 +89,10 @@ export function vitrineBrain(llm: LlmClient, deps: BrainDeps): VitrineBrain {
 
       const today = localDate(input.today, input.timezone);
       const collector: TurnCollector = newCollector();
-      const tools = vitrineTools({ store: deps.store, userId, today }, collector);
+      const tools = vitrineTools({ store: deps.store, userId, today, matches: deps.matches ?? null, handoff: deps.handoff ?? null }, collector);
       const context = await contextBlock(deps, userId, input, today);
       const { text } = await llm.runTools({ system: SYSTEM_PROMPT, messages: buildMessages(input, context), tools, maxIterations: 8 });
-      return { reply: { text: text || VITRINE_FAILURE_MESSAGE, proposals: [] }, calls: collector.calls, problems: collector.problems };
+      return { reply: { text: text || VITRINE_FAILURE_MESSAGE, proposals: collector.proposals }, calls: collector.calls, problems: collector.problems };
     },
 
     async respond(input) {

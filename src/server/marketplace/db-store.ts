@@ -139,6 +139,11 @@ export class DbStorefrontStore implements StorefrontStore {
     return row ? this.toStorefront(row as Row) : null;
   }
 
+  async getById(id: string): Promise<Storefront | null> {
+    const row = await this.db.selectFrom("storefronts").selectAll().where("id", "=", id).executeTakeFirst();
+    return row ? this.toStorefront(row as Row) : null;
+  }
+
   async save(userId: string, patch: Partial<StorefrontFields>, origin: Partial<Record<FieldGroup, Provenance>> = {}): Promise<Storefront> {
     const at = this.now();
     const current = await this.db.selectFrom("storefronts").select(["id", "version", "provenance"]).where("user_id", "=", userId).executeTakeFirst();

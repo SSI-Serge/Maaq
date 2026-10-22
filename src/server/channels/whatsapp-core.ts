@@ -11,6 +11,8 @@ import type { DB } from "@/server/db/schema.generated";
 import { frenchDate } from "@/server/gifts/model";
 import { giftStore, occasionsFor, prefsStore } from "@/server/gifts/service";
 import { Rejection } from "@/server/http";
+import { appHandoffDeps } from "@/server/marketplace/handoff-app";
+import { HandoffRefused, parseIntroductionButton, respondToIntroduction } from "@/server/marketplace/handoff";
 import { ensureDigitornRef } from "@/server/profile/digitorn-ref";
 import { consumeLinkCode, extractLinkCode, setOptIn } from "./linking";
 import { KeyedQueue } from "./queue";
@@ -45,6 +47,12 @@ export const MESSAGES = {
   slow: "Je m'en occupe, un instant…",
   timeout: "Je n'ai pas réussi à répondre à temps. Réessayez dans un instant, ou ouvrez le tchat dans MAAQ.",
   decided: { validate: "C'est validé.", refuse: "C'est refusé : rien n'a été fait." },
+  introduction: {
+    accept: "C'est accepté : le membre reçoit le contact de votre vitrine, et vous recevez le sien dans le tchat vitrine de MAAQ.",
+    decline: "C'est refusé : le membre en est informé, rien n'est transmis.",
+    question: "Pour poser une question au membre, ouvrez le tchat vitrine dans MAAQ et dites-la moi : je la transmets telle quelle.",
+    failed: "Je n'ai pas pu enregistrer votre réponse. Réessayez depuis le tchat vitrine de MAAQ.",
+  },
   rateLimited: "Vous m'avez envoyé beaucoup de messages d'un coup. Attendez une minute avant de continuer.",
   sorted: "C'est noté : plus de rappel pour cette occasion.",
   snoozed: (date: string) => `C'est noté : je vous en reparle le ${date}.`,
@@ -229,6 +237,12 @@ export class WhatsAppCore {
       await this.text(waId, MESSAGES.inactive, user.id);
       return;
     }
+    // Boutons d'une mise en relation (fournisseur) : même transition que la carte du tchat vitrine, sans passer par kdo_help.
+    const introduction = message.type === "button" && message.buttonId ? parseIntroductionButton(message.buttonId) : null;
+    if (introduction) {
+      await this.handleIntroductionButton(waId, user, introduction);
+      return;
+    }
     const agentId = await this.kdoHelpAgentId(user.id);
     if (!agentId) {
       await this.text(waId, MESSAGES.noAgent, user.id);
@@ -240,6 +254,19 @@ export class WhatsAppCore {
       return;
     }
     await this.relayText(waId, user, session, agentId, requestIdFor(message.externalId), message.text ?? "");
+  }
+
+  private async handleIntroductionButton(waId: string, user: LinkedUser, button: { introductionId: string; response: "accept" | "decline" | "question" }): Promise<void> {
+    if (button.response === "question") {
+      await this.text(waId, MESSAGES.introduction.question, user.id);
+      return;
+    }
+    try {
+      await respondToIntroduction(appHandoffDeps(this.db, this.nowFn), { supplierUserId: user.id, introductionId: button.introductionId, response: button.response });
+      await this.text(waId, MESSAGES.introduction[button.response], user.id);
+    } catch (error) {
+      await this.text(waId, error instanceof HandoffRefused ? error.message : MESSAGES.introduction.failed, user.id);
+    }
   }
 
   private async handleButton(waId: string, user: LinkedUser, session: SessionContext, agentId: string, buttonId: string): Promise<void> {

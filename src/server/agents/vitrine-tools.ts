@@ -17,8 +17,11 @@ import {
   type Storefront,
   type StorefrontFields,
 } from "@/server/marketplace/model";
+import { describeStatus, HandoffRefused, respondToIntroduction, type HandoffDeps } from "@/server/marketplace/handoff";
+import type { Introduction, MatchStore } from "@/server/marketplace/match-store";
 import { normalizePatch, type StorefrontPatch } from "@/server/marketplace/service";
 import type { StorefrontStore } from "@/server/marketplace/store";
+import type { BrainProposal } from "./types";
 
 /**
  * Outils de l'agent vitrine : lecture et écriture de la vitrine du fournisseur, avec la provenance de chaque
@@ -31,16 +34,38 @@ export interface ToolDeps {
   userId: string;
   /** Jour civil du fournisseur, AAAA-MM-JJ. */
   today: string;
+  /** Mises en relation reçues (phase 3) ; absents dans les tests sans transfert. */
+  matches?: MatchStore | null;
+  handoff?: HandoffDeps | null;
 }
 
 export interface TurnCollector {
   calls: string[];
   /** Refus des contrôles objectifs (catégorie inconnue, tarif incohérent…), pour les évaluations. */
   problems: string[];
+  /** Réponses à une mise en relation, à valider par carte : elles libèrent un contact. */
+  proposals: BrainProposal[];
 }
 
 export function newCollector(): TurnCollector {
-  return { calls: [], problems: [] };
+  return { calls: [], problems: [], proposals: [] };
+}
+
+export const INTRO_STATUS_TEXT: Record<Introduction["status"], string> = {
+  requested: "en attente de votre réponse",
+  question: "vous avez posé une question, en attente de la réponse du membre",
+  accepted: "acceptée",
+  declined: "refusée par vous",
+  connected: "acceptée, contacts échangés",
+  expired: "expirée sans réponse",
+};
+
+/** Mises en relation d'une vitrine, telles que le modèle les lit. */
+export function describeIntroductions(introductions: Introduction[]): string {
+  if (introductions.length === 0) return "Aucune mise en relation reçue.";
+  return introductions
+    .map((i) => `- [mise en relation ${i.id}] demandée le ${i.requestedAt.slice(0, 10)}, ${INTRO_STATUS_TEXT[i.status]}${i.supplierMessage ? ` (votre mot : « ${i.supplierMessage} »)` : ""}\n  Texte du membre : « ${i.sharedText.replace(/\n/g, " / ")} »`)
+    .join("\n");
 }
 
 const CATEGORY_CODES = SERVICE_CATEGORIES.map((c) => c.code) as [string, ...string[]];
@@ -278,5 +303,59 @@ export function vitrineTools(deps: ToolDeps, collector: TurnCollector): BetaRunn
     },
   });
 
-  return [lire, enregistrerDits, proposer, confirmer, apercu, pause, indisponible];
+  const listerIntroductions = betaZodTool({
+    name: "lister_introductions",
+    description: "Mises en relation reçues par la vitrine : qui demande quoi (texte approuvé par le membre), et leur statut.",
+    inputSchema: z.object({}),
+    run: async () => {
+      note("lister_introductions");
+      if (!deps.matches) return "Les mises en relation ne sont pas disponibles ici.";
+      const storefront = await store.get(userId);
+      if (!storefront) return "Aucune vitrine, donc aucune mise en relation.";
+      return describeIntroductions(await deps.matches.listIntroductionsForStorefront(storefront.id));
+    },
+  });
+
+  const repondreIntroduction = betaZodTool({
+    name: "repondre_introduction",
+    description:
+      "Répond à une mise en relation : accepter (MAAQ transmet au membre le contact de la vitrine et vous transmet le sien), refuser, ou poser une question (message obligatoire, transmis tel quel). Rien ne part avant que le fournisseur valide la carte affichée : dites-le, sans considérer la réponse envoyée.",
+    inputSchema: z.object({
+      introduction_id: z.string().uuid(),
+      reponse: z.enum(["accepter", "refuser", "question"]),
+      message: z.string().max(500).optional().describe("Question ou mot d'explication, avec les mots du fournisseur"),
+    }),
+    run: async ({ introduction_id, reponse, message }) => {
+      note("repondre_introduction");
+      if (!deps.matches || !deps.handoff) return "Refusé : les mises en relation ne sont pas disponibles ici.";
+      const storefront = await store.get(userId);
+      const introduction = await deps.matches.getIntroduction(introduction_id);
+      if (!storefront || !introduction || introduction.storefrontId !== storefront.id) return "Refusé : cette mise en relation est introuvable.";
+      if (introduction.status !== "requested" && introduction.status !== "question") return `Refusé : cette mise en relation est déjà ${describeStatus(introduction.status)}.`;
+      if (reponse === "question" && !message?.trim()) return "Refusé : écrivez la question à transmettre.";
+      const response = reponse === "accepter" ? "accept" : reponse === "refuser" ? "decline" : "question";
+      const contact = storefront.contactMethod ? `${CONTACT_LABEL[storefront.contactMethod]} — ${storefront.contactValue ?? "non renseigné"}` : "contact non renseigné";
+      const summary =
+        response === "accept"
+          ? `Accepter la mise en relation (réf. ${introduction.id.slice(0, 8)}) : MAAQ transmet au membre votre contact « ${contact} » et vous transmet le sien (prénom, email, téléphone s'il existe).${message?.trim() ? `\nVotre mot : « ${message.trim()} »` : ""}`
+          : response === "decline"
+            ? `Refuser la mise en relation (réf. ${introduction.id.slice(0, 8)}). Le membre en sera informé${message?.trim() ? ` avec votre mot : « ${message.trim()} »` : ", sans explication"}. Rien n'est transmis.`
+            : `Poser cette question au membre (réf. ${introduction.id.slice(0, 8)}) : « ${message!.trim()} ». Aucun contact n'est transmis.`;
+      const handoff = deps.handoff;
+      collector.proposals.push({
+        summary,
+        execute: async () => {
+          try {
+            await respondToIntroduction(handoff, { supplierUserId: userId, introductionId: introduction.id, response, message: message ?? null });
+          } catch (error) {
+            if (error instanceof HandoffRefused && error.code === "already_answered") return;
+            throw error;
+          }
+        },
+      });
+      return `Carte de validation affichée : ${summary.split("\n")[0]} Dites au fournisseur de valider ou refuser la carte ; rien ne part avant.`;
+    },
+  });
+
+  return [lire, enregistrerDits, proposer, confirmer, apercu, pause, indisponible, listerIntroductions, repondreIntroduction];
 }

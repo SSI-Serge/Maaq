@@ -8,12 +8,15 @@ Documentation de l'agent **coup_de_main** (rubrique Perso) : l'acheteur du marke
 | `src/server/marketplace/match-store.ts`, `match-db-store.ts` | Demandes, suggestions, mises en relation, préférences (base et mémoire) |
 | `src/server/marketplace/introduction.ts` | Texte transmis au fournisseur, message dans son tchat vitrine, résumé de la carte |
 | `src/server/marketplace/rematch.ts` | Réexamen périodique des demandes « me prévenir » |
+| `src/server/marketplace/agenda.ts`, `src/server/adapters/calendar/` | Suggestions déclenchées par l'agenda (phase 2b) : classification des titres, question avant toute recherche ; agenda de démonstration `/dev/agenda` |
+| `src/server/marketplace/external.ts`, `src/server/adapters/places/` | Annuaire externe quand l'offre des membres est mince (phase 2c) : Google Places (New), Sirene, démonstration |
+| `src/server/marketplace/handoff.ts`, `handoff-app.ts` | Transfert au fournisseur et retour vers l'acheteur (phase 3) : accepter, refuser, question, échange des contacts, expiration, boutons WhatsApp |
 | `src/server/marketplace/buyer-service.ts` | Magasin partagé, écran de consentement |
 | `src/server/agents/coup-de-main.ts`, `coup-de-main-tools.ts` | Texte système, contexte, outils de l'agent |
 | `src/app/api/marketplace/prefs` | Lecture et modification du consentement et des catégories coupées |
 | `src/app/(app)/reglages/suggestions/page.tsx` | Écran Réglages › Suggestions de services |
-| `db/migrations/0009_marketplace_matching.sql` | Tables `service_requests`, `suggestions`, `introductions` (`marketplace_prefs` vient de 0008) |
-| `tests/marketplace-matching.test.ts` | Règles, service, agent avec faux modèle, base, consentement, traitement périodique |
+| `db/migrations/0009_marketplace_matching.sql`, `0010_marketplace_agenda.sql` | Tables `service_requests`, `suggestions`, `introductions`, `agenda_events_seen` ; code postal du profil ; consentement agenda |
+| `tests/marketplace-matching.test.ts`, `marketplace-agenda.test.ts`, `marketplace-external.test.ts`, `marketplace-handoff.test.ts` | Règles, service, agents avec faux modèle, base, consentements, traitements périodiques, annuaire, transfert |
 
 ## Ce que fait l'agent
 
@@ -25,7 +28,20 @@ Documentation de l'agent **coup_de_main** (rubrique Perso) : l'acheteur du marke
 - **Deux raisons par suggestion.** `reason` (pour l'acheteur) et `internal_reason` (règles d'éligibilité, score, réserves, pour l'opérateur), plus le journal complet du passage sur la demande (`match_log`), vitrines écartées comprises (US-17).
 - **Aucun résultat** : l'agent le dit et propose d'être prévenu (`prevenir_plus_tard`), ce qui exige le consentement aux suggestions proactives.
 - **Intérêt** (`interesse`) : l'outil rédige le texte transmis (besoin, moment, zone approximative, prénom seulement) et l'affiche sur une carte Valider / Refuser. **La carte est la seule voie vers une mise en relation** : sa validation crée la ligne `introductions` (statut `requested`, `shared_text` exactement tel qu'approuvé), marque la suggestion `interested` et dépose un message dans le tchat vitrine du fournisseur (`postAgentMessage`). Une seule mise en relation ouverte par couple (acheteur, vitrine).
-- `ignorer` (carence de 90 jours), `couper_suggestions` (une catégorie, ou tout : désactive les suggestions proactives), `statut`, `voir_vitrine`.
+- `ignorer` (carence de 90 jours), `couper_suggestions` (une catégorie, ou tout : désactive les suggestions proactives), `statut`, `voir_vitrine`, `clore_demande`, `repondre_fournisseur` (réponse à la question d'un fournisseur).
+- **Zone par défaut.** Une demande sans code postal prend celui du profil (Réglages › Mes informations), sauf si un service à distance convient.
+
+## Troisième voie : l'agenda (phase 2b)
+
+Avec un consentement propre (texte et version distincts, Réglages › Suggestions de services, qui exige les suggestions), le passage périodique lit les titres et dates des événements des 14 prochains jours de l'agenda du profil, classe en un appel structuré ceux qui ressemblent à un service à faire faire (seuil de confiance dans `rules.ts`), et crée une demande `proposed` avec une phrase neutre (jamais le titre), la date, et le code postal du profil. coup_de_main pose alors la question dans son tchat : « Je vois que vous avez ajouté « … » … Voulez-vous que je cherche quelqu'un près de chez vous ? » La recherche n'a lieu que sur le oui (`chercher`) ; le non clôt la demande. Chaque événement n'est examiné qu'une fois (`agenda_events_seen`, clé opaque). L'agenda lu dépend de `CALENDAR_MODE` : `dev` (agenda de démonstration, `/dev/agenda`, en attendant le calendrier maître), `none`.
+
+## Annuaire externe (phase 2c)
+
+Quand moins de trois vitrines de membres répondent, un bloc « Hors MAAQ » complète la réponse avec des établissements d'un annuaire : Google Places API (New) avec un masque de champs minimal (nom, commune, note, nombre d'avis, lien ; aucun texte d'avis), ou le registre Sirene (sans avis) en repli ou seul. L'annuaire ne reçoit que la catégorie et le code postal, jamais le texte de la demande ; rien n'est conservé ; ces établissements n'ont jamais de carte de mise en relation. `PLACES_MODE` : `off`, `dev` (noms fictifs), `sirene`, `google` (clé `GOOGLE_PLACES_API_KEY`, puis Sirene en repli).
+
+## Transfert au fournisseur (phase 3)
+
+La validation de la carte dépose le texte approuvé dans le tchat vitrine du fournisseur et, s'il a relié WhatsApp avec consentement, lui envoie le modèle `maaq_mise_en_relation` (boutons Accepter / Refuser / Question ; message à boutons dans la fenêtre de 24 h). Le fournisseur répond dans son tchat vitrine (`repondre_introduction`, carte à valider car accepter libère son contact) ou par les boutons WhatsApp (même transition, sans passer par kdo_help ; « Question » renvoie au tchat vitrine pour l'écrire). Accepter échange les contacts : l'acheteur reçoit dans coup_de_main le contact choisi sur la vitrine, le fournisseur reçoit le prénom, l'email et le téléphone de l'acheteur ; la mise en relation passe à `connected`. Refuser prévient l'acheteur sans rien transmettre. Une question est transmise à l'acheteur, qui répond par `repondre_fournisseur`. Sans réponse sous 7 jours, le passage périodique fait expirer la demande et prévient l'acheteur ; refusée, expirée ou faite, la vitrine n'est pas reproposée pendant 90 jours.
 
 ## Consentement
 
@@ -45,4 +61,4 @@ Même réglage que kdo_help et vitrine (`LOCAL_AGENTS_MODE=anthropic`). L'agent 
 
 ## Pas encore
 
-Réponse du fournisseur et échange des coordonnées (phase 3), modèle WhatsApp de notification, signalement et console d'administration (phase 4), déclenchement par l'agenda, photos, recherche publique.
+Signalement et console d'administration (phase 4), calendrier maître (l'agenda de démonstration en tient lieu), notification push, photos, recherche publique.

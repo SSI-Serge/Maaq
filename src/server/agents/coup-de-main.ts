@@ -1,6 +1,7 @@
 import type { PlacesDirectory } from "@/server/adapters/places/types";
 import { localDate } from "@/server/gifts/model";
-import type { MatchStore } from "@/server/marketplace/match-store";
+import type { HandoffDeps } from "@/server/marketplace/handoff";
+import type { EligibleStorefront, Introduction, MatchStore } from "@/server/marketplace/match-store";
 import { SERVICE_CATEGORIES } from "@/server/marketplace/model";
 import { coupDeMainTools, describeRequest, INTRODUCTION_STATUS_TEXT, newCollector, SUGGESTION_STATUS_TEXT, type TurnCollector } from "./coup-de-main-tools";
 import { buildMessages } from "./messages";
@@ -26,7 +27,8 @@ Démarche :
 3. Sans résultat, dis-le honnêtement, sans inventer de fournisseur, et propose d'être prévenu si une vitrine correspondante arrive (prevenir_plus_tard). Cela demande que les suggestions soient activées dans Réglages › Suggestions de services : indique-le si l'outil le signale.
 4. Si la personne est intéressée par une suggestion, appelle interesse : l'outil affiche une carte avec le texte exact qui serait envoyé au fournisseur (son besoin, le moment, la zone approximative et son prénom, rien d'autre). Rien n'est envoyé tant qu'elle n'a pas validé la carte : dis-le, et ne présente jamais la mise en relation comme faite. Si elle veut modifier le texte, rappelle interesse avec ses précisions.
 5. Pour écarter une suggestion : ignorer. Pour couper des suggestions d'une catégorie ou toutes : couper_suggestions. Pour faire le point : statut.
-6. Une demande « issue de votre agenda, en attente de votre réponse » vient d'une question que tu as posée après avoir vu un événement de l'agenda de la personne. Si elle répond oui, appelle chercher sur cette demande ; si elle répond non, appelle clore_demande. Ne cherche jamais sans son oui.
+6. Quand une mise en relation est au statut « le fournisseur a posé une question », transmets la réponse de la personne avec repondre_fournisseur (identifiant de la mise en relation dans le contexte). Quand elle est « faite », les coordonnées ont été échangées : la personne contacte le fournisseur elle-même.
+7. Une demande « issue de votre agenda, en attente de votre réponse » vient d'une question que tu as posée après avoir vu un événement de l'agenda de la personne. Si elle répond oui, appelle chercher sur cette demande ; si elle répond non, appelle clore_demande. Ne cherche jamais sans son oui.
 
 Règles :
 - Disponibilité « à convenir » signifie non confirmée : ne dis jamais que le fournisseur est disponible. Un tarif « sur devis » n'est pas un prix.
@@ -51,8 +53,10 @@ export interface BrainDeps {
   store: MatchStore;
   /** Profil MAAQ d'une référence Digitorn ; par défaut, la référence sert d'identifiant et de prénom (tests). */
   profileOf?: (userRef: string) => Promise<Profile | null>;
-  /** Dépose un message dans le tchat vitrine d'un fournisseur ; par défaut, rien (tests sans simulateur). */
-  notifySupplier?: (supplierUserId: string, text: string) => Promise<void>;
+  /** Prévient le fournisseur d'une mise en relation demandée ; par défaut, rien (tests sans simulateur). */
+  notifySupplier?: (introduction: Introduction, storefront: EligibleStorefront) => Promise<void>;
+  /** Transfert (phase 3) : réponse de l'acheteur à une question du fournisseur. */
+  handoff?: HandoffDeps | null;
   /** Annuaire externe (phase 2c) ; absent = jamais de bloc « Hors MAAQ ». */
   directory?: PlacesDirectory | null;
   now?: () => Date;
@@ -91,7 +95,7 @@ export async function contextBlock(deps: BrainDeps, userId: string, input: Agent
     lines.push("Mises en relation :");
     for (const i of introductions.slice(0, 5)) {
       const sf = await deps.store.getEligible(i.storefrontId, today);
-      lines.push(`- ${sf?.displayName ?? "vitrine retirée"} : ${INTRODUCTION_STATUS_TEXT[i.status]}`);
+      lines.push(`- ${sf?.displayName ?? "vitrine retirée"} : ${INTRODUCTION_STATUS_TEXT[i.status]}${i.supplierMessage ? ` — « ${i.supplierMessage} »` : ""} [mise en relation ${i.id}]`);
     }
   }
   if (input.context.rank !== "primary_user") lines.push("La personne qui écrit est un invité du compte, pas l'utilisateur principal.");
@@ -124,7 +128,7 @@ export function coupDeMainBrain(llm: LlmClient, deps: BrainDeps): CoupDeMainBrai
 
       const today = localDate(input.today, input.timezone);
       const collector: TurnCollector = newCollector();
-      const tools = coupDeMainTools({ store: deps.store, llm, userId: profile.id, firstName: profile.firstName, postcode: profile.postcode ?? null, today, now, notifySupplier, directory: deps.directory ?? null }, collector);
+      const tools = coupDeMainTools({ store: deps.store, llm, userId: profile.id, firstName: profile.firstName, postcode: profile.postcode ?? null, today, now, notifySupplier, directory: deps.directory ?? null, handoff: deps.handoff ?? null }, collector);
       const context = await contextBlock(deps, profile.id, input, today);
       const { text } = await llm.runTools({ system: SYSTEM_PROMPT, messages: buildMessages(input, context), tools, maxIterations: 8 });
       return { reply: { text: text || COUP_DE_MAIN_FAILURE_MESSAGE, proposals: collector.proposals }, calls: collector.calls, problems: collector.problems, outcomes: collector.outcomes, external: collector.external };

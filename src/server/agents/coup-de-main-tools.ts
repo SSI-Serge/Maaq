@@ -3,7 +3,8 @@ import type { BetaRunnableTool } from "@anthropic-ai/sdk/lib/tools/BetaRunnableT
 import { z } from "zod";
 import type { PlacesDirectory } from "@/server/adapters/places/types";
 import { renderExternal, searchExternal, type ExternalBlock } from "@/server/marketplace/external";
-import { draftSharedText, proposalSummary, supplierNotice } from "@/server/marketplace/introduction";
+import { answerSupplierQuestion, HandoffRefused, type HandoffDeps } from "@/server/marketplace/handoff";
+import { draftSharedText, proposalSummary } from "@/server/marketplace/introduction";
 import { IntroductionOpen, type EligibleStorefront, type Introduction, type MatchStore, type ServiceRequest, type Suggestion } from "@/server/marketplace/match-store";
 import { matchRequest, renderSuggestions, viewOf, type MatchOutcome } from "@/server/marketplace/matching";
 import { buyerPreview, departementOf, SERVICE_CATEGORIES, servedDepartements } from "@/server/marketplace/model";
@@ -25,8 +26,10 @@ export interface ToolDeps {
   /** Jour civil de l'acheteur, AAAA-MM-JJ. */
   today: string;
   now: () => Date;
-  /** Dépose un message dans le tchat vitrine du fournisseur (après validation de la carte). */
-  notifySupplier: (supplierUserId: string, text: string) => Promise<void>;
+  /** Prévient le fournisseur d'une mise en relation demandée (après validation de la carte) : tchat vitrine, WhatsApp s'il est relié. */
+  notifySupplier: (introduction: Introduction, storefront: EligibleStorefront) => Promise<void>;
+  /** Transfert (phase 3) : réponse de l'acheteur à la question d'un fournisseur ; absent dans les tests sans transfert. */
+  handoff?: HandoffDeps | null;
   /** Annuaire externe quand l'offre des membres est mince ; null = aucun. */
   directory?: PlacesDirectory | null;
 }
@@ -247,7 +250,7 @@ export function coupDeMainTools(deps: ToolDeps, collector: TurnCollector): BetaR
             throw error;
           }
           await store.setSuggestionStatus(userId, suggestion.id, "interested");
-          await deps.notifySupplier(storefront.userId, supplierNotice(introduction, storefront));
+          await deps.notifySupplier(introduction, storefront);
         },
       });
       return `Carte de validation affichée pour ${name}. Texte qui serait envoyé, mot pour mot :\n« ${sharedText} »\nDites à la personne de valider ou refuser la carte, ou de demander une modification. Rien n'est envoyé avant sa validation.`;
@@ -299,6 +302,23 @@ export function coupDeMainTools(deps: ToolDeps, collector: TurnCollector): BetaR
     },
   });
 
+  const repondre = betaZodTool({
+    name: "repondre_fournisseur",
+    description: "Transmet au fournisseur la réponse de la personne à la question qu'il a posée sur une mise en relation (statut « le fournisseur a posé une question »). Avec les mots de la personne.",
+    inputSchema: z.object({ introduction_id: z.string().uuid(), texte: z.string().min(1).max(500) }),
+    run: async ({ introduction_id, texte }) => {
+      note("repondre_fournisseur");
+      if (!deps.handoff) return refuse("le transfert des réponses n'est pas disponible ici.");
+      try {
+        await answerSupplierQuestion(deps.handoff, { buyerUserId: userId, introductionId: introduction_id, text: texte });
+      } catch (error) {
+        if (error instanceof HandoffRefused) return refuse(error.message);
+        throw error;
+      }
+      return "Réponse transmise au fournisseur ; je vous dirai ce qu'il décide.";
+    },
+  });
+
   const clore = betaZodTool({
     name: "clore_demande",
     description: "Clôt une demande : la personne n'en veut plus (par exemple « non » à une demande issue de son agenda). Rien ne sera plus cherché ni proposé pour elle.",
@@ -334,14 +354,14 @@ export function coupDeMainTools(deps: ToolDeps, collector: TurnCollector): BetaR
         lines.push("Mises en relation :");
         for (const i of introductions) {
           const sf = await store.getEligible(i.storefrontId, deps.today);
-          lines.push(`- ${sf?.displayName ?? "vitrine retirée"} : ${INTRODUCTION_STATUS_TEXT[i.status]} (demandée le ${i.requestedAt.slice(0, 10)})`);
+          lines.push(`- ${sf?.displayName ?? "vitrine retirée"} : ${INTRODUCTION_STATUS_TEXT[i.status]} (demandée le ${i.requestedAt.slice(0, 10)})${i.supplierMessage ? ` — mot du fournisseur : « ${i.supplierMessage} »` : ""} [mise en relation ${i.id}]`);
         }
       }
       return lines.join("\n");
     },
   });
 
-  return [demander, chercher, prevenir, voir, interesse, ignorer, couper, clore, statut];
+  return [demander, chercher, prevenir, voir, interesse, ignorer, couper, clore, repondre, statut];
 }
 
 export { viewOf };

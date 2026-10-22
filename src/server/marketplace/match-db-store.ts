@@ -4,6 +4,7 @@ import type { ServiceCategory } from "./model";
 import {
   ACTIVE_SUGGESTION,
   DEFAULT_PREFS,
+  IntroductionNotFound,
   IntroductionOpen,
   OPEN_INTRODUCTION,
   RequestNotFound,
@@ -14,6 +15,7 @@ import {
   type EligibleStorefront,
   type Introduction,
   type IntroductionInput,
+  type IntroductionPatch,
   type MarketplacePrefs,
   type MatchLogEntry,
   type MatchStore,
@@ -443,6 +445,38 @@ export class DbMatchStore implements MatchStore {
 
   async listIntroductions(buyerUserId: string): Promise<Introduction[]> {
     const rows = await this.db.selectFrom("introductions").selectAll().where("buyer_user_id", "=", buyerUserId).orderBy("requested_at", "desc").execute();
+    return rows.map((row) => toIntroduction(row as IntroductionRow));
+  }
+
+  async getIntroduction(id: string): Promise<Introduction | null> {
+    const row = await this.db.selectFrom("introductions").selectAll().where("id", "=", id).executeTakeFirst();
+    return row ? toIntroduction(row as IntroductionRow) : null;
+  }
+
+  async listIntroductionsForStorefront(storefrontId: string): Promise<Introduction[]> {
+    const rows = await this.db.selectFrom("introductions").selectAll().where("storefront_id", "=", storefrontId).orderBy("requested_at", "desc").execute();
+    return rows.map((row) => toIntroduction(row as IntroductionRow));
+  }
+
+  async updateIntroduction(id: string, patch: IntroductionPatch): Promise<Introduction> {
+    const row = await this.db
+      .updateTable("introductions")
+      .set({
+        ...(patch.status !== undefined ? { status: patch.status } : {}),
+        ...(patch.supplierMessage !== undefined ? { supplier_message: patch.supplierMessage } : {}),
+        ...(patch.answeredAt !== undefined ? { answered_at: patch.answeredAt ? new Date(patch.answeredAt) : null } : {}),
+        ...(patch.connectedAt !== undefined ? { connected_at: patch.connectedAt ? new Date(patch.connectedAt) : null } : {}),
+        updated_at: this.now(),
+      })
+      .where("id", "=", id)
+      .returningAll()
+      .executeTakeFirst();
+    if (!row) throw new IntroductionNotFound();
+    return toIntroduction(row as IntroductionRow);
+  }
+
+  async listIntroductionsToExpire(before: string): Promise<Introduction[]> {
+    const rows = await this.db.selectFrom("introductions").selectAll().where("status", "in", ["requested", "question"]).where("requested_at", "<", new Date(before)).execute();
     return rows.map((row) => toIntroduction(row as IntroductionRow));
   }
 

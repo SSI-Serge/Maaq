@@ -47,3 +47,6 @@ export const AGENDA_CONSENT_TEXT =
 
 /** Annuaire externe (phase 2c) : résultats montrés au plus, en complément des vitrines de membres. */
 export const MAX_EXTERNAL = 3;
+
+/** Mise en relation (phase 3) : sans réponse du fournisseur après ce délai, elle expire et l'acheteur est prévenu. */
+export const INTRODUCTION_EXPIRY_DAYS = 7;

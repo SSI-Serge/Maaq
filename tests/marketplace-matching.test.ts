@@ -239,7 +239,7 @@ describe("coup_de_main — agent avec faux modèle", () => {
     const relevance = fakeRelevance(scores);
     const llm: LlmClient = { runTools: fake.llm.runTools, complete: relevance.complete };
     const notified: { userId: string; text: string }[] = [];
-    const brain = coupDeMainBrain(llm, { store, profileOf: async (ref) => ({ id: ref, firstName: "Camille" }), notifySupplier: async (userId, text) => void notified.push({ userId, text }), now: () => NOW });
+    const brain = coupDeMainBrain(llm, { store, profileOf: async (ref) => ({ id: ref, firstName: "Camille" }), notifySupplier: async (introduction, storefront) => void notified.push({ userId: storefront.userId, text: supplierNotice(introduction, storefront) }), now: () => NOW });
     return { storefronts, store, brain, relevance, notified, steps: fake.steps, lastPrompt: fake.lastPrompt };
   }
 
@@ -374,7 +374,7 @@ describe("coup_de_main — agent avec faux modèle", () => {
     const [suggestion] = await store.addSuggestions([{ requestId: request.id, buyerUserId: "camille", storefrontId: sf.id, reason: "Tresses à Lyon.", internalReason: "test", score: 0.9, fit: "strong" }]);
     const fake = fakeLlm([{ calls: [{ tool: "interesse", input: { suggestion_id: suggestion.id } }], text: "Validez la carte." }]);
     const notified: string[] = [];
-    const brain = coupDeMainBrain(fake.llm, { store, profileOf: async (ref) => ({ id: ref, firstName: "Camille" }), notifySupplier: async (userId) => void notified.push(userId) });
+    const brain = coupDeMainBrain(fake.llm, { store, profileOf: async (ref) => ({ id: ref, firstName: "Camille" }), notifySupplier: async (_introduction, storefront) => void notified.push(storefront.userId) });
     const mock = new MockDigitorn({ replyDelayMs: 0, executionDelayMs: 0, brains: [brain] });
     await mock.submitRequest({ requestId: "r1", userRef: "camille", agentRef: COUP_DE_MAIN_REF, text: "Intéressée", context: context(), channel: "web" });
     await mock.settle();

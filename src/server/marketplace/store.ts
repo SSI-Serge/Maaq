@@ -15,6 +15,8 @@ export interface StateChange {
 
 export interface StorefrontStore {
   get(userId: string): Promise<Storefront | null>;
+  /** Par identifiant de vitrine, quel que soit son statut (mise en relation, réponse du fournisseur). */
+  getById(id: string): Promise<Storefront | null>;
   /**
    * Enregistre des champs ; crée le brouillon s'il n'existe pas. Chaque groupe touché prend la provenance
    * donnée pour lui (sinon « stated ») : une valeur modifiée n'est plus confirmée, sauf si l'origine le dit.
@@ -50,6 +52,11 @@ export class MemoryStorefrontStore implements StorefrontStore {
 
   async get(userId: string): Promise<Storefront | null> {
     const item = this.items.get(userId);
+    return item ? structuredClone(item) : null;
+  }
+
+  async getById(id: string): Promise<Storefront | null> {
+    const item = [...this.items.values()].find((s) => s.id === id);
     return item ? structuredClone(item) : null;
   }
 

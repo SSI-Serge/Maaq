@@ -23,6 +23,17 @@ export const TEMPLATES = {
     body: "Bonjour {{1}}, une date approche : {{2}}. Souhaitez-vous des idées de cadeaux ?",
     buttons: ["Voir les idées", "Plus tard", "C'est réglé"],
   },
+  /**
+   * Demande de mise en relation reçue par un fournisseur (marketplace silencieux). {{1}} prénom du fournisseur,
+   * {{2}} nom de la vitrine, {{3}} texte approuvé par l'acheteur. Accepter transmet le contact choisi sur la vitrine.
+   */
+  introduction_request: {
+    name: "maaq_mise_en_relation",
+    language: "fr",
+    category: "UTILITY",
+    body: "Bonjour {{1}}, un membre MAAQ souhaite être mis en relation avec votre vitrine « {{2}} » : {{3}} Accepter transmet au membre le contact indiqué sur votre vitrine, et vous transmet le sien. Sans réponse sous 7 jours, la demande expire.",
+    buttons: ["Accepter", "Refuser", "Question"],
+  },
   /** Confirmation de liaison. {{1}} prénom. */
   welcome: {
     name: "maaq_bienvenue",

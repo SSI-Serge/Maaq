@@ -474,6 +474,9 @@ function GroupEditor({ group, storefront, categories, onDone, onCancel }: { grou
             hint="Révélé seulement après une mise en relation acceptée."
             maxLength={200}
           />
+          <p className={s.muted}>
+            Ce qui circule, étape par étape : une suggestion montre au membre votre vitrine sans ce contact ; une demande de mise en relation vous apporte son besoin, le moment, sa zone et son prénom ; si vous acceptez, il reçoit ce contact et vous recevez son email (et son téléphone s&apos;il en a un). Refuser ne transmet rien ; sans réponse sous 7 jours, la demande expire.
+          </p>
         </>
       )}
 

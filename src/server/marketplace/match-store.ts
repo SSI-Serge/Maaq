@@ -113,6 +113,13 @@ export interface Introduction {
   connectedAt: string | null;
 }
 
+export interface IntroductionPatch {
+  status?: IntroductionStatus;
+  supplierMessage?: string | null;
+  answeredAt?: string | null;
+  connectedAt?: string | null;
+}
+
 export interface IntroductionInput {
   suggestionId: string | null;
   buyerUserId: string;
@@ -190,6 +197,12 @@ export interface MatchStore {
   /** Crée la mise en relation ; refuse s'il en existe déjà une ouverte pour ce couple. */
   createIntroduction(input: IntroductionInput): Promise<Introduction>;
   listIntroductions(buyerUserId: string): Promise<Introduction[]>;
+  getIntroduction(id: string): Promise<Introduction | null>;
+  /** Mises en relation reçues par une vitrine (côté fournisseur). */
+  listIntroductionsForStorefront(storefrontId: string): Promise<Introduction[]>;
+  updateIntroduction(id: string, patch: IntroductionPatch): Promise<Introduction>;
+  /** Mises en relation encore sans réponse (requested, question) demandées avant cet instant. */
+  listIntroductionsToExpire(before: string): Promise<Introduction[]>;
 
   getPrefs(userId: string): Promise<MarketplacePrefs>;
   setPrefs(userId: string, patch: PrefsPatch): Promise<MarketplacePrefs>;
@@ -206,6 +219,13 @@ export class SuggestionNotFound extends Error {
   constructor() {
     super("Cette suggestion est introuvable.");
     this.name = "SuggestionNotFound";
+  }
+}
+
+export class IntroductionNotFound extends Error {
+  constructor() {
+    super("Cette mise en relation est introuvable.");
+    this.name = "IntroductionNotFound";
   }
 }
 
@@ -446,6 +466,34 @@ export class MemoryMatchStore implements MatchStore {
     return [...this.introductions.values()]
       .filter((i) => i.buyerUserId === buyerUserId)
       .sort((a, b) => b.requestedAt.localeCompare(a.requestedAt))
+      .map((i) => structuredClone(i));
+  }
+
+  async getIntroduction(id: string): Promise<Introduction | null> {
+    const found = this.introductions.get(id);
+    return found ? structuredClone(found) : null;
+  }
+
+  async listIntroductionsForStorefront(storefrontId: string): Promise<Introduction[]> {
+    return [...this.introductions.values()]
+      .filter((i) => i.storefrontId === storefrontId)
+      .sort((a, b) => b.requestedAt.localeCompare(a.requestedAt))
+      .map((i) => structuredClone(i));
+  }
+
+  async updateIntroduction(id: string, patch: IntroductionPatch): Promise<Introduction> {
+    const found = this.introductions.get(id);
+    if (!found) throw new IntroductionNotFound();
+    if (patch.status !== undefined) found.status = patch.status;
+    if (patch.supplierMessage !== undefined) found.supplierMessage = patch.supplierMessage;
+    if (patch.answeredAt !== undefined) found.answeredAt = patch.answeredAt;
+    if (patch.connectedAt !== undefined) found.connectedAt = patch.connectedAt;
+    return structuredClone(found);
+  }
+
+  async listIntroductionsToExpire(before: string): Promise<Introduction[]> {
+    return [...this.introductions.values()]
+      .filter((i) => (i.status === "requested" || i.status === "question") && i.requestedAt < before)
       .map((i) => structuredClone(i));
   }
 
