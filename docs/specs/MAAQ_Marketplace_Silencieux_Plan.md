@@ -1,6 +1,6 @@
 # Maaq silent marketplace — implementation plan
 
-Status: **confirmed on 2026-10-21**; Phase 1 built on `ulrichagents` (see `Vitrine-agent/README.md`); Phase 2 built on 2026-10-22 (buyer agent `coup_de_main`, matcher, consent screen, periodic re-match, migration `0009_marketplace_matching.sql`; see `Coup-de-main-agent/README.md`). Phases 3 and 4 pending. Based on the user stories US-01 to US-17 and on the way MAAQ runs agents today (kdo_help). The decisions in section 3 were confirmed with the clickable mock.
+Status: **confirmed on 2026-10-21**; Phase 1 built on `ulrichagents` (see `Vitrine-agent/README.md`); Phase 2 built on 2026-10-22 (buyer agent `coup_de_main`, matcher, consent screen, periodic re-match, migration `0009_marketplace_matching.sql`; see `Coup-de-main-agent/README.md`). Phases 2b (agenda trigger) and 2c (external directory) added on 2026-10-22 after discussion; phases 2b, 2c, 3 and 4 pending. Based on the user stories US-01 to US-17 and on the way MAAQ runs agents today (kdo_help). The decisions in section 3 were confirmed with the clickable mock.
 
 ## 1. The feature in one paragraph
 
@@ -37,10 +37,11 @@ What is new in kind, not just in code:
 4. **Hours are not required.** "By arrangement" is a valid, honest value (the story's open choice). Availability is shown as given, never inferred.
 5. **Voice = browser speech recognition, as today.** The `Dictation` component is generalised into a mic button in the chat input for local agents. No server-side transcription, no audio stored, no WhatsApp voice notes (the channel already replies that it cannot listen). Low-confidence handling (US-04): instead of relying on the API's confidence value, the agent always reads back price, location and contact details before marking them confirmed.
 6. **"Connected" means a contact exchange, not a relayed chat.** When the supplier accepts, each side receives the other's chosen contact detail (phone, email, or a WhatsApp link) and the introduction is closed as connected.
-7. **Explicit buyer requests first; agenda-triggered suggestions deferred.** US-09's consent screen is built with the "use my agenda" switch present but inactive (labelled as coming), so the consent model is right from day one. Google Calendar reading is a later phase.
+7. **Explicit buyer requests first; agenda-triggered suggestions as a later phase (2b).** US-09's consent screen is built with the "use my agenda" switch present but inactive (labelled as coming), so the consent model is right from day one. Confirmed on 2026-10-22: the agenda path has its own consent text and version (separate from the suggestions consent), asked in context in the app rather than during onboarding; the agent asks before looking ("Je vois que vous avez ajouté un rendez-vous pour … Voulez-vous que je cherche quelqu'un près de chez vous ?") rather than naming a provider straight away; the buyer's area comes from the profile, not from the request.
 8. **Photos deferred.** No user file storage today outside contract documents sent to Drive. The record has a `photos` slot left empty.
 9. **No ratings in the MVP** (US-14 rule 4), no public search: storefronts are `suggested_only` by default, with the "searchable" flag stored but unused.
 10. **Suggestions do not count against the daily request cap** (they are agent-initiated), and a dismissed storefront is not suggested again to that buyer for 90 days [to confirm the number].
+11. **Thin supply is bridged with an external directory, kept apart from member storefronts (phase 2c).** Confirmed on 2026-10-22: Google Places API (New) is the one external source in France (coverage plus ratings and reviews); Yelp is not viable (no French coverage, paid-only API); Sirene, the public company register, is a free fallback without reviews. External results are shown in a separate, labelled block, never get an introduction card, and Google only ever receives a category and a location, never the request text or a calendar title.
 
 ## 4. Data model (migration `0008_marketplace.sql`)
 
@@ -110,6 +111,28 @@ Both chats can ask for status at any time; every transition is a row, never a fr
 - Interest → proposal card → introduction (requested); statuses visible in both chats.
 - Tests: eligibility explains itself; out-of-area never shown as local; unknown availability never shown as confirmed; low score withheld; dismissal cooldown; no fabricated match on empty results.
 
+### Phase 2b — Agenda trigger (US-09, third way a service is suggested)
+
+Depends on the master calendar planned on the main branch (none exists on `master` or `test` as of 2026-10-22; the `google_calendar` connector type exists, with no reader yet).
+
+- Consent: a dedicated text and version for reading calendar titles, stored in `marketplace_prefs` (`agenda_opt_in`, plus `agenda_consent_version` / `agenda_opt_in_at` in a small migration). Standard wording, asked in the app at the moment the calendar is first connected or first usable by coup_de_main, not during onboarding. The switch on Réglages › Suggestions de services becomes active.
+- Reader: upcoming events for opted-in profiles over a lookahead window (14 days to start), with a per-event dedup key so an event is evaluated once.
+- Classification: one structured model call per batch of event titles → service category or none, with a confidence; below a threshold nothing happens. The title never leaves MAAQ except for this call.
+- Need: a `service_request` with `source = 'agenda'` (new column, values `chat` | `agenda`), timing = event date, area = the profile's postcode (new profile field, also used as the default for chat requests). Then the existing matcher, thresholds, cooldown and reasons apply unchanged.
+- Delivery: question first, in the coup_de_main chat via `postAgentMessage` ("Je vois que vous avez ajouté un rendez-vous pour … Voulez-vous que je cherche quelqu'un près de chez vous ?"). Only on "oui" does the search run and show providers, then the usual card. A push notification can ride on the PWA later.
+- Tests: no event evaluated twice; nothing happens without the agenda consent; misread title never shows a provider (question first); title never sent to the directory.
+- Sequencing: after the master calendar lands, and preferably after phase 3 so suppliers can answer before unprompted suggestions start.
+
+### Phase 2c — External directory when supply is thin (Google Places, Sirene)
+
+- Source: Google Places API (New) — Text Search or Nearby Search by category and location (5,000 free calls per SKU per month since March 2025), Place Details basic fields (10,000 free), rating and review count only for the two or three results shown (higher-tier fields). Legacy Places API not available for new projects. Attribution displayed; nothing stored beyond 30 days except the place id.
+- Fallback: Sirene via `recherche-entreprises.api.gouv.fr` (free, no key): registered businesses by activity code (96.02A coiffure, 96.02B beauté, 97.00Z services domestiques…) and commune; no reviews, no phone, no official radius search, many dormant entries. Used to say "someone registered nearby exists", not to recommend.
+- Display: member storefronts first, always. External results in a separate block "Hors MAAQ : établissements trouvés sur Google Maps" with name, rating, review count, distance and a link; no introduction card, the person contacts them directly. Same honesty rules: nothing claimed beyond the fields returned.
+- Privacy: only a category and a location go to the external API, never the request text nor a calendar title.
+- Config: `GOOGLE_PLACES_API_KEY` optional; without it the block is simply absent. Budget alert on the Google project, since caps do not stop usage.
+- Tests: external block absent without key; member results ranked above external ones; request text never in the outbound call; reviews fetched only for shown results.
+- Sequencing: independent of 2b; can land before it, since it helps explicit requests at once.
+
 ### Phase 3 — Agent handoff (US-07, 08, 15)
 
 - Supplier contact preferences on the review screen; what is shared at each step spelled out in the UI and in the agent's text.
@@ -123,7 +146,7 @@ Both chats can ask for status at any time; every transition is a row, never a fr
 
 ## 8. Out of the first release
 
-Public search, ratings, agenda-triggered suggestions, photos, server-side transcription, WhatsApp voice notes, automated booking, paid ranking, radius matching, relayed chat between buyer and supplier.
+Public search, ratings of members, photos, server-side transcription, WhatsApp voice notes, automated booking, paid ranking, radius matching, relayed chat between buyer and supplier. Agenda-triggered suggestions and the external directory are now planned as phases 2b and 2c.
 
 ## 9. Risks and open points
 
@@ -131,4 +154,6 @@ Public search, ratings, agenda-triggered suggestions, photos, server-side transc
 - **Browser speech recognition** is uneven (good on Chrome/Android, partial on iOS Safari): text must always work equally well, which the design guarantees.
 - **Thin supply.** With few storefronts, honest "no provider" answers will be frequent; the notify-later request keeps the buyer's need without faking a match.
 - **Legal text.** The consent for proactive suggestions and the cross-account visibility of a published storefront should be reflected in the privacy policy versions (`legal_document_versions`) before the pilot.
+- **External directory dependence (2c).** Google Places terms limit caching and require attribution; Google reviews are the only review source with French coverage for small local services, so there is no second opinion to cross-check against. Sirene lists dormant micro-businesses.
+- **Calendar titles are sensitive (2b).** Reading them needs its own consent and must stay inside MAAQ except for the classification call; the question-first delivery limits the damage of a misread title.
 - **Digitorn.** Like kdo_help, these agents run in MAAQ's simulator even in live mode; moving them to Digitorn later means porting prompts and tools, not the data model.
