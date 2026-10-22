@@ -11,12 +11,13 @@ Documentation de l'agent **coup_de_main** (rubrique Perso) : l'acheteur du marke
 | `src/server/marketplace/agenda.ts`, `src/server/adapters/calendar/` | Suggestions déclenchées par l'agenda (phase 2b) : classification des titres, question avant toute recherche ; agenda de démonstration `/dev/agenda` |
 | `src/server/marketplace/external.ts`, `src/server/adapters/places/` | Annuaire externe quand l'offre des membres est mince (phase 2c) : Google Places (New), Sirene, démonstration |
 | `src/server/marketplace/handoff.ts`, `handoff-app.ts` | Transfert au fournisseur et retour vers l'acheteur (phase 3) : accepter, refuser, question, échange des contacts, expiration, boutons WhatsApp |
+| `src/server/admin/storefronts.ts`, `src/app/(app)/admin/vitrines`, `src/app/api/admin/vitrines` | Admin › Vitrines (phase 4) : liste signalées d'abord, suspension, catégorie, signalements, raisons internes, compteurs |
 | `src/server/marketplace/buyer-service.ts` | Magasin partagé, écran de consentement |
 | `src/server/agents/coup-de-main.ts`, `coup-de-main-tools.ts` | Texte système, contexte, outils de l'agent |
 | `src/app/api/marketplace/prefs` | Lecture et modification du consentement et des catégories coupées |
 | `src/app/(app)/reglages/suggestions/page.tsx` | Écran Réglages › Suggestions de services |
-| `db/migrations/0009_marketplace_matching.sql`, `0010_marketplace_agenda.sql` | Tables `service_requests`, `suggestions`, `introductions`, `agenda_events_seen` ; code postal du profil ; consentement agenda |
-| `tests/marketplace-matching.test.ts`, `marketplace-agenda.test.ts`, `marketplace-external.test.ts`, `marketplace-handoff.test.ts` | Règles, service, agents avec faux modèle, base, consentements, traitements périodiques, annuaire, transfert |
+| `db/migrations/0009_marketplace_matching.sql`, `0010_marketplace_agenda.sql`, `0011_marketplace_reports.sql` | Tables `service_requests`, `suggestions`, `introductions`, `agenda_events_seen`, `listing_reports` ; code postal du profil ; consentement agenda ; suspension administrateur |
+| `tests/marketplace-matching.test.ts`, `marketplace-agenda.test.ts`, `marketplace-external.test.ts`, `marketplace-handoff.test.ts`, `marketplace-admin.test.ts` | Règles, service, agents avec faux modèle, base, consentements, traitements périodiques, annuaire, transfert, administration |
 
 ## Ce que fait l'agent
 
@@ -59,6 +60,10 @@ De l'acheteur : seulement le texte approuvé sur la carte, vers le fournisseur. 
 
 Même réglage que kdo_help et vitrine (`LOCAL_AGENTS_MODE=anthropic`). L'agent `coup_de_main` est créé par `npm run dev` ou `npm run db:seed`. Pour une démonstration, il faut une vitrine publiée par un autre profil.
 
+## Signalement et administration (phase 4)
+
+Un membre qui trouve une vitrine suggérée trompeuse, déplacée ou abusive le dit à coup_de_main (`signaler_vitrine` : motif parmi description trompeuse, contenu inapproprié, pas un service, publicité, autre, avec ses mots) ; la vitrine est écartée pour lui et un signalement ouvert est créé (`listing_reports`, US-16). Sur Admin › Vitrines (US-17), l'administrateur voit les vitrines par statut, les signalées d'abord, avec pour chacune : les champs visibles par un acheteur (jamais le contact), les signalements à traiter (traité avec suite donnée, ou sans suite), les suggestions faites avec la raison montrée et la raison interne, le journal de mise en relation (y compris les fois où la vitrine a été retenue ou jugée inéligible, avec chaque règle), les mises en relation, et les actions d'administration. Il peut suspendre la vitrine (raison obligatoire, montrée au fournisseur sur « Ma vitrine » et dans son tchat ; hors suggestions jusqu'à la levée) et corriger sa catégorie. Compteurs : vitrines par statut, éligibles par catégorie et par département, suggestions montrées / intérêt / écartées, mises en relation par statut, signalements. Chaque action va dans `admin_audit_log`.
+
 ## Pas encore
 
-Signalement et console d'administration (phase 4), calendrier maître (l'agenda de démonstration en tient lieu), notification push, photos, recherche publique.
+Calendrier maître (l'agenda de démonstration en tient lieu), notification push, photos, recherche publique, évaluations avec le vrai modèle.

@@ -175,7 +175,7 @@ export function groupValue(s: StorefrontFields, group: FieldGroup, categoryLabel
 /** État de la vitrine tel que rendu au modèle : chaque groupe avec sa valeur et sa provenance, puis ce qui bloque. */
 export function describeStorefront(storefront: Storefront | null, categoryLabel: (code: string) => string): string {
   if (!storefront) return "Aucune vitrine : rien n'est encore enregistré.";
-  const lines = [`Statut : ${storefront.status === "draft" ? "brouillon, non publiée" : storefront.status === "published" ? "publiée" : "publiée, suggestions en pause"}${storefront.pausedUntil ? ` (indisponible jusqu'au ${storefront.pausedUntil})` : ""}`];
+  const lines = [`Statut : ${storefront.status === "draft" ? "brouillon, non publiée" : storefront.status === "published" ? "publiée" : "publiée, suggestions en pause"}${storefront.pausedUntil ? ` (indisponible jusqu'au ${storefront.pausedUntil})` : ""}${storefront.adminPaused ? ` — SUSPENDUE PAR MAAQ${storefront.adminPauseReason ? ` : ${storefront.adminPauseReason}` : ""} (hors suggestions jusqu'à la levée par l'administrateur ; invitez le fournisseur à corriger sa vitrine ou à contacter le support)` : ""}`];
   for (const group of GROUPS) {
     const value = groupValue(storefront, group, categoryLabel);
     const source = storefront.provenance[group]?.source;

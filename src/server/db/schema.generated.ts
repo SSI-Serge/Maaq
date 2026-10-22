@@ -13,7 +13,7 @@ export type AgentStatus = "available" | "blocked";
 
 export type AnonymizationStatus = "done" | "none" | "pending";
 
-export type AuditAction = "account_created" | "account_updated" | "activation_link_resent" | "agent_blocked" | "agent_published" | "agent_reactivated" | "contract_archived" | "contract_created" | "contract_field_changed" | "contract_updated" | "device_revoked_by_admin";
+export type AuditAction = "account_created" | "account_updated" | "activation_link_resent" | "agent_blocked" | "agent_published" | "agent_reactivated" | "contract_archived" | "contract_created" | "contract_field_changed" | "contract_updated" | "device_revoked_by_admin" | "report_reviewed" | "storefront_category_changed" | "storefront_paused" | "storefront_resumed";
 
 export type ChannelKind = "web" | "whatsapp";
 
@@ -76,6 +76,8 @@ export type JsonPrimitive = boolean | number | string | null;
 export type JsonValue = JsonArray | JsonObject | JsonPrimitive;
 
 export type LegalDocumentType = "contract_challenge_consent" | "privacy_policy" | "terms_of_use";
+
+export type ListingReportStatus = "dismissed" | "open" | "reviewed";
 
 export type LogbookEntryType = "action_done" | "action_refused" | "action_validated" | "request";
 
@@ -720,6 +722,20 @@ export interface LegalDocumentVersions {
   version_label: string;
 }
 
+export interface ListingReports {
+  admin_decision: string | null;
+  admin_user_id: string | null;
+  comment: string | null;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  reason: string;
+  reporter_user_id: string | null;
+  reviewed_at: Timestamp | null;
+  status: Generated<ListingReportStatus>;
+  storefront_id: string;
+  suggestion_id: string | null;
+}
+
 export interface LogbookEntries {
   account_id: string;
   agent_id: Int8;
@@ -876,6 +892,11 @@ export interface Sessions {
 }
 
 export interface Storefronts {
+  admin_pause_reason: string | null;
+  /**
+   * Suspendue par l'administrateur (signalement, contenu inadapté) : hors suggestions jusqu'à la levée. [US-17]
+   */
+  admin_paused: Generated<boolean>;
   availability_mode: string | null;
   availability_text: string | null;
   category_code: string | null;
@@ -1141,6 +1162,7 @@ export interface DB {
   introductions: Introductions;
   legal_acceptances: LegalAcceptances;
   legal_document_versions: LegalDocumentVersions;
+  listing_reports: ListingReports;
   logbook_entries: LogbookEntries;
   logbook_entry_participants: LogbookEntryParticipants;
   logbook_sync_runs: LogbookSyncRuns;

@@ -55,6 +55,9 @@ export interface Storefront extends StorefrontFields {
   status: StorefrontStatus;
   /** Indisponibilité temporaire, AAAA-MM-JJ inclus. */
   pausedUntil: string | null;
+  /** Suspendue par l'administrateur (signalement) : hors suggestions jusqu'à la levée, raison montrée au fournisseur. */
+  adminPaused: boolean;
+  adminPauseReason: string | null;
   searchable: boolean;
   provenance: Partial<Record<FieldGroup, ProvenanceEntry>>;
   lastConfirmedAt: string | null;

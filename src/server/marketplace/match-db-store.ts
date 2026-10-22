@@ -6,6 +6,7 @@ import {
   DEFAULT_PREFS,
   IntroductionNotFound,
   IntroductionOpen,
+  ReportNotFound,
   OPEN_INTRODUCTION,
   RequestNotFound,
   SuggestionNotFound,
@@ -16,7 +17,10 @@ import {
   type Introduction,
   type IntroductionInput,
   type IntroductionPatch,
+  type ListingReport,
   type MarketplacePrefs,
+  type ReportInput,
+  type ReportStatus,
   type MatchLogEntry,
   type MatchStore,
   type PrefsPatch,
@@ -186,6 +190,36 @@ function toIntroduction(row: IntroductionRow): Introduction {
     requestedAt: new Date(row.requested_at).toISOString(),
     answeredAt: iso(row.answered_at),
     connectedAt: iso(row.connected_at),
+  };
+}
+
+type ReportRow = {
+  id: string;
+  reporter_user_id: string | null;
+  storefront_id: string;
+  suggestion_id: string | null;
+  reason: string;
+  comment: string | null;
+  status: ReportStatus;
+  admin_decision: string | null;
+  admin_user_id: string | null;
+  reviewed_at: Date | null;
+  created_at: Date;
+};
+
+function toReport(row: ReportRow): ListingReport {
+  return {
+    id: row.id,
+    reporterUserId: row.reporter_user_id,
+    storefrontId: row.storefront_id,
+    suggestionId: row.suggestion_id,
+    reason: row.reason as ListingReport["reason"],
+    comment: row.comment,
+    status: row.status,
+    adminDecision: row.admin_decision,
+    adminUserId: row.admin_user_id,
+    reviewedAt: iso(row.reviewed_at),
+    createdAt: new Date(row.created_at).toISOString(),
   };
 }
 
@@ -478,6 +512,39 @@ export class DbMatchStore implements MatchStore {
   async listIntroductionsToExpire(before: string): Promise<Introduction[]> {
     const rows = await this.db.selectFrom("introductions").selectAll().where("status", "in", ["requested", "question"]).where("requested_at", "<", new Date(before)).execute();
     return rows.map((row) => toIntroduction(row as IntroductionRow));
+  }
+
+  async createReport(input: ReportInput): Promise<ListingReport> {
+    const row = await this.db
+      .insertInto("listing_reports")
+      .values({ reporter_user_id: input.reporterUserId, storefront_id: input.storefrontId, suggestion_id: input.suggestionId, reason: input.reason, comment: input.comment?.trim() || null, created_at: this.now() })
+      .returningAll()
+      .executeTakeFirstOrThrow();
+    return toReport(row as ReportRow);
+  }
+
+  async getReport(id: string): Promise<ListingReport | null> {
+    const row = await this.db.selectFrom("listing_reports").selectAll().where("id", "=", id).executeTakeFirst();
+    return row ? toReport(row as ReportRow) : null;
+  }
+
+  async listReports(options: { storefrontId?: string; status?: ReportStatus } = {}): Promise<ListingReport[]> {
+    let query = this.db.selectFrom("listing_reports").selectAll();
+    if (options.storefrontId) query = query.where("storefront_id", "=", options.storefrontId);
+    if (options.status) query = query.where("status", "=", options.status);
+    const rows = await query.orderBy("created_at", "desc").execute();
+    return rows.map((row) => toReport(row as ReportRow));
+  }
+
+  async reviewReport(id: string, review: { status: Exclude<ReportStatus, "open">; adminDecision: string | null; adminUserId: string }): Promise<ListingReport> {
+    const row = await this.db
+      .updateTable("listing_reports")
+      .set({ status: review.status, admin_decision: review.adminDecision, admin_user_id: review.adminUserId, reviewed_at: this.now() })
+      .where("id", "=", id)
+      .returningAll()
+      .executeTakeFirst();
+    if (!row) throw new ReportNotFound();
+    return toReport(row as ReportRow);
   }
 
   async getPrefs(userId: string): Promise<MarketplacePrefs> {

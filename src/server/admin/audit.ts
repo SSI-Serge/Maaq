@@ -9,7 +9,7 @@ export async function logAdminAction(
   entry: {
     adminId: string;
     action: AuditAction;
-    entityType: "agent" | "account" | "contract" | "contract_field";
+    entityType: "agent" | "account" | "contract" | "contract_field" | "storefront" | "listing_report";
     entityId: string;
     details?: Record<string, unknown>;
     now: Date;

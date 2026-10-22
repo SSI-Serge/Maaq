@@ -201,6 +201,11 @@ export function StorefrontReview({ agentId, added }: { agentId: string; added: b
         </div>
       )}
 
+      {storefront.adminPaused && (
+        <Notice tone="warning">
+          Vitrine suspendue par MAAQ{storefront.adminPauseReason ? ` : ${storefront.adminPauseReason}` : ""}. Elle n&apos;est plus proposée aux membres jusqu&apos;à la levée de la suspension. Corrigez ce qui est signalé ou contactez le support (Réglages › Aide et support).
+        </Notice>
+      )}
       <StatusPanel key={`${storefront.status}:${storefront.pausedUntil ?? ""}`} storefront={storefront} canPublish={canPublish} onChanged={view.reload} />
     </div>
   );

@@ -5,7 +5,7 @@ import type { PlacesDirectory } from "@/server/adapters/places/types";
 import { renderExternal, searchExternal, type ExternalBlock } from "@/server/marketplace/external";
 import { answerSupplierQuestion, HandoffRefused, type HandoffDeps } from "@/server/marketplace/handoff";
 import { draftSharedText, proposalSummary } from "@/server/marketplace/introduction";
-import { IntroductionOpen, type EligibleStorefront, type Introduction, type MatchStore, type ServiceRequest, type Suggestion } from "@/server/marketplace/match-store";
+import { IntroductionOpen, REPORT_REASON_LABEL, type EligibleStorefront, type Introduction, type MatchStore, type ReportReason, type ServiceRequest, type Suggestion } from "@/server/marketplace/match-store";
 import { matchRequest, renderSuggestions, viewOf, type MatchOutcome } from "@/server/marketplace/matching";
 import { buyerPreview, departementOf, SERVICE_CATEGORIES, servedDepartements } from "@/server/marketplace/model";
 import type { BrainProposal, LlmClient } from "./types";
@@ -319,6 +319,25 @@ export function coupDeMainTools(deps: ToolDeps, collector: TurnCollector): BetaR
     },
   });
 
+  const signaler = betaZodTool({
+    name: "signaler_vitrine",
+    description:
+      "Signale à MAAQ une vitrine suggérée qui pose problème (description trompeuse, contenu inapproprié, pas un service, publicité, autre), avec le commentaire de la personne. La vitrine est écartée pour elle ; l'administrateur examine le signalement. Ne signale que si la personne le demande.",
+    inputSchema: z.object({
+      suggestion_id: z.string().uuid(),
+      motif: z.enum(["misleading", "inappropriate", "not_a_service", "spam", "other"]),
+      commentaire: z.string().max(1000).optional().describe("Avec les mots de la personne"),
+    }),
+    run: async ({ suggestion_id, motif, commentaire }) => {
+      note("signaler_vitrine");
+      const suggestion = await store.getSuggestion(userId, suggestion_id);
+      if (!suggestion) return refuse("suggestion introuvable.");
+      await store.createReport({ reporterUserId: userId, storefrontId: suggestion.storefrontId, suggestionId: suggestion.id, reason: motif as ReportReason, comment: commentaire ?? null });
+      if (suggestion.status === "shown") await store.setSuggestionStatus(userId, suggestion.id, "dismissed");
+      return `Signalement transmis à MAAQ (${REPORT_REASON_LABEL[motif as ReportReason]}). Cette vitrine est écartée pour la personne ; l'administrateur examinera le signalement. Remerciez-la, sans promettre de décision.`;
+    },
+  });
+
   const clore = betaZodTool({
     name: "clore_demande",
     description: "Clôt une demande : la personne n'en veut plus (par exemple « non » à une demande issue de son agenda). Rien ne sera plus cherché ni proposé pour elle.",
@@ -361,7 +380,7 @@ export function coupDeMainTools(deps: ToolDeps, collector: TurnCollector): BetaR
     },
   });
 
-  return [demander, chercher, prevenir, voir, interesse, ignorer, couper, clore, repondre, statut];
+  return [demander, chercher, prevenir, voir, interesse, ignorer, couper, clore, repondre, signaler, statut];
 }
 
 export { viewOf };

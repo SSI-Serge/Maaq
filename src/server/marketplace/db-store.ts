@@ -55,6 +55,8 @@ type Row = {
   contact_method: Storefront["contactMethod"];
   contact_value_encrypted: Buffer | null;
   paused_until: Date | string | null;
+  admin_paused: boolean;
+  admin_pause_reason: string | null;
   searchable: boolean;
   provenance: unknown;
   last_confirmed_at: Date | null;
@@ -99,6 +101,8 @@ export class DbStorefrontStore implements StorefrontStore {
       contactMethod: row.contact_method,
       contactValue: row.contact_value_encrypted ? this.cipher.decrypt(Buffer.from(row.contact_value_encrypted)) : null,
       pausedUntil: day(row.paused_until),
+      adminPaused: row.admin_paused,
+      adminPauseReason: row.admin_pause_reason,
       searchable: row.searchable,
       provenance: (row.provenance ?? {}) as Partial<Record<FieldGroup, ProvenanceEntry>>,
       lastConfirmedAt: iso(row.last_confirmed_at),
@@ -186,6 +190,8 @@ export class DbStorefrontStore implements StorefrontStore {
       .set({
         ...(change.status !== undefined ? { status: change.status } : {}),
         ...(change.pausedUntil !== undefined ? { paused_until: change.pausedUntil } : {}),
+        ...(change.adminPaused !== undefined ? { admin_paused: change.adminPaused } : {}),
+        ...(change.adminPauseReason !== undefined ? { admin_pause_reason: change.adminPauseReason } : {}),
         ...(change.publishedAt !== undefined ? { published_at: change.publishedAt ? new Date(change.publishedAt) : null } : {}),
         ...(change.lastConfirmedAt !== undefined ? { last_confirmed_at: change.lastConfirmedAt ? new Date(change.lastConfirmedAt) : null } : {}),
         updated_at: at,
@@ -207,6 +213,7 @@ export class DbStorefrontStore implements StorefrontStore {
       .selectFrom("storefronts")
       .selectAll()
       .where("status", "=", "published")
+      .where("admin_paused", "=", false)
       .where((eb) => eb.or([eb("paused_until", "is", null), eb("paused_until", "<", sql<Date>`${today}::date`)]))
       .orderBy("published_at")
       .execute();

@@ -1,6 +1,6 @@
 # Maaq silent marketplace — implementation plan
 
-Status: **confirmed on 2026-10-21**; Phase 1 built on `ulrichagents` (see `Vitrine-agent/README.md`); Phase 2 built on 2026-10-22 (buyer agent `coup_de_main`, matcher, consent screen, periodic re-match, migration `0009_marketplace_matching.sql`; see `Coup-de-main-agent/README.md`). Phases 2b (agenda trigger, on a calendar-source interface with a demo agenda until the master calendar exists), 2c (external directory) and 3 (supplier handoff) built on 2026-10-22; phase 4 pending. Based on the user stories US-01 to US-17 and on the way MAAQ runs agents today (kdo_help). The decisions in section 3 were confirmed with the clickable mock.
+Status: **confirmed on 2026-10-21**; Phase 1 built on `ulrichagents` (see `Vitrine-agent/README.md`); Phase 2 built on 2026-10-22 (buyer agent `coup_de_main`, matcher, consent screen, periodic re-match, migration `0009_marketplace_matching.sql`; see `Coup-de-main-agent/README.md`). Phases 2b (agenda trigger, on a calendar-source interface with a demo agenda until the master calendar exists), 2c (external directory), 3 (supplier handoff) and 4 (reporting, Admin › Vitrines, counters; migration `0011_marketplace_reports.sql`) built on 2026-10-22. All planned phases are built; the master calendar, push notifications and photos remain. Based on the user stories US-01 to US-17 and on the way MAAQ runs agents today (kdo_help). The decisions in section 3 were confirmed with the clickable mock.
 
 ## 1. The feature in one paragraph
 

@@ -128,6 +128,40 @@ export interface IntroductionInput {
   channel?: "app" | "whatsapp";
 }
 
+export type ReportReason = "misleading" | "inappropriate" | "not_a_service" | "spam" | "other";
+export type ReportStatus = "open" | "reviewed" | "dismissed";
+
+export const REPORT_REASON_LABEL: Record<ReportReason, string> = {
+  misleading: "Description trompeuse",
+  inappropriate: "Contenu inapproprié",
+  not_a_service: "Ce n'est pas un service",
+  spam: "Publicité ou abus",
+  other: "Autre",
+};
+
+/** Signalement d'une vitrine par un membre (US-16). */
+export interface ListingReport {
+  id: string;
+  reporterUserId: string | null;
+  storefrontId: string;
+  suggestionId: string | null;
+  reason: ReportReason;
+  comment: string | null;
+  status: ReportStatus;
+  adminDecision: string | null;
+  adminUserId: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+}
+
+export interface ReportInput {
+  reporterUserId: string;
+  storefrontId: string;
+  suggestionId: string | null;
+  reason: ReportReason;
+  comment?: string | null;
+}
+
 export interface MarketplacePrefs {
   suggestionsOptIn: boolean;
   /** Lecture de l'agenda pour repérer un besoin : consentement propre, texte et version distincts. */
@@ -206,6 +240,12 @@ export interface MatchStore {
 
   getPrefs(userId: string): Promise<MarketplacePrefs>;
   setPrefs(userId: string, patch: PrefsPatch): Promise<MarketplacePrefs>;
+
+  createReport(input: ReportInput): Promise<ListingReport>;
+  getReport(id: string): Promise<ListingReport | null>;
+  /** Signalements d'une vitrine, ou tous (administration), les plus récents d'abord. */
+  listReports(options?: { storefrontId?: string; status?: ReportStatus }): Promise<ListingReport[]>;
+  reviewReport(id: string, review: { status: Exclude<ReportStatus, "open">; adminDecision: string | null; adminUserId: string }): Promise<ListingReport>;
 }
 
 export class RequestNotFound extends Error {
@@ -219,6 +259,13 @@ export class SuggestionNotFound extends Error {
   constructor() {
     super("Cette suggestion est introuvable.");
     this.name = "SuggestionNotFound";
+  }
+}
+
+export class ReportNotFound extends Error {
+  constructor() {
+    super("Ce signalement est introuvable.");
+    this.name = "ReportNotFound";
   }
 }
 
@@ -277,6 +324,7 @@ export class MemoryMatchStore implements MatchStore {
   private readonly suggestions = new Map<string, Suggestion>();
   private readonly introductions = new Map<string, Introduction>();
   private readonly prefs = new Map<string, MarketplacePrefs>();
+  private readonly reports = new Map<string, ListingReport>();
   private readonly seen = new Map<string, Set<string>>();
   /** Profils connus de la version en mémoire (tests) : prénom et code postal. */
   readonly profiles = new Map<string, { firstName: string; postcode: string | null }>();
@@ -495,6 +543,34 @@ export class MemoryMatchStore implements MatchStore {
     return [...this.introductions.values()]
       .filter((i) => (i.status === "requested" || i.status === "question") && i.requestedAt < before)
       .map((i) => structuredClone(i));
+  }
+
+  async createReport(input: ReportInput): Promise<ListingReport> {
+    const report: ListingReport = { id: randomUUID(), reporterUserId: input.reporterUserId, storefrontId: input.storefrontId, suggestionId: input.suggestionId, reason: input.reason, comment: input.comment?.trim() || null, status: "open", adminDecision: null, adminUserId: null, reviewedAt: null, createdAt: this.now().toISOString() };
+    this.reports.set(report.id, report);
+    return structuredClone(report);
+  }
+
+  async getReport(id: string): Promise<ListingReport | null> {
+    const found = this.reports.get(id);
+    return found ? structuredClone(found) : null;
+  }
+
+  async listReports(options: { storefrontId?: string; status?: ReportStatus } = {}): Promise<ListingReport[]> {
+    return [...this.reports.values()]
+      .filter((r) => (!options.storefrontId || r.storefrontId === options.storefrontId) && (!options.status || r.status === options.status))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .map((r) => structuredClone(r));
+  }
+
+  async reviewReport(id: string, review: { status: Exclude<ReportStatus, "open">; adminDecision: string | null; adminUserId: string }): Promise<ListingReport> {
+    const found = this.reports.get(id);
+    if (!found) throw new ReportNotFound();
+    found.status = review.status;
+    found.adminDecision = review.adminDecision;
+    found.adminUserId = review.adminUserId;
+    found.reviewedAt = this.now().toISOString();
+    return structuredClone(found);
   }
 
   async getPrefs(userId: string): Promise<MarketplacePrefs> {

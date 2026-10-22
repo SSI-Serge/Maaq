@@ -9,6 +9,8 @@ import { EMPTY_FIELDS, groupFilled, SERVICE_CATEGORIES, touchedGroups, type Fiel
 export interface StateChange {
   status?: StorefrontStatus;
   pausedUntil?: string | null;
+  adminPaused?: boolean;
+  adminPauseReason?: string | null;
   publishedAt?: string | null;
   lastConfirmedAt?: string | null;
 }
@@ -62,7 +64,7 @@ export class MemoryStorefrontStore implements StorefrontStore {
 
   private blank(userId: string): Storefront {
     const at = this.now().toISOString();
-    return { ...EMPTY_FIELDS, id: randomUUID(), userId, status: "draft", pausedUntil: null, searchable: false, provenance: {}, lastConfirmedAt: null, publishedAt: null, version: 1, createdAt: at, updatedAt: at };
+    return { ...EMPTY_FIELDS, id: randomUUID(), userId, status: "draft", pausedUntil: null, adminPaused: false, adminPauseReason: null, searchable: false, provenance: {}, lastConfirmedAt: null, publishedAt: null, version: 1, createdAt: at, updatedAt: at };
   }
 
   async save(userId: string, patch: Partial<StorefrontFields>, origin: Partial<Record<FieldGroup, Provenance>> = {}): Promise<Storefront> {
@@ -94,6 +96,8 @@ export class MemoryStorefrontStore implements StorefrontStore {
     if (!current) throw new StorefrontNotFound();
     if (change.status !== undefined) current.status = change.status;
     if (change.pausedUntil !== undefined) current.pausedUntil = change.pausedUntil;
+    if (change.adminPaused !== undefined) current.adminPaused = change.adminPaused;
+    if (change.adminPauseReason !== undefined) current.adminPauseReason = change.adminPauseReason;
     if (change.publishedAt !== undefined) current.publishedAt = change.publishedAt;
     if (change.lastConfirmedAt !== undefined) current.lastConfirmedAt = change.lastConfirmedAt;
     current.updatedAt = this.now().toISOString();
@@ -106,6 +110,6 @@ export class MemoryStorefrontStore implements StorefrontStore {
   }
 
   async listEligible(today: string): Promise<Storefront[]> {
-    return [...this.items.values()].filter((s) => s.status === "published" && (s.pausedUntil === null || s.pausedUntil < today)).map((s) => structuredClone(s));
+    return [...this.items.values()].filter((s) => s.status === "published" && !s.adminPaused && (s.pausedUntil === null || s.pausedUntil < today)).map((s) => structuredClone(s));
   }
 }

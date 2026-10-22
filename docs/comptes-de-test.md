@@ -23,7 +23,7 @@ Les emails et SMS envoyés par l'application arrivent dans la boîte de test : h
 
 ## Console d'administration
 
-- Se connecter avec admin@maaq.test : on arrive sur « Agents IA ».
+- Se connecter avec admin@maaq.test : on arrive sur « Agents IA ». « Vitrines » liste les vitrines du marketplace silencieux (signalées d'abord), avec suspension, correction de catégorie, signalements et raisons internes des suggestions.
 - Cinq agents (Admin_Classify, Admin_lib, kdo_help, vitrine, coup_de_main) et quatre contrats obligatoires sont déjà créés. kdo_help, vitrine et coup_de_main répondent avec un vrai modèle si `LOCAL_AGENTS_MODE=anthropic` (voir `Kdo-agent/agents-locaux.md`). Pour voir une suggestion de coup_de_main, publiez d'abord une vitrine depuis un autre profil (Dominique, agent vitrine). L'agenda de démonstration est sur http://localhost:3000/dev/agenda (ajouter un événement, lancer le passage) ; l'annuaire externe de démonstration (`PLACES_MODE=dev`) complète les réponses avec des établissements fictifs.
 - « Créer un compte » envoie un lien d'activation dans la boîte de test ; l'ouvrir permet d'activer le compte.
 - Astuce : ouvrir la console sur http://127.0.0.1:3000 et l'application sur http://localhost:3000 garde deux sessions séparées.
