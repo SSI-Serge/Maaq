@@ -106,3 +106,21 @@ export const formTime = (local: string) => local.slice(11, 16);
 
 /** « 12/03/2018 » */
 export const birthLabel = (day: string) => `${day.slice(8, 10)}/${day.slice(5, 7)}/${day.slice(0, 4)}`;
+
+/** « les RDV personnels » : le type accordé au pluriel (US-82 RF7). */
+export const TYPE_PLURAL: Record<EventType, string> = {
+  school: "scolaires",
+  medical: "médicaux",
+  work: "professionnels",
+  family: "familiaux",
+  personal: "personnels",
+  admin: "administratifs",
+};
+
+/** État d'un rappel dans le détail d'un rendez-vous (US-81 RF5, RF10) : « Envoyé », « Prévu le mar. 3 nov. à 9h00 », « Non applicable » ou « Désactivé ». */
+export function reminderState(reminder: { state: "sent" | "planned" | "not_applicable" | "off"; at: string }): string {
+  if (reminder.state === "sent") return "Envoyé";
+  if (reminder.state === "not_applicable") return "Non applicable";
+  if (reminder.state === "off") return "Désactivé";
+  return `Prévu le ${shortDate(dayOf(reminder.at))} à ${clock(reminder.at)}`;
+}

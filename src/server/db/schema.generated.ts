@@ -632,6 +632,10 @@ export interface FamilyEvents {
    */
   place_encrypted: Buffer | null;
   recurrence: string | null;
+  /**
+   * Les rappels dont l'échéance précède cet instant sont « Non applicables » ; vide : date du dernier changement de statut [US-81 RF5, RF9]
+   */
+  reminders_from: Timestamp | null;
   source: FamilyEventSource;
   /**
    * Identifiant de la demande (et rang dans la demande) qui a créé le rendez-vous : rend la création idempotente
@@ -656,6 +660,34 @@ export interface FamilyEvents {
    * Numéro de version : incrémenté à chaque modification ou changement de statut ; une modification fondée sur une version dépassée est refusée [US-76 RT1]
    */
   version: Generated<number>;
+}
+
+/**
+ * Rappels (d7, d1, d0) et relances (nudge24, nudge48) envoyés pour un rendez-vous. Ne contient aucun titre ni lieu. [US-81 RT2, US-83 RT1]
+ */
+export interface FamilyNotifications {
+  account_id: string;
+  channel: Generated<string>;
+  claimed_at: Generated<Timestamp>;
+  event_id: string;
+  id: Generated<string>;
+  kind: string;
+  recipient_user_id: string;
+  sent_at: Timestamp | null;
+  status: Generated<string>;
+}
+
+/**
+ * Rappels J-7, J-1 et Jour J actifs, par famille et par type de rendez-vous. [US-82]
+ */
+export interface FamilyReminderSettings {
+  account_id: string;
+  d0: Generated<boolean>;
+  d1: Generated<boolean>;
+  d7: Generated<boolean>;
+  event_type: FamilyEventType;
+  updated_at: Generated<Timestamp>;
+  updated_by_user_id: string | null;
 }
 
 export interface FamilyMembers {
@@ -996,6 +1028,8 @@ export interface DB {
   family_event_proposals: FamilyEventProposals;
   family_events: FamilyEvents;
   family_members: FamilyMembers;
+  family_notifications: FamilyNotifications;
+  family_reminder_settings: FamilyReminderSettings;
   idempotency_keys: IdempotencyKeys;
   legal_acceptances: LegalAcceptances;
   legal_document_versions: LegalDocumentVersions;

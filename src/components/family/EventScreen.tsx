@@ -9,7 +9,7 @@ import { useSessionUser } from "@/components/auth/AuthGate";
 import { Button, Loading, Notice, RetryNotice } from "@/components/ui";
 import type { ConflictView, EventView, MemberChip } from "@/server/assistant/events";
 import { conflictSentence, EventForm } from "./EventForm";
-import { clock, dayOf, longDate, shortDate, stamp, TYPE_LABEL, whenLabel } from "./format";
+import { clock, dayOf, longDate, reminderState, shortDate, stamp, TYPE_LABEL, whenLabel } from "./format";
 import { MemberChips, StatusChip } from "./parts";
 import styles from "./family.module.css";
 
@@ -199,6 +199,9 @@ export function EventScreen({ id }: { id: string }) {
               Confirmé par {who} le {when}.
             </Notice>
           )}
+          {provisional && event.nudge && (
+            <Notice tone="info">Relance envoyée il y a {event.nudge.kind === "nudge48" ? "48h" : "24h"} — en attente de votre confirmation.</Notice>
+          )}
           {setAside && (
             <Notice tone="info">
               Écarté{who ? ` par ${who}` : ""} le {when}. Il disparaîtra bientôt du calendrier ; vous pouvez encore le confirmer.
@@ -268,6 +271,19 @@ export function EventScreen({ id }: { id: string }) {
               <div className={styles.row}>
                 <span className={styles.rowLabel}>Note</span>
                 <span className={styles.rowValue}>{event.notes}</span>
+              </div>
+            )}
+            {event.status === "confirmed" && event.reminders.length > 0 && (
+              <div className={styles.row}>
+                <span className={styles.rowLabel}>Rappels</span>
+                <span className={styles.rowValue}>
+                  {event.reminders.map((r) => (
+                    <span key={r.kind} className={styles.reminderLine}>
+                      <span>{r.label}</span>
+                      <span className={r.state === "sent" ? styles.reminderSent : styles.reminderOther}>{reminderState(r)}</span>
+                    </span>
+                  ))}
+                </span>
               </div>
             )}
           </div>

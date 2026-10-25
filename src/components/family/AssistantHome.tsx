@@ -41,9 +41,14 @@ export function AssistantHome() {
         + Nouvelle demande
       </Link>
 
-      <Link href="/assistant/membres" className={styles.link}>
-        Membres de la famille ›
-      </Link>
+      <div style={{ display: "flex", gap: 16 }}>
+        <Link href="/assistant/membres" className={styles.link}>
+          Membres de la famille ›
+        </Link>
+        <Link href="/assistant/reglages" className={styles.link}>
+          Réglages ›
+        </Link>
+      </div>
 
       <Section
         title="Confirmations en attente"

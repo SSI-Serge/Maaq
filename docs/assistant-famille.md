@@ -63,7 +63,7 @@ Règles : version numérotée par rendez-vous (une modification fondée sur une 
 (deux parents au même instant : une seule confirmation, l'autre voit « déjà traité par … ») ; conflit revérifié à la confirmation (409 avec les conflits et
 les créneaux alternatifs, `allowConflict` pour passer outre) ; un provisoire est passé à son heure de début, un confirmé quand il est terminé ; historique de
 chaque changement (auteur, date) dans `family_event_history` ; titre, lieu et note chiffrés en base (migration `0008`) ; une couleur par membre.
-Reste à construire : l'expiration automatique des rendez-vous écartés ou jamais confirmés (avec les relances, étape rappels), les notifications aux autres profils.
+L'expiration automatique des rendez-vous écartés ou jamais confirmés est faite (étape 3a). Reste à construire : les notifications aux autres profils.
 
 ### Membres de la famille (US-92, US-93)
 | Route | Rôle |
@@ -89,9 +89,10 @@ Onglet **Calendrier** ajouté à la barre de navigation (l'onglet Agents reste a
 | `/calendrier` | Calendrier familial | Vue semaine ou mois, légende des membres (filtre), « Aujourd'hui », bornes 12 mois passés / 24 mois à venir |
 | `/calendrier/jour/[date]` | Vue Jour | Rendez-vous rangés par période (matin, midi, après-midi, soir) |
 | `/calendrier/rdv/[id]` | Détail et confirmation | Conflit en phrase, créneaux alternatifs, confirmer / modifier / écarter / annuler, messages de succès des US-75 à US-80 |
+| `/assistant/reglages` | Réglages de l'Assistant | Délais de rappel par type de RDV (six types, J-7 / J-1 / Jour J), lien vers les membres |
 | `/assistant/membres` | Membres de la famille | Liste avec badges et couleurs, ajouter / modifier / retirer / effacer définitivement, section repliée « Membres retirés » (lien depuis l'accueil de l'Assistant) |
 
-Pas encore d'écran : rappels (étape 3), notifications aux autres profils, réglages de l'Assistant (adresse de transfert, délais de rappel).
+Pas encore d'écran : activation des rappels sur téléphone (lot 3b), notifications aux autres profils, adresse de transfert des mails.
 
 Données de démonstration pour voir les écrans en local (foyer de Camille, Léo et Mia, 13 rendez-vous dont un conflit, un écarté et une journée chargée) :
 ```
@@ -99,6 +100,23 @@ npm run db:seed
 npx tsx scripts/assistant-demo.ts
 ```
 Tests : `tests/family-format.test.ts` (dates, semaines, grille du mois) ; le comportement serveur est couvert par `tests/family-events.test.ts` et `tests/assistant.test.ts`.
+
+## Étape 3a : rappels et relances par email (US-81, US-82, US-83)
+Les rappels et relances partent **par email aux deux parents** (utilisateur principal et invité 1) ; les notifications web et le badge de l'icône sont le lot 3b (US-94, US-84).
+Un passage du planificateur (toutes les 5 minutes, `src/instrumentation.ts` ou `POST /api/cron/run`) fait, dans `src/server/assistant/reminders.ts` :
+1. passer à « Ignoré » (motif « sans réponse », changement du système) un RDV provisoire arrivé à son début, et un RDV écarté arrivé à la relance suivante prévue, ou 24 h après s'il n'en reste plus ;
+2. envoyer le rappel dû de chaque RDV confirmé : J-7 à 9 h, J-1 à 18 h, jour J à 7 h 30 (2 h avant si le RDV commence avant 9 h 30), dans le fuseau du foyer (appareil de l'utilisateur principal) ;
+3. envoyer la relance due de chaque RDV provisoire : 24 h puis 48 h après sa création, décalée à 8 h si elle tombe entre 21 h et 8 h.
+
+Les échéances ne sont pas enregistrées, elles sont recalculées à chaque passage ; seuls les envois le sont (`family_notifications`, clé unique RDV + échéance + destinataire, réservation reprise au bout de 10 minutes). Conséquences, choisies par l'équipe de dev :
+- un rappel manqué est rattrapé tant que le RDV n'a pas commencé, mais **un seul** : le plus récent dû (après un long incident, J-7 n'a plus de sens si J-1 est arrivé) ; idem pour les relances ;
+- un rappel dont l'échéance précède la confirmation (`reminders_from`) est « Non applicable » ; un changement d'horaire remet ce point de départ à zéro et efface les envois déjà faits, donc les rappels de la nouvelle date repartent ;
+- un rappel réactivé dans les réglages après son échéance n'est pas rattrapé ;
+- le lieu d'un RDV médical ne figure jamais dans un email de rappel (D31) ;
+- un RDV provisoire modifié par un parent n'est plus relancé (US-83 RF5, à confirmer avec le BA) ;
+- les RDV ignorés sont supprimés 30 jours après (US-77 RT1).
+Réglages par type (`family_reminder_settings`, sans ligne : tout actif) : `GET` et `PATCH /api/family/reminder-settings`, page `/assistant/reglages` ; lecture seule pour les invités secondaires prévue par la US-82, mais l'Assistant reste réservé aux deux parents. Le détail d'un RDV confirmé affiche l'état de chaque rappel (Envoyé, Prévu, Non applicable, Désactivé) et celui d'un RDV provisoire la dernière relance.
+Tests : `tests/family-reminders.test.ts` (29). Migration `0010`. Pour un vrai envoi il faut `MESSAGING_MODE=smtp` ; le déploiement de test envoie dans la boîte de test.
 
 ## Réglages
 Voir `.env.example`. Tout est facultatif tant que `ASSISTANT_MODE=off`.

@@ -1,5 +1,6 @@
 import { sql } from "kysely";
 import type { Ctx } from "@/server/auth/service";
+import { runReminders, type RemindersResult } from "@/server/assistant/reminders";
 import { cleanupExports } from "@/server/compliance/exports";
 import { runLifecycle, type LifecycleResult } from "@/server/compliance/lifecycle";
 import { syncLogbook, type SyncResult } from "@/server/logbook/service";
@@ -17,6 +18,8 @@ export interface JobsResult {
   /** Suppressions de comptes, rappels, comptes jamais activés, réessais chez Digitorn (US-56, US-58, US-68). */
   lifecycle: LifecycleResult;
   exports: { expired: number; failed: number };
+  /** Rappels et relances de l'Assistant Famille envoyés, rendez-vous sans réponse passés à « Ignoré » (US-81, US-83). */
+  reminders: RemindersResult;
 }
 
 /** Synchronise le carnet toutes les X heures (US-40 RT2) puis nettoie les données expirées (US-40 RT6, US-61 RT2, US-70 RT3). */
@@ -28,10 +31,15 @@ export async function runDueJobs(ctx: Ctx, options: { force?: boolean } = {}): P
   // Les suppressions arrivées à échéance et les exports ne dépendent pas de la fréquence du carnet : on les traite à chaque passage.
   const lifecycle = await runLifecycle(ctx);
   const exports = await cleanupExports(ctx);
-  if (!due) return { logbook: "not_due", purged: null, lifecycle, exports };
+  // Les rappels partent à l'heure dite : à chaque passage. Une panne de ce traitement ne doit pas bloquer les autres.
+  const reminders = await runReminders(ctx).catch((error) => {
+    console.error("Rappels de l'Assistant Famille :", error);
+    return { sent: 0, failed: 0, ignored: 0 };
+  });
+  if (!due) return { logbook: "not_due", purged: null, lifecycle, exports, reminders };
 
   const logbook = await syncLogbook(ctx);
-  return { logbook, purged: await purgeExpired(ctx), lifecycle, exports };
+  return { logbook, purged: await purgeExpired(ctx), lifecycle, exports, reminders };
 }
 
 /** Supprime les données arrivées au bout de leur durée de conservation. */
@@ -47,6 +55,9 @@ export async function purgeExpired(ctx: Ctx): Promise<{ logbook: number; errorRe
   // Conversations avec l'Assistant Famille : 4 jours au plus (D38, US-44). Les rendez-vous restent dans le calendrier.
   const four = new Date(ctx.now.getTime() - 4 * 86_400_000);
   const d = await ctx.db.deleteFrom("assistant_messages").where("created_at", "<", four).executeTakeFirst();
+  // Rendez-vous ignorés : supprimés 30 jours après être passés au statut Ignoré (US-77 RT1).
+  const month = new Date(ctx.now.getTime() - 30 * 86_400_000);
+  await ctx.db.deleteFrom("family_events").where("status", "=", "ignored").where("status_changed_at", "<", month).execute();
   return {
     logbook: Number(logbook.rows[0]?.n ?? 0),
     errorReports: Number(reports.rows[0]?.n ?? 0),

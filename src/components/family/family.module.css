@@ -729,3 +729,80 @@
   line-height: 1.5;
   color: var(--ink-soft);
 }
+
+/* ---- Rappels dans le détail d'un rendez-vous ---- */
+.reminderLine {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+.reminderSent {
+  font-weight: 700;
+  color: var(--success);
+}
+.reminderOther {
+  color: var(--ink-soft);
+}
+
+/* ---- Réglages de l'Assistant Famille ---- */
+.settingRow {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+}
+.settingType {
+  font-family: var(--font-serif);
+  font-size: 16px;
+}
+.switches {
+  display: flex;
+  gap: 8px;
+}
+.switch {
+  flex: 1;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.switch[aria-checked="true"] {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary-strong);
+}
+.switch:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.linkRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 56px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  color: var(--ink);
+}
+.linkRowSub {
+  display: block;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+/* L'état actif ne repose pas que sur la couleur. */
+.switch[aria-checked="true"]::before {
+  content: "✓ ";
+}

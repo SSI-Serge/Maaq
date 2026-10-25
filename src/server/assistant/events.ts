@@ -6,6 +6,7 @@ import { EVENT_TYPES, findConflicts, loadCalendarEvent, loadCalendarEvents, type
 import { seal, sealOptional } from "./fields";
 import { ensureParentMembers, isParent } from "./family";
 import { isLocalDateTime, localMs, localToUtc, utcToLocal } from "./local-time";
+import { reminderDetails, type NudgeView, type ReminderView } from "./reminders";
 
 /**
  * Cycle de vie des rendez-vous du calendrier familial (US-74 à US-80) : consulter, confirmer, modifier, écarter, annuler.
@@ -67,6 +68,10 @@ export interface EventView {
   conflicts: ConflictView[];
   /** Créneaux libres proches, quand il y a un conflit (US-74 RF6). */
   alternatives: { start: string; end: string }[];
+  /** Rappels J-7, J-1 et Jour J d'un rendez-vous confirmé, avec leur état (US-81). Remplis dans le détail seulement. */
+  reminders: ReminderView[];
+  /** Dernière relance envoyée pour un rendez-vous provisoire (US-83 RF8). Rempli dans le détail seulement. */
+  nudge: NudgeView | null;
 }
 
 interface Viewer {
@@ -128,7 +133,7 @@ function toView(v: Viewer, e: CalendarEvent, members: Map<string, MemberChip>, n
     id: e.id, title: e.title, type: e.type, status: e.status, start: utcToLocal(e.startsAt, v.timeZone), end: utcToLocal(e.endsAt, v.timeZone), allDay: e.allDay,
     place: e.place, notes: e.notes, allFamily: e.allFamily, members: chips, source: e.source, requestedBy: e.createdByUserId ? (names.get(e.createdByUserId) ?? null) : null,
     version: e.version, past: isPast(e, now), statusChange: { byFirstName: e.statusChangedByUserId ? (names.get(e.statusChangedByUserId) ?? null) : null, at: e.statusChangedAt.toISOString() },
-    can: actionsFor(v, e, now), conflicts: [], alternatives: [],
+    can: actionsFor(v, e, now), conflicts: [], alternatives: [], reminders: [], nudge: null,
   };
 }
 
@@ -217,7 +222,8 @@ export async function getEvent(ctx: Ctx, session: SessionContext, id: string): P
   }
   const members = await loadMembers(ctx.db, v.accountId);
   const names = await firstNames(ctx.db, [e.createdByUserId, e.statusChangedByUserId]);
-  return withConflicts(ctx.db, v, toView(v, e, members, names, ctx.now), e, ctx.now);
+  const view = await withConflicts(ctx.db, v, toView(v, e, members, names, ctx.now), e, ctx.now);
+  return { ...view, ...(await reminderDetails(ctx.db, v.accountId, e, v.timeZone, ctx.now)) };
 }
 
 /** Confirmations en attente d'un profil (US-75 RF4, US-84) : provisoires qu'il peut traiter, à venir. Les écartés n'y figurent plus. */
@@ -278,7 +284,7 @@ export async function confirmEvent(ctx: Ctx, session: SessionContext, id: string
     // US-74 RF9 : le conflit est vérifié à nouveau au moment de la confirmation.
     const { views } = await conflictsOf(trx, v, e);
     if (views.length && !options.allowConflict) throw fail("conflict", "Ce créneau chevauche un autre rendez-vous.", 409, { conflicts: views, alternatives: await nearestSlots(trx, v, e, ctx.now) });
-    await trx.updateTable("family_events").set({ status: "confirmed", version: e.version + 1, status_changed_at: ctx.now, status_changed_by_user_id: v.userId, updated_at: ctx.now }).where("id", "=", id).execute();
+    await trx.updateTable("family_events").set({ status: "confirmed", version: e.version + 1, status_changed_at: ctx.now, status_changed_by_user_id: v.userId, reminders_from: ctx.now, updated_at: ctx.now }).where("id", "=", id).execute();
     await record(trx, v.accountId, id, "confirmed", e.status, "confirmed", v.userId, ctx.now);
   });
   return getEvent(ctx, session, id);
@@ -375,6 +381,7 @@ export async function updateEvent(ctx: Ctx, session: SessionContext, id: string,
     if (!changes.allFamily && changes.memberIds.some((m) => members.get(m)?.removed && !e.memberIds.includes(m))) {
       throw fail("invalid_members", "Un des membres choisis a été retiré de la famille.", 422);
     }
+    const rescheduled = checked.from.getTime() !== e.startsAt.getTime() || changes.allDay !== e.allDay;
     const next: CalendarEvent = { ...e, startsAt: checked.from, endsAt: checked.to, allFamily: changes.allFamily, memberIds: changes.allFamily ? [] : [...new Set(changes.memberIds)] };
     if (e.status === "confirmed") {
       const { views } = await conflictsOf(trx, v, next);
@@ -385,9 +392,12 @@ export async function updateEvent(ctx: Ctx, session: SessionContext, id: string,
       .set({
         title_encrypted: seal(checked.title), event_type: changes.type, starts_at: checked.from, ends_at: checked.to, all_day: changes.allDay, place_encrypted: sealOptional(checked.place),
         notes_encrypted: sealOptional(checked.notes), all_family: changes.allFamily, version: e.version + 1, updated_at: ctx.now,
+        // Un changement d'horaire recalcule les rappels non envoyés : ceux de l'ancienne date ne comptent plus, ceux de la nouvelle repartent (US-81 RF9).
+        ...(rescheduled ? { reminders_from: ctx.now } : {}),
       })
       .where("id", "=", id)
       .execute();
+    if (rescheduled) await trx.deleteFrom("family_notifications").where("event_id", "=", id).where("kind", "in", ["d7", "d1", "d0"]).execute();
     await trx.deleteFrom("family_event_members").where("event_id", "=", id).execute();
     if (!changes.allFamily) await trx.insertInto("family_event_members").values(next.memberIds.map((m) => ({ event_id: id, member_id: m }))).execute();
     await record(trx, v.accountId, id, "modified", e.status, e.status, v.userId, ctx.now);
