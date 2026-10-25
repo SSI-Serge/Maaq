@@ -20,6 +20,14 @@ export function requireParent(session: SessionContext): string {
   return session.user.accountId;
 }
 
+/** Couleurs des membres dans le calendrier (AF-5) : distinctes entre elles et lisibles sur fond clair comme sur fond sombre. */
+export const MEMBER_COLORS = ["#2f6b9a", "#c2562f", "#3a8a5c", "#8a4fa0", "#b8860b", "#2a7f86", "#a63d5e", "#5c6b2f"];
+
+async function nextColor(db: Db, accountId: string): Promise<string> {
+  const used = (await db.selectFrom("family_members").select("color").where("account_id", "=", accountId).execute()).map((r) => r.color);
+  return MEMBER_COLORS.find((c) => !used.includes(c)) ?? MEMBER_COLORS[used.length % MEMBER_COLORS.length];
+}
+
 async function nextAliasIndex(db: Db, accountId: string, role: "parent" | "child"): Promise<number> {
   const row = await db
     .selectFrom("family_members")
@@ -51,7 +59,7 @@ export async function ensureParentMembers(db: Db, accountId: string): Promise<vo
     if (known.has(parent.id)) continue;
     await db
       .insertInto("family_members")
-      .values({ account_id: accountId, user_id: parent.id, first_name: parent.first_name, role: "parent", alias_index: await nextAliasIndex(db, accountId, "parent") })
+      .values({ account_id: accountId, user_id: parent.id, first_name: parent.first_name, role: "parent", alias_index: await nextAliasIndex(db, accountId, "parent"), color: await nextColor(db, accountId) })
       .onConflict((oc) => oc.doNothing())
       .execute();
   }
@@ -62,6 +70,7 @@ export interface FamilyMemberView {
   firstName: string;
   role: "parent" | "child";
   birthDate: string | null;
+  color: string | null;
   isYou: boolean;
 }
 
@@ -83,12 +92,12 @@ export async function listFamilyMembers(ctx: Ctx, session: SessionContext): Prom
   await ensureParentMembers(ctx.db, accountId);
   const rows = await ctx.db
     .selectFrom("family_members")
-    .select(["id", "first_name", "role", "birth_date", "user_id"])
+    .select(["id", "first_name", "role", "birth_date", "color", "user_id"])
     .where("account_id", "=", accountId)
     .orderBy("role")
     .orderBy("alias_index")
     .execute();
-  return rows.map((r) => ({ id: r.id, firstName: r.first_name, role: r.role, birthDate: iso(r.birth_date as Date | string | null), isYou: r.user_id === session.user.id }));
+  return rows.map((r) => ({ id: r.id, firstName: r.first_name, role: r.role, birthDate: iso(r.birth_date as Date | string | null), color: r.color, isYou: r.user_id === session.user.id }));
 }
 
 /** Ajoute un enfant au foyer (sans compte). Les deux parents peuvent gérer les membres (D33). */
@@ -103,8 +112,8 @@ export async function addChild(ctx: Ctx, session: SessionContext, input: { first
   await ensureParentMembers(ctx.db, accountId);
   const row = await ctx.db
     .insertInto("family_members")
-    .values({ account_id: accountId, first_name: firstName, role: "child", birth_date: input.birthDate ?? null, alias_index: await nextAliasIndex(ctx.db, accountId, "child") })
-    .returning(["id", "first_name", "role", "birth_date"])
+    .values({ account_id: accountId, first_name: firstName, role: "child", birth_date: input.birthDate ?? null, alias_index: await nextAliasIndex(ctx.db, accountId, "child"), color: await nextColor(ctx.db, accountId) })
+    .returning(["id", "first_name", "role", "birth_date", "color"])
     .executeTakeFirstOrThrow();
-  return { id: row.id, firstName: row.first_name, role: row.role, birthDate: iso(row.birth_date as Date | string | null), isYou: false };
+  return { id: row.id, firstName: row.first_name, role: row.role, birthDate: iso(row.birth_date as Date | string | null), color: row.color, isYou: false };
 }

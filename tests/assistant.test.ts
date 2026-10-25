@@ -2,11 +2,13 @@ import { randomUUID } from "node:crypto";
 import type { Kysely } from "kysely";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { loadAgentDefinition, runAssistant, FAILURE_REPLY, type AgentRunInput } from "@/server/assistant/agent";
+import { open, openOptional } from "@/server/assistant/fields";
 import { addChild, ensureParentMembers, listFamilyMembers, loadPseudoMembers } from "@/server/assistant/family";
 import { describeNow, localToUtc, utcToLocal } from "@/server/assistant/local-time";
 import { createModel, ModelError, type AssistantModel, type ContentBlock, type ModelRequest } from "@/server/assistant/model";
 import { ageBand, Pseudonymizer, maskContacts, type PseudoMember } from "@/server/assistant/pseudonymize";
-import { configuredModel, sendAssistantMessage } from "@/server/assistant/service";
+import { configuredModel, listAssistantMessages, sendAssistantMessage } from "@/server/assistant/service";
+import { purgeExpired } from "@/server/jobs";
 import { executeTool, expandEventRefs, TOOL_NAMES, TYPE_TO_DB, type ToolContext } from "@/server/assistant/tools";
 import type { Ctx } from "@/server/auth/service";
 import type { DB } from "@/server/db/schema.generated";
@@ -34,6 +36,12 @@ async function rejectionOf(promise: Promise<unknown>): Promise<Rejection> {
     throw error;
   }
   throw new Error("un refus était attendu");
+}
+
+/** Le seul rendez-vous du foyer, avec titre, lieu et note déchiffrés (ils sont chiffrés en base, US-75 RT5). */
+async function plainEvent(accountId: string) {
+  const row = await db.selectFrom("family_events").selectAll().where("account_id", "=", accountId).executeTakeFirstOrThrow();
+  return { ...row, title: open(row.title_encrypted), place: openOptional(row.place_encrypted), notes: openOptional(row.notes_encrypted) };
 }
 
 /** Un foyer : parent principal « Sophie », invité de rang core « Marc », invité secondaire, deux enfants. */
@@ -194,7 +202,7 @@ describe("outils de l'assistant", () => {
     const input = { titre: "Réunion de copropriété", type: "familial", debut: "2026-11-05T19:30", fin: "2026-11-05T20:30", journee_entiere: false, membres: ["Parent 1"], source: "saisie", lieu: "Salle commune", notes: "Apporter les papiers" };
     const first = await call("creer_evenement_provisoire", input, ctx);
     expect(first.json.statut).toBe("provisoire");
-    const row = await db.selectFrom("family_events").selectAll().where("account_id", "=", f.accountId).executeTakeFirstOrThrow();
+    const row = await plainEvent(f.accountId);
     expect(row.starts_at.toISOString()).toBe("2026-11-05T18:30:00.000Z");
     expect(row.status).toBe("provisional");
     expect(row.place).toBe("Salle commune");
@@ -209,7 +217,7 @@ describe("outils de l'assistant", () => {
     const ctx = await toolCtx(f);
     const r = await call("creer_evenement_provisoire", { titre: "Orthodontiste Dr Martin", type: "medical", debut: "2026-11-06T17:00", fin: "2026-11-06T18:00", journee_entiere: false, membres: ["Enfant 1"], source: "saisie", lieu: "12 rue des Lilas", notes: "radios" }, ctx);
     expect(r.json.avis).toContain("lieu et les notes");
-    const row = await db.selectFrom("family_events").selectAll().where("account_id", "=", f.accountId).executeTakeFirstOrThrow();
+    const row = await plainEvent(f.accountId);
     expect(row.title).toBe("RDV médical — Léo");
     expect(row.place).toBeNull();
     expect(row.notes).toBeNull();
@@ -219,7 +227,7 @@ describe("outils de l'assistant", () => {
     const f = await family();
     const ctx = await toolCtx(f);
     await call("creer_evenement_provisoire", { titre: "Judo Enfant 1", type: "perso", debut: "2026-11-07T10:00", fin: "2026-11-07T11:00", journee_entiere: false, membres: ["Enfant 1"], source: "saisie", notes: "Enfant 1 apporte son kimono" }, ctx);
-    const row = await db.selectFrom("family_events").selectAll().where("account_id", "=", f.accountId).executeTakeFirstOrThrow();
+    const row = await plainEvent(f.accountId);
     expect(row.title).toBe("Judo Léo");
     expect(row.notes).toBe("Léo apporte son kimono");
   });
@@ -416,7 +424,7 @@ describe("boucle de l'assistant", () => {
     expect(model.requests[0].system).toBe(loadAgentDefinition().instructions);
     expect(model.requests[3].tools).toEqual(model.requests[0].tools);
     // Ce que MAAQ a rangé.
-    const row = await db.selectFrom("family_events").selectAll().where("account_id", "=", f.accountId).executeTakeFirstOrThrow();
+    const row = await plainEvent(f.accountId);
     expect([row.title, row.place, row.status, row.source]).toEqual(["RDV médical — Léo", null, "provisional", "typed"]);
     expect(result.createdEventIds).toEqual([row.id]);
   });
@@ -551,6 +559,29 @@ describe("message d'un parent à l'assistant", () => {
     const closed = await rejectionOf(sendAssistantMessage(ctxAt(), f.session, { requestId: randomUUID(), text: "Bonjour" }));
     expect([closed.status, closed.code]).toEqual([503, "assistant_unavailable"]);
     expect(() => configuredModel()).toThrow(Rejection);
+  });
+
+  it("rend l'historique du fil, déchiffré, avec les rendez-vous créés par chaque demande, puis le purge au bout de 4 jours", async () => {
+    const f = await family();
+    const model = scripted((req, n) =>
+      n === 0
+        ? [use("c", "creer_evenement_provisoire", { titre: "Judo", type: "perso", debut: "2026-11-07T10:00", fin: "2026-11-07T11:00", journee_entiere: false, membres: ["Enfant 1"], source: "saisie" })]
+        : say("Fait."),
+    );
+    await sendAssistantMessage(ctxAt(), f.session, { requestId: randomUUID(), text: "Judo samedi 10h pour Léo" }, { model });
+    const thread = await listAssistantMessages(ctxAt(), f.session);
+    expect(thread.map((m) => [m.role, m.text])).toEqual([["user", "Judo samedi 10h pour Léo"], ["assistant", "Fait."]]);
+    expect(thread[0].events).toEqual([]);
+    expect(thread[1].events).toEqual([expect.objectContaining({ title: "Judo", start: "2026-11-07T10:00", status: "provisional" })]);
+    expect(await listAssistantMessages(ctxAt(), await sessionFor(db, f.marc.id))).toEqual([]); // chaque parent a son fil
+    expect((await rejectionOf(listAssistantMessages(ctxAt(), await sessionFor(db, f.other.id)))).status).toBe(403);
+
+    // D38 : au plus 4 jours ; les rendez-vous restent dans le calendrier.
+    const later = { db, now: new Date(NOW.getTime() + 5 * 86_400_000) };
+    expect(await listAssistantMessages(later, f.session)).toEqual([]);
+    await purgeExpired(later);
+    expect(await db.selectFrom("assistant_messages").select("id").where("account_id", "=", f.accountId).execute()).toEqual([]);
+    expect(await db.selectFrom("family_events").select("id").where("account_id", "=", f.accountId).execute()).toHaveLength(1);
   });
 
   it("efface toutes les données du foyer avec le compte", async () => {

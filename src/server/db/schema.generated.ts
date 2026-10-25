@@ -581,6 +581,18 @@ export interface ErrorReports {
   user_comment: string | null;
 }
 
+export interface FamilyEventHistory {
+  account_id: string;
+  action: string;
+  by_user_id: string | null;
+  created_at: Generated<Timestamp>;
+  event_id: string;
+  from_status: FamilyEventStatus | null;
+  id: Generated<string>;
+  reason: string | null;
+  to_status: FamilyEventStatus;
+}
+
 export interface FamilyEventMembers {
   event_id: string;
   member_id: string;
@@ -602,13 +614,23 @@ export interface FamilyEventProposals {
 export interface FamilyEvents {
   account_id: string;
   all_day: Generated<boolean>;
+  /**
+   * Concerne toute la famille (D27) : en conflit avec tout rendez-vous qui le chevauche
+   */
+  all_family: Generated<boolean>;
   created_at: Generated<Timestamp>;
   created_by_user_id: string | null;
   ends_at: Timestamp;
   event_type: FamilyEventType;
   id: Generated<string>;
-  notes: string | null;
-  place: string | null;
+  /**
+   * Note chiffrée. Jamais transmise à l'assistant (D31).
+   */
+  notes_encrypted: Buffer | null;
+  /**
+   * Lieu chiffré. Jamais transmis à l'assistant (D31).
+   */
+  place_encrypted: Buffer | null;
   recurrence: string | null;
   source: FamilyEventSource;
   /**
@@ -620,8 +642,20 @@ export interface FamilyEvents {
    */
   starts_at: Timestamp;
   status: Generated<FamilyEventStatus>;
-  title: string;
+  status_changed_at: Generated<Timestamp>;
+  /**
+   * Auteur du dernier changement de statut ; vide pour un changement fait par le système
+   */
+  status_changed_by_user_id: string | null;
+  /**
+   * Titre chiffré (AES-256-GCM, clé de l'application) : peut contenir un prénom ou une donnée de santé. [US-75 RT5]
+   */
+  title_encrypted: Buffer;
   updated_at: Generated<Timestamp>;
+  /**
+   * Numéro de version : incrémenté à chaque modification ou changement de statut ; une modification fondée sur une version dépassée est refusée [US-76 RT1]
+   */
+  version: Generated<number>;
 }
 
 export interface FamilyMembers {
@@ -631,6 +665,10 @@ export interface FamilyMembers {
    */
   alias_index: number;
   birth_date: Timestamp | null;
+  /**
+   * Couleur du membre dans le calendrier (AF-5), au format #rrggbb
+   */
+  color: string | null;
   created_at: Generated<Timestamp>;
   first_name: string;
   id: Generated<string>;
@@ -945,6 +983,7 @@ export interface DB {
   devices: Devices;
   erasure_traces: ErasureTraces;
   error_reports: ErrorReports;
+  family_event_history: FamilyEventHistory;
   family_event_members: FamilyEventMembers;
   family_event_proposals: FamilyEventProposals;
   family_events: FamilyEvents;

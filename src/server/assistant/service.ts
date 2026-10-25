@@ -2,6 +2,7 @@ import type { Ctx, SessionContext } from "@/server/auth/service";
 import { Rejection } from "@/server/http";
 import { env } from "@/server/env";
 import { decrypt, encrypt } from "@/server/security/crypto";
+import { loadCalendarEvent } from "./calendar";
 import { loadAgentDefinition, runAssistant, type AgentDefinition, type AgentLimits, type AgentSource } from "./agent";
 import { ensureParentMembers, loadPseudoMembers, requireParent } from "./family";
 import { createModel, type AssistantModel } from "./model";
@@ -134,20 +135,13 @@ export async function sendAssistantMessage(
     limits: deps.limits,
   });
 
-  const events = result.createdEventIds.length
-    ? (
-        await ctx.db
-          .selectFrom("family_events")
-          .select(["id", "title", "event_type", "status", "starts_at", "ends_at"])
-          .where("account_id", "=", accountId)
-          .where("id", "in", result.createdEventIds)
-          .orderBy("starts_at")
-          .execute()
-      ).map((e): AssistantEventView => ({
-        id: e.id, title: e.title, type: e.event_type, status: e.status,
-        start: utcToLocal(e.starts_at, session.device.timezone || "Europe/Paris"), end: utcToLocal(e.ends_at, session.device.timezone || "Europe/Paris"),
-      }))
-    : [];
+  const tz = session.device.timezone || "Europe/Paris";
+  const events: AssistantEventView[] = [];
+  for (const id of result.createdEventIds) {
+    const e = await loadCalendarEvent(ctx.db, accountId, id);
+    if (e) events.push({ id: e.id, title: e.title, type: e.type, status: e.status, start: utcToLocal(e.startsAt, tz), end: utcToLocal(e.endsAt, tz) });
+  }
+  events.sort((a, b) => a.start.localeCompare(b.start));
 
   if (result.status !== "ok") {
     return { requestId: input.requestId, reply: result.reply, failed: true, alreadyAnswered: false, events, proposals: result.proposalIds.length, durationMs: result.durationMs };
@@ -160,4 +154,57 @@ export async function sendAssistantMessage(
     .execute();
   await ctx.db.updateTable("assistant_conversations").set({ last_message_at: answeredAt }).where("id", "=", conversation.id).execute();
   return { requestId: input.requestId, reply: result.reply, failed: false, alreadyAnswered: false, events, proposals: result.proposalIds.length, durationMs: result.durationMs };
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------
+// Historique du fil (écran de saisie)
+// ---------------------------------------------------------------------------------------------------------------------------
+
+/** Les conversations restent consultables 4 jours au plus (D38, US-44). */
+export const ASSISTANT_HISTORY_DAYS = 4;
+
+export interface AssistantMessageView {
+  id: string;
+  requestId: string;
+  role: "user" | "assistant";
+  text: string;
+  at: string;
+  /** Rendez-vous provisoires créés par la demande, pour le lien « Voir la proposition de RDV ». */
+  events: { id: string; title: string; start: string; status: string }[];
+}
+
+/** Messages récents du fil de ce parent, du plus ancien au plus récent. */
+export async function listAssistantMessages(ctx: Ctx, session: SessionContext): Promise<AssistantMessageView[]> {
+  const accountId = requireParent(session);
+  const conversation = await ctx.db.selectFrom("assistant_conversations").select("id").where("user_id", "=", session.user.id).executeTakeFirst();
+  if (!conversation) return [];
+  const since = new Date(ctx.now.getTime() - ASSISTANT_HISTORY_DAYS * 86_400_000);
+  const rows = await ctx.db
+    .selectFrom("assistant_messages")
+    .select(["id", "request_id", "role", "content_encrypted", "created_at"])
+    .where("conversation_id", "=", conversation.id)
+    .where("created_at", ">=", since)
+    .orderBy("created_at")
+    .orderBy("role", "desc")
+    .execute();
+  const tz = session.device.timezone || "Europe/Paris";
+  const out: AssistantMessageView[] = [];
+  for (const row of rows) {
+    const events: AssistantMessageView["events"] = [];
+    if (row.role === "assistant") {
+      const created = await ctx.db
+        .selectFrom("family_events")
+        .select("id")
+        .where("account_id", "=", accountId)
+        .where("source_ref", "like", `${row.request_id}:%`)
+        .where("status", "in", ["provisional", "confirmed", "set_aside"])
+        .execute();
+      for (const c of created) {
+        const e = await loadCalendarEvent(ctx.db, accountId, c.id);
+        if (e) events.push({ id: e.id, title: e.title, start: utcToLocal(e.startsAt, tz), status: e.status });
+      }
+    }
+    out.push({ id: row.id, requestId: row.request_id, role: row.role, text: decrypt(row.content_encrypted, key()), at: row.created_at.toISOString(), events });
+  }
+  return out;
 }

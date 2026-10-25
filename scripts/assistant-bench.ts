@@ -5,7 +5,7 @@
 //   npx tsx scripts/assistant-bench.ts --env agent/.env              # clé ANTHROPIC_API_KEY lue dans ce fichier (jamais affichée)
 //   npx tsx scripts/assistant-bench.ts --cas 01 29 30 --runs 2
 //   npx tsx scripts/assistant-bench.ts --provider foundry            # avec FOUNDRY_RESOURCE et FOUNDRY_API_KEY (quand le quota sera accordé)
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
@@ -14,6 +14,7 @@ import { config } from "dotenv";
 import { Kysely, PostgresDialect } from "kysely";
 import { Pool } from "pg";
 import { loadAgentDefinition, runAssistant, type AgentRunResult } from "../src/server/assistant/agent";
+import { open, openOptional, seal, sealOptional } from "../src/server/assistant/fields";
 import { ensureParentMembers, loadPseudoMembers } from "../src/server/assistant/family";
 import { utcToLocal } from "../src/server/assistant/local-time";
 import { createModel } from "../src/server/assistant/model";
@@ -33,6 +34,15 @@ const list = (name: string) => {
 
 const envFile = option("env") ?? path.join(process.cwd(), "agent", ".env");
 config({ path: envFile, quiet: true });
+// Un réglage laissé vide dans le fichier n'est pas un réglage ; et le banc a besoin des secrets de l'application (chiffrement des titres),
+// jetables ici : la base du banc disparaît à la fin.
+for (const [name, value] of Object.entries(process.env)) if (value === "") delete process.env[name];
+const throwaway = (bytes: number) => randomBytes(bytes).toString("base64");
+process.env.ENCRYPTION_KEY ??= throwaway(32);
+process.env.HMAC_KEY ??= throwaway(32);
+process.env.AUTH_SECRET ??= throwaway(32);
+process.env.CRON_SECRET ??= randomBytes(24).toString("hex");
+process.env.DATABASE_URL ??= "postgres://maaq:maaq@localhost:5432/inutilise";
 const provider = (option("provider") ?? process.env.FOURNISSEUR ?? "anthropic") as "anthropic" | "foundry";
 const apiKey = provider === "foundry" ? process.env.FOUNDRY_API_KEY : process.env.ANTHROPIC_API_KEY;
 if (!apiKey || (provider === "foundry" && !process.env.FOUNDRY_RESOURCE)) {
@@ -111,8 +121,8 @@ async function seedCalendar(accountId: string) {
     await db
       .insertInto("family_events")
       .values({
-        id: seedUuid(e.id), account_id: accountId, title: e.titre, event_type: TYPE[e.type] as never, starts_at: localToUtc(e.debut, TZ), ends_at: localToUtc(e.fin, TZ),
-        all_day: Boolean(e.journee_entiere), place: e.lieu ?? null, status: "confirmed", source: "typed",
+        id: seedUuid(e.id), account_id: accountId, title_encrypted: seal(e.titre), event_type: TYPE[e.type] as never, starts_at: localToUtc(e.debut, TZ), ends_at: localToUtc(e.fin, TZ),
+        all_day: Boolean(e.journee_entiere), place_encrypted: sealOptional(e.lieu), status: "confirmed", source: "typed",
       })
       .execute();
     await db.insertInto("family_event_members").values(e.membres.map((m) => ({ event_id: seedUuid(e.id), member_id: members.find((x) => x.first_name === m)!.id }))).execute();
@@ -127,13 +137,13 @@ async function evaluate(c: Case, result: AgentRunResult, accountId: string): Pro
   const created = result.createdEventIds.length
     ? await db
         .selectFrom("family_events")
-        .select(["id", "title", "event_type", "starts_at", "ends_at", "all_day", "place", "notes"])
+        .select(["id", "title_encrypted", "event_type", "starts_at", "ends_at", "all_day", "place_encrypted", "notes_encrypted"])
         .where("id", "in", result.createdEventIds)
         .execute()
     : [];
   const links = created.length ? await db.selectFrom("family_event_members as l").innerJoin("family_members as m", "m.id", "l.member_id").select(["l.event_id", "m.first_name"]).where("l.event_id", "in", created.map((e) => e.id)).execute() : [];
   const rows = created.map((e) => ({
-    ...e, start: utcToLocal(e.starts_at, TZ), end: utcToLocal(e.ends_at, TZ), who: links.filter((l) => l.event_id === e.id).map((l) => normalize(l.first_name)),
+    ...e, title: open(e.title_encrypted), place: openOptional(e.place_encrypted), notes: openOptional(e.notes_encrypted), start: utcToLocal(e.starts_at, TZ), end: utcToLocal(e.ends_at, TZ), who: links.filter((l) => l.event_id === e.id).map((l) => normalize(l.first_name)),
   }));
 
   if (result.status !== "ok") failures.push(`état ${result.status}`);

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireProfile } from "@/server/auth/http";
-import { sendAssistantMessage } from "@/server/assistant/service";
+import { listAssistantMessages, sendAssistantMessage } from "@/server/assistant/service";
 import { handler, parseBody } from "@/server/http";
 
 export const dynamic = "force-dynamic";
@@ -20,4 +20,10 @@ export const POST = handler(async (request: Request) => {
   const body = await parseBody(request, schema);
   const reply = await sendAssistantMessage(ctx, session, { ...body, source: "typed" });
   return NextResponse.json(reply, { status: reply.failed ? 502 : 201 });
+});
+
+/** Fil récent de ce parent avec l'assistant : 4 jours au plus (D38). */
+export const GET = handler(async () => {
+  const { session, ctx } = await requireProfile({ passive: true });
+  return NextResponse.json({ messages: await listAssistantMessages(ctx, session) });
 });

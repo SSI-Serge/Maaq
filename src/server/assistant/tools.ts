@@ -1,5 +1,7 @@
 import { sql, type Kysely } from "kysely";
 import type { DB } from "@/server/db/schema.generated";
+import { findConflicts, loadCalendarEvent, loadCalendarEvents, type CalendarEvent, type EventSource, type EventStatus, type EventType } from "./calendar";
+import { seal, sealOptional } from "./fields";
 import { isLocalDateTime, localDay, localMs, localToUtc, utcToLocal } from "./local-time";
 import { ageBand, fold, Pseudonymizer, type PseudoMember } from "./pseudonymize";
 
@@ -14,10 +16,6 @@ import { ageBand, fold, Pseudonymizer, type PseudoMember } from "./pseudonymize"
 
 export class ToolError extends Error {}
 
-type EventType = "school" | "medical" | "work" | "family" | "personal" | "admin";
-type EventStatus = "provisional" | "confirmed" | "canceled" | "set_aside" | "ignored";
-type EventSource = "typed" | "dictation" | "capture" | "mail";
-
 /** Types vus par le modèle (agent/outils/outils.json) et leur valeur en base. */
 export const TYPE_TO_DB: Record<string, EventType> = {
   ecole: "school", medical: "medical", pro: "work", familial: "family", perso: "personal", admin: "admin",
@@ -25,9 +23,10 @@ export const TYPE_TO_DB: Record<string, EventType> = {
 const TYPE_FROM_DB: Record<EventType, string> = Object.fromEntries(Object.entries(TYPE_TO_DB).map(([fr, en]) => [en, fr])) as Record<EventType, string>;
 const STATUS_FR: Partial<Record<EventStatus, string>> = { provisional: "provisoire", confirmed: "confirme" };
 
-/** Un rendez-vous occupe le calendrier tant qu'il est provisoire ou confirmé (D32 : écarté, ignoré et annulé ne bloquent pas). */
-const ACTIVE: EventStatus[] = ["provisional", "confirmed"];
-const MAX_TITLE = 200;
+/** Limites des écrans (US-76 RF2) : titre 100 caractères, lieu 200, note 500. */
+export const MAX_TITLE = 100;
+export const MAX_PLACE = 200;
+export const MAX_NOTES = 500;
 const STOP_WORDS = new Set(["rendez", "vous", "avec", "pour", "dans", "chez", "votre", "notre", "cabinet"]);
 
 export interface ToolContext {
@@ -47,18 +46,6 @@ export interface ToolContext {
   proposals: string[];
 }
 
-interface EventRow {
-  id: string;
-  title: string;
-  event_type: EventType;
-  starts_at: Date;
-  ends_at: Date;
-  all_day: boolean;
-  place: string | null;
-  status: EventStatus;
-  memberIds: string[];
-}
-
 const shortRef = (id: string) => `evt-${id.slice(0, 8)}`;
 export const EVENT_REF = /^evt-([0-9a-f]{8})$/;
 
@@ -66,37 +53,25 @@ function words(text: string): Set<string> {
   return new Set(fold(text).split(/[^a-z0-9]+/).filter((w) => w.length >= 4 && !STOP_WORDS.has(w)));
 }
 
-async function loadEvents(ctx: ToolContext, from: Date, to: Date, statuses: EventStatus[] = ACTIVE): Promise<EventRow[]> {
-  const rows = await ctx.db
-    .selectFrom("family_events")
-    .select(["id", "title", "event_type", "starts_at", "ends_at", "all_day", "place", "status"])
-    .where("account_id", "=", ctx.accountId)
-    .where("status", "in", statuses)
-    .where("starts_at", "<", to)
-    .where("ends_at", ">", from)
-    .orderBy("starts_at")
-    .execute();
-  return attachMembers(ctx, rows);
+const loadEvents = (ctx: ToolContext, from: Date, to: Date) => loadCalendarEvents(ctx.db, ctx.accountId, { from, to });
+
+/** Alias des personnes d'un rendez-vous : tous les membres pour un rendez-vous « toute la famille ». */
+function aliases(ctx: ToolContext, e: CalendarEvent): string[] {
+  return e.allFamily ? ctx.pseudo.members.map((m) => Pseudonymizer.aliasOf(m)) : e.memberIds.map((m) => ctx.pseudo.aliasFor(m));
 }
 
-async function attachMembers<T extends { id: string }>(ctx: ToolContext, rows: T[]): Promise<(T & { memberIds: string[] })[]> {
-  if (!rows.length) return [];
-  const links = await ctx.db.selectFrom("family_event_members").select(["event_id", "member_id"]).where("event_id", "in", rows.map((r) => r.id)).execute();
-  const byEvent = new Map<string, string[]>();
-  for (const l of links) byEvent.set(l.event_id, [...(byEvent.get(l.event_id) ?? []), l.member_id]);
-  return rows.map((r) => ({ ...r, memberIds: byEvent.get(r.id) ?? [] }));
-}
+const concerns = (e: CalendarEvent, who: Set<string>) => e.allFamily || e.memberIds.some((m) => who.has(m));
 
 /** Événement tel que le modèle le voit : identifiant, créneau, type, statut, membres ; sans titre, lieu ni note (D31). */
-function publicEvent(ctx: ToolContext, e: EventRow) {
+function publicEvent(ctx: ToolContext, e: CalendarEvent) {
   return {
     id: shortRef(e.id),
-    debut: utcToLocal(e.starts_at, ctx.timeZone),
-    fin: utcToLocal(e.ends_at, ctx.timeZone),
-    type: TYPE_FROM_DB[e.event_type],
+    debut: utcToLocal(e.startsAt, ctx.timeZone),
+    fin: utcToLocal(e.endsAt, ctx.timeZone),
+    type: TYPE_FROM_DB[e.type],
     statut: STATUS_FR[e.status] ?? e.status,
-    membres: e.memberIds.map((m) => ctx.pseudo.aliasFor(m)),
-    ...(e.all_day ? { journee_entiere: true } : {}),
+    membres: aliases(ctx, e),
+    ...(e.allDay ? { journee_entiere: true } : {}),
   };
 }
 
@@ -115,7 +90,7 @@ function text(value: unknown, name: string, { required = true, max = 5000 } = {}
     return null;
   }
   if (typeof value !== "string") throw new ToolError(`« ${name} » doit être un texte`);
-  if (value.length > max) throw new ToolError(`« ${name} » est trop long`);
+  if (value.length > max) throw new ToolError(`« ${name} » est trop long (${max} caractères au plus)`);
   return value;
 }
 
@@ -141,19 +116,19 @@ function span(ctx: ToolContext, start: string, end: string): { from: Date; to: D
   return { from, to, allDay: allDay || end.length === 10 };
 }
 
-async function findEvent(ctx: ToolContext, ref: unknown) {
+async function findEvent(ctx: ToolContext, ref: unknown): Promise<CalendarEvent> {
   const m = EVENT_REF.exec(String(ref).trim());
   if (!m) throw new ToolError(`aucun événement avec l'identifiant ${String(ref)}`);
   const rows = await ctx.db
     .selectFrom("family_events")
-    .select(["id", "title", "event_type", "starts_at", "ends_at", "all_day", "place", "status"])
+    .select("id")
     .where("account_id", "=", ctx.accountId)
     .where(sql<boolean>`id::text like ${`${m[1]}%`}`)
     .limit(2)
     .execute();
   if (rows.length === 0) throw new ToolError(`aucun événement avec l'identifiant ${String(ref)}`);
   if (rows.length > 1) throw new ToolError(`identifiant ambigu : ${String(ref)}`);
-  return (await attachMembers(ctx, rows))[0] as EventRow;
+  return (await loadCalendarEvent(ctx.db, ctx.accountId, rows[0].id))!;
 }
 
 type Tool = (input: Record<string, unknown>, ctx: ToolContext) => Promise<unknown>;
@@ -174,15 +149,15 @@ const TOOLS: Record<string, Tool> = {
     const from = toUtc(ctx, local(input.date_debut, "date_debut").slice(0, 10));
     const to = toUtc(ctx, `${local(input.date_fin, "date_fin").slice(0, 10)}T23:59`);
     const who = input.membre ? members(ctx, [input.membre])[0].id : null;
-    const events = (await loadEvents(ctx, from, to)).filter((e) => !who || e.memberIds.includes(who));
+    const events = (await loadEvents(ctx, from, to)).filter((e) => !who || e.allFamily || e.memberIds.includes(who));
     return { evenements: events.map((e) => publicEvent(ctx, e)) };
   },
 
   async verifier_conflits(input, ctx) {
-    const who = new Set(members(ctx, input.membres).map((m) => m.id));
+    const who = members(ctx, input.membres).map((m) => m.id);
     const { from, to } = span(ctx, local(input.debut, "debut"), local(input.fin, "fin"));
     if (to <= from) throw new ToolError("la fin doit être après le début");
-    const conflicts = (await loadEvents(ctx, from, to)).filter((e) => e.memberIds.some((m) => who.has(m)));
+    const conflicts = await findConflicts(ctx.db, ctx.accountId, { from, to, memberIds: who, allFamily: false });
     return { conflits: conflicts.map((e) => publicEvent(ctx, e)), libre: conflicts.length === 0 };
   },
 
@@ -193,8 +168,8 @@ const TOOLS: Record<string, Tool> = {
     const wanted = Math.min(Math.max(Number(input.nombre ?? 3) || 3, 1), 5);
     const startDay = local(input.date_souhaitee, "date_souhaitee").slice(0, 10);
     const rangeFrom = toUtc(ctx, startDay);
-    const busy = (await loadEvents(ctx, rangeFrom, new Date(rangeFrom.getTime() + 16 * 86_400_000))).filter((e) => e.memberIds.some((m) => who.has(m)));
-    const busyLocal = busy.map((e) => [localMs(e.starts_at, ctx.timeZone), localMs(e.ends_at, ctx.timeZone)] as const);
+    const busy = (await loadEvents(ctx, rangeFrom, new Date(rangeFrom.getTime() + 16 * 86_400_000))).filter((e) => concerns(e, who));
+    const busyLocal = busy.map((e) => [localMs(e.startsAt, ctx.timeZone), localMs(e.endsAt, ctx.timeZone)] as const);
     const nowLocal = localMs(ctx.now, ctx.timeZone);
     const slots: { debut: string; fin: string }[] = [];
     const firstDay = Date.parse(`${startDay}T00:00:00Z`);
@@ -229,10 +204,10 @@ const TOOLS: Record<string, Tool> = {
     const dayStart = toUtc(ctx, day);
     const events = await loadEvents(ctx, dayStart, new Date(dayStart.getTime() + 24 * 3_600_000 + 3_600_000));
     const found = events.filter((e) => {
-      if (localDay(e.starts_at, ctx.timeZone) !== day) return false;
-      if (around && Math.abs(localMs(e.starts_at, ctx.timeZone) - Date.parse(`${around}:00Z`)) > 30 * 60_000) return false;
-      if (who && !e.memberIds.some((m) => who.has(m))) return false;
-      const sameMedical = medicalAsked && e.event_type === "medical";
+      if (localDay(e.startsAt, ctx.timeZone) !== day) return false;
+      if (around && Math.abs(localMs(e.startsAt, ctx.timeZone) - Date.parse(`${around}:00Z`)) > 30 * 60_000) return false;
+      if (who && !concerns(e, who)) return false;
+      const sameMedical = medicalAsked && e.type === "medical";
       const equivalent = [...words(`${e.title} ${e.place ?? ""}`)].some((w) => keys.has(w));
       return sameMedical || equivalent;
     });
@@ -249,12 +224,10 @@ const TOOLS: Record<string, Tool> = {
     const medical = type === "medical";
 
     // D31 : titre générique pour un rendez-vous médical, ni lieu ni note renseignés par l'assistant. Règle de MAAQ, pas du modèle.
-    const title = medical
-      ? `RDV médical — ${who[0].firstName}`
-      : ctx.pseudo.fromModel(text(input.titre, "titre", { max: MAX_TITLE })!).trim();
+    const title = medical ? `RDV médical — ${who[0].firstName}` : ctx.pseudo.fromModel(text(input.titre, "titre", { max: MAX_TITLE * 2 })!).trim().slice(0, MAX_TITLE);
     if (!title) throw new ToolError("« titre » est obligatoire");
-    const place = medical ? null : (text(input.lieu, "lieu", { required: false }) && ctx.pseudo.fromModel(String(input.lieu)));
-    const notes = medical ? null : (text(input.notes, "notes", { required: false }) && ctx.pseudo.fromModel(String(input.notes)));
+    const place = medical ? null : (text(input.lieu, "lieu", { required: false, max: MAX_PLACE * 2 }) && ctx.pseudo.fromModel(String(input.lieu)).slice(0, MAX_PLACE));
+    const notes = medical ? null : (text(input.notes, "notes", { required: false, max: MAX_NOTES * 2 }) && ctx.pseudo.fromModel(String(input.notes)).slice(0, MAX_NOTES));
     const recurrence = text(input.recurrence, "recurrence", { required: false, max: 300 });
     const ignored = medical && (input.lieu || input.notes);
 
@@ -263,8 +236,9 @@ const TOOLS: Record<string, Tool> = {
     const inserted = await ctx.db
       .insertInto("family_events")
       .values({
-        account_id: ctx.accountId, title: title.slice(0, MAX_TITLE), event_type: type, starts_at: from, ends_at: to, all_day: allDay,
-        place, notes, recurrence, status: "provisional", source: ctx.source, source_ref: sourceRef, created_by_user_id: ctx.userId,
+        account_id: ctx.accountId, title_encrypted: seal(title), event_type: type, starts_at: from, ends_at: to, all_day: allDay,
+        place_encrypted: sealOptional(place), notes_encrypted: sealOptional(notes), recurrence, status: "provisional", source: ctx.source,
+        source_ref: sourceRef, created_by_user_id: ctx.userId, status_changed_at: ctx.now,
       })
       .onConflict((oc) => oc.columns(["account_id", "source_ref"]).where("source_ref", "is not", null).doNothing())
       .returning("id")
@@ -273,6 +247,10 @@ const TOOLS: Record<string, Tool> = {
     const id = inserted?.id ?? (await ctx.db.selectFrom("family_events").select("id").where("account_id", "=", ctx.accountId).where("source_ref", "=", sourceRef).executeTakeFirstOrThrow()).id;
     if (inserted) {
       await ctx.db.insertInto("family_event_members").values(who.map((m) => ({ event_id: id, member_id: m.id }))).execute();
+      await ctx.db
+        .insertInto("family_event_history")
+        .values({ account_id: ctx.accountId, event_id: id, action: "created", from_status: null, to_status: "provisional", by_user_id: ctx.userId, created_at: ctx.now })
+        .execute();
     }
     ctx.created.ids.push(id);
     return {
@@ -342,31 +320,32 @@ export async function expandEventRefs(db: Kysely<DB>, accountId: string, textWit
   for (const prefix of refs) {
     const rows = await db
       .selectFrom("family_events")
-      .select(["id", "title", "event_type"])
+      .select("id")
       .where("account_id", "=", accountId)
       .where(sql<boolean>`id::text like ${`${prefix}%`}`)
       .limit(2)
       .execute();
     if (rows.length !== 1 || !canSee(rows[0].id)) continue;
-    if (rows[0].event_type === "medical") {
+    const event = (await loadCalendarEvent(db, accountId, rows[0].id))!;
+    if (event.type === "medical") {
       // Les rendez-vous créés par l'assistant portent déjà leur titre générique ; sinon on le recompose avec la première personne concernée.
-      if (rows[0].title.startsWith("RDV médical")) {
-        titles.set(prefix, rows[0].title);
+      if (event.title.startsWith("RDV médical")) {
+        titles.set(prefix, event.title);
         continue;
       }
       const who = await db
-        .selectFrom("family_event_members as l")
-        .innerJoin("family_members as m", "m.id", "l.member_id")
-        .select("m.first_name")
-        .where("l.event_id", "=", rows[0].id)
-        .orderBy("m.role")
-        .orderBy("m.alias_index")
+        .selectFrom("family_members")
+        .select("first_name")
+        .where("id", "in", event.memberIds.length ? event.memberIds : ["00000000-0000-0000-0000-000000000000"])
+        .orderBy("role")
+        .orderBy("alias_index")
         .limit(1)
         .executeTakeFirst();
       titles.set(prefix, who ? `RDV médical — ${who.first_name}` : "RDV médical");
     } else {
-      titles.set(prefix, rows[0].title);
+      titles.set(prefix, event.title);
     }
   }
   return textWithRefs.replace(/\[\[evt-([0-9a-f]{8})\]\]/g, (_all, prefix: string) => titles.get(prefix) ?? "un rendez-vous");
 }
+

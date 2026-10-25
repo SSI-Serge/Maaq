@@ -44,9 +44,12 @@ export async function purgeExpired(ctx: Ctx): Promise<{ logbook: number; errorRe
   const a = await ctx.db.deleteFrom("idempotency_keys").where("created_at", "<", day).executeTakeFirst();
   const b = await ctx.db.deleteFrom("chat_requests").where("created_at", "<", day).executeTakeFirst();
   const c = await ctx.db.deleteFrom("daily_request_counters").where("request_date", "<", week).executeTakeFirst();
+  // Conversations avec l'Assistant Famille : 4 jours au plus (D38, US-44). Les rendez-vous restent dans le calendrier.
+  const four = new Date(ctx.now.getTime() - 4 * 86_400_000);
+  const d = await ctx.db.deleteFrom("assistant_messages").where("created_at", "<", four).executeTakeFirst();
   return {
     logbook: Number(logbook.rows[0]?.n ?? 0),
     errorReports: Number(reports.rows[0]?.n ?? 0),
-    technical: Number(a.numDeletedRows) + Number(b.numDeletedRows) + Number(c.numDeletedRows),
+    technical: Number(a.numDeletedRows) + Number(b.numDeletedRows) + Number(c.numDeletedRows) + Number(d.numDeletedRows),
   };
 }

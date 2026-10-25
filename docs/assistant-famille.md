@@ -28,7 +28,7 @@ la première famille réelle.**
 | Membres du foyer | `src/server/assistant/family.ts` |
 | Message d'un parent, historique, idempotence | `src/server/assistant/service.ts` |
 | Routes | `POST /api/assistant/messages`, `GET` et `POST /api/family/members` |
-| Tests | `tests/assistant.test.ts` (45 tests, base réelle) |
+| Tests | `tests/assistant.test.ts` (45 tests) et `tests/family-events.test.ts` (29 tests), base réelle |
 | Banc d'essai de bout en bout, vrai modèle | `scripts/assistant-bench.ts` |
 
 ## Règles du PO appliquées dans le code
@@ -45,6 +45,48 @@ la première famille réelle.**
 - Le contenu des messages est chiffré en base (AES-256-GCM, clé de l'application). Les journaux ne contiennent que des métadonnées
   (durée, outils, jetons, identifiants de requête) ; un contrôle signale tout prénom, email ou téléphone parti chez le modèle.
 
+## Étape 2, partie serveur : cycle de vie des rendez-vous (US-74 à US-80)
+Le serveur sait lister, consulter, confirmer, modifier, écarter et annuler les rendez-vous du calendrier familial, avec les droits de D26.
+Les écrans sont décrits dans la section suivante.
+
+| Route | Rôle |
+|---|---|
+| `GET /api/family/events?from=&to=` | Rendez-vous visibles par le profil sur la période (provisoires, confirmés, écartés), avec les rendez-vous en conflit |
+| `GET /api/family/events/pending` | Confirmations en attente du profil (provisoires à venir qu'il peut traiter ; sans les écartés) |
+| `GET /api/family/events/[id]` | Détail, conflits et créneaux alternatifs (3 au plus, entre 8 h et 20 h, les plus proches du créneau demandé) |
+| `PATCH /api/family/events/[id]` | Modifier un provisoire ou un confirmé (corps : champs du formulaire, `version`, `allowConflict`) |
+| `POST /api/family/events/[id]/confirm` | Confirmer, ou « Confirmer quand même » un rendez-vous écarté |
+| `POST /api/family/events/[id]/set-aside` | Ignorer : le rendez-vous est écarté (gris, barré) |
+| `POST /api/family/events/[id]/cancel` | Annuler un rendez-vous confirmé |
+
+Règles : version numérotée par rendez-vous (une modification fondée sur une version dépassée est refusée, « modifié entre-temps ») ; confirmation atomique
+(deux parents au même instant : une seule confirmation, l'autre voit « déjà traité par … ») ; conflit revérifié à la confirmation (409 avec les conflits et
+les créneaux alternatifs, `allowConflict` pour passer outre) ; un provisoire est passé à son heure de début, un confirmé quand il est terminé ; historique de
+chaque changement (auteur, date) dans `family_event_history` ; titre, lieu et note chiffrés en base (migration `0008`) ; une couleur par membre.
+Reste à construire : l'expiration automatique des rendez-vous écartés ou jamais confirmés (avec les relances, étape rappels), les notifications aux autres profils.
+
+Code : `src/server/assistant/events.ts` (cycle de vie), `calendar.ts` (lecture, conflits), `fields.ts` (chiffrement) ; tests : `tests/family-events.test.ts`.
+
+## Étape 2, écrans (d'après les maquettes)
+Onglet **Calendrier** ajouté à la barre de navigation (l'onglet Agents reste actif sur `/assistant`). Composants dans `src/components/family/`.
+
+| Page | Écran | Contenu |
+|---|---|---|
+| `/assistant` | Accueil de l'Assistant Famille | Confirmations en attente, prochains rendez-vous, accès à la saisie et au calendrier |
+| `/assistant/demande` | Nouvelle demande | Tchat : historique des 4 derniers jours, envoi d'un texte, lien « Voir la proposition de RDV », « Réessayer » sans doublon (identifiant de demande) |
+| `/calendrier` | Calendrier familial | Vue semaine ou mois, légende des membres (filtre), « Aujourd'hui », bornes 12 mois passés / 24 mois à venir |
+| `/calendrier/jour/[date]` | Vue Jour | Rendez-vous rangés par période (matin, midi, après-midi, soir) |
+| `/calendrier/rdv/[id]` | Détail et confirmation | Conflit en phrase, créneaux alternatifs, confirmer / modifier / écarter / annuler, messages de succès des US-75 à US-80 |
+
+Pas encore d'écran : membres du foyer (US-92/93), rappels (étape 3), notifications aux autres profils.
+
+Données de démonstration pour voir les écrans en local (foyer de Camille, Léo et Mia, 13 rendez-vous dont un conflit, un écarté et une journée chargée) :
+```
+npm run db:seed
+npx tsx scripts/assistant-demo.ts
+```
+Tests : `tests/family-format.test.ts` (dates, semaines, grille du mois) ; le comportement serveur est couvert par `tests/family-events.test.ts` et `tests/assistant.test.ts`.
+
 ## Réglages
 Voir `.env.example`. Tout est facultatif tant que `ASSISTANT_MODE=off`.
 ```
@@ -60,7 +102,7 @@ Les clés se rangent dans Secret Manager, jamais dans le dépôt ni dans une con
 ## Vérifier
 ```
 npx tsc --noEmit
-npx vitest run tests/assistant.test.ts     # 45 tests, sans clé
+npx vitest run tests/assistant.test.ts     # 46 tests, sans clé
 npx tsx scripts/assistant-bench.ts --env agent/.env --runs 2     # vrai modèle, environ 1 à 3 $ par passage
 ```
 `agent/.env` n'est jamais suivi par Git (`agent/.gitignore`). Le banc de bout en bout écrit son rapport dans `agent/resultats/`.

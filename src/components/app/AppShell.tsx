@@ -10,6 +10,8 @@ interface Tab {
   href: string;
   label: string;
   icon: ReactNode;
+  /** Autres adresses qui laissent cet onglet actif (par exemple l'Assistant Famille, rattaché aux agents). */
+  alsoActiveOn?: string[];
   /** Onglet visible seulement pour l'utilisateur principal. */
   primaryOnly?: boolean;
   /** Onglet visible pour le noyau du compte : utilisateur principal et invité 1 (US-30 RF3). */
@@ -18,7 +20,17 @@ interface Tab {
 
 /** Onglets du bas de l'application, d'après les maquettes U-Agents, U-Contrats et Invités. */
 const TABS: Tab[] = [
-  { href: "/accueil", label: "Agents", icon: <path d="M4 5h16v11H8l-4 4V5z" /> },
+  { href: "/accueil", label: "Agents", alsoActiveOn: ["/assistant"], icon: <path d="M4 5h16v11H8l-4 4V5z" /> },
+  {
+    href: "/calendrier",
+    label: "Calendrier",
+    icon: (
+      <>
+        <rect x="4" y="5" width="16" height="15" rx="2" />
+        <path d="M4 10h16M9 3v4M15 3v4" />
+      </>
+    ),
+  },
   {
     href: "/contrats",
     label: "Contrats",
@@ -91,7 +103,7 @@ export function AppShell({
       <div className={styles.content}>{children}</div>
       <nav className={styles.tabs} aria-label="Navigation principale">
         {tabs.map((tab) => {
-          const active = pathname.startsWith(tab.href);
+          const active = [tab.href, ...(tab.alsoActiveOn ?? [])].some((prefix) => pathname.startsWith(prefix));
           return (
             <Link key={tab.href} href={tab.href} className={`${styles.tab} ${active ? styles.tabActive : ""}`} aria-current={active ? "page" : undefined}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
