@@ -561,6 +561,17 @@ describe("message d'un parent à l'assistant", () => {
     expect(() => configuredModel()).toThrow(Rejection);
   });
 
+  it("garde l'origine d'une demande dictée : l'assistant la voit comme dictée, la base l'enregistre, et seul le texte circule", async () => {
+    const f = await family();
+    const model = scripted(() => say("Noté."));
+    await sendAssistantMessage(ctxAt(), f.session, { requestId: randomUUID(), text: "Dentiste pour Léo mardi à 17h", source: "dictation" }, { model });
+    await sendAssistantMessage(ctxAt(), f.session, { requestId: randomUUID(), text: "Judo samedi" }, { model });
+    expect(model.requests[0].messages[0].content as string).toContain('<message source="dictee">');
+    expect(model.requests[1].messages[model.requests[1].messages.length - 1].content as string).toContain('<message source="saisie">');
+    const rows = await db.selectFrom("assistant_messages").select("source").where("account_id", "=", f.accountId).where("role", "=", "user").orderBy("created_at").execute();
+    expect(rows.map((r) => r.source)).toEqual(["dictation", "typed"]);
+  });
+
   it("rend l'historique du fil, déchiffré, avec les rendez-vous créés par chaque demande, puis le purge au bout de 4 jours", async () => {
     const f = await family();
     const model = scripted((req, n) =>

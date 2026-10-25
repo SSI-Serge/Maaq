@@ -824,3 +824,44 @@
   font-weight: 700;
   color: var(--secondary-strong);
 }
+
+/* ---- Dictée d'une demande ---- */
+.micButton {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  min-height: 46px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg-raised);
+  color: var(--primary);
+  cursor: pointer;
+}
+.micButton:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.micListening {
+  border-color: var(--error);
+  background: var(--error);
+  color: var(--primary-ink);
+  animation: micPulse 1.4s ease-in-out infinite;
+}
+.dictation {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--error);
+}
+@keyframes micPulse {
+  50% {
+    opacity: 0.7;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .micListening {
+    animation: none;
+  }
+}

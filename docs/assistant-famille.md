@@ -131,6 +131,11 @@ Tests : `tests/push.test.ts` (15, envoi simulé), `tests/push-state.test.ts` (8,
 **À vérifier sur un vrai téléphone, en HTTPS** (ce que le navigateur de développement ne permet pas) : l'abonnement réel, la réception, le toucher qui ouvre le bon écran (y compris après le verrouillage de l'application, AF-3), le badge sur iPhone (iOS 16.4 et plus, application installée).
 **Tuile du tableau de bord** (US-84 RF6) : l'Assistant n'étant pas un agent du catalogue, sa tuile est fixe, en tête du dashboard, réservée aux deux parents, avec le nombre de confirmations en attente (`FamilyTile`). Solution provisoire : si l'Assistant devient un agent du catalogue (US-106, plateforme Foundry), la tuile passera par les cartes d'agents.
 
+## Dictée d'une demande (US-71, voie rapide)
+Un bouton micro à côté du champ de « Nouvelle demande » (`src/client/speech.ts`, `AssistantChat`). Il utilise la reconnaissance vocale du **navigateur** (Chrome sur Android, Safari) : le texte s'écrit en direct dans le champ, le parent le relit et le corrige, puis l'envoie. Seul le texte part au serveur, jamais le son ; une dictée dure 2 minutes au plus. L'origine « dictée » est transmise (`source: "dictation"` dans `POST /api/assistant/messages`), enregistrée avec le message et signalée à l'assistant (`<message source="dictee">`). Le bouton n'apparaît que si le navigateur sait transcrire.
+**Limite à connaître :** sur Chrome Android, le navigateur envoie l'audio aux serveurs de Google pour le transcrire : hors du cadre prévu pour le pilote (transcription européenne, audio en mémoire, jamais stocké). À ne pas utiliser avec de vraies données. La voie cible (enregistrement WAV dans le téléphone, transcription Azure Speech par le serveur) remplacera la transcription du navigateur sans changer l'écran ni le circuit « dictée » de l'assistant ; `AZURE_SPEECH_KEY` et `AZURE_SPEECH_REGION` sont déjà dans Secret Manager depuis l'essai voix.
+Tests : `tests/speech.test.ts` (assemblage du texte), `tests/assistant.test.ts` (origine de la demande). Pas de test automatique de la reconnaissance : à essayer sur un téléphone.
+
 ## Réglages
 Voir `.env.example`. Tout est facultatif tant que `ASSISTANT_MODE=off`.
 ```
