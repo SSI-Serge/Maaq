@@ -21,6 +21,9 @@ ENV MAAQ_DATA_DIR=/tmp/maaq-data
 COPY --from=builder --chown=node:node /app/.next/standalone ./
 COPY --from=builder --chown=node:node /app/.next/static ./.next/static
 COPY --from=builder --chown=node:node /app/public ./public
+# Instructions et outils de l'Assistant Famille : lus au démarrage par le backend (agent/INTEGRATION.md).
+COPY --from=builder --chown=node:node /app/agent/instructions.md ./agent/instructions.md
+COPY --from=builder --chown=node:node /app/agent/outils ./agent/outils
 USER node
 EXPOSE 8080
 CMD ["node", "server.js"]

@@ -13,6 +13,8 @@ export type AgentStatus = "available" | "blocked";
 
 export type AnonymizationStatus = "done" | "none" | "pending";
 
+export type AssistantMessageRole = "assistant" | "user";
+
 export type AuditAction = "account_created" | "account_updated" | "activation_link_resent" | "agent_blocked" | "agent_published" | "agent_reactivated" | "contract_archived" | "contract_created" | "contract_field_changed" | "contract_updated" | "device_revoked_by_admin";
 
 export type ChatErasureReason = "agent_removed" | "device_revoked" | "logout";
@@ -42,6 +44,18 @@ export type ErasureStatus = "done" | "failed" | "pending";
 export type ExecutionStatus = "failed" | "not_started" | "running" | "succeeded";
 
 export type ExportStatus = "expired" | "failed" | "preparing" | "ready" | "requested";
+
+export type FamilyEventSource = "capture" | "dictation" | "mail" | "typed";
+
+export type FamilyEventStatus = "canceled" | "confirmed" | "ignored" | "provisional" | "set_aside";
+
+export type FamilyEventType = "admin" | "family" | "medical" | "personal" | "school" | "work";
+
+export type FamilyMemberRole = "child" | "parent";
+
+export type FamilyProposalKind = "cancellation" | "modification";
+
+export type FamilyProposalStatus = "applied" | "pending" | "refused";
 
 export type Generated<T> = T extends ColumnType<infer S, infer I, infer U>
   ? ColumnType<S, I | undefined, U>
@@ -138,6 +152,10 @@ export interface Accounts {
    * in_app_request = bouton Désabonnement (annulable immédiatement) ; billing_unsubscribe = outil de facturation (reprise = nouvel abonnement hors app) — US-59 RF2/RF3
    */
   grace_origin: GraceOrigin | null;
+  /**
+   * Date d'envoi du rappel « suppression dans 7 jours » : un seul rappel par délai de grâce (US-58 RF3). Remis à vide quand le compte est repris
+   */
+  grace_reminder_sent_at: Timestamp | null;
   grace_started_at: Timestamp | null;
   /**
    * Nombre maximum d'invités du plan. Une réduction du plan n'expulse personne (US-21 RF6) : seuls les ajouts sont bloqués
@@ -157,7 +175,6 @@ export interface Accounts {
    */
   subscription_ended_at: Timestamp | null;
   updated_at: Generated<Timestamp>;
-  grace_reminder_sent_at: Timestamp | null;
 }
 
 export interface ActionDecisions {
@@ -322,6 +339,25 @@ export interface AgentValidatedActions {
   sort_order: Generated<number>;
 }
 
+export interface AssistantConversations {
+  account_id: string;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  last_message_at: Generated<Timestamp>;
+  user_id: string;
+}
+
+export interface AssistantMessages {
+  account_id: string;
+  content_encrypted: Buffer;
+  conversation_id: string;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  request_id: string;
+  role: AssistantMessageRole;
+  source: Generated<FamilyEventSource>;
+}
+
 export interface CcAddresses {
   agent_id: Int8;
   created_at: Generated<Timestamp>;
@@ -345,6 +381,14 @@ export interface ChatErasureRequests {
   reason: ChatErasureReason;
   requested_at: Generated<Timestamp>;
   status: Generated<ErasureStatus>;
+  user_id: string;
+}
+
+export interface ChatRequests {
+  agent_id: Int8;
+  counted_date: Timestamp;
+  created_at: Generated<Timestamp>;
+  request_id: string;
   user_id: string;
 }
 
@@ -537,12 +581,62 @@ export interface ErrorReports {
   user_comment: string | null;
 }
 
-export interface ChatRequests {
-  agent_id: Int8;
-  counted_date: Timestamp;
+export interface FamilyEventMembers {
+  event_id: string;
+  member_id: string;
+}
+
+export interface FamilyEventProposals {
+  account_id: string;
+  changes: Json | null;
   created_at: Generated<Timestamp>;
-  request_id: string;
-  user_id: string;
+  decided_at: Timestamp | null;
+  decided_by_user_id: string | null;
+  event_id: string;
+  id: Generated<string>;
+  kind: FamilyProposalKind;
+  reason: string | null;
+  status: Generated<FamilyProposalStatus>;
+}
+
+export interface FamilyEvents {
+  account_id: string;
+  all_day: Generated<boolean>;
+  created_at: Generated<Timestamp>;
+  created_by_user_id: string | null;
+  ends_at: Timestamp;
+  event_type: FamilyEventType;
+  id: Generated<string>;
+  notes: string | null;
+  place: string | null;
+  recurrence: string | null;
+  source: FamilyEventSource;
+  /**
+   * Identifiant de la demande (et rang dans la demande) qui a créé le rendez-vous : rend la création idempotente
+   */
+  source_ref: string | null;
+  /**
+   * Début en UTC ; l'assistant raisonne en heure locale du foyer (fuseau de l'appareil de l'utilisateur principal, D35)
+   */
+  starts_at: Timestamp;
+  status: Generated<FamilyEventStatus>;
+  title: string;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface FamilyMembers {
+  account_id: string;
+  /**
+   * Numéro de l'alias « Parent N » / « Enfant N » donné au modèle à la place du prénom ; attribué à la création du membre, propre au compte et au rôle
+   */
+  alias_index: number;
+  birth_date: Timestamp | null;
+  created_at: Generated<Timestamp>;
+  first_name: string;
+  id: Generated<string>;
+  role: FamilyMemberRole;
+  updated_at: Generated<Timestamp>;
+  user_id: string | null;
 }
 
 export interface IdempotencyKeys {
@@ -834,6 +928,8 @@ export interface DB {
   agent_sample_prompts: AgentSamplePrompts;
   agent_validated_actions: AgentValidatedActions;
   agents: Agents;
+  assistant_conversations: AssistantConversations;
+  assistant_messages: AssistantMessages;
   cc_addresses: CcAddresses;
   chat_erasure_requests: ChatErasureRequests;
   chat_requests: ChatRequests;
@@ -849,6 +945,10 @@ export interface DB {
   devices: Devices;
   erasure_traces: ErasureTraces;
   error_reports: ErrorReports;
+  family_event_members: FamilyEventMembers;
+  family_event_proposals: FamilyEventProposals;
+  family_events: FamilyEvents;
+  family_members: FamilyMembers;
   idempotency_keys: IdempotencyKeys;
   legal_acceptances: LegalAcceptances;
   legal_document_versions: LegalDocumentVersions;

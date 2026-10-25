@@ -1,0 +1,121 @@
+[
+  {
+    "name": "lister_membres",
+    "description": "Liste les membres de la famille : référence (« Parent 1 », « Enfant 2 »…), rôle et tranche d'âge. À utiliser pour savoir pour qui est un rendez-vous ou vérifier une référence.",
+    "input_schema": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "lister_evenements",
+    "description": "Liste les événements du calendrier familial entre deux dates incluses, éventuellement pour un seul membre. Chaque événement est décrit par son identifiant, son créneau, son type, son statut et les références des membres, sans titre ni lieu ni note. Sert à répondre aux questions sur le planning et à retrouver un événement à modifier ou annuler.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "date_debut": {"type": "string", "description": "Première date, format AAAA-MM-JJ."},
+        "date_fin": {"type": "string", "description": "Dernière date incluse, format AAAA-MM-JJ."},
+        "membre": {"type": "string", "description": "Référence d'un membre pour filtrer (facultatif)."}
+      },
+      "required": ["date_debut", "date_fin"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "verifier_conflits",
+    "description": "Vérifie si un créneau chevauche des événements existants pour les membres indiqués. À appeler avant toute création. Renvoie les événements en conflit (identifiant, créneau, type, membres) et un booléen `libre`.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "debut": {"type": "string", "description": "Début, format AAAA-MM-JJTHH:MM (heure locale)."},
+        "fin": {"type": "string", "description": "Fin, format AAAA-MM-JJTHH:MM (heure locale)."},
+        "membres": {"type": "array", "items": {"type": "string"}, "description": "Références des membres concernés."}
+      },
+      "required": ["debut", "fin", "membres"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "proposer_creneaux",
+    "description": "Propose des créneaux libres pour les membres indiqués, à partir d'une date souhaitée, entre 8 h et 20 h. À utiliser quand le créneau demandé est en conflit.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "date_souhaitee": {"type": "string", "description": "Date de départ de la recherche, format AAAA-MM-JJ."},
+        "duree_minutes": {"type": "integer", "description": "Durée du rendez-vous en minutes."},
+        "membres": {"type": "array", "items": {"type": "string"}, "description": "Références des membres concernés."},
+        "nombre": {"type": "integer", "description": "Nombre de créneaux à proposer (3 par défaut)."}
+      },
+      "required": ["date_souhaitee", "duree_minutes", "membres"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "rechercher_doublon",
+    "description": "Cherche un événement déjà enregistré qui correspond au même rendez-vous : même jour, heure de début à 30 minutes près si elle est donnée, au moins un membre en commun si des membres sont donnés (le parent qui écrit est toujours ajouté d'office à ces membres), et objet équivalent (pour un rendez-vous médical, le même type suffit). À appeler avant toute création, et pour retrouver l'événement d'un rendez-vous reporté ou annulé. Les événements trouvés sont décrits sans titre ni lieu.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "date": {"type": "string", "description": "Jour du rendez-vous, format AAAA-MM-JJ."},
+        "heure": {"type": "string", "description": "Heure de début HH:MM si connue (facultatif)."},
+        "type": {"type": "string", "enum": ["ecole", "medical", "pro", "familial", "perso", "admin"], "description": "Type du rendez-vous si connu (facultatif)."},
+        "objet": {"type": "string", "description": "Objet du rendez-vous en quelques mots (activité, praticien, lieu, école…)."},
+        "membres": {"type": "array", "items": {"type": "string"}, "description": "Références des membres concernés si elles sont connues (facultatif)."}
+      },
+      "required": ["date", "objet"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "creer_evenement_provisoire",
+    "description": "Crée un rendez-vous au statut provisoire. La famille doit ensuite le confirmer dans l'application. Ne l'appelle qu'après rechercher_doublon et verifier_conflits, et seulement si toutes les informations sont claires. Pour un rendez-vous médical, ne renseigne ni le lieu ni les notes : l'application donne elle-même un titre générique.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "titre": {"type": "string", "description": "Titre court sans prénom ni référence de personne, ex. « Réunion de copropriété »."},
+        "type": {"type": "string", "enum": ["ecole", "medical", "pro", "familial", "perso", "admin"]},
+        "debut": {"type": "string", "description": "AAAA-MM-JJTHH:MM, ou AAAA-MM-JJ si journée entière."},
+        "fin": {"type": "string", "description": "AAAA-MM-JJTHH:MM, ou AAAA-MM-JJ si journée entière."},
+        "journee_entiere": {"type": "boolean"},
+        "membres": {"type": "array", "items": {"type": "string"}, "description": "Références des membres concernés."},
+        "lieu": {"type": "string", "description": "Jamais pour un rendez-vous médical."},
+        "notes": {"type": "string", "description": "Préparation nécessaire, informations utiles. Jamais pour un rendez-vous médical."},
+        "recurrence": {"type": "string", "description": "Si le rendez-vous se répète, ex. « hebdomadaire, le mercredi » (facultatif)."},
+        "source": {"type": "string", "enum": ["saisie", "dictee", "capture", "mail"]}
+      },
+      "required": ["titre", "type", "debut", "fin", "journee_entiere", "membres", "source"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "modifier_evenement",
+    "description": "Propose une modification d'un événement existant (report, changement d'horaire ou de lieu). La famille confirme ensuite dans l'application.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "string", "description": "Identifiant de l'événement existant."},
+        "debut": {"type": "string", "description": "Nouveau début AAAA-MM-JJTHH:MM (facultatif)."},
+        "fin": {"type": "string", "description": "Nouvelle fin AAAA-MM-JJTHH:MM (facultatif)."},
+        "lieu": {"type": "string"},
+        "notes": {"type": "string"},
+        "motif": {"type": "string", "description": "Raison du changement, ex. « report demandé par le cabinet »."}
+      },
+      "required": ["id", "motif"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "annuler_evenement",
+    "description": "Propose l'annulation d'un événement existant. La famille confirme ensuite dans l'application.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "string", "description": "Identifiant de l'événement existant."},
+        "motif": {"type": "string"}
+      },
+      "required": ["id", "motif"],
+      "additionalProperties": false
+    }
+  }
+]

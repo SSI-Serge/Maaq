@@ -1,0 +1,4 @@
+.env
+resultats/
+__pycache__/
+.venv/
