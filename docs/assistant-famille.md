@@ -90,9 +90,10 @@ Onglet **Calendrier** ajouté à la barre de navigation (l'onglet Agents reste a
 | `/calendrier/jour/[date]` | Vue Jour | Rendez-vous rangés par période (matin, midi, après-midi, soir) |
 | `/calendrier/rdv/[id]` | Détail et confirmation | Conflit en phrase, créneaux alternatifs, confirmer / modifier / écarter / annuler, messages de succès des US-75 à US-80 |
 | `/assistant/reglages` | Réglages de l'Assistant | Délais de rappel par type de RDV (six types, J-7 / J-1 / Jour J), lien vers les membres |
+| `/assistant/rappels` | Activer mes rappels | Autorisation des notifications sur cet appareil (US-94) |
 | `/assistant/membres` | Membres de la famille | Liste avec badges et couleurs, ajouter / modifier / retirer / effacer définitivement, section repliée « Membres retirés » (lien depuis l'accueil de l'Assistant) |
 
-Pas encore d'écran : activation des rappels sur téléphone (lot 3b), notifications aux autres profils, adresse de transfert des mails.
+Pas encore d'écran : notifications aux autres profils, adresse de transfert des mails.
 
 Données de démonstration pour voir les écrans en local (foyer de Camille, Léo et Mia, 13 rendez-vous dont un conflit, un écarté et une journée chargée) :
 ```
@@ -117,6 +118,18 @@ Les échéances ne sont pas enregistrées, elles sont recalculées à chaque pas
 - les RDV ignorés sont supprimés 30 jours après (US-77 RT1).
 Réglages par type (`family_reminder_settings`, sans ligne : tout actif) : `GET` et `PATCH /api/family/reminder-settings`, page `/assistant/reglages` ; lecture seule pour les invités secondaires prévue par la US-82, mais l'Assistant reste réservé aux deux parents. Le détail d'un RDV confirmé affiche l'état de chaque rappel (Envoyé, Prévu, Non applicable, Désactivé) et celui d'un RDV provisoire la dernière relance.
 Tests : `tests/family-reminders.test.ts` (29). Migration `0010`. Pour un vrai envoi il faut `MESSAGING_MODE=smtp` ; le déploiement de test envoie dans la boîte de test.
+
+## Étape 3b : notifications web et badge (US-94, US-81 RF6, US-84) — vérifié en local, pas sur iPhone
+Les rappels et relances partent d'abord **par notification** sur chaque appareil autorisé du parent ; **par email** s'il n'en a aucun ou si la notification n'est pas partie ; le rappel J-1 est toujours doublé par un email (AF-3). Si seul l'email de J-1 échoue après une notification réussie, la notification n'est pas rejouée.
+- **Clés VAPID** : `npx web-push generate-vapid-keys`, puis `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` (Secret Manager en ligne) et `VAPID_SUBJECT` (`.env.example`). Sans clés, tout reste par email. Une paire de développement est dans le `.env` local, non suivi par Git.
+- **Appareils** : table `push_subscriptions` (migration `0011`), rattachée à `devices` ; supprimée à la déconnexion, au changement de mot de passe (autres appareils) et à la révocation d'un appareil. Routes `GET/POST/DELETE /api/push/subscription` et `POST /api/push/test` (notification de test, bouton de l'écran d'activation).
+- **Envoi** (`src/server/push/service.ts`, bibliothèque `web-push`) : seules les adresses des services Apple, Google, Mozilla et Microsoft sont acceptées (le serveur appelle l'adresse fournie par l'appareil : liste blanche contre le SSRF). 404 et 410 : abonnement supprimé ; 429, 5xx, réseau : un nouvel essai, sans désinscrire ; 400, 401, 403 : pas de nouvel essai (configuration). Le lieu d'un RDV médical ne figure jamais dans une notification.
+- **Service worker** (`public/sw.js`) : reçoit la notification, l'affiche, met à jour le badge (`setAppBadge`) avec le nombre de confirmations en attente porté par chaque notification, et ouvre l'écran concerné au toucher.
+- **Écran** `/assistant/rappels` (maquette `RDV-Activer-Rappels`) : s'ouvre à la première visite de l'Assistant sur un appareil qui peut recevoir des notifications, puis un bandeau de l'accueil prend le relais ; « Activer mes rappels » déclenche la demande d'autorisation, jamais avant l'appui. Variantes : iPhone sans installation (« Installer MAAQ d'abord »), iOS avant 16.4, refus, déjà activé (avec notification de test), navigateur sans notifications, serveur sans clés. Lien aussi dans les réglages de l'Assistant.
+- **Badge** : `useBadgeSync` (dans `AppShell`) le met à jour à l'ouverture, au retour au premier plan et après une confirmation, un écart ou une annulation ; uniquement sur un appareil qui gère le badge et où les notifications sont autorisées.
+Tests : `tests/push.test.ts` (15, envoi simulé), `tests/push-state.test.ts` (8, détection des cas iPhone / Android).
+**À vérifier sur un vrai téléphone, en HTTPS** (ce que le navigateur de développement ne permet pas) : l'abonnement réel, la réception, le toucher qui ouvre le bon écran (y compris après le verrouillage de l'application, AF-3), le badge sur iPhone (iOS 16.4 et plus, application installée).
+**Tuile du tableau de bord** (US-84 RF6) : l'Assistant n'étant pas un agent du catalogue, sa tuile est fixe, en tête du dashboard, réservée aux deux parents, avec le nombre de confirmations en attente (`FamilyTile`). Solution provisoire : si l'Assistant devient un agent du catalogue (US-106, plateforme Foundry), la tuile passera par les cartes d'agents.
 
 ## Réglages
 Voir `.env.example`. Tout est facultatif tant que `ASSISTANT_MODE=off`.

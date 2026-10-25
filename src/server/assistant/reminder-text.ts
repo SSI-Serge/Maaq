@@ -43,9 +43,24 @@ const placeLine = (event: NotifiedEvent) => (event.place && event.type !== "medi
 
 const SIGNATURE = "\n\nL'équipe MAAQ";
 
+/** « Demain 17h00 — RDV médical — Léo » (US-81 RF4). */
+export function reminderHeadline(event: NotifiedEvent, timeZone: string, now: Date): string {
+  return `${when(event, timeZone, now)} ${timeOf(event, timeZone)} — ${event.title}`;
+}
+
+/** « À confirmer : RDV médical — Léo, mardi 17h00 » (US-83 RF3). */
+export function nudgeHeadline(event: NotifiedEvent, timeZone: string, now: Date): string {
+  return `À confirmer : ${event.title}, ${weekdayOf(event, timeZone, now)} ${timeOf(event, timeZone)}`;
+}
+
+/** Texte d'une notification : même contenu que l'email, lieu des RDV médicaux exclu (D31). */
+export function reminderPushBody(event: NotifiedEvent, timeZone: string, now: Date): string {
+  return `${reminderHeadline(event, timeZone, now)}${event.place && event.type !== "medical" ? `\n${event.place}` : ""}`;
+}
+
 export function reminderEmail(params: { firstName: string; to: string; event: NotifiedEvent; timeZone: string; now: Date; appUrl: string }): OutgoingEmail {
   const { event, timeZone, now } = params;
-  const headline = `${when(event, timeZone, now)} ${timeOf(event, timeZone)} — ${event.title}`;
+  const headline = reminderHeadline(event, timeZone, now);
   return {
     to: params.to,
     subject: headline,
@@ -59,7 +74,7 @@ export function reminderEmail(params: { firstName: string; to: string; event: No
 
 export function nudgeEmail(params: { firstName: string; to: string; event: NotifiedEvent; timeZone: string; now: Date; appUrl: string }): OutgoingEmail {
   const { event, timeZone, now } = params;
-  const headline = `À confirmer : ${event.title}, ${weekdayOf(event, timeZone, now)} ${timeOf(event, timeZone)}`;
+  const headline = nudgeHeadline(event, timeZone, now);
   return {
     to: params.to,
     subject: headline,

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useApiMutation, useApiQuery } from "@/client/hooks";
+import { usePush } from "@/client/push";
 import { AppShell, Section } from "@/components/app/AppShell";
 import { Loading, Notice, RetryNotice } from "@/components/ui";
 import type { EventType } from "@/server/assistant/calendar";
@@ -30,6 +31,7 @@ const KINDS: { kind: ReminderKind; label: string }[] = [
  */
 export function SettingsScreen() {
   const query = useApiQuery<{ settings: Setting[]; canEdit: boolean }>("/api/family/reminder-settings");
+  const { state: push } = usePush();
   const mutation = useApiMutation();
   // Valeurs confirmées par le serveur depuis le chargement : elles remplacent celles de la liste chargée.
   const [confirmed, setConfirmed] = useState<Partial<Record<EventType, Setting>>>({});
@@ -99,6 +101,16 @@ export function SettingsScreen() {
             </div>
           );
         })}
+      </Section>
+
+      <Section title="Notifications">
+        <Link href="/assistant/rappels" className={styles.linkRow}>
+          <span>
+            Activer mes rappels
+            <span className={styles.linkRowSub}>{push === "enabled" ? "✓ Activés sur cet appareil" : "Recevoir les rappels par notification sur ce téléphone"}</span>
+          </span>
+          <span aria-hidden>›</span>
+        </Link>
       </Section>
 
       <Section title="Famille">

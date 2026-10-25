@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
+import { useBadgeSync } from "@/client/badge";
 import { useSessionUser } from "@/components/auth/AuthGate";
 import styles from "./app.module.css";
 
@@ -83,6 +84,7 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const user = useSessionUser();
+  useBadgeSync();
   const isCore = user.role === "primary_user" || user.guestRank === "core";
   const tabs = TABS.filter((tab) => (!tab.primaryOnly || user.role === "primary_user") && (!tab.coreOnly || isCore));
 

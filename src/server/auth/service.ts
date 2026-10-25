@@ -604,6 +604,10 @@ export async function completePasswordReset(
       .where("revoked_at", "is", null);
     if (input.deviceId) revoke = revoke.where("device_id", "<>", input.deviceId);
     await revoke.execute();
+    // Les appareils déconnectés ne reçoivent plus de notifications (US-94 RF9).
+    let unsubscribe = trx.deleteFrom("push_subscriptions").where("device_id", "in", trx.selectFrom("devices").select("id").where("user_id", "=", input.userId));
+    if (input.deviceId) unsubscribe = unsubscribe.where("device_id", "<>", input.deviceId);
+    await unsubscribe.execute();
     await logSecurityEvent(trx, { userId: input.userId, type: "password_changed", deviceId: input.deviceId, now: ctx.now });
     return updated;
   });
@@ -628,6 +632,8 @@ export async function logout(ctx: Ctx, session: SessionContext): Promise<void> {
       .where("id", "=", session.sessionId)
       .where("revoked_at", "is", null)
       .execute();
+    // Cet appareil n'est plus inscrit aux notifications (US-94 RF9).
+    await trx.deleteFrom("push_subscriptions").where("device_id", "=", session.device.id).execute();
     if (session.user.role === "admin") return null; // pas de tchat pour l'administrateur
     return trx
       .insertInto("chat_erasure_requests")

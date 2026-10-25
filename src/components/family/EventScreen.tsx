@@ -9,6 +9,7 @@ import { useSessionUser } from "@/components/auth/AuthGate";
 import { Button, Loading, Notice, RetryNotice } from "@/components/ui";
 import type { ConflictView, EventView, MemberChip } from "@/server/assistant/events";
 import { conflictSentence, EventForm } from "./EventForm";
+import { pendingChanged } from "@/client/badge";
 import { clock, dayOf, longDate, reminderState, shortDate, stamp, TYPE_LABEL, whenLabel } from "./format";
 import { MemberChips, StatusChip } from "./parts";
 import styles from "./family.module.css";
@@ -117,6 +118,7 @@ export function EventScreen({ id }: { id: string }) {
     });
     if (!result) return;
     setKept(false);
+    pendingChanged(); // le badge de l'icône suit le nombre de confirmations en attente (US-84 RF2)
     if (action === "cancel") {
       setDone("canceled");
       setMode("view");

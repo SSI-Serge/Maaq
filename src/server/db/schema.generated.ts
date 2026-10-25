@@ -822,6 +822,22 @@ export interface ProfileAgents {
   user_id: string;
 }
 
+/**
+ * Abonnement aux notifications web d'un appareil. Les clés servent à chiffrer chaque notification pour cet appareil seul. [US-94 RT2]
+ */
+export interface PushSubscriptions {
+  auth: string;
+  created_at: Generated<Timestamp>;
+  device_id: string;
+  /**
+   * Adresse du service de notification du navigateur ; une adresse devenue invalide (404, 410) entraîne la suppression de l'abonnement [US-81 RT4]
+   */
+  endpoint: string;
+  id: Generated<string>;
+  p256dh: string;
+  updated_at: Generated<Timestamp>;
+}
+
 export interface SchemaMigrations {
   applied_at: Generated<Timestamp>;
   name: string;
@@ -1039,6 +1055,7 @@ export interface DB {
   platform_setting_changes: PlatformSettingChanges;
   platform_settings: PlatformSettings;
   profile_agents: ProfileAgents;
+  push_subscriptions: PushSubscriptions;
   schema_migrations: SchemaMigrations;
   security_events: SecurityEvents;
   sessions: Sessions;

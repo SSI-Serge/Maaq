@@ -806,3 +806,21 @@
 .switch[aria-checked="true"]::before {
   content: "✓ ";
 }
+
+/* ---- Activation des rappels ---- */
+.reminderText {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--ink-soft);
+}
+.banner {
+  display: block;
+  padding: 12px 14px;
+  border: 1px solid var(--secondary);
+  border-radius: var(--radius);
+  background: var(--secondary-soft);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--secondary-strong);
+}

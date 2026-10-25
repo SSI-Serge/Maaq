@@ -6,6 +6,7 @@ import { useApiQuery } from "@/client/hooks";
 import { AgentCard, type DashboardAgent } from "@/components/app/AgentCard";
 import { AppShell, Section, appStyles as s } from "@/components/app/AppShell";
 import { useSessionUser } from "@/components/auth/AuthGate";
+import { FamilyTile } from "@/components/family/FamilyTile";
 import { ButtonLink, RetryNotice } from "@/components/ui";
 
 type Tab = "pro" | "perso";
@@ -64,6 +65,8 @@ export default function DashboardPage() {
       }
     >
       {user.role === "primary_user" && <InviteSuggestion />}
+
+      <FamilyTile />
 
       <div className={s.segments} role="tablist">
         {(["pro", "perso"] as const).map((t) => (

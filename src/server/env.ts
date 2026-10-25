@@ -26,6 +26,14 @@ const schema = z.object({
   SMTP_PASSWORD: z.string().min(1).optional(),
   /** Expéditeur des emails, par exemple « MAAQ <ne-pas-repondre@maaq.fr> ». */
   MAIL_FROM: z.string().min(3).optional(),
+  /**
+   * Notifications web (rappels de l'Assistant Famille). Paire de clés VAPID : `npx web-push generate-vapid-keys`. Sans elle, les rappels partent
+   * par email seulement. La clé privée se range dans Secret Manager, jamais dans le dépôt.
+   */
+  VAPID_PUBLIC_KEY: z.string().min(1).optional(),
+  VAPID_PRIVATE_KEY: z.string().min(1).optional(),
+  /** Contact transmis au service de notification : « mailto:… » ou une adresse https. */
+  VAPID_SUBJECT: z.string().min(1).default("mailto:ne-pas-repondre@maaq.fr"),
   DRIVE_MODE: z.enum(["local"]).default("local"),
   CRON_SECRET: z.string().min(16, "au moins 16 caractères"),
   /** Secret de l'outil de facturation qui signale désabonnements et réabonnements (US-58 RT2). Sans lui, ce point d'entrée est fermé. */
@@ -48,6 +56,9 @@ const checked = schema.superRefine((value, ctx) => {
     for (const name of ["SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD", "MAIL_FROM"] as const) {
       if (!value[name]) ctx.addIssue({ code: "custom", path: [name], message: "obligatoire avec MESSAGING_MODE=smtp" });
     }
+  }
+  if (Boolean(value.VAPID_PUBLIC_KEY) !== Boolean(value.VAPID_PRIVATE_KEY)) {
+    ctx.addIssue({ code: "custom", path: ["VAPID_PRIVATE_KEY"], message: "la clé publique et la clé privée VAPID vont ensemble" });
   }
   if (value.ASSISTANT_MODE === "live") {
     const needed = value.ASSISTANT_PROVIDER === "foundry" ? (["FOUNDRY_RESOURCE", "FOUNDRY_API_KEY"] as const) : (["ANTHROPIC_API_KEY"] as const);

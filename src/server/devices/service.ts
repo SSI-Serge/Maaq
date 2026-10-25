@@ -142,6 +142,8 @@ export async function revokeDevice(ctx: Ctx, actor: RevokeActor, deviceId: strin
       .executeTakeFirst();
     if (!revoked) return null; // révoqué entre-temps (double envoi)
     await trx.updateTable("sessions").set({ revoked_at: ctx.now, revoked_reason: "device_revoked" }).where("device_id", "=", deviceId).where("revoked_at", "is", null).execute();
+    // L'appareil révoqué n'est plus inscrit aux notifications (US-94 RF9).
+    await trx.deleteFrom("push_subscriptions").where("device_id", "=", deviceId).execute();
     await trx
       .insertInto("security_events")
       .values({ user_id: target.user_id, actor_user_id: actor.userId, device_id: deviceId, event_type: "device_revoked", occurred_at: ctx.now, details: JSON.stringify({ device_type: target.device_type }) })

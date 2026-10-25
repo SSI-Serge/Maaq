@@ -7,7 +7,8 @@ import { Rejection } from "@/server/http";
 import { EVENT_TYPES, loadCalendarEvent, type CalendarEvent, type EventType } from "./calendar";
 import { requireParent } from "./family";
 import { localToUtc, utcToLocal } from "./local-time";
-import { nudgeEmail, reminderEmail, type NotifiedEvent, type NudgeKind, type ReminderKind } from "./reminder-text";
+import { nudgeEmail, nudgeHeadline, reminderEmail, reminderPushBody, type NotifiedEvent, type NudgeKind, type ReminderKind } from "./reminder-text";
+import { pushConfigured, sendPush, type PushPayload } from "@/server/push/service";
 
 /**
  * Rappels (US-81), délais par type (US-82) et relances (US-83), envoyés par email. Les échéances ne sont pas enregistrées : elles sont recalculées
@@ -235,17 +236,56 @@ async function claim(ctx: Ctx, accountId: string, eventId: string, kind: string,
   return Boolean(row);
 }
 
-async function deliver(ctx: Ctx, accountId: string, eventId: string, kind: ReminderKind | NudgeKind, recipients: Recipient[], build: (to: Recipient) => OutgoingEmail, totals: RemindersResult): Promise<void> {
+interface Message {
+  email: OutgoingEmail;
+  push: Omit<PushPayload, "badge" | "tag">;
+}
+
+/** Confirmations en attente d'un foyer : le nombre porté par chaque notification pour le badge de l'icône (US-84 RF1, RT2). */
+export async function pendingConfirmations(db: Db, accountId: string, now: Date): Promise<number> {
+  const row = await db
+    .selectFrom("family_events")
+    .select((eb) => eb.fn.countAll<string>().as("n"))
+    .where("account_id", "=", accountId)
+    .where("status", "=", "provisional")
+    .where("starts_at", ">", now)
+    .executeTakeFirstOrThrow();
+  return Number(row.n);
+}
+
+/**
+ * Envoie à chaque destinataire : par notification sur ses appareils autorisés, par email à défaut ou si la notification n'est pas partie (US-81 RF6,
+ * RF11). Le rappel J-1 est toujours doublé par un email (AF-3). Après un envoi réussi par notification, un email en échec ne fait pas rejouer la
+ * notification : la réservation est conservée.
+ */
+async function deliver(ctx: Ctx, accountId: string, eventId: string, kind: ReminderKind | NudgeKind, recipients: Recipient[], build: (to: Recipient) => Message, totals: RemindersResult): Promise<void> {
+  const badge = pushConfigured() ? await pendingConfirmations(ctx.db, accountId, ctx.now) : 0;
   for (const to of recipients) {
     if (!(await claim(ctx, accountId, eventId, kind, to.id))) continue;
+    const message = build(to);
+    let pushed = 0;
     try {
-      await messenger().sendEmail(build(to));
-      await ctx.db.updateTable("family_notifications").set({ status: "sent", sent_at: ctx.now }).where("event_id", "=", eventId).where("kind", "=", kind).where("recipient_user_id", "=", to.id).execute();
+      pushed = (await sendPush(ctx, to.id, { ...message.push, tag: `${kind}-${eventId}`, badge })).delivered;
+      const email = pushed === 0 || kind === "d1";
+      if (email) await messenger().sendEmail(message.email);
+      await ctx.db
+        .updateTable("family_notifications")
+        .set({ status: "sent", sent_at: ctx.now, channel: pushed > 0 && email ? "push+email" : pushed > 0 ? "push" : "email" })
+        .where("event_id", "=", eventId)
+        .where("kind", "=", kind)
+        .where("recipient_user_id", "=", to.id)
+        .execute();
       totals.sent += 1;
     } catch (error) {
-      // L'envoi n'a pas abouti : on libère la réservation, et le passage suivant réessaie tant que le rendez-vous n'a pas commencé (US-81 RF8).
-      await ctx.db.deleteFrom("family_notifications").where("event_id", "=", eventId).where("kind", "=", kind).where("recipient_user_id", "=", to.id).where("status", "=", "claimed").execute();
       console.error("Rappel non envoyé :", error);
+      if (pushed > 0) {
+        // La notification est partie : on garde l'envoi pour ne pas la rejouer ; seul l'email de J-1 manque.
+        await ctx.db.updateTable("family_notifications").set({ status: "sent", sent_at: ctx.now, channel: "push" }).where("event_id", "=", eventId).where("kind", "=", kind).where("recipient_user_id", "=", to.id).execute();
+        totals.sent += 1;
+        continue;
+      }
+      // Rien n'est parti : on libère la réservation, et le passage suivant réessaie tant que le rendez-vous n'a pas commencé (US-81 RF8).
+      await ctx.db.deleteFrom("family_notifications").where("event_id", "=", eventId).where("kind", "=", kind).where("recipient_user_id", "=", to.id).where("status", "=", "claimed").execute();
       totals.failed += 1;
     }
   }
@@ -319,7 +359,10 @@ export async function runReminders(ctx: Ctx, options: { accountId?: string } = {
     if (!kind) continue;
     const event = await notified(ctx.db, row.account_id, row.id);
     if (!event) continue;
-    await deliver(ctx, row.account_id, row.id, kind, recipients, (to) => reminderEmail({ firstName: to.firstName, to: to.email, event, timeZone, now: ctx.now, appUrl }), totals);
+    await deliver(ctx, row.account_id, row.id, kind, recipients, (to) => ({
+      email: reminderEmail({ firstName: to.firstName, to: to.email, event, timeZone, now: ctx.now, appUrl }),
+      push: { title: "Assistant Famille", body: reminderPushBody(event, timeZone, ctx.now), url: `/calendrier/rdv/${event.id}` },
+    }), totals);
   }
 
   // Relances : rendez-vous provisoires restés sans réponse (US-83).
@@ -344,7 +387,10 @@ export async function runReminders(ctx: Ctx, options: { accountId?: string } = {
     if (modified) continue;
     const event = await notified(ctx.db, row.account_id, row.id);
     if (!event) continue;
-    await deliver(ctx, row.account_id, row.id, latest.k, recipients, (to) => nudgeEmail({ firstName: to.firstName, to: to.email, event, timeZone, now: ctx.now, appUrl }), totals);
+    await deliver(ctx, row.account_id, row.id, latest.k, recipients, (to) => ({
+      email: nudgeEmail({ firstName: to.firstName, to: to.email, event, timeZone, now: ctx.now, appUrl }),
+      push: { title: "Assistant Famille", body: nudgeHeadline(event, timeZone, ctx.now), url: `/calendrier/rdv/${event.id}` },
+    }), totals);
   }
   return totals;
 }

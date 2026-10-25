@@ -1,7 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 import { useApiQuery } from "@/client/hooks";
+import { remindersSeen, usePush } from "@/client/push";
 import { AppShell, Section } from "@/components/app/AppShell";
 import { Loading, RetryNotice } from "@/components/ui";
 import type { EventView } from "@/server/assistant/events";
@@ -34,6 +37,15 @@ export function AssistantHome() {
   const pending = useApiQuery<{ events: EventView[] }>("/api/family/events/pending");
   const upcoming = useApiQuery<{ events: EventView[] }>("/api/assistant/upcoming");
   const waiting = pending.data?.events ?? [];
+  const router = useRouter();
+  const { state: push } = usePush();
+
+  // Première ouverture sur un appareil qui peut recevoir des notifications : l'écran d'activation s'ouvre (US-94 RF1). Il ne se représente pas
+  // ensuite ; un bandeau prend le relais tant que les rappels ne sont pas activés (RF6).
+  useEffect(() => {
+    if ((push === "ready" || push === "ios_install" || push === "ios_too_old") && !remindersSeen()) router.replace("/assistant/rappels");
+  }, [push, router]);
+  const reminderBanner = (push === "ready" || push === "ios_install") && remindersSeen();
 
   return (
     <AppShell title="Assistant Famille" subtitle="Vous transmettez l'information, l'assistant range le rendez-vous et vous demande de confirmer.">
@@ -41,6 +53,11 @@ export function AssistantHome() {
         + Nouvelle demande
       </Link>
 
+      {reminderBanner && (
+        <Link href="/assistant/rappels" className={styles.banner}>
+          Activez vos rappels pour être prévenu à temps ›
+        </Link>
+      )}
       <div style={{ display: "flex", gap: 16 }}>
         <Link href="/assistant/membres" className={styles.link}>
           Membres de la famille ›
