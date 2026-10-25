@@ -57,7 +57,7 @@ const loadEvents = (ctx: ToolContext, from: Date, to: Date) => loadCalendarEvent
 
 /** Alias des personnes d'un rendez-vous : tous les membres pour un rendez-vous « toute la famille ». */
 function aliases(ctx: ToolContext, e: CalendarEvent): string[] {
-  return e.allFamily ? ctx.pseudo.members.map((m) => Pseudonymizer.aliasOf(m)) : e.memberIds.map((m) => ctx.pseudo.aliasFor(m));
+  return e.allFamily ? ctx.pseudo.active.map((m) => Pseudonymizer.aliasOf(m)) : e.memberIds.map((m) => ctx.pseudo.aliasFor(m));
 }
 
 const concerns = (e: CalendarEvent, who: Set<string>) => e.allFamily || e.memberIds.some((m) => who.has(m));
@@ -136,7 +136,7 @@ type Tool = (input: Record<string, unknown>, ctx: ToolContext) => Promise<unknow
 const TOOLS: Record<string, Tool> = {
   async lister_membres(_input, ctx) {
     return {
-      membres: ctx.pseudo.members.map((m) => ({
+      membres: ctx.pseudo.active.map((m) => ({
         ref: Pseudonymizer.aliasOf(m),
         role: m.role === "child" ? "enfant" : "parent",
         // Un parent sans date de naissance est un adulte ; pour un enfant, la tranche reste inconnue.

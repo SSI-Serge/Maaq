@@ -1,20 +1,20 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { addChild, listFamilyMembers } from "@/server/assistant/family";
+import { addChild, familyOverview } from "@/server/assistant/family";
 import { requireProfile } from "@/server/auth/http";
 import { handler, parseBody } from "@/server/http";
 
 export const dynamic = "force-dynamic";
 
-/** Membres du foyer pour l'Assistant Famille : les parents et les enfants. Réservé aux deux parents (D33). */
+/** Membres du foyer pour l'Assistant Famille : les actifs, puis les retirés. Réservé aux deux parents (D33). */
 export const GET = handler(async () => {
   const { session, ctx } = await requireProfile({ passive: true });
-  return NextResponse.json({ members: await listFamilyMembers(ctx, session) });
+  return NextResponse.json(await familyOverview(ctx, session));
 });
 
-const schema = z.object({ firstName: z.string().max(100), birthDate: z.iso.date().nullable().optional() });
+const schema = z.object({ firstName: z.string().max(200), birthDate: z.iso.date().nullable().optional() });
 
-/** Ajoute un enfant au foyer (sans compte). */
+/** Ajoute un membre sans compte (US-92). */
 export const POST = handler(async (request: Request) => {
   const { session, ctx } = await requireProfile();
   const body = await parseBody(request, schema);

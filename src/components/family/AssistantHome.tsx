@@ -41,6 +41,10 @@ export function AssistantHome() {
         + Nouvelle demande
       </Link>
 
+      <Link href="/assistant/membres" className={styles.link}>
+        Membres de la famille ›
+      </Link>
+
       <Section
         title="Confirmations en attente"
         action={waiting.length > 0 ? <span className={styles.badge} aria-label={`${waiting.length} en attente`}>{waiting.length}</span> : undefined}

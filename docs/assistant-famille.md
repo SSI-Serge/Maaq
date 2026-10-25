@@ -65,7 +65,19 @@ les créneaux alternatifs, `allowConflict` pour passer outre) ; un provisoire es
 chaque changement (auteur, date) dans `family_event_history` ; titre, lieu et note chiffrés en base (migration `0008`) ; une couleur par membre.
 Reste à construire : l'expiration automatique des rendez-vous écartés ou jamais confirmés (avec les relances, étape rappels), les notifications aux autres profils.
 
-Code : `src/server/assistant/events.ts` (cycle de vie), `calendar.ts` (lecture, conflits), `fields.ts` (chiffrement) ; tests : `tests/family-events.test.ts`.
+### Membres de la famille (US-92, US-93)
+| Route | Rôle |
+|---|---|
+| `GET /api/family/members` | `{ members, removed, max }` : membres actifs (badge, couleur, nombre de RDV à venir) et membres retirés non effacés |
+| `POST /api/family/members` | Ajouter un membre sans compte (prénom, date de naissance facultative) |
+| `PATCH /api/family/members/[id]` | Modifier ; pour un membre relié à un profil, la date seule (le prénom suit le profil) |
+| `POST /api/family/members/[id]/remove` | Retirer : archivé (`archived_at`), ses RDV gardent son prénom, pas de restauration |
+| `POST /api/family/members/[id]/erase` | Effacer définitivement (D34) : RDV du seul membre supprimés, RDV partagés sous « Ancien membre », prénom et naissance effacés |
+
+Règles : prénom de 30 caractères au plus et unique parmi les membres actifs (casse et accents ignorés) ; 12 membres actifs au plus ; date de naissance non future ; couleur d'un membre retiré réattribuable ; un membre relié à un profil ne se retire ni ne s'efface ici ; un membre retiré n'est plus proposé pour un RDV (il peut rester sur ceux où il figure) ni reconnu par l'assistant, mais son alias reste traduit dans les textes existants. Migration `0009`.
+Non fait : choix du rôle « Parent / Autre » à l'ajout (à confirmer par le PM), lecture seule pour les invités secondaires (l'Assistant reste réservé aux deux parents), retrait automatique d'un membre à la suppression de son invité (US-20), effacement des images et mails liés (RT3 d'US-93 : ces contenus n'existent pas encore).
+
+Code : `src/server/assistant/events.ts` (cycle de vie), `calendar.ts` (lecture, conflits), `fields.ts` (chiffrement), `family.ts` (membres) ; tests : `tests/family-events.test.ts`, `tests/family-members.test.ts`.
 
 ## Étape 2, écrans (d'après les maquettes)
 Onglet **Calendrier** ajouté à la barre de navigation (l'onglet Agents reste actif sur `/assistant`). Composants dans `src/components/family/`.
@@ -77,8 +89,9 @@ Onglet **Calendrier** ajouté à la barre de navigation (l'onglet Agents reste a
 | `/calendrier` | Calendrier familial | Vue semaine ou mois, légende des membres (filtre), « Aujourd'hui », bornes 12 mois passés / 24 mois à venir |
 | `/calendrier/jour/[date]` | Vue Jour | Rendez-vous rangés par période (matin, midi, après-midi, soir) |
 | `/calendrier/rdv/[id]` | Détail et confirmation | Conflit en phrase, créneaux alternatifs, confirmer / modifier / écarter / annuler, messages de succès des US-75 à US-80 |
+| `/assistant/membres` | Membres de la famille | Liste avec badges et couleurs, ajouter / modifier / retirer / effacer définitivement, section repliée « Membres retirés » (lien depuis l'accueil de l'Assistant) |
 
-Pas encore d'écran : membres du foyer (US-92/93), rappels (étape 3), notifications aux autres profils.
+Pas encore d'écran : rappels (étape 3), notifications aux autres profils, réglages de l'Assistant (adresse de transfert, délais de rappel).
 
 Données de démonstration pour voir les écrans en local (foyer de Camille, Léo et Mia, 13 rendez-vous dont un conflit, un écarté et une journée chargée) :
 ```

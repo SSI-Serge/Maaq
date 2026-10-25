@@ -24,6 +24,8 @@ export interface MemberChip {
   firstName: string;
   role: "parent" | "child";
   color: string;
+  /** Membre retiré (US-93) : ses rendez-vous gardent son prénom, mais il n'est plus proposé. */
+  removed?: boolean;
 }
 
 export interface ConflictView {
@@ -109,8 +111,8 @@ function actionsFor(v: Viewer, e: CalendarEvent, now: Date): EventActions {
 }
 
 async function loadMembers(db: Kysely<DB>, accountId: string): Promise<Map<string, MemberChip>> {
-  const rows = await db.selectFrom("family_members").select(["id", "first_name", "role", "color", "alias_index"]).where("account_id", "=", accountId).orderBy("role").orderBy("alias_index").execute();
-  return new Map(rows.map((r) => [r.id, { id: r.id, firstName: r.first_name, role: r.role, color: r.color ?? FALLBACK_COLOR }]));
+  const rows = await db.selectFrom("family_members").select(["id", "first_name", "role", "color", "alias_index", "archived_at"]).where("account_id", "=", accountId).orderBy("role").orderBy("alias_index").execute();
+  return new Map(rows.map((r) => [r.id, { id: r.id, firstName: r.first_name, role: r.role, color: r.color ?? FALLBACK_COLOR, ...(r.archived_at ? { removed: true } : {}) }]));
 }
 export const FALLBACK_COLOR = "#6b7280";
 
@@ -121,7 +123,7 @@ async function firstNames(db: Kysely<DB>, userIds: (string | null)[]): Promise<M
 }
 
 function toView(v: Viewer, e: CalendarEvent, members: Map<string, MemberChip>, names: Map<string, string>, now: Date): EventView {
-  const chips = e.allFamily ? [...members.values()] : e.memberIds.map((id) => members.get(id)).filter((m): m is MemberChip => Boolean(m));
+  const chips = e.allFamily ? [...members.values()].filter((m) => !m.removed) : e.memberIds.map((id) => members.get(id)).filter((m): m is MemberChip => Boolean(m));
   return {
     id: e.id, title: e.title, type: e.type, status: e.status, start: utcToLocal(e.startsAt, v.timeZone), end: utcToLocal(e.endsAt, v.timeZone), allDay: e.allDay,
     place: e.place, notes: e.notes, allFamily: e.allFamily, members: chips, source: e.source, requestedBy: e.createdByUserId ? (names.get(e.createdByUserId) ?? null) : null,
@@ -369,6 +371,10 @@ export async function updateEvent(ctx: Ctx, session: SessionContext, id: string,
     if (e.status !== "provisional" && e.status !== "confirmed") throw e.status === "canceled" || e.status === "ignored" ? stale(e) : await already(trx, e);
     if (options.expectedVersion !== e.version) throw stale(e);
     if (isPast(e, ctx.now)) throw fail("event_past", "Ce rendez-vous est déjà passé.", 409);
+    // Un membre retiré n'est plus proposé (US-93 RF6) ; il peut rester sur un rendez-vous où il figure déjà.
+    if (!changes.allFamily && changes.memberIds.some((m) => members.get(m)?.removed && !e.memberIds.includes(m))) {
+      throw fail("invalid_members", "Un des membres choisis a été retiré de la famille.", 422);
+    }
     const next: CalendarEvent = { ...e, startsAt: checked.from, endsAt: checked.to, allFamily: changes.allFamily, memberIds: changes.allFamily ? [] : [...new Set(changes.memberIds)] };
     if (e.status === "confirmed") {
       const { views } = await conflictsOf(trx, v, next);

@@ -18,6 +18,10 @@ export interface PseudoMember {
   aliasIndex: number;
   /** AAAA-MM-JJ */
   birthDate: string | null;
+  /** Membre retiré : plus reconnu par l'assistant, mais son alias et son prénom restent traduits dans les textes existants (US-93 RF6). */
+  archived?: boolean;
+  /** Membre effacé définitivement : son prénom n'existe plus (D34). */
+  erased?: boolean;
 }
 
 const ROLE_LABEL: Record<MemberRole, string> = { parent: "Parent", child: "Enfant" };
@@ -65,12 +69,13 @@ export class Pseudonymizer {
 
   constructor(members: PseudoMember[]) {
     this.members = members;
-    for (const m of members) {
-      this.byAlias.set(Pseudonymizer.aliasOf(m), m);
-      const key = fold(m.firstName).trim();
+    for (const m of members) this.byAlias.set(Pseudonymizer.aliasOf(m), m);
+    // Les membres actifs d'abord : un prénom repris par un nouveau membre désigne le nouveau, pas l'ancien (US-93 RF8).
+    for (const m of [...members].sort((a, b) => Number(Boolean(a.archived)) - Number(Boolean(b.archived)))) {
+      const key = m.erased ? "" : fold(m.firstName).trim();
       if (!key) continue;
-      if (this.byKey.has(key)) this.warnings.push(`prénom ambigu : « ${m.firstName} »`);
-      else this.byKey.set(key, m);
+      if (!this.byKey.has(key)) this.byKey.set(key, m);
+      else if (!m.archived) this.warnings.push(`prénom ambigu : « ${m.firstName} »`);
     }
     const keys = [...this.byKey.keys()].sort((a, b) => b.length - a.length); // le plus long d'abord
     // Le trait d'union compte comme une lettre : « Jean-Pierre » ne se coupe pas, « Marie-Claire » n'est pas « Marie ».
@@ -109,9 +114,15 @@ export class Pseudonymizer {
     return value;
   }
 
-  /** Résout la référence d'un membre reçue d'un outil : seul un alias est accepté. */
+  /** Les membres que l'assistant connaît : ni retirés ni effacés. */
+  get active(): PseudoMember[] {
+    return this.members.filter((m) => !m.archived);
+  }
+
+  /** Résout la référence d'un membre reçue d'un outil : seul un alias est accepté, et seulement celui d'un membre actif. */
   resolve(ref: unknown): PseudoMember | null {
-    return this.byAlias.get(String(ref).trim()) ?? null;
+    const member = this.byAlias.get(String(ref).trim());
+    return member && !member.archived ? member : null;
   }
 
   aliasFor(memberId: string): string {

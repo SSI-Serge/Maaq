@@ -664,12 +664,20 @@ export interface FamilyMembers {
    * Numéro de l'alias « Parent N » / « Enfant N » donné au modèle à la place du prénom ; attribué à la création du membre, propre au compte et au rôle
    */
   alias_index: number;
+  /**
+   * Date de retrait : le membre n'est plus proposé ni reconnu par l'assistant, mais ses rendez-vous gardent son prénom. Définitif (pas de restauration). [US-93 RF6, RF8]
+   */
+  archived_at: Timestamp | null;
   birth_date: Timestamp | null;
   /**
    * Couleur du membre dans le calendrier (AF-5), au format #rrggbb
    */
   color: string | null;
   created_at: Generated<Timestamp>;
+  /**
+   * Date d'effacement définitif : prénom et date de naissance effacés, rendez-vous du seul membre supprimés, rendez-vous partagés conservés sous « Ancien membre ». [US-93 RF13, D34]
+   */
+  erased_at: Timestamp | null;
   first_name: string;
   id: Generated<string>;
   role: FamilyMemberRole;
