@@ -3,7 +3,7 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-10-27T17:46:09Z",
+  "updated": "2026-10-27T17:52:09Z",
   "deploys": [
     {
       "at": "2026-10-25T08:05:53Z",
@@ -1948,7 +1948,7 @@
           "env": "preview",
           "note": "Chaque mois, MAAQ pose aux parents des questions sur les échéances à prévoir (impôts, rentrée, entretien…), au plus 5 par semaine. Trois choix : « Oui, c'est fait ou prévu », « Non, à faire » (une tâche est créée) ou « Me le rappeler dans 1, 3 ou 6 mois ». Section « À anticiper » de l'accueil, questions du point de la semaine, réglages (catalogue activé ou non, situation de la famille).",
           "at": "2026-10-27T14:11:42Z",
-          "unsure": "Essayé dans un navigateur local le 27/10 (création et cochage d'une tâche, liste « À préparer » et confirmation avec la tâche, vue Jour, point de la semaine, question d'anticipation) ; jamais sur un téléphone. Le contenu du catalogue (7 échéances non médicales) est une proposition à relire par l'équipe produit. Le suivi dentaire est désactivé : le contenu médical attend la validation du référent santé. Les textes des questions (« Avez-vous prévu : … ? ») et des tâches (« À prévoir : … ») sont à relire."
+          "unsure": "Essayé dans un navigateur local le 27/10 (question d'anticipation et réponse « Non, à faire ») ; jamais sur un téléphone. Le contenu du catalogue (7 échéances non médicales) reste à relire par l'équipe produit. Le suivi dentaire est désactivé : le contenu médical attend la source, la date de revue et le « validé par » du référent santé."
         },
         {
           "id": "f16s10",
@@ -2048,6 +2048,14 @@
         {
           "at": "2026-10-27T17:46:09Z",
           "what": "Les suggestions d'adresses viennent de la Géoplateforme de l'État (data.geopf.fr), qui remplace l'ancienne API Adresse : gratuite, sans clé, adresses françaises."
+        },
+        {
+          "at": "2026-10-27T17:52:09Z",
+          "what": "Décisions du PO sur le lot 7 (D62) : titre « À prévoir : … » composé par MAAQ, avis mensuel direct sans registre, « Pas maintenant » gardé sur l'appareil : acceptés."
+        },
+        {
+          "at": "2026-10-27T17:52:09Z",
+          "what": "Consentement à la position (lot 8) : politique décidée par le DPO (texte de la US-107, journal 5 ans, position chiffrée 3 heures, pas d'adresse de domicile). Reste à obtenir l'accès TomTom."
         }
       ],
       "unsure": [
@@ -2055,8 +2063,7 @@
         "L'offre gratuite de TomTom (2 500 requêtes par jour) est à reconfirmer : la grille a changé le 1er juillet 2026.",
         "Les vacances scolaires de l'année suivante ne sont pas connues d'avance : l'alerte de septembre pour l'administrateur reste à faire.",
         "Le test d'un cas de rappel J-1 dépendait de l'heure d'exécution (fuseau d'essai) : corrigé, il tourne à toute heure.",
-        "Le point de la semaine fait appel à un modèle : coût et qualité du résumé à mesurer sur des semaines fictives avant le pilote.",
-        "Le mois et l'année de naissance manquants : le choix « Pas maintenant » reste sur l'appareil, pas côté serveur."
+        "Le point de la semaine fait appel à un modèle : coût et qualité du résumé à mesurer sur des semaines fictives avant le pilote."
       ],
       "activity": [
         {

@@ -274,7 +274,7 @@ Schéma : `0010_lot7_schema.sql`, copie exacte de `lot_7_2_schema.sql` de la ses
   pour la famille (l'autre reçoit « déjà traitée »). La question garde le libellé du catalogue avec le repère {membre} : jamais de prénom conservé.
 - **Écrans** : section « À anticiper » de l'accueil (parents), « Questions de la semaine » du point de la semaine, cartes « Indiquez le mois et l'année de naissance de Léo… » (« Pas maintenant » gardé sur l'appareil), et Réglages ▸ Anticipation (interrupteur du catalogue, questionnaire « Situation de la famille »).
 - **Pas fait / à savoir** : pas de type de notification mensuelle dans la base : l'avis est envoyé directement aux parents qui ont un appareil, sans registre ni email ; le texte de la tâche et de la question est composé par MAAQ à partir du libellé (« Avez-vous prévu : … ? » / « Pensez-vous à : … ? ») : à relire avec l'équipe produit ;
-  « Pas maintenant » n'est pas conservé côté serveur. **Écrans essayés dans un navigateur local le 27/10, jamais sur téléphone.**
+  « Pas maintenant » n'est pas conservé côté serveur. **Décisions du PO du 27/10/2026 (D62)** : le titre « À prévoir : [libellé] » composé par MAAQ est accepté (pas de colonne de titre dans le catalogue) ; l'avis mensuel envoyé directement aux appareils des parents, sans registre ni email, est accepté ; « Pas maintenant » mémorisé sur l'appareil seulement est accepté ; le contenu du catalogue d'amorçage reste à relire par l'équipe produit, et le suivi dentaire reste désactivé tant que le référent santé n'a pas donné sa source, sa date de revue et son « validé par ». **Écrans essayés dans un navigateur local le 27/10, jamais sur téléphone.**
 
 ## Lot 8 du MVP2 : trajets et « Sur place » (US-107, US-112) — en cours
 
@@ -289,7 +289,7 @@ Le schéma porte les règles : demande de recherche « Sur place » avec plafond
 **À faire, dans cet ordre**
 1. ~~Champ « Adresse »~~ (fait, voir ci-dessus).
 2. Consentement à la position par appareil (écran d'information, version du texte, retrait, journal) et dernière position (US-107 RF11, RF12).
-3. Interrupteur « Suivre mon trajet », estimations, notifications de 1 h 30 et de 15 minutes avant le départ, écran « Suivi du trajet » (US-107 RF4 à RF13). **Bloqué : service de trajets TomTom** (compte, clé et déclaration du sous-traitant par le DPO).
+3. Interrupteur « Suivre mon trajet », estimations, notifications de 1 h 30 et de 15 minutes avant le départ, écran « Suivi du trajet » (US-107 RF4 à RF13). **Bloqué : service de trajets TomTom** (compte, clé et déclaration du sous-traitant par le DPO). La politique de consentement à la position est décidée (D47, DPO) : texte de la US-107 RF11 validé par le DPO, journal du consentement gardé 5 ans, dernière position chiffrée et gardée 3 heures au plus, jamais d'adresse de domicile.
 4. « Sur place » : bouton, recherche en arrière-plan, message du tchat, section du détail, suggestion automatique (US-112). **Bloqué : même service TomTom** (recherche de lieux).
 5. Planificateur (recherches bloquées, purges, notifications), export et suppression des données de position (US-55/US-56, lot 9).
 
