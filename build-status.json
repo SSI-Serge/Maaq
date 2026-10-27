@@ -3,7 +3,7 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-10-27T10:43:33Z",
+  "updated": "2026-10-27T10:58:10Z",
   "deploys": [
     {
       "at": "2026-10-25T08:05:53Z",
@@ -148,6 +148,15 @@
       ],
       "what": "Lot 0 du calendrier intelligent sur https://test.maaq.fr : la base est recréée avec le schéma de référence. Pas la production.",
       "note": "Comptes remis depuis la sauvegarde ; rendez-vous, enfants et conversation de test perdus ; connexions des appareils à refaire."
+    },
+    {
+      "at": "2026-10-27T10:58:10Z",
+      "env": "preview",
+      "storyIds": [
+        "f17s2",
+        "f17s3"
+      ],
+      "what": "Lot 1 sur https://test.maaq.fr : plafond quotidien de demandes à l'assistant et journaux sans contenu. Pas la production."
     }
   ],
   "features": [
@@ -1948,23 +1957,27 @@
           "title": "Retrouver ses données dans une base alignée sur le schéma de conception (lot 0)",
           "state": "testing",
           "env": "preview",
-          "note": "Fait et en ligne sur la zone de test : la base suit le schéma de la session base de données (61 tables). Les rendez-vous, enfants et conversations de test sont perdus, comme décidé ; les comptes sont remis.",
+          "note": "Fait et en ligne sur la zone de test : la base suit le schéma de la session base de données (63 tables). Contrôle fait : aucune différence avec le schéma de référence. Rendez-vous, enfants et conversations de test perdus, comme décidé.",
           "unsure": "Pas encore essayé sur le téléphone après la recréation : il faut se reconnecter, recréer le schéma de déverrouillage et réactiver les notifications.",
           "at": "2026-10-27T10:43:33Z"
         },
         {
           "id": "f17s2",
           "title": "Plafonner le nombre de demandes de l'assistant par jour (lot 1)",
-          "state": "planning",
-          "env": null,
-          "note": "Borne la dépense avant les tâches, le point de la semaine et la recherche « Sur place »."
+          "state": "done",
+          "env": "preview",
+          "note": "Chaque demande compte une fois pour le profil ; un renvoi ne recompte pas ; au-delà de la limite du compte, la demande est refusée avant d'atteindre le modèle.",
+          "at": "2026-10-27T10:58:10Z",
+          "unsure": "Essayé par des tests automatiques seulement. La limite se règle dans la console, compte par compte."
         },
         {
           "id": "f17s3",
           "title": "Garder les journaux d'exploitation sans aucun contenu (lot 1)",
-          "state": "planning",
-          "env": null,
-          "note": "Y compris le journal des erreurs d'outil."
+          "state": "done",
+          "env": "preview",
+          "note": "Les journaux n'écrivent plus le texte des erreurs, seulement leur type, leur code et leur origine. Testé : un texte sensible placé dans une erreur n'apparaît jamais.",
+          "at": "2026-10-27T10:58:10Z",
+          "unsure": "Ne couvre que l'assistant, les routes, les rappels et les notifications ; les autres parties de l'application gardent leur journalisation."
         },
         {
           "id": "f17s4",
@@ -1992,6 +2005,21 @@
         "La base de test n'a pas de sauvegarde automatique : une sauvegarde manuelle précède chaque migration."
       ],
       "activity": [
+        {
+          "at": "2026-10-27T10:58:10Z",
+          "kind": "live",
+          "what": "Lot 1 en ligne sur la zone de test"
+        },
+        {
+          "at": "2026-10-27T10:58:10Z",
+          "kind": "ok",
+          "what": "Lot 1 construit : plafond quotidien de l'assistant et journaux sans contenu, 509 tests verts"
+        },
+        {
+          "at": "2026-10-27T10:55:38Z",
+          "kind": "ok",
+          "what": "Lot 1 construit : plafond quotidien de l'assistant et journaux sans contenu, 509 tests verts"
+        },
         {
           "at": "2026-10-27T10:43:33Z",
           "kind": "live",
