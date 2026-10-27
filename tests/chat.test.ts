@@ -273,7 +273,7 @@ describe("US-70 — plafond quotidien de demandes", () => {
     expect((await rejectionOf(send(primary.session, agent.id, "Deux"))).code).toBe("daily_cap_reached");
   });
 
-  it("RF5 : la journée suit le fuseau de l'appareil, le compteur repart le lendemain", async () => {
+  it("RF5 : la journée suit le fuseau de la famille, le compteur repart le lendemain", async () => {
     const instant = new Date("2026-10-02T22:30:00Z");
     expect(localDay(instant, "Europe/Paris")).toBe("2026-10-03");
     expect(localDay(instant, "America/New_York")).toBe("2026-10-02");
@@ -286,6 +286,19 @@ describe("US-70 — plafond quotidien de demandes", () => {
     expect((await rejectionOf(send(primary.session, agent.id, "Encore"))).code).toBe("daily_cap_reached");
     clock = new Date("2026-10-03T10:00:00Z");
     await send(primary.session, agent.id, "Demain");
+  });
+
+  it("RF5 : le fuseau de la famille l'emporte sur celui de l'appareil (décision du PO du 27/10/2026)", async () => {
+    const { primary } = await household();
+    await limitTo(primary.accountId, 1);
+    await db.updateTable("accounts").set({ family_timezone: "America/New_York" }).where("id", "=", primary.accountId!).execute();
+    const agent = await agentFor([primary.id]); // l'appareil de la session est à Paris
+    clock = new Date("2026-10-02T22:30:00Z"); // le 3 à Paris, le 2 à New York
+    await send(primary.session, agent.id, "Premier");
+    clock = new Date("2026-10-03T02:00:00Z"); // le 3 à 4 h à Paris, toujours le 2 à New York : même jour pour la famille
+    expect((await rejectionOf(send(primary.session, agent.id, "Deuxième"))).code).toBe("daily_cap_reached");
+    clock = new Date("2026-10-03T05:00:00Z"); // minuit passé à New York : nouveau jour
+    await send(primary.session, agent.id, "Troisième");
   });
 
   it("RF9 : valider ou refuser une action ne compte pas dans le plafond", async () => {

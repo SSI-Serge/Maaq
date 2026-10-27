@@ -3,7 +3,7 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-10-27T10:59:22Z",
+  "updated": "2026-10-27T11:17:15Z",
   "deploys": [
     {
       "at": "2026-10-25T08:05:53Z",
@@ -157,6 +157,15 @@
         "f17s3"
       ],
       "what": "Lot 1 sur https://test.maaq.fr : plafond quotidien de demandes à l'assistant et journaux sans contenu. Pas la production."
+    },
+    {
+      "at": "2026-10-27T11:17:15Z",
+      "env": "preview",
+      "storyIds": [
+        "f16s1"
+      ],
+      "what": "Lot 2 sur https://test.maaq.fr : l'autre parent est prévenu quand un RDV est ajouté. Seuls les RDV proposés à partir de maintenant sont notifiés. Pas la production.",
+      "note": "À essayer sur téléphone : autoriser les notifications sur deux profils (Camille et dkuete), faire proposer un RDV à l'assistant, le confirmer."
     }
   ],
   "features": [
@@ -1823,9 +1832,11 @@
         {
           "id": "f16s1",
           "title": "US-113 · Être prévenu quand l'autre parent ajoute un RDV au calendrier",
-          "state": "planning",
-          "env": null,
-          "note": "Lot 2. Décisions D57 à D59 prises ; 22 critères sur 24 testables dès cette livraison."
+          "state": "testing",
+          "env": "preview",
+          "note": "Lot 2 construit : l'autre parent est prévenu une seule fois par RDV, par notification seulement. Réglage « Être prévenu des RDV ajoutés » propre à chaque profil. 22 critères sur 24 couverts par des tests.",
+          "at": "2026-10-27T11:17:15Z",
+          "unsure": "Jamais essayé sur un vrai téléphone : réception, toucher sur la notification, report de nuit à 8 h. Le critère 7.2 attend l'enregistrement d'office (lot 3) et le 9.1 les séries (lot 4)."
         },
         {
           "id": "f16s2",
@@ -1932,6 +1943,10 @@
         {
           "at": "2026-10-27T12:00:00Z",
           "what": "Calendrier retenu : 3 à 3,5 semaines, recette en trois vagues, deux sessions en parallèle quand c'est possible (D60)."
+        },
+        {
+          "at": "2026-10-27T11:17:15Z",
+          "what": "La date de mise en service des notifications de RDV est réglée sur la zone de test au moment de la mise en ligne ; elle n'est pas encore modifiable dans la console."
         }
       ],
       "unsure": [
@@ -1940,6 +1955,16 @@
         "L'offre gratuite de TomTom (2 500 requêtes par jour) est à reconfirmer : la grille a changé le 1er juillet 2026."
       ],
       "activity": [
+        {
+          "at": "2026-10-27T11:17:15Z",
+          "kind": "live",
+          "what": "Lot 2 en ligne sur la zone de test ; mise en service des notifications de RDV à partir de maintenant"
+        },
+        {
+          "at": "2026-10-27T11:17:15Z",
+          "kind": "ok",
+          "what": "Lot 2 construit : notification de l'autre parent, réglage personnel, 19 tests dédiés, 528 tests verts"
+        },
         {
           "at": "2026-10-27T09:30:40Z",
           "kind": "work",
@@ -2010,6 +2035,10 @@
         {
           "at": "2026-10-27T10:59:22Z",
           "what": "Le plafond quotidien de l'assistant compte le jour dans le fuseau de la famille, comme les rappels et les heures de nuit (le tchat des agents Digitorn garde celui de l'appareil)."
+        },
+        {
+          "at": "2026-10-27T11:17:15Z",
+          "what": "Les deux plafonds quotidiens (assistant et tchat des agents Digitorn) comptent le jour dans le fuseau de la famille."
         }
       ],
       "unsure": [

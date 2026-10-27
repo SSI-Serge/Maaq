@@ -111,9 +111,15 @@ export function blockedMessage(agent: LoadedAgent): string | null {
   return agent.status === "blocked" ? (agent.maintenance_message ?? "Cet agent est temporairement indisponible.") : null;
 }
 
-/** Jour calendaire dans le fuseau de l'appareil (US-70 RF5, hypothèse H35). */
+/** Jour calendaire dans un fuseau donné : celui de la famille (US-70 RF5, décision du PO du 27/10/2026, AF-2). */
 export function localDay(now: Date, timeZone: string): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
+}
+
+/** Fuseau de la famille (AF-2) : le même pour le plafond du tchat des agents, celui de l'assistant, les rappels et les heures de nuit. */
+async function familyDay(ctx: Ctx, session: SessionContext): Promise<string> {
+  const account = await ctx.db.selectFrom("accounts").select("family_timezone").where("id", "=", session.user.accountId!).executeTakeFirstOrThrow();
+  return localDay(ctx.now, account.family_timezone);
 }
 
 async function dailyCap(ctx: Ctx, session: SessionContext): Promise<DailyCap> {
@@ -122,7 +128,7 @@ async function dailyCap(ctx: Ctx, session: SessionContext): Promise<DailyCap> {
     .selectFrom("daily_request_counters")
     .select("request_count")
     .where("user_id", "=", session.user.id)
-    .where("request_date", "=", sql<Date>`${localDay(ctx.now, session.device.timezone)}::date`)
+    .where("request_date", "=", sql<Date>`${await familyDay(ctx, session)}::date`)
     .executeTakeFirst();
   const used = counter?.request_count ?? 0;
   return { limit: account.daily_request_limit, used, remaining: Math.max(account.daily_request_limit - used, 0) };
@@ -330,7 +336,7 @@ export async function sendMessage(
   if (!text) throw new Rejection("empty_request", "Écrivez votre demande avant de l'envoyer.", 422);
   if (text.length > MAX_REQUEST_LENGTH) throw new Rejection("request_too_long", `Votre demande dépasse ${MAX_REQUEST_LENGTH} caractères.`, 422);
 
-  const day = localDay(ctx.now, session.device.timezone);
+  const day = await familyDay(ctx, session);
   const counted = await ctx.db
     .insertInto("chat_requests")
     .values({ user_id: session.user.id, request_id: input.requestId, agent_id: input.agentId, counted_date: day, created_at: ctx.now })
