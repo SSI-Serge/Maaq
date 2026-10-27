@@ -3,8 +3,16 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-10-27T18:19:38Z",
+  "updated": "2026-10-27T18:29:38Z",
   "deploys": [
+    {
+      "at": "2026-10-27T18:29:38Z",
+      "env": "preview",
+      "what": "Lot 8 sur la zone de test : champ Adresse, consentement à la position, suivi du trajet avec un faux service (durées inventées)",
+      "storyIds": [
+        "f16s11"
+      ]
+    },
     {
       "at": "2026-10-25T08:05:53Z",
       "env": "preview",
@@ -1963,10 +1971,10 @@
           "id": "f16s11",
           "title": "US-107 · Être prévenu des temps de trajet entre mes RDV",
           "state": "testing",
-          "env": null,
+          "env": "preview",
           "note": "Lot 8 : tout est fait avec un faux service de trajets (durées inventées) : alerte « RDV rapproché », champ « Adresse », consentement à la position, interrupteur « Suivre mon trajet », notifications 1 h 30 et 15 minutes avant le départ, écran « Suivi du trajet ». Reste à brancher TomTom et à l'essayer en vrai.",
           "unsure": "Jamais vu dans un navigateur ni sur un téléphone ; la lecture réelle de la position n'a jamais tourné. Aucune durée de trajet réelle : seul le faux service a été essayé, TomTom est écrit mais jamais interrogé (compte, clé et déclaration du sous-traitant par le DPO attendus). Sur iPhone, l'autorisation de la position peut être redemandée à chaque lancement. Textes écrits par MAAQ à relire : « commence après » de l'alerte, notification du second calcul quand le trafic s'alourdit. Export et suppression des données de position : lot 9.",
-          "at": "2026-10-27T17:32:11Z"
+          "at": "2026-10-27T18:29:38Z"
         },
         {
           "id": "f16s12",
@@ -2071,6 +2079,11 @@
         "Le suivi du trajet ne repose pour l'instant que sur un faux service : aucune durée réelle n'a été obtenue de TomTom."
       ],
       "activity": [
+        {
+          "at": "2026-10-27T18:29:38Z",
+          "kind": "live",
+          "what": "Zone de test : suivi du trajet ouvert avec le faux service (TRAVEL_MODE=fake)"
+        },
         {
           "at": "2026-10-27T18:19:38Z",
           "kind": "building",

@@ -294,6 +294,8 @@ Le schéma porte les règles : demande de recherche « Sur place » avec plafond
   - 32 tests (`tests/family-travel-notices.test.ts`) pour les critères 4.1 à 14.1 qui ne demandent pas un téléphone. **Écrans jamais vus dans un navigateur ni sur un téléphone ; la lecture réelle de la position (`navigator.geolocation`) n'a jamais tourné.**
   - **Écarts et choix à confirmer** : (1) la spécification dit que le premier calcul tombant « entre 21 h et 8 h » part la veille à 21 h ; pour un RDV du soir même (premier calcul à 22 h), reculer de plusieurs heures n'a pas de sens : seuls les premiers calculs avant 8 h reculent. (2) Les notifications de trajet ne concernent que les RDV confirmés. (3) « Écran ouvert » = un calcul de l'écran date de moins de 4 minutes.
 
+**Zone de test** : `TRAVEL_MODE=fake` depuis le 27/10/2026 (révision `maaq-test-00027`). Les durées de trajet y sont inventées d'après la distance. Pour fermer le suivi : `gcloud run services update maaq-test --region europe-west1 --project maaq-test --update-env-vars TRAVEL_MODE=off`.
+
 **À faire, dans cet ordre**
 1. ~~Champ « Adresse »~~ (fait, voir ci-dessus).
 2. ~~Consentement à la position~~ (fait, voir ci-dessus).
