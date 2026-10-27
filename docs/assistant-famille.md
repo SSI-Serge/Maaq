@@ -202,7 +202,7 @@ Migration copiée de la session « base de données » (`0006_lot4_schema.sql`).
 - **Calcul** : par jours locaux, donc un changement d'heure ne décale pas l'heure locale d'une séance. Chaque semaine (un ou plusieurs jours), toutes les deux semaines, chaque mois le même jour du mois
   (le 31 se replie sur le dernier jour) ou le même jour de la semaine (premier… dernier). Fin : date, nombre de séances tenues (vacances sautées exclues), ou sans fin.
 - **Agent** : l'outil `creer_evenement_provisoire` prend une `repetition` structurée (à la place du texte libre `recurrence`) ; les consignes lui font demander « Jusqu'à quand ? » si la fin manque.
-  **Non mesuré avec le vrai modèle** : il faut relancer le banc d'essai (`scripts/assistant-bench.ts`) et ajouter des cas de série avant le pilote.
+  **Mesuré avec le vrai modèle le 27/10/2026** (`scripts/assistant-bench.ts --jeu series --runs 2`, `claude-sonnet-5-5`) : les 10 cas de série (37 à 46) réussis aux deux passages.
 - **Confirmation** : « Confirmer le rendez-vous » confirme la série entière (toutes les séances ou aucune) ; les séances en conflit sont comptées et listées (« 3 séances sur 24 »), à garder explicitement. « Ignorer » ferme toute la série.
 - **Portée** (formulaire et annulation) : « Cette séance » (reste rattachée, mention « Modifiée »), « Cette séance et les suivantes » (la série est scindée, l'ancienne s'arrête la veille), « Toute la série »
   (les séances modifiées seules ne sont pas touchées). Un RDV provisoire peut devenir une série depuis le formulaire (CA 7.1).
@@ -237,7 +237,7 @@ Schéma : `0007_lot5_schema.sql`, copie exacte de `lot_5_2_schema.sql` de la ses
 - **Pas fait / à savoir** : notifications « [Prénom] vous a confié… » (US-96 RF4, RF6) et information des parents quand un membre est retiré (RF8) : le type de notification n'existe dans la base qu'au lot 6 ; notification d'annulation
   d'un RDV avec « tâches retirées » : aucun type de notification d'annulation n'existe, le message est affiché à l'annulation. Modifier ou retirer une tâche en l'écrivant à l'agent : impossible sans lui donner le titre des tâches (contraire à AT-4) ;
   seul l'ajout par le tchat est fait. La carte « Tâche proposée » n'est pas conservée par le serveur (la base n'a pas de tâche proposée sans RDV) : elle disparaît quand la conversation est rechargée. « Toutes » réécrit aussi les occurrences
-  déplacées une à une. **Non mesuré avec le vrai modèle** (nouveaux cas de tâches à ajouter au banc d'essai) ; **écrans essayés dans un navigateur local le 27/10 (tâches, « À préparer », vue Jour, point de la semaine, anticipation), jamais sur téléphone**.
+  déplacées une à une. **mesuré avec le vrai modèle le 27/10/2026** : les 14 cas de tâches (47 à 60) réussis aux deux passages, durée médiane 5,9 s, 95e centile 8,9 s ; **écrans essayés dans un navigateur local le 27/10 (tâches, « À préparer », vue Jour, point de la semaine, anticipation), jamais sur téléphone**.
 
 ## Lot 6 du MVP2 : rappels de tâches et point de la semaine (US-97, US-98, US-96 RF4/RF6)
 

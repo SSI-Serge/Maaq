@@ -130,7 +130,7 @@ Chaque ligne se coche « oui / non / à revoir ». Les cases « Sur téléphone 
 | Notification d'annulation « tâches retirées » | Le message s'affiche seulement à l'écran à l'annulation. | Idem. |
 | Semaine couverte par le point | **Tranché par le PO le 27/10** : le lundi-dimanche qui suit l'envoi (le point part le dimanche pour la semaine qui démarre). La US-98 RF7 et le CA 7.1 (« les 7 jours qui suivent ») sont à corriger par la session des user stories. | Fait côté code ; texte des US à aligner. |
 | Résumé du point | Jamais produit avec le vrai modèle ; modèle léger à choisir (`ASSISTANT_DIGEST_MODEL`) ; coût à mesurer. | Choisir le modèle après la lecture de F3. |
-| Banc d'essai de l'assistant | Non relancé avec le vrai modèle depuis les séries, tâches et point (coût d'environ 1 à 3 $ par passage, sur votre clé). | Autoriser un passage avant le pilote. |
+| Banc d'essai de l'assistant | **Fait le 27/10** pour les séries et les tâches : 48 passages sur 48 réussis (24 cas × 2), médiane 5,9 s, 95e centile 8,9 s. Le point de la semaine (résumé du modèle léger) n'a pas de cas dans le banc. Le jeu de base de 36 cas n'a pas été relancé depuis les changements des lots 4 à 6. | Décider si on relance le jeu de base avant le pilote. |
 | Alerte de septembre si les vacances de l'année suivante manquent | Non faite. | À planifier avant septembre 2027. |
 | Recette sur iPhone | Attend un utilisateur équipé que le responsable produit doit recruter. | Recruter. |
 
