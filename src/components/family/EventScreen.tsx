@@ -196,7 +196,12 @@ export function EventScreen({ id }: { id: string }) {
 
           {event.past && (provisional || setAside) && <Notice tone="warning">Ce rendez-vous est déjà passé.</Notice>}
           {event.past && event.status === "confirmed" && <Notice tone="info">Ce rendez-vous est passé : il n&apos;est plus modifiable.</Notice>}
-          {!event.past && event.status === "confirmed" && who && (
+          {!event.past && event.status === "confirmed" && event.statusChange?.auto && (
+            <Notice tone="info">
+              Confirmé par MAAQ (sans réponse) le {when}. Personne n&apos;a confirmé ni écarté ce RDV après deux relances. Vous pouvez encore le modifier ou l&apos;annuler.
+            </Notice>
+          )}
+          {!event.past && event.status === "confirmed" && who && !event.statusChange?.auto && (
             <Notice tone="success">
               Confirmé par {who} le {when}.
             </Notice>
@@ -315,6 +320,14 @@ export function EventScreen({ id }: { id: string }) {
               <Button block onClick={() => void act("confirm")} loading={busy && pendingLabel === "confirm"} disabled={busy || mustChoose}>
                 {busy && pendingLabel === "confirm" ? "Confirmation…" : setAside ? "Confirmer quand même" : "Confirmer le rendez-vous"}
               </Button>
+            )}
+            {/* Mention sous le bouton : le RDV sera-t-il ajouté sans réponse, ou jamais (AT-8, US-95 UX) */}
+            {provisional && event.can.confirm && event.autoConfirm && (
+              <span className={styles.source}>
+                {"at" in event.autoConfirm
+                  ? `Sans réponse de votre part, ce RDV sera ajouté à votre calendrier le ${shortDate(dayOf(event.autoConfirm.at))} à ${clock(event.autoConfirm.at)}.`
+                  : "Ce RDV ne sera jamais ajouté sans votre confirmation."}
+              </span>
             )}
             {(event.can.modify || event.can.setAside) && (
               <div className={styles.actionsRow}>

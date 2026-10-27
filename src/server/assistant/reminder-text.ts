@@ -63,6 +63,38 @@ export function eventToConfirmBody(event: NotifiedEvent, requester: string, time
   return `À confirmer — ${requester} a demandé : ${event.title}, ${weekdayOf(event, timeZone, now)} ${timeOf(event, timeZone)}`;
 }
 
+/** « jeudi 5 novembre à 18h00 » : jour entier et heure, pour un avis qui ne dit pas « demain » (AT-8). */
+function dayAndTime(event: NotifiedEvent, timeZone: string): string {
+  const day = new Intl.DateTimeFormat("fr-FR", { timeZone, weekday: "long", day: "numeric", month: "long" }).format(event.startsAt);
+  return event.allDay ? `${day}, toute la journée` : `${day} à ${timeOf(event, timeZone)}`;
+}
+
+/** « RDV ajouté automatiquement : titre, jeudi 5 novembre à 18h00 » : avis aux parents d'un enregistrement sans réponse (AT-8, US-113 RF7). */
+export function autoConfirmedHeadline(event: NotifiedEvent, timeZone: string): string {
+  return `RDV ajouté automatiquement : ${event.title}, ${dayAndTime(event, timeZone)}`;
+}
+
+/** « RDV ajouté au calendrier : titre, jeudi à 18h00 » : un invité secondaire concerné par un RDV enregistré d'office (US-113 RF10). */
+export function eventAddedAutoBody(event: NotifiedEvent, timeZone: string, now: Date): string {
+  return `RDV ajouté au calendrier : ${event.title}, ${weekdayOf(event, timeZone, now)} ${event.allDay ? "toute la journée" : `à ${timeOf(event, timeZone)}`}`;
+}
+
+/** Ajoutée à la seconde relance quand l'enregistrement sans réponse est en service pour ce RDV (AT-8). */
+export const AUTO_CONFIRM_WARNING = "Sans réponse de votre part, ce RDV sera ajouté à votre calendrier dans 24 h.";
+
+export function autoConfirmedEmail(params: { firstName: string; to: string; event: NotifiedEvent; timeZone: string; appUrl: string }): OutgoingEmail {
+  const headline = autoConfirmedHeadline(params.event, params.timeZone);
+  return {
+    to: params.to,
+    subject: headline,
+    text:
+      `Bonjour ${params.firstName},\n\n${headline}\n\n` +
+      `Personne n'a confirmé ni écarté ce RDV après deux relances. Vous pouvez encore le modifier ou l'annuler.\n` +
+      `Ouvrir le rendez-vous : ${params.appUrl}/calendrier/rdv/${params.event.id}` +
+      SIGNATURE,
+  };
+}
+
 /** Texte d'une notification : même contenu que l'email, lieu des RDV médicaux exclu (D31). */
 export function reminderPushBody(event: NotifiedEvent, timeZone: string, now: Date): string {
   return `${reminderHeadline(event, timeZone, now)}${event.place && event.type !== "medical" ? `\n${event.place}` : ""}`;
@@ -82,7 +114,7 @@ export function reminderEmail(params: { firstName: string; to: string; event: No
   };
 }
 
-export function nudgeEmail(params: { firstName: string; to: string; event: NotifiedEvent; timeZone: string; now: Date; appUrl: string }): OutgoingEmail {
+export function nudgeEmail(params: { firstName: string; to: string; event: NotifiedEvent; timeZone: string; now: Date; appUrl: string; autoConfirmWarning?: boolean }): OutgoingEmail {
   const { event, timeZone, now } = params;
   const headline = nudgeHeadline(event, timeZone, now);
   return {
@@ -91,6 +123,7 @@ export function nudgeEmail(params: { firstName: string; to: string; event: Notif
     text:
       `Bonjour ${params.firstName},\n\n${headline}\n\n` +
       `L'Assistant Famille a préparé ce rendez-vous : il attend votre confirmation pour entrer dans le calendrier.\n` +
+      (params.autoConfirmWarning ? `${AUTO_CONFIRM_WARNING}\n` : "") +
       `Confirmer le rendez-vous : ${params.appUrl}/calendrier/rdv/${event.id}` +
       SIGNATURE,
   };

@@ -6,6 +6,7 @@ import { EVENT_TYPES, MEDICAL_TITLE, STATUS_CODE, TYPE_CODE, eventTypeIds, findC
 import { seal, sealOptional } from "./fields";
 import { MEMBER_COLORS, isParent } from "./family";
 import { isLocalDateTime, localMs, localToUtc, utcToLocal } from "./local-time";
+import { env } from "@/server/env";
 import { notifyAfterConfirmation } from "./notices";
 import { cancelPendingNotices, reminderDetails, type NudgeView, type ReminderView } from "./reminders";
 
@@ -64,7 +65,10 @@ export interface EventView {
   version: number;
   past: boolean;
   /** Dernier changement de statut : « Confirmé par Julien le 24/10 à 9 h 12 ». */
-  statusChange: { byFirstName: string | null; at: string } | null;
+  /** `auto` : confirmé d'office, au nom de « MAAQ (sans réponse) » (AT-8). */
+  statusChange: { byFirstName: string | null; at: string; auto: boolean } | null;
+  /** Pour un RDV provisoire, quand l'enregistrement sans réponse est en service : l'échéance (heure locale), ou « jamais » (US-95, UX). */
+  autoConfirm: { at: string } | { never: true } | null;
   can: EventActions;
   /** Autres rendez-vous en conflit avec celui-ci (provisoires, confirmés ; écartés et annulés ne comptent pas). */
   conflicts: ConflictView[];
@@ -130,12 +134,19 @@ async function firstNames(db: Kysely<DB>, userIds: (string | null)[]): Promise<M
   return new Map((await db.selectFrom("users").select(["id", "first_name"]).where("id", "in", ids).execute()).map((u) => [u.id, u.first_name]));
 }
 
+/** Un RDV provisoire sera ajouté sans réponse à son échéance, sauf conflit ou autre exception (AT-8) ; sans échéance, il ne le sera jamais. */
+function autoConfirmOf(v: Viewer, e: CalendarEvent): EventView["autoConfirm"] {
+  if (env().AUTO_CONFIRM_MODE !== "on" || e.status !== "provisional") return null;
+  return e.autoConfirmAt ? { at: utcToLocal(e.autoConfirmAt, v.timeZone) } : { never: true };
+}
+
 function toView(v: Viewer, e: CalendarEvent, members: Map<string, MemberChip>, names: Map<string, string>, now: Date): EventView {
   const chips = e.allFamily ? [...members.values()].filter((m) => !m.removed) : e.memberIds.map((id) => members.get(id)).filter((m): m is MemberChip => Boolean(m));
   return {
     id: e.id, title: e.title, type: e.type, status: e.status, start: utcToLocal(e.startsAt, v.timeZone), end: utcToLocal(e.endsAt, v.timeZone), allDay: e.allDay,
     place: e.place, notes: e.notes, allFamily: e.allFamily, members: chips, source: e.source, requestedBy: e.createdByUserId ? (names.get(e.createdByUserId) ?? null) : null,
-    version: e.version, past: isPast(e, now), statusChange: { byFirstName: e.statusChangedByUserId ? (names.get(e.statusChangedByUserId) ?? null) : null, at: e.statusChangedAt.toISOString() },
+    version: e.version, past: isPast(e, now), statusChange: { byFirstName: e.statusChangedByUserId ? (names.get(e.statusChangedByUserId) ?? null) : null, at: e.statusChangedAt.toISOString(), auto: e.autoConfirmed },
+    autoConfirm: autoConfirmOf(v, e),
     can: actionsFor(v, e, now), conflicts: [], alternatives: [], reminders: [], nudge: null,
   };
 }
@@ -179,7 +190,8 @@ async function nearestSlots(db: Kysely<DB>, v: Viewer, e: CalendarEvent, now: Da
 async function withConflicts(db: Kysely<DB>, v: Viewer, view: EventView, e: CalendarEvent, now: Date): Promise<EventView> {
   if (e.status !== "provisional" && e.status !== "set_aside" && e.status !== "confirmed") return view;
   const { views } = await conflictsOf(db, v, e);
-  return { ...view, conflicts: views, alternatives: views.length && e.status !== "confirmed" ? await nearestSlots(db, v, e, now) : [] };
+  // Un RDV en conflit n'est jamais enregistré sans réponse : il reste à confirmer par une personne (AT-8).
+  return { ...view, conflicts: views, alternatives: views.length && e.status !== "confirmed" ? await nearestSlots(db, v, e, now) : [], autoConfirm: views.length && view.autoConfirm ? { never: true } : view.autoConfirm };
 }
 
 /** Les changements de statut sont écrits dans l'historique par la base ; les modifications, ici (US-75 RT4). */

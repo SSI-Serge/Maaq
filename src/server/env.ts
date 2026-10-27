@@ -43,6 +43,8 @@ const schema = z.object({
    * (tests) ou par Microsoft Foundry (pilote), et exécute lui-même les outils. Les clés se rangent dans Secret Manager.
    */
   ASSISTANT_MODE: z.enum(["off", "live"]).default("off"),
+  /** Enregistrement sans réponse (AT-8, D49) : livré éteint. « on » : un RDV provisoire sans réponse entre dans le calendrier au bout de 72 h. */
+  AUTO_CONFIRM_MODE: z.enum(["off", "on"]).default("off"),
   ASSISTANT_PROVIDER: z.enum(["anthropic", "foundry"]).default("anthropic"),
   ASSISTANT_MODEL: z.string().min(1).default("claude-sonnet-5-5"),
   ASSISTANT_EFFORT: z.enum(["low", "medium", "high"]).default("medium"),

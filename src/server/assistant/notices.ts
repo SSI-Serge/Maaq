@@ -1,11 +1,14 @@
-import { sql } from "kysely";
+import { sql, type Kysely } from "kysely";
+import { messenger } from "@/server/adapters/messaging";
 import type { Ctx, SessionContext } from "@/server/auth/service";
+import type { DB } from "@/server/db/schema.generated";
+import { env } from "@/server/env";
 import { Rejection } from "@/server/http";
 import { pushConfigured, sendPush } from "@/server/push/service";
 import { describeError } from "@/server/safe-log";
-import { loadCalendarEvent } from "./calendar";
+import { loadCalendarEvent, type EventType } from "./calendar";
 import { requireFamilyProfile } from "./family";
-import { eventAddedBody, eventToConfirmBody } from "./reminder-text";
+import { autoConfirmedEmail, autoConfirmedHeadline, eventAddedAutoBody, eventAddedBody, eventToConfirmBody } from "./reminder-text";
 import { familyTimeZone, pendingConfirmations } from "./reminders";
 
 /**
@@ -15,7 +18,8 @@ import { familyTimeZone, pendingConfirmations } from "./reminders";
  * jamais d'email (AF-3), le contenu est composé par MAAQ sans appel à l'agent (RT3).
  */
 
-const NOTICE_KINDS = ["event_added", "event_to_confirm"] as const;
+/** « Ajouté » et « à confirmer » (US-113), et l'avis aux parents d'un enregistrement sans réponse (AT-8, `auto_confirmed`). */
+const NOTICE_KINDS = ["event_added", "event_to_confirm", "auto_confirmed"] as const;
 /** Attente maximale de la tentative immédiate après une confirmation : au-delà, le planificateur prend le relais (RT1). */
 export const IMMEDIATE_WAIT_MS = 3000;
 
@@ -40,7 +44,7 @@ export async function runEventNotices(ctx: Ctx, options: { eventId?: string } = 
   const gone = await sql`
     update scheduled_notifications n set status = 'abandoned'
       from family_events e
-     where e.id = n.event_id and n.status = 'scheduled' and n.kind in ('event_added', 'event_to_confirm') and e.starts_at <= ${ctx.now}
+     where e.id = n.event_id and n.status = 'scheduled' and n.kind in ('event_added', 'event_to_confirm', 'auto_confirmed') and e.starts_at <= ${ctx.now}
        ${options.eventId ? sql`and n.event_id = ${options.eventId}::uuid` : sql``}`.execute(ctx.db);
   totals.abandoned = Number(gone.numAffectedRows ?? 0);
 
@@ -76,8 +80,14 @@ async function deliver(ctx: Ctx, id: string, totals: NoticesResult): Promise<voi
       const timeZone = await familyTimeZone(trx, meta.account_id);
       const notified = { id: event.id, title: event.title, type: event.type, place: event.place, startsAt: event.startsAt, allDay: event.allDay };
       const name = requester ?? "Un parent";
+      if (row.kind === "auto_confirmed") {
+        await deliverAutoConfirmed(ctx, trx, row, notified, timeZone, meta.account_id, totals);
+        return;
+      }
       // Le lieu n'est jamais repris : une notification s'affiche sur l'écran verrouillé (D31, RF8).
-      const body = row.kind === "event_to_confirm" ? eventToConfirmBody(notified, name, timeZone, ctx.now) : eventAddedBody(notified, name, timeZone, ctx.now);
+      // Un invité secondaire concerné par un RDV enregistré d'office reçoit un texte sans demandeur (RF10).
+      const auto = await trx.selectFrom("family_events").select("auto_confirmed").where("id", "=", row.event_id).executeTakeFirstOrThrow();
+      const body = row.kind === "event_to_confirm" ? eventToConfirmBody(notified, name, timeZone, ctx.now) : auto.auto_confirmed ? eventAddedAutoBody(notified, timeZone, ctx.now) : eventAddedBody(notified, name, timeZone, ctx.now);
       const badge = pushConfigured() ? await pendingConfirmations(trx, meta.account_id, ctx.now) : 0;
       const sent = await sendPush(ctx, row.recipient_user_id, { title: "Assistant Famille", body, url: `/calendrier/rdv/${event.id}`, tag: `notice-${event.id}`, badge });
       if (sent.delivered > 0) {
@@ -129,4 +139,49 @@ export async function setPersonalSettings(ctx: Ctx, session: SessionContext, inp
     .onConflict((oc) => oc.column("user_id").doUpdateSet({ notify_events_added: input.notifyEventsAdded }))
     .execute();
   return { notifyEventsAdded: input.notifyEventsAdded, audience: parent ? "parent" : "guest" };
+}
+
+/**
+ * Avis aux parents d'un RDV enregistré d'office, « RDV ajouté automatiquement » (AT-8, US-113 RF7) : par notification sur leurs appareils, par email à défaut
+ * (c'est le seul moyen de savoir que le RDV est entré dans le calendrier). La ligne est déjà verrouillée par l'appelant ; si rien ne part, elle reste en attente.
+ */
+async function deliverAutoConfirmed(
+  ctx: Ctx,
+  trx: Kysely<DB>,
+  row: { id: string; recipient_user_id: string; attempts: number },
+  event: { id: string; title: string; type: EventType; place: string | null; startsAt: Date; allDay: boolean },
+  timeZone: string,
+  accountId: string,
+  totals: NoticesResult,
+): Promise<void> {
+  const to = await trx.selectFrom("users").select(["first_name", "email"]).where("id", "=", row.recipient_user_id).executeTakeFirst();
+  const badge = pushConfigured() ? await pendingConfirmations(trx, accountId, ctx.now) : 0;
+  const pushed = (await sendPush(ctx, row.recipient_user_id, { title: "Assistant Famille", body: autoConfirmedHeadline(event, timeZone), url: `/calendrier/rdv/${event.id}`, tag: `auto-${event.id}`, badge })).delivered;
+  let emailed = false;
+  if (pushed === 0 && to?.email) {
+    await messenger().sendEmail(autoConfirmedEmail({ firstName: to.first_name, to: to.email, event, timeZone, appUrl: env().APP_URL.replace(/\/$/, "") }));
+    emailed = true;
+  }
+  if (pushed > 0 || emailed) {
+    await trx.updateTable("scheduled_notifications").set({ status: "sent", push_sent_at: pushed > 0 ? ctx.now : null, email_sent_at: emailed ? ctx.now : null, attempts: row.attempts + 1 }).where("id", "=", row.id).execute();
+    totals.sent += 1;
+  } else {
+    await trx.updateTable("scheduled_notifications").set({ attempts: row.attempts + 1, last_error: "aucun moyen de joindre le destinataire" }).where("id", "=", row.id).execute();
+    totals.failed += 1;
+  }
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------
+// Enregistrement sans réponse (AT-8, D49)
+// ---------------------------------------------------------------------------------------------------------------------------
+
+/**
+ * Confirme d'office, au nom de « MAAQ (sans réponse) », les RDV provisoires dont l'échéance est atteinte (`auto_confirm_family_events`) : 72 h après la proposition,
+ * ou 2 h avant le début ; jamais pour un RDV en conflit, sans membre précisé, écarté, issu d'un mail ou d'un partage, ni pour une série. Toléré 60 minutes après
+ * l'échéance. Livré éteint : sans `AUTO_CONFIRM_MODE=on`, rien n'est confirmé. Retourne le nombre de RDV confirmés.
+ */
+export async function runAutoConfirm(ctx: Ctx, options: { enabled?: boolean } = {}): Promise<number> {
+  if (!(options.enabled ?? env().AUTO_CONFIRM_MODE === "on")) return 0;
+  const done = await sql<{ n: number }>`select auto_confirm_family_events() as n`.execute(ctx.db);
+  return Number(done.rows[0]?.n ?? 0);
 }

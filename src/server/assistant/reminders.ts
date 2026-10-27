@@ -8,7 +8,7 @@ import { Rejection } from "@/server/http";
 import { EVENT_TYPES, TYPE_CODE, eventTypeIds, loadCalendarEvent, typeOfCode, type CalendarEvent, type EventType } from "./calendar";
 import { requireFamilyProfile, requireParent } from "./family";
 import { localToUtc, utcToLocal } from "./local-time";
-import { nudgeEmail, nudgeHeadline, reminderEmail, reminderPushBody, type NotifiedEvent, type NudgeKind, type ReminderKind } from "./reminder-text";
+import { AUTO_CONFIRM_WARNING, nudgeEmail, nudgeHeadline, reminderEmail, reminderPushBody, type NotifiedEvent, type NudgeKind, type ReminderKind } from "./reminder-text";
 import { pushConfigured, sendPush, type PushPayload } from "@/server/push/service";
 
 /**
@@ -393,7 +393,7 @@ export async function runReminders(ctx: Ctx, options: { accountId?: string } = {
   // Relances : rendez-vous provisoires restés sans réponse (US-83).
   const provisional = await ctx.db
     .selectFrom("family_events")
-    .select(["id", "account_id", "starts_at", "created_at"])
+    .select(["id", "account_id", "starts_at", "created_at", "auto_confirm_at"])
     .where("status", "=", "provisional")
     .where("starts_at", ">", ctx.now)
     .where("created_at", "<=", new Date(ctx.now.getTime() - NUDGE_HOURS.nudge24 * HOUR))
@@ -412,9 +412,11 @@ export async function runReminders(ctx: Ctx, options: { accountId?: string } = {
     if (modified) continue;
     const event = await notified(ctx.db, row.account_id, row.id);
     if (!event) continue;
+    // La seconde relance annonce l'enregistrement sans réponse quand il est en service pour ce RDV (AT-8).
+    const warn = latest.k === "nudge48" && env().AUTO_CONFIRM_MODE === "on" && row.auto_confirm_at !== null;
     await deliver(ctx, row.account_id, row.id, latest.k, latest.due, recipients, (to) => ({
-      email: nudgeEmail({ firstName: to.firstName, to: to.email, event, timeZone, now: ctx.now, appUrl }),
-      push: { title: "Assistant Famille", body: nudgeHeadline(event, timeZone, ctx.now), url: `/calendrier/rdv/${event.id}` },
+      email: nudgeEmail({ firstName: to.firstName, to: to.email, event, timeZone, now: ctx.now, appUrl, autoConfirmWarning: warn }),
+      push: { title: "Assistant Famille", body: `${nudgeHeadline(event, timeZone, ctx.now)}${warn ? `\n${AUTO_CONFIRM_WARNING}` : ""}`, url: `/calendrier/rdv/${event.id}` },
     }), totals);
   }
   return totals;

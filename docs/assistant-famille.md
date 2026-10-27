@@ -180,6 +180,19 @@ les envois (une ligne par RDV et par destinataire, jamais le demandeur ni celui 
 - Texte : « Camille a ajouté : titre, jeudi 18h00 » ; « À confirmer — Camille a demandé : titre, jeudi 18h00 ». Un RDV médical porte son titre générique, le lieu n'est jamais repris.
 - Reste pour les lots suivants : l'avis de l'enregistrement d'office (lot 3, CA 7.2) et les séries (lot 4, CA 9.1).
 
+## Lot 3 du MVP2 : enregistrement sans réponse (AT-8, D49) — livré éteint
+
+Migrations copiées de la session « base de données » (`0004_lot3_valeurs_enumerees.sql`, `0005_lot3_schema.sql`). La base calcule l'échéance (`auto_confirm_at` : le plus petit de
+proposition + 72 h et début − 2 h ; vide pour une série, une source hors tchat, un RDV écarté ou proposé moins de 2 h avant son début) et confirme (`auto_confirm_family_events`,
+tolérance de 60 minutes, jamais en cas de conflit ou de membre à préciser). `runAutoConfirm` (notices.ts) l'appelle à chaque passage de 5 minutes, **avant** les notifications.
+- **Interrupteur** : `AUTO_CONFIRM_MODE=off` par défaut ; `on` met l'enregistrement en service. Éteint, la mention sous le bouton de confirmation et l'avertissement de la seconde relance ne s'affichent pas,
+  et un RDV jamais confirmé passe à « Ignoré » à son début comme avant.
+- **Avis** : `auto_confirmed` aux deux parents et à la demandeuse (« RDV ajouté automatiquement : titre, jeudi 5 novembre à 18h00 »), par notification puis par email à défaut ; l'invitée secondaire concernée reçoit
+  « RDV ajouté au calendrier : … ». Le soir et la nuit, l'avis part à 8 h.
+- **Détail du RDV** : « Confirmé par MAAQ (sans réponse) le … » avec la phrase d'explication ; sous le bouton « Confirmer », « Sans réponse de votre part, ce RDV sera ajouté à votre calendrier le … » ou « Ce RDV ne sera jamais ajouté sans votre confirmation » (conflit compris).
+- **Seconde relance** : ajoute « Sans réponse de votre part, ce RDV sera ajouté à votre calendrier dans 24 h. » quand l'enregistrement est en service pour ce RDV.
+- Reste pour le lot 5 : les tâches proposées passent à « à faire » avec le RDV ; pour le lot 4 : une série jamais confirmée est fermée à sa première séance.
+
 ## Réglages
 Voir `.env.example`. Tout est facultatif tant que `ASSISTANT_MODE=off`.
 ```

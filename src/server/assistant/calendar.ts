@@ -43,6 +43,10 @@ export interface CalendarEvent {
   /** Qui a confirmé, écarté, ignoré ou annulé en dernier ; vide pour un changement du système. */
   statusChangedByUserId: string | null;
   updatedAt: Date;
+  /** Confirmé d'office, au nom de « MAAQ (sans réponse) » (AT-8). */
+  autoConfirmed: boolean;
+  /** Échéance d'enregistrement sans réponse d'un RDV provisoire ; vide = jamais (série, source hors tchat, proposé trop tard). */
+  autoConfirmAt: Date | null;
   memberIds: string[];
 }
 
@@ -77,7 +81,7 @@ function selectEvents(db: Kysely<DB>) {
     .innerJoin("event_types as t", "t.id", "e.event_type_id")
     .select([
       "e.id", "e.title", "t.code as type_code", "e.starts_at", "e.ends_at", "e.all_day", "e.location", "e.note", "e.status", "e.whole_family",
-      "e.version", "e.source", "e.requested_by_user_id", "e.status_changed_at", "e.updated_at", changedBy,
+      "e.version", "e.source", "e.requested_by_user_id", "e.status_changed_at", "e.updated_at", "e.auto_confirmed", "e.auto_confirm_at", changedBy,
     ]);
 }
 
@@ -107,7 +111,7 @@ async function hydrate(db: Kysely<DB>, rows: Row[]): Promise<CalendarEvent[]> {
     id: r.id, title: titleOf(r), type: fromCode(TYPE_CODE, r.type_code), startsAt: r.starts_at, endsAt: r.ends_at, allDay: r.all_day,
     place: openOptional(r.location), notes: openOptional(r.note), status: fromCode(STATUS_CODE, r.status), allFamily: r.whole_family, version: r.version,
     source: fromCode(SOURCE_CODE, r.source), createdByUserId: r.requested_by_user_id, statusChangedAt: r.status_changed_at,
-    statusChangedByUserId: r.changed_by_user_id, updatedAt: r.updated_at, memberIds: byEvent.get(r.id) ?? [],
+    statusChangedByUserId: r.changed_by_user_id, updatedAt: r.updated_at, autoConfirmed: r.auto_confirmed, autoConfirmAt: r.auto_confirm_at, memberIds: byEvent.get(r.id) ?? [],
   }));
 }
 

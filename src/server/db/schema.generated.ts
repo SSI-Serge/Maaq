@@ -99,7 +99,7 @@ export type MessageSender = "agent" | "profile";
 
 export type NotificationChannel = "none" | "push";
 
-export type NotificationKind = "event_added" | "event_to_confirm" | "follow_up_24h" | "follow_up_48h" | "reminder_d1" | "reminder_d7" | "reminder_day_of";
+export type NotificationKind = "auto_confirmed" | "event_added" | "event_to_confirm" | "follow_up_24h" | "follow_up_48h" | "reminder_d1" | "reminder_d7" | "reminder_day_of";
 
 export type NotificationStatus = "abandoned" | "cancelled" | "not_applicable" | "scheduled" | "sent";
 
@@ -699,6 +699,14 @@ export interface FamilyEventMembers {
 export interface FamilyEvents {
   account_id: string;
   all_day: Generated<boolean>;
+  /**
+   * Échéance d'enregistrement sans réponse : le plus petit de (proposition + 72 h) et (début - 2 h). NULL = jamais : RDV non provisoire, source hors tchat, séance de série, ou proposé moins de 2 h avant son début. Le délai court depuis la proposition même si le RDV est modifié
+   */
+  auto_confirm_at: Timestamp | null;
+  /**
+   * Confirmé d'office, au nom de « MAAQ (sans réponse) » : confirmed_by_user_id est alors vide, et l'historique porte le motif no_response. À distinguer d'une confirmation dont l'auteur a été supprimé
+   */
+  auto_confirmed: Generated<boolean>;
   confirmed_at: Timestamp | null;
   /**
    * Profil qui a confirmé le RDV ; vide si la confirmation est automatique (auto_confirmed) ou si le profil a été supprimé
