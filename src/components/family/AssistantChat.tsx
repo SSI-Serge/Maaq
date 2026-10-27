@@ -7,7 +7,9 @@ import { useApiQuery } from "@/client/hooks";
 import { MAX_DICTATION_SECONDS, useSpeechInput } from "@/client/speech";
 import { AppShell, appStyles } from "@/components/app/AppShell";
 import { Button, Loading, Notice, RetryNotice } from "@/components/ui";
-import type { AssistantMessageView } from "@/server/assistant/service";
+import type { AssistantMessageView, TaskDraftView } from "@/server/assistant/service";
+import type { TaskLists } from "@/server/assistant/tasks";
+import { EventProposalCard, TaskDraftCard } from "./ProposalCards";
 import styles from "./family.module.css";
 
 const MAX_LENGTH = 4000;
@@ -20,6 +22,8 @@ interface Entry {
   role: "user" | "assistant";
   text: string;
   events: AssistantMessageView["events"];
+  /** Tâches proposées par l'assistant : cartes à ajouter, perdues au rechargement (rien n'est enregistré, US-110 RF1). */
+  drafts?: TaskDraftView[];
   /** Demande envoyée sans réponse : on peut la renvoyer avec le même identifiant, sans doublon. */
   failedRequest?: string;
   /** Texte tapé ou dicté : la nouvelle tentative garde l'origine du message. */
@@ -33,6 +37,7 @@ interface Reply {
   reply: string;
   failed: boolean;
   events: { id: string; title: string; start: string; status: string }[];
+  taskDrafts?: TaskDraftView[];
 }
 
 /**
@@ -43,6 +48,8 @@ interface Reply {
 export function AssistantChat() {
   const history = useApiQuery<{ messages: AssistantMessageView[] }>("/api/assistant/messages");
   const [added, setAdded] = useState<Entry[]>([]);
+  // Personnes à qui assigner une tâche proposée, pour le bouton « Modifier » de sa carte.
+  const taskLists = useApiQuery<{ lists: TaskLists }>("/api/family/tasks");
   const [text, setText] = useState("");
   // Le texte vient d'une dictée que le parent a relue : l'assistant le sait, la voix n'est jamais envoyée.
   const [dictated, setDictated] = useState(false);
@@ -78,7 +85,7 @@ export function AssistantChat() {
         timeoutMs: REPLY_TIMEOUT_MS,
         onSlow: () => setSlow(true),
       });
-      setAdded((current) => [...current.filter((e) => e.failedRequest !== requestId), { key: `${requestId}:reply`, role: "assistant", text: reply.reply, events: reply.events }]);
+      setAdded((current) => [...current.filter((e) => e.failedRequest !== requestId), { key: `${requestId}:reply`, role: "assistant", text: reply.reply, events: reply.events, drafts: reply.taskDrafts }]);
     } catch (err) {
       const apiError = err instanceof ApiError ? err : new ApiError("server", String(err));
       setError(apiError);
@@ -126,10 +133,17 @@ export function AssistantChat() {
         {thread.map((entry) => (
           <div key={entry.key} className={`${styles.bubble} ${entry.role === "user" ? styles.bubbleUser : styles.bubbleAgent}`}>
             {entry.text}
-            {entry.events.map((e) => (
-              <Link key={e.id} href={`/calendrier/rdv/${e.id}`} className={styles.bubbleLink}>
-                Voir la proposition de RDV ›
-              </Link>
+            {entry.events.map((e) =>
+              e.status === "provisional" ? (
+                <EventProposalCard key={e.id} eventId={e.id} />
+              ) : (
+                <Link key={e.id} href={`/calendrier/rdv/${e.id}`} className={styles.bubbleLink}>
+                  Voir la proposition de RDV ›
+                </Link>
+              ),
+            )}
+            {entry.drafts?.map((d, i) => (
+              <TaskDraftCard key={`${d.title}:${d.due}:${i}`} draft={d} assignable={taskLists.data?.lists.assignable ?? []} />
             ))}
           </div>
         ))}

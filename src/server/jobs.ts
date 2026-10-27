@@ -2,6 +2,7 @@ import { sql } from "kysely";
 import type { Ctx } from "@/server/auth/service";
 import { runAutoConfirm, runEventNotices, type NoticesResult } from "@/server/assistant/notices";
 import { completeSeries } from "@/server/assistant/series";
+import { completeTaskSeries } from "@/server/assistant/task-series";
 import { runReminders, type RemindersResult } from "@/server/assistant/reminders";
 import { cleanupExports } from "@/server/compliance/exports";
 import { runLifecycle, type LifecycleResult } from "@/server/compliance/lifecycle";
@@ -40,6 +41,8 @@ export async function runDueJobs(ctx: Ctx, options: { force?: boolean } = {}): P
   // Ordre d'un passage de 5 minutes : notifications de RDV (la base les remet en accord avec l'état des RDV, les réserve, puis on les envoie), puis rappels et relances.
   // Séries de RDV : séances complétées vers l'avant, séries sans réponse fermées à leur première séance (US-109).
   await completeSeries(ctx.db, ctx.now).catch((error) => console.error(`Séries de RDV : ${describeError(error)}`));
+  // Tâches récurrentes : occurrences créées 8 semaines à l'avance, et occurrences des nouvelles séances pour les tâches qui suivent une série de RDV (US-110 RT2).
+  await completeTaskSeries(ctx.db, ctx.now).catch((error) => console.error(`Tâches récurrentes : ${describeError(error)}`));
   // Enregistrement sans réponse (AT-8) : éteint tant que AUTO_CONFIRM_MODE n'est pas « on ».
   await runAutoConfirm(ctx).catch((error) => console.error(`Enregistrement sans réponse : ${describeError(error)}`));
   const notices = await runEventNotices(ctx).catch((error) => {
@@ -69,7 +72,7 @@ export async function purgeExpired(ctx: Ctx): Promise<{ logbook: number; errorRe
   let database = 0;
   for (const job of [
     "purge_expired_conversation_messages", "purge_expired_family_events", "purge_expired_attachments", "purge_expired_inbound_emails", "purge_old_daily_counters",
-    "purge_admin_audit_log", "purge_expired_security_events",
+    "purge_admin_audit_log", "purge_expired_security_events", "purge_expired_family_tasks",
   ]) {
     const done = await sql<{ n: string | null }>`select ${sql.ref(job)}() as n`.execute(ctx.db);
     database += Number(done.rows[0]?.n ?? 0);

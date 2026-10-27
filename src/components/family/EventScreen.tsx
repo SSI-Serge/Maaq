@@ -12,6 +12,7 @@ import { conflictSentence, EventForm } from "./EventForm";
 import { pendingChanged } from "@/client/badge";
 import { clock, dayOf, longDate, reminderState, shortDate, stamp, TYPE_LABEL, whenLabel } from "./format";
 import { MemberChips, StatusChip } from "./parts";
+import { PrepareList } from "./PrepareList";
 import styles from "./family.module.css";
 
 type Action = "confirm" | "setAside" | "cancel";
@@ -50,6 +51,8 @@ export function EventScreen({ id }: { id: string }) {
   const [kept, setKept] = useState(false);
   /** Portée de l'annulation d'une séance de série (US-109 RF8). */
   const [cancelScope, setCancelScope] = useState<"this" | "following" | "all">("this");
+  /** Tâches de préparation retirées avec le RDV annulé : « 2 tâches de préparation ont été retirées » (US-95 RF10). */
+  const [retiredTasks, setRetiredTasks] = useState(0);
 
   const event = override ?? detail.data?.event;
 
@@ -93,10 +96,11 @@ export function EventScreen({ id }: { id: string }) {
   const provisional = event.status === "provisional";
   const setAside = event.status === "set_aside";
   const busy = mutation.pending;
+  const proposedTasks = event.tasks?.items.filter((t) => t.status === "proposed").length ?? 0;
   const shownStart = slot ? slot.start : event.start;
   const shownEnd = slot ? slot.end : event.end;
 
-  async function act(action: Action) {
+  async function act(action: Action, options: { withoutTasks?: boolean } = {}) {
     if (!event) return;
     setLastAction(action);
     setPendingLabel(action);
@@ -117,12 +121,13 @@ export function EventScreen({ id }: { id: string }) {
     }
     const result = await mutation.run<{ event: EventView } | { id: string; status: "canceled" }>(`/api/family/events/${event.id}/${PATH[action]}`, {
       method: "POST",
-      body: { version, ...(action === "confirm" && kept ? { allowConflict: true } : {}), ...(action === "cancel" && event.series ? { scope: cancelScope } : {}) },
+      body: { version, ...(action === "confirm" && kept ? { allowConflict: true } : {}), ...(action === "confirm" && options.withoutTasks ? { withoutTasks: true } : {}), ...(action === "cancel" && event.series ? { scope: cancelScope } : {}) },
     });
     if (!result) return;
     setKept(false);
     pendingChanged(); // le badge de l'icône suit le nombre de confirmations en attente (US-84 RF2)
     if (action === "cancel") {
+      setRetiredTasks((result as unknown as { event: { retiredTasks?: number } }).event.retiredTasks ?? 0);
       setDone("canceled");
       setMode("view");
       return;
@@ -135,7 +140,9 @@ export function EventScreen({ id }: { id: string }) {
     return (
       <AppShell title="Rendez-vous annulé" back={{ href: "/calendrier", label: "Calendrier" }}>
         <div className={styles.success}>
-          <div className={`${styles.alert} ${styles.alertSuccess}`}>Rendez-vous annulé. Il a été retiré du calendrier familial.</div>
+          <div className={`${styles.alert} ${styles.alertSuccess}`}>Rendez-vous annulé. Il a été retiré du calendrier familial.
+            {retiredTasks > 0 && ` ${retiredTasks} tâche${retiredTasks > 1 ? "s" : ""} de préparation ${retiredTasks > 1 ? "ont été retirées" : "a été retirée"}.`}
+          </div>
           <Link href="/calendrier" className={styles.link}>
             Retour au calendrier ›
           </Link>
@@ -326,6 +333,9 @@ export function EventScreen({ id }: { id: string }) {
             )}
           </div>
 
+          {/* Liste « À préparer » : se retire, se modifie, s'ajoute ici comme dans la carte du tchat (US-95 RF3, RF5) */}
+          {event.tasks && (event.tasks.items.length > 0 || event.tasks.editable) && <PrepareList event={event} onUpdated={setOverride} onStale={reload} disabled={busy} />}
+
           {mustChoose && event.can.confirm && <span className={styles.source}>Choisissez un horaire ci-dessus pour confirmer.</span>}
           {error && error.kind === "rejected" && code !== "conflict" && (
             <div className={styles.dialog} role="alert">
@@ -349,8 +359,13 @@ export function EventScreen({ id }: { id: string }) {
           <div className={styles.actions}>
             {event.can.confirm && (
               <Button block onClick={() => void act("confirm")} loading={busy && pendingLabel === "confirm"} disabled={busy || mustChoose}>
-                {busy && pendingLabel === "confirm" ? "Confirmation…" : setAside ? "Confirmer quand même" : "Confirmer le rendez-vous"}
+                {busy && pendingLabel === "confirm" ? "Confirmation…" : setAside ? "Confirmer quand même" : proposedTasks > 0 ? `Confirmer le RDV et ${proposedTasks} tâche${proposedTasks > 1 ? "s" : ""}` : "Confirmer le rendez-vous"}
               </Button>
+            )}
+            {event.can.confirm && proposedTasks > 0 && (
+              <button type="button" className={styles.link} onClick={() => void act("confirm", { withoutTasks: true })} disabled={busy || mustChoose}>
+                Confirmer sans les tâches
+              </button>
             )}
             {/* Mention sous le bouton : le RDV sera-t-il ajouté sans réponse, ou jamais (AT-8, US-95 UX) */}
             {provisional && event.can.confirm && event.autoConfirm && (

@@ -6,7 +6,7 @@ import type { DB } from "@/server/db/schema.generated";
 import { describeNow } from "./local-time";
 import type { AssistantModel, ContentBlock, ModelMessage, TextBlock, ToolResultBlock, ToolUseBlock } from "./model";
 import { Pseudonymizer, type PseudoMember } from "./pseudonymize";
-import { executeTool, expandEventRefs, type ToolContext } from "./tools";
+import { executeTool, expandEventRefs, type TaskDraft, type ToolContext } from "./tools";
 
 /**
  * Boucle de l'Assistant Famille (agent/INTEGRATION.md § 1 à 3) : MAAQ appelle le modèle, exécute lui-même les outils demandés et boucle
@@ -74,6 +74,8 @@ export interface AgentRunResult {
   status: AgentStatus;
   createdEventIds: string[];
   proposalIds: string[];
+  /** Tâches seules proposées : cartes du tchat, rien n'est enregistré. */
+  taskDrafts: TaskDraft[];
   toolCalls: { name: string; ms: number; isError: boolean }[];
   /** Appels d'outils détaillés (paramètres retraduits, résultat tel que vu par le modèle) : pour le banc d'essai, jamais journalisés. */
   trace: { name: string; input: unknown; output: string; isError: boolean }[];
@@ -136,11 +138,11 @@ export async function runAssistant(input: AgentRunInput): Promise<AgentRunResult
   const started = Date.now();
   const toolContext: ToolContext = {
     db: input.db, accountId: input.accountId, userId: input.userId, authorMemberId: input.authorMemberId, timeZone: input.timeZone, now: input.now, requestId: input.requestId,
-    source: input.source, sourceMessageId: input.sourceMessageId, pseudo, created: { ids: [] }, proposals: [],
+    source: input.source, sourceMessageId: input.sourceMessageId, pseudo, created: { ids: [] }, proposals: [], taskDrafts: [],
   };
   const messages: ModelMessage[] = buildMessages(input, pseudo);
   const result: AgentRunResult = {
-    reply: FAILURE_REPLY, status: "error", createdEventIds: [], proposalIds: [], toolCalls: [], trace: [],
+    reply: FAILURE_REPLY, status: "error", createdEventIds: [], proposalIds: [], taskDrafts: [], toolCalls: [], trace: [],
     usage: { inputTokens: 0, outputTokens: 0, cacheRead: 0, cacheWrite: 0 }, turns: 0, durationMs: 0, requestIds: [], leaks: [], unknownAliases: [],
   };
 
@@ -201,6 +203,7 @@ export async function runAssistant(input: AgentRunInput): Promise<AgentRunResult
 
   result.createdEventIds = toolContext.created.ids;
   result.proposalIds = toolContext.proposals;
+  result.taskDrafts = toolContext.taskDrafts ?? [];
   result.durationMs = Date.now() - started;
   // Contrôle : rien d'identifiant ne doit être parti chez le modèle (instructions et messages ; les octets d'image ne comptent pas).
   result.leaks = pseudo.leaks([input.definition.instructions, ...strings(messages.filter((m) => m.role === "user"))].join("\n"));

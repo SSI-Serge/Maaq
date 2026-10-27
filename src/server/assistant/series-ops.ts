@@ -1,8 +1,11 @@
+import { randomBytes } from "node:crypto";
 import { sql } from "kysely";
 import { Rejection } from "@/server/http";
 import { TYPE_CODE, eventTypeIds, type CalendarEvent, type EventType } from "./calendar";
 import { seal, sealOptional } from "./fields";
 import { localDay, utcToLocal } from "./local-time";
+import { copyTemplates, proposedTasksToTemplates } from "./event-tasks";
+import { materializeEventSeriesTasks } from "./task-series";
 import { addDays, holidaysOf, horizonDay, isoWeekday, loadSeries, materialize, ruleLabel, ruleOf, type Db, type SeriesRule } from "./series";
 
 /**
@@ -203,6 +206,8 @@ export async function rewriteSeries(db: Db, e: CalendarEvent, edit: SeriesEdit, 
   const members = edit.allFamily ? [] : [...new Set(edit.memberIds)];
   const until = await horizonDay(db, now, series.series_timezone);
   const created = await materialize(db, fresh, members, until, now);
+  // Les séances recréées reçoivent les tâches de la série (US-95 RF12).
+  await materializeEventSeriesTasks(db, series.id, now);
   const wanted = e.occurrenceDate!;
   const same = created.length ? await db.selectFrom("family_events").select(["id", sql<string>`occurrence_date::text`.as("d")]).where("id", "in", created).orderBy("occurrence_date").execute() : [];
   return (same.find((r) => r.d >= wanted) ?? same[0])?.id ?? e.id;
@@ -236,9 +241,12 @@ export async function splitSeries(db: Db, e: CalendarEvent, edit: SeriesEdit, no
     .returning("id")
     .executeTakeFirstOrThrow();
   await replaceMembers(db, row.id, e.accountId, edit.memberIds, edit.allFamily);
+  // La nouvelle série garde les tâches de l'ancienne (US-95 RF12).
+  await copyTemplates(db, old.id, row.id, !confirmed);
   const fresh = (await loadSeries(db, e.accountId, row.id))!;
   const until = await horizonDay(db, now, old.series_timezone);
   const created = await materialize(db, fresh, edit.allFamily ? [] : [...new Set(edit.memberIds)], until, now);
+  await materializeEventSeriesTasks(db, row.id, now);
   if (!created.length) throw fail("empty_series", "La règle de répétition ne produit aucune séance.", 422);
   const first = await db.selectFrom("family_events").select("id").where("id", "in", created).orderBy("occurrence_date").limit(1).executeTakeFirstOrThrow();
   return first.id;
@@ -252,11 +260,15 @@ export async function transformToSeries(db: Db, e: CalendarEvent, edit: SeriesEd
   const source = (await db.selectFrom("family_events").select(["source", "source_message_id"]).where("id", "=", e.id).executeTakeFirstOrThrow());
   const reverse = { chat_text: "typed", voice: "dictation", photo: "capture", forwarded_email: "mail" } as const;
   try {
+    // La première séance a le même créneau que le RDV d'origine : l'empreinte anti-doublon de ce dernier est libérée avant de créer les séances.
+    await db.updateTable("family_events").set({ fingerprint: randomBytes(16) }).where("id", "=", e.id).execute();
     const result = await createSeries(db, {
       accountId: e.accountId, userId, type: edit.type, title: edit.title, place: edit.place, notes: edit.notes, startTime, durationMinutes: duration, allDay: edit.allDay, allFamily: edit.allFamily,
       memberIds: edit.memberIds, firstDate, rule: ruleFromRepetition(edit.repetition, firstDate), timeZone, source: reverse[source.source as keyof typeof reverse] ?? "typed",
       sourceMessageId: source.source_message_id === null ? null : Number(source.source_message_id), now,
     });
+    // Les tâches proposées du RDV deviennent les modèles de la série, avant que le RDV d'origine soit remplacé par ses séances.
+    await proposedTasksToTemplates(db, e, result.seriesId, timeZone);
     await db.deleteFrom("family_events").where("id", "=", e.id).execute();
     return result.eventIds[0];
   } catch (error) {

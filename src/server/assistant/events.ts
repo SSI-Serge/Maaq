@@ -4,11 +4,14 @@ import type { DB } from "@/server/db/schema.generated";
 import { Rejection } from "@/server/http";
 import { EVENT_TYPES, MEDICAL_TITLE, STATUS_CODE, TYPE_CODE, eventTypeIds, findConflicts, fingerprintOf, loadCalendarEvent, loadCalendarEvents, type CalendarEvent, type EventSource, type EventStatus, type EventType } from "./calendar";
 import { seal, sealOptional } from "./fields";
-import { MEMBER_COLORS, isParent } from "./family";
+import { isParent } from "./family";
+import { loadMembers, type MemberChip } from "./member-chips";
 import { isLocalDateTime, localMs, localToUtc, utcToLocal } from "./local-time";
 import { env } from "@/server/env";
 import { notifyAfterConfirmation } from "./notices";
 import { cancelPendingNotices, reminderDetails, type NudgeView, type ReminderView } from "./reminders";
+import { dropProposedTasks, loadEventTasks, type EventTasksView } from "./event-tasks";
+import { materializeEventSeriesTasks } from "./task-series";
 import { SCOPES, cancelSeries, conflictingSessions, confirmSeries, rewriteSeries, seriesView, splitSeries, transformToSeries, type RepetitionInput, type Scope, type SeriesEdit, type SeriesView } from "./series-ops";
 
 /**
@@ -23,15 +26,7 @@ export const MAX_EVENT_NOTES = 500;
 const DEFAULT_MINUTES = 60;
 const VISIBLE: EventStatus[] = ["provisional", "confirmed", "set_aside"];
 
-export interface MemberChip {
-  id: string;
-  firstName: string;
-  /** « autre » : un invité secondaire, que l'assistant ne connaît pas encore. */
-  role: "parent" | "child" | "other";
-  color: string;
-  /** Membre retiré (US-93) : ses rendez-vous gardent son prénom, mais il n'est plus proposé. */
-  removed?: boolean;
-}
+export { FALLBACK_COLOR, FORMER_MEMBER, loadMembers, type MemberChip } from "./member-chips";
 
 export interface ConflictView {
   id: string;
@@ -82,6 +77,8 @@ export interface EventView {
   reminders: ReminderView[];
   /** Dernière relance envoyée pour un rendez-vous provisoire (US-83 RF8). Rempli dans le détail seulement. */
   nudge: NudgeView | null;
+  /** Liste « À préparer » : tâches proposées, à faire et faites du rendez-vous (US-95). Remplie dans le détail seulement. */
+  tasks: EventTasksView | null;
 }
 
 interface Viewer {
@@ -124,14 +121,6 @@ function actionsFor(v: Viewer, e: CalendarEvent, now: Date): EventActions {
   };
 }
 
-async function loadMembers(db: Kysely<DB>, accountId: string): Promise<Map<string, MemberChip>> {
-  const rows = await db.selectFrom("family_members").select(["id", "first_name", "role", "color_index", "alias_number", "archived_at"]).where("account_id", "=", accountId).orderBy("role").orderBy("alias_number").execute();
-  return new Map(rows.map((r) => [r.id, { id: r.id, firstName: r.first_name ?? FORMER_MEMBER, role: r.role, color: MEMBER_COLORS[r.color_index % MEMBER_COLORS.length] ?? FALLBACK_COLOR, ...(r.archived_at ? { removed: true } : {}) }]));
-}
-export const FALLBACK_COLOR = "#6b7280";
-/** Prénom affiché d'un membre effacé définitivement : ses rendez-vous partagés le gardent sous ce nom (D34). */
-export const FORMER_MEMBER = "Ancien membre";
-
 async function firstNames(db: Kysely<DB>, userIds: (string | null)[]): Promise<Map<string, string>> {
   const ids = [...new Set(userIds.filter((x): x is string => Boolean(x)))];
   if (!ids.length) return new Map();
@@ -153,7 +142,7 @@ function toView(v: Viewer, e: CalendarEvent, members: Map<string, MemberChip>, n
     autoConfirm: autoConfirmOf(v, e),
     recurring: Boolean(e.seriesId),
     series: null,
-    can: actionsFor(v, e, now), conflicts: [], alternatives: [], reminders: [], nudge: null,
+    can: actionsFor(v, e, now), conflicts: [], alternatives: [], reminders: [], nudge: null, tasks: null,
   };
 }
 
@@ -254,7 +243,8 @@ export async function getEvent(ctx: Ctx, session: SessionContext, id: string): P
   const members = await loadMembers(ctx.db, v.accountId);
   const names = await firstNames(ctx.db, [e.createdByUserId, e.statusChangedByUserId]);
   const view = await withConflicts(ctx.db, v, toView(v, e, members, names, ctx.now), e, ctx.now);
-  return { ...view, series: await seriesView(ctx.db, e, v.timeZone), ...(await reminderDetails(ctx.db, v.accountId, e, v.timeZone, ctx.now)) };
+  const taskViewer = { accountId: v.accountId, userId: v.userId, parent: v.parent, memberId: v.memberId, timeZone: v.timeZone, today: utcToLocal(ctx.now, v.timeZone).slice(0, 10), nowLocal: utcToLocal(ctx.now, v.timeZone) };
+  return { ...view, series: await seriesView(ctx.db, e, v.timeZone), tasks: await loadEventTasks(ctx.db, taskViewer, e, ctx.now, members), ...(await reminderDetails(ctx.db, v.accountId, e, v.timeZone, ctx.now)) };
 }
 
 /** Confirmations en attente d'un profil (US-75 RF4, US-84) : provisoires qu'il peut traiter, à venir. Les écartés n'y figurent plus. */
@@ -305,6 +295,8 @@ export interface ChangeOptions {
   allowConflict?: boolean;
   /** Portée sur une série : « cette séance » (par défaut), « cette séance et les suivantes », « toute la série » (US-109 RF8). */
   scope?: Scope;
+  /** « Confirmer sans les tâches » : les tâches proposées avec le RDV sont abandonnées (US-95 RF4). */
+  withoutTasks?: boolean;
 }
 
 async function already(db: Kysely<DB>, e: CalendarEvent): Promise<Rejection> {
@@ -338,11 +330,16 @@ export async function confirmEvent(ctx: Ctx, session: SessionContext, id: string
       if ((views.length || clashes.length) && !options.allowConflict) {
         throw fail("conflict", "Une ou plusieurs séances chevauchent un autre rendez-vous.", 409, { conflicts: views, alternatives: [], sessions: clashes.map((c) => utcToLocal(c.startsAt, v.timeZone)) });
       }
+      if (options.withoutTasks) await dropProposedTasks(trx, e);
       await confirmSeries(trx, e, v.userId);
+      // Les modèles de tâche proposés avec la série deviennent des tâches récurrentes : une occurrence par séance (US-95 RF12).
+      await materializeEventSeriesTasks(trx, e.seriesId, ctx.now);
       await cancelPendingNotices(trx, id, ["follow_up_24h", "follow_up_48h"]);
       return;
     }
     if (views.length && !options.allowConflict) throw fail("conflict", "Ce créneau chevauche un autre rendez-vous.", 409, { conflicts: views, alternatives: await nearestSlots(trx, v, e, ctx.now) });
+    // Les tâches proposées passent à « à faire » avec le rendez-vous, dans la même transaction (la base s'en charge, D48) ; « sans les tâches », elles sont abandonnées d'abord.
+    if (options.withoutTasks) await dropProposedTasks(trx, e);
     await changeStatus(trx, e, "confirmed", v.userId);
     await cancelPendingNotices(trx, id, ["follow_up_24h", "follow_up_48h"]);
   });
@@ -372,10 +369,12 @@ export async function setAsideEvent(ctx: Ctx, session: SessionContext, id: strin
 }
 
 /** US-80 : annuler un rendez-vous confirmé. Il disparaît du calendrier et ne peut pas être rétabli. */
-export async function cancelEvent(ctx: Ctx, session: SessionContext, id: string, options: ChangeOptions = {}): Promise<{ id: string; status: "canceled" }> {
+export async function cancelEvent(ctx: Ctx, session: SessionContext, id: string, options: ChangeOptions = {}): Promise<{ id: string; status: "canceled"; retiredTasks: number }> {
   const v = await viewerOf(ctx, session);
+  let seriesId: string | null = null;
   await ctx.db.transaction().execute(async (trx) => {
     const e = await locked(trx, v, id);
+    seriesId = e.seriesId;
     if (e.status !== "confirmed") throw e.status === "canceled" || e.status === "ignored" ? stale(e) : fail("not_confirmed", "Seul un rendez-vous confirmé peut être annulé.", 409);
     if (options.expectedVersion !== undefined && options.expectedVersion !== e.version) throw stale(e);
     if (isPast(e, ctx.now)) throw fail("event_past", "Ce rendez-vous est déjà passé.", 409);
@@ -388,7 +387,12 @@ export async function cancelEvent(ctx: Ctx, session: SessionContext, id: string,
     await changeStatus(trx, e, "canceled", v.userId);
     await cancelPendingNotices(trx, id, ["reminder_d7", "reminder_d1", "reminder_day_of"]);
   });
-  return { id, status: "canceled" };
+  // Les tâches « à faire » du rendez-vous annulé sont annulées avec lui par la base : on les compte pour le dire (US-95 RF10).
+  const retired = await sql<{ n: string | null }>`
+    select coalesce(sum(family_event_retired_task_count(e.id)), 0) as n from family_events e
+     where e.account_id = ${v.accountId}::uuid and e.status in ('cancelled', 'dismissed')
+       and (e.id = ${id}::uuid or (${seriesId}::uuid is not null and e.series_id = ${seriesId}::uuid and e.status_changed_at > now() - interval '1 minute'))`.execute(ctx.db);
+  return { id, status: "canceled", retiredTasks: Number(retired.rows[0]?.n ?? 0) };
 }
 
 export interface EventChanges {

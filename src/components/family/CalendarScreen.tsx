@@ -6,6 +6,7 @@ import { useApiQuery } from "@/client/hooks";
 import { AppShell, appStyles as s } from "@/components/app/AppShell";
 import { Loading, RetryNotice } from "@/components/ui";
 import type { CalendarListItem, MemberChip } from "@/server/assistant/events";
+import type { TaskView } from "@/server/assistant/tasks";
 import {
   addDays, addMonths, dayOf, monthGrid, monthLabel, monthStart, shortDate, todayLocal, weekStart, weekdayShort,
 } from "./format";
@@ -37,6 +38,10 @@ export function CalendarScreen() {
 
   const members = useApiQuery<{ members: (MemberChip & { isYou: boolean })[] }>("/api/family/members");
   const events = useApiQuery<{ events: CalendarListItem[] }>(`/api/family/events?from=${range.from}&to=${range.to}`);
+  // Les vues Semaine et Mois indiquent le nombre de tâches du jour (AT-5).
+  const tasks = useApiQuery<{ tasks: TaskView[] }>(`/api/family/tasks?from=${range.from}&to=${range.to}`);
+  const taskCount = new Map<string, number>();
+  for (const t of tasks.data?.tasks ?? []) taskCount.set(t.due, (taskCount.get(t.due) ?? 0) + 1);
   // Le message « aucun rendez-vous » n'a de sens que si le foyer n'en a aucun à venir : la période affichée peut simplement être vide.
   const upcoming = useApiQuery<{ events: CalendarListItem[] }>("/api/assistant/upcoming");
 
@@ -93,9 +98,19 @@ export function CalendarScreen() {
         <button type="button" className={styles.todayButton} onClick={() => setAnchor(today)}>
           Aujourd&apos;hui
         </button>
-        <button type="button" className={styles.todayButton} onClick={events.reload}>
+        <button
+          type="button"
+          className={styles.todayButton}
+          onClick={() => {
+            events.reload();
+            tasks.reload();
+          }}
+        >
           Actualiser
         </button>
+        <Link href="/assistant/taches" className={styles.todayButton}>
+          Tâches ›
+        </Link>
       </div>
 
       {events.error && <RetryNotice message={events.error.message} onRetry={events.reload} />}
@@ -118,13 +133,18 @@ export function CalendarScreen() {
               <Link href={`/calendrier/jour/${day}`}>{shortDate(day)}</Link>
               {day === today && <span className={styles.tag}>Aujourd&apos;hui</span>}
             </div>
-            {list.length === 0 && <div className={styles.nothing}>Rien de prévu</div>}
+            {list.length === 0 && !taskCount.get(day) && <div className={styles.nothing}>Rien de prévu</div>}
             {list.slice(0, 3).map((e) => (
               <EventLine key={e.id} event={e} />
             ))}
             {list.length > 3 && (
               <Link href={`/calendrier/jour/${day}`} className={styles.more}>
                 + {list.length - 3} autre{list.length - 3 > 1 ? "s" : ""}
+              </Link>
+            )}
+            {(taskCount.get(day) ?? 0) > 0 && (
+              <Link href={`/calendrier/jour/${day}`} className={styles.more}>
+                {taskCount.get(day)} tâche{(taskCount.get(day) ?? 0) > 1 ? "s" : ""}
               </Link>
             )}
           </section>
@@ -146,12 +166,13 @@ export function CalendarScreen() {
                 key={day}
                 href={`/calendrier/jour/${day}`}
                 role="gridcell"
-                aria-label={`${shortDate(day)}, ${count} rendez-vous`}
+                aria-label={`${shortDate(day)}, ${count} rendez-vous${taskCount.get(day) ? `, ${taskCount.get(day)} tâche${(taskCount.get(day) ?? 0) > 1 ? "s" : ""}` : ""}`}
                 className={`${styles.cell} ${outside ? styles.cellOut : ""} ${day === today ? styles.cellToday : ""}`}
               >
                 {Number(day.slice(8, 10))}
                 {count > 0 && <span className={styles.count}>{count}</span>}
                 {count > 0 && <Dots members={byDay.get(day)![0].members.slice(0, 3)} />}
+                {(taskCount.get(day) ?? 0) > 0 && <span className={styles.hint}>{taskCount.get(day)} t.</span>}
               </Link>
             );
           })}

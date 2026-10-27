@@ -59,6 +59,12 @@ export function AssistantHome() {
         </Link>
       )}
       <div style={{ display: "flex", gap: 16 }}>
+        <Link href="/assistant/taches/nouvelle" className={styles.link}>
+          + Tâche
+        </Link>
+        <Link href="/assistant/taches" className={styles.link}>
+          Tâches ›
+        </Link>
         <Link href="/assistant/membres" className={styles.link}>
           Membres de la famille ›
         </Link>

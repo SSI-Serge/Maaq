@@ -133,6 +133,12 @@ export type SettingValueType = "email" | "integer" | "timestamp";
 
 export type SyncStatus = "failed" | "running" | "succeeded";
 
+export type TaskCancelReason = "event_cancelled" | "expired" | "series_ended" | "user";
+
+export type TaskSource = "agent" | "anticipation" | "user";
+
+export type TaskStatus = "cancelled" | "done" | "proposed" | "todo";
+
 export type Timestamp = ColumnType<Date, Date | string, Date | string>;
 
 export type UserRole = "admin" | "guest" | "primary_user";
@@ -902,6 +908,85 @@ export interface FamilySettings {
   updated_by_user_id: string | null;
 }
 
+export interface FamilyTasks {
+  account_id: string;
+  assigned_member_id: string | null;
+  /**
+   * user ; event_cancelled (RDV annulé ou ignoré) ; series_ended ; expired (jamais faite, annulée automatiquement 45 jours après l'échéance)
+   */
+  cancel_reason: TaskCancelReason | null;
+  created_at: Generated<Timestamp>;
+  created_by_user_id: string | null;
+  /**
+   * Échéance relative au RDV : nombre de jours avant. L'écart est conservé quand le RDV est déplacé (US-95 RF6)
+   */
+  days_before_event: number | null;
+  done_at: Timestamp | null;
+  /**
+   * Membre qui a coché la tâche (« Faite par [prénom] ») : le membre survit à la suppression d'un profil, avec son alias
+   */
+  done_by_member_id: string | null;
+  due_date: Timestamp;
+  due_time: string | null;
+  event_id: string | null;
+  id: Generated<string>;
+  note: Buffer | null;
+  occurrence_date: Timestamp | null;
+  series_id: string | null;
+  source: Generated<TaskSource>;
+  /**
+   * proposed = suggérée par l'agent, visible dans « À préparer » ; todo ; done (avec auteur et date) ; cancelled (motif obligatoire). « En retard » n'est pas un statut
+   */
+  status: Generated<TaskStatus>;
+  status_changed_at: Generated<Timestamp>;
+  status_changed_by_user_id: string | null;
+  /**
+   * Titre chiffré. Titre générique pour une tâche liée à un RDV médical (AT-4) ; transmis à l'agent uniquement sous forme de référence (D39)
+   */
+  title: Buffer;
+  updated_at: Generated<Timestamp>;
+  version: Generated<number>;
+}
+
+export interface FamilyTaskSeries {
+  account_id: string;
+  assigned_member_id: string | null;
+  created_at: Generated<Timestamp>;
+  created_by_user_id: string | null;
+  days_before_event: number | null;
+  due_time: string | null;
+  end_kind: Generated<SeriesEndKind>;
+  /**
+   * Série terminée ou annulée : plus d'occurrence créée, comptée hors des 50 tâches récurrentes actives
+   */
+  ended_at: Timestamp | null;
+  /**
+   * Mode « suit une série de RDV » : une occurrence par séance, échéance = date de la séance moins days_before_event. NULL = règle propre
+   */
+  event_series_id: string | null;
+  first_date: Timestamp | null;
+  id: Generated<string>;
+  materialized_until: Timestamp | null;
+  month_day: number | null;
+  month_mode: SeriesMonthMode | null;
+  month_nth: number | null;
+  month_weekday: number | null;
+  note: Buffer | null;
+  occurrence_count: number | null;
+  /**
+   * Modèle de tâche proposé avec une série de RDV provisoire : confirm_family_series le passe à faux, le planificateur l'ignore tant qu'il est proposé, l'abandon de la série le supprime (D48)
+   */
+  proposed: Generated<boolean>;
+  repeat_interval: Generated<number>;
+  repeat_unit: SeriesRepeatUnit | null;
+  source: Generated<TaskSource>;
+  title: Buffer;
+  until_date: Timestamp | null;
+  updated_at: Generated<Timestamp>;
+  version: Generated<number>;
+  weekdays: number[] | null;
+}
+
 export interface ForwardingAuthorizedSenders {
   account_id: string;
   added_by_user_id: string | null;
@@ -1286,6 +1371,32 @@ export interface VFamilyLogbook {
   occurred_at: Timestamp | null;
 }
 
+export interface VFamilyTasks {
+  account_id: string | null;
+  assigned_member_id: string | null;
+  cancel_reason: TaskCancelReason | null;
+  created_at: Timestamp | null;
+  created_by_user_id: string | null;
+  days_before_event: number | null;
+  done_at: Timestamp | null;
+  done_by_member_id: string | null;
+  due_date: Timestamp | null;
+  due_time: string | null;
+  event_id: string | null;
+  id: string | null;
+  is_overdue: boolean | null;
+  note: Buffer | null;
+  occurrence_date: Timestamp | null;
+  series_id: string | null;
+  source: TaskSource | null;
+  status: TaskStatus | null;
+  status_changed_at: Timestamp | null;
+  status_changed_by_user_id: string | null;
+  title: Buffer | null;
+  updated_at: Timestamp | null;
+  version: number | null;
+}
+
 export interface VGuestDisplayStatus {
   account_id: string | null;
   display_status: string | null;
@@ -1362,6 +1473,8 @@ export interface DB {
   family_members: FamilyMembers;
   family_reminder_settings: FamilyReminderSettings;
   family_settings: FamilySettings;
+  family_task_series: FamilyTaskSeries;
+  family_tasks: FamilyTasks;
   forwarding_authorized_senders: ForwardingAuthorizedSenders;
   forwarding_consent_events: ForwardingConsentEvents;
   forwarding_mailboxes: ForwardingMailboxes;
@@ -1389,6 +1502,7 @@ export interface DB {
   v_account_guest_quota: VAccountGuestQuota;
   v_dashboard_agents: VDashboardAgents;
   v_family_logbook: VFamilyLogbook;
+  v_family_tasks: VFamilyTasks;
   v_guest_display_status: VGuestDisplayStatus;
   v_info_prefill_suggestions: VInfoPrefillSuggestions;
   v_never_activated_purge_candidates: VNeverActivatedPurgeCandidates;

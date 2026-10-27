@@ -136,14 +136,16 @@ export async function loadSeries(db: Db, accountId: string, id: string, options:
   return (await query.executeTakeFirst()) as SeriesRow | undefined;
 }
 
-export function ruleOf(row: SeriesRow): SeriesRule {
+export type RuleColumns = Pick<SeriesRow, "repeat_unit" | "repeat_interval" | "weekdays" | "month_mode" | "month_day" | "month_nth" | "month_weekday" | "end_kind" | "until_date" | "occurrence_count"> & { skip_school_holidays?: boolean };
+
+export function ruleOf(row: RuleColumns): SeriesRule {
   return {
     unit: row.repeat_unit === "month" ? "month" : "week",
     interval: row.repeat_interval === 2 ? 2 : 1,
     ...(row.weekdays ? { weekdays: row.weekdays.map(Number) } : {}),
     ...(row.month_mode ? { monthMode: row.month_mode, monthDay: row.month_day ?? undefined, monthNth: row.month_nth ?? undefined, monthWeekday: row.month_weekday ?? undefined } : {}),
     end: row.end_kind === "date" ? { kind: "date", date: row.until_date! } : row.end_kind === "count" ? { kind: "count", count: row.occurrence_count! } : { kind: "never" },
-    skipSchoolHolidays: row.skip_school_holidays,
+    skipSchoolHolidays: row.skip_school_holidays ?? false,
   };
 }
 

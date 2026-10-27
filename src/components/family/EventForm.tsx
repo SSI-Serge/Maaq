@@ -298,7 +298,7 @@ export function EventForm({ event, members, onSaved, onCancel, onStale }: Props)
   );
 }
 
-function Field({ label, error, children }: { label: string; error?: string | null; children: React.ReactNode }) {
+export function Field({ label, error, children }: { label: string; error?: string | null; children: React.ReactNode }) {
   return (
     <div className={styles.field}>
       <span className={styles.label}>{label}</span>

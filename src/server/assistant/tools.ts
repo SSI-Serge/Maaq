@@ -3,7 +3,12 @@ import type { DB } from "@/server/db/schema.generated";
 import { SOURCE_CODE, TYPE_CODE, eventTypeIds, findConflicts, fingerprintOf, loadCalendarEvent, loadCalendarEvents, type CalendarEvent, type EventSource, type EventStatus, type EventType } from "./calendar";
 import { createSeries, SeriesError } from "./series";
 import { ruleFromRepetition, type RepetitionInput } from "./series-ops";
+import { insertEventTask, type WriteContext } from "./event-tasks";
 import { seal, sealOptional } from "./fields";
+import { loadMembers } from "./member-chips";
+import { familyTimeZone } from "./reminders";
+import { isDay, type TaskRepetition } from "./tasks";
+import { Rejection } from "@/server/http";
 import { isLocalDateTime, localDay, localMs, localToUtc, utcToLocal } from "./local-time";
 import { ageBand, fold, Pseudonymizer, type PseudoMember } from "./pseudonymize";
 
@@ -51,6 +56,84 @@ function repetitionOf(value: unknown): RepetitionInput {
   return { frequency, ...(days ? { weekdays: days } : {}), end: fin, skipSchoolHolidays: input.sauf_vacances_scolaires === true };
 }
 
+/** Tâche proposée par l'agent, que la famille ajoute elle-même depuis une carte du tchat (US-110 RF1) : rien n'est enregistré avant. */
+export interface TaskDraft {
+  title: string;
+  due: string;
+  dueTime: string | null;
+  assigneeId: string | null;
+  repetition: TaskRepetition | null;
+}
+
+/** Répétition d'une tâche décrite par l'agent : celles des RDV, plus « quotidienne ». */
+function taskRepetitionOf(value: unknown): TaskRepetition {
+  if (value && typeof value === "object" && !Array.isArray(value) && (value as Record<string, unknown>).frequence === "quotidienne") {
+    return { frequency: "daily", end: repetitionOf({ ...(value as object), frequence: "hebdomadaire" }).end };
+  }
+  const { frequency, weekdays, end } = repetitionOf(value);
+  return { frequency, ...(weekdays ? { weekdays } : {}), end };
+}
+
+/** Échéances relatives que l'agent peut proposer (US-95 RF3) et leur écart en jours. */
+const DUE_DAYS: Record<string, number> = { le_jour_meme: 0, la_veille: 1, "2_jours_avant": 2, "3_jours_avant": 3, "1_semaine_avant": 7 };
+/** Pour un RDV médical, trois titres génériques seulement, sans spécialité ni motif (AT-4, D31). */
+const MEDICAL_TASKS = new Map([
+  ["preparer la carte vitale", "Préparer la carte Vitale"],
+  ["preparer le carnet de sante", "Préparer le carnet de santé"],
+  ["preparer les documents a apporter", "Préparer les documents à apporter"],
+]);
+const MAX_AGENT_TASKS = 5;
+
+interface AgentTask {
+  title: string;
+  daysBefore: number;
+  assigneeId: string | null;
+}
+
+function agentTask(raw: unknown, ctx: ToolContext, medical: boolean, firstName: string | null): AgentTask {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new ToolError("chaque tâche doit être un objet {titre, echeance}");
+  const t = raw as Record<string, unknown>;
+  const daysBefore = DUE_DAYS[String(t.echeance)];
+  if (daysBefore === undefined) throw new ToolError(`échéance inconnue : « ${String(t.echeance)} » (attendu : ${Object.keys(DUE_DAYS).join(", ")})`);
+  let title = ctx.pseudo.fromModel(text(t.titre, "titre de la tâche", { max: 200 })!).trim();
+  if (medical) {
+    const allowed = MEDICAL_TASKS.get(fold(title).replace(/[^a-z ]/g, " ").replace(/\s+/g, " ").trim());
+    if (!allowed) throw new ToolError(`pour un rendez-vous médical, seuls ces titres sont acceptés : ${[...MEDICAL_TASKS.values()].join(" ; ")}`);
+    title = firstName ? `${allowed} — RDV médical de ${firstName}` : `${allowed} — RDV médical`;
+  }
+  title = title.slice(0, MAX_TITLE);
+  if (!title) throw new ToolError("le titre de la tâche est vide");
+  return { title, daysBefore, assigneeId: t.membre ? members(ctx, [t.membre])[0].id : null };
+}
+
+function agentTasks(value: unknown, ctx: ToolContext, medical: boolean, firstName: string | null): AgentTask[] {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value)) throw new ToolError("« taches » doit être une liste");
+  if (value.length > MAX_AGENT_TASKS) throw new ToolError(`au plus ${MAX_AGENT_TASKS} tâches par rendez-vous`);
+  return value.map((raw) => agentTask(raw, ctx, medical, firstName));
+}
+
+/** Enregistre les tâches au statut « proposée » avec le rendez-vous (D48) ; celles que la base ou les règles refusent sont signalées au modèle, sans bloquer le rendez-vous. */
+async function attachTasks(ctx: ToolContext, event: CalendarEvent, tasks: AgentTask[]): Promise<{ taches: number; taches_ignorees?: { echeance_jours_avant: number; raison: string }[] }> {
+  if (!tasks.length) return { taches: 0 };
+  const write: WriteContext = {
+    accountId: ctx.accountId, userId: ctx.userId, timeZone: await familyTimeZone(ctx.db, ctx.accountId), now: ctx.now, members: await loadMembers(ctx.db, ctx.accountId), parent: true,
+    memberId: ctx.authorMemberId ?? null, source: "agent",
+  };
+  let added = 0;
+  const ignored: { echeance_jours_avant: number; raison: string }[] = [];
+  for (const task of tasks) {
+    try {
+      await insertEventTask(ctx.db, write, event, { title: task.title, daysBefore: task.daysBefore, assigneeId: task.assigneeId });
+      added += 1;
+    } catch (error) {
+      if (!(error instanceof Rejection)) throw error;
+      ignored.push({ echeance_jours_avant: task.daysBefore, raison: error.message });
+    }
+  }
+  return { taches: added, ...(ignored.length ? { taches_ignorees: ignored } : {}) };
+}
+
 const STATUS_FR: Partial<Record<EventStatus, string>> = { provisional: "provisoire", confirmed: "confirme" };
 
 /** Limites des écrans (US-76 RF2) : titre 100 caractères, lieu 200, note 500. */
@@ -76,6 +159,8 @@ export interface ToolContext {
   /** Rendez-vous créés pendant cette demande. */
   created: { ids: string[] };
   proposals: string[];
+  /** Tâches seules proposées pendant cette demande : cartes du tchat, jamais enregistrées par l'agent. */
+  taskDrafts?: TaskDraft[];
 }
 
 const shortRef = (id: string) => `evt-${id.slice(0, 8)}`;
@@ -261,6 +346,7 @@ const TOOLS: Record<string, Tool> = {
     const place = medical ? null : (text(input.lieu, "lieu", { required: false, max: MAX_PLACE * 2 }) && ctx.pseudo.fromModel(String(input.lieu)).slice(0, MAX_PLACE));
     const notes = medical ? null : (text(input.notes, "notes", { required: false, max: MAX_NOTES * 2 }) && ctx.pseudo.fromModel(String(input.notes)).slice(0, MAX_NOTES));
     const ignored = medical && (input.lieu || input.notes);
+    const proposedTasks = agentTasks(input.taches, ctx, medical, who[0].firstName);
 
     // Un rendez-vous qui se répète devient une série : une seule proposition, confirmée d'un geste (US-109).
     if (input.repetition !== undefined && input.repetition !== null) {
@@ -273,8 +359,9 @@ const TOOLS: Record<string, Tool> = {
           rule: ruleFromRepetition(repetition, firstDate), timeZone: ctx.timeZone, source: ctx.source, sourceMessageId: ctx.sourceMessageId ?? null, now: ctx.now,
         });
         if (!ctx.created.ids.includes(result.eventIds[0])) ctx.created.ids.push(result.eventIds[0]);
+        const attached = await attachTasks(ctx, (await loadCalendarEvent(ctx.db, ctx.accountId, result.eventIds[0]))!, proposedTasks);
         return {
-          id: shortRef(result.eventIds[0]), statut: "provisoire", seances: result.eventIds.length,
+          id: shortRef(result.eventIds[0]), statut: "provisoire", seances: result.eventIds.length, ...attached,
           message: "Série créée en provisoire, en attente de confirmation par la famille : une seule confirmation vaut pour toutes les séances.",
           ...(ignored ? { avis: "Pour un rendez-vous médical, le lieu et les notes ne sont pas enregistrés par l'assistant." } : {}),
         };
@@ -290,6 +377,7 @@ const TOOLS: Record<string, Tool> = {
     const memberIds = who.map((m) => m.id);
     const fingerprint = fingerprintOf({ startsAt: from, endsAt: to, type, allFamily: false, memberIds });
     const typeId = (await eventTypeIds(ctx.db)).get(TYPE_CODE[type])!;
+    let isNew = true;
     const id = await ctx.db.transaction().execute(async (trx) => {
       const inserted = await trx
         .insertInto("family_events")
@@ -300,18 +388,47 @@ const TOOLS: Record<string, Tool> = {
         .onConflict((oc) => oc.columns(["account_id", "fingerprint"]).where(sql<boolean>`status in ('provisional', 'set_aside', 'confirmed')`).doNothing())
         .returning("id")
         .executeTakeFirst();
-      if (!inserted) return (await trx.selectFrom("family_events").select("id").where("account_id", "=", ctx.accountId).where("fingerprint", "=", fingerprint).where("status", "in", ["provisional", "set_aside", "confirmed"]).executeTakeFirstOrThrow()).id;
+      if (!inserted) {
+        isNew = false;
+        return (await trx.selectFrom("family_events").select("id").where("account_id", "=", ctx.accountId).where("fingerprint", "=", fingerprint).where("status", "in", ["provisional", "set_aside", "confirmed"]).executeTakeFirstOrThrow()).id;
+      }
       await trx.insertInto("family_event_members").values(memberIds.map((member_id) => ({ event_id: inserted.id, member_id, account_id: ctx.accountId }))).execute();
       await trx.insertInto("family_event_history").values({ event_id: inserted.id, user_id: ctx.userId, action: "created", from_status: null, to_status: "provisional", occurred_at: ctx.now }).execute();
       return inserted.id;
     });
     if (!ctx.created.ids.includes(id)) ctx.created.ids.push(id);
+    // Un rendez-vous déjà là (même demande rejouée) n'a pas de nouvelle liste de tâches.
+    const attached = isNew ? await attachTasks(ctx, (await loadCalendarEvent(ctx.db, ctx.accountId, id))!, proposedTasks) : { taches: 0 };
     return {
       id: shortRef(id),
       statut: "provisoire",
       message: "Créé en provisoire, en attente de confirmation par la famille.",
+      ...attached,
       ...(ignored ? { avis: "Pour un rendez-vous médical, le lieu et les notes ne sont pas enregistrés par l'assistant." } : {}),
     };
+  },
+
+  async ajouter_tache_rdv(input, ctx) {
+    const event = await findEvent(ctx, input.id);
+    const first = event.memberIds[0] ? (ctx.pseudo.active.find((m) => m.id === event.memberIds[0])?.firstName ?? null) : null;
+    const [task] = agentTasks([{ titre: input.titre, echeance: input.echeance, membre: input.membre }], ctx, event.type === "medical", first);
+    const done = await attachTasks(ctx, event, [task]);
+    if (!done.taches) throw new ToolError(done.taches_ignorees?.[0]?.raison ?? "la tâche n'a pas pu être ajoutée");
+    return { id: input.id, statut: event.status === "confirmed" ? "tache_ajoutee" : "tache_proposee", message: "Tâche ajoutée à la liste « À préparer » du rendez-vous." };
+  },
+
+  async proposer_tache(input, ctx) {
+    const title = ctx.pseudo.fromModel(text(input.titre, "titre", { max: MAX_TITLE * 2 })!).trim().slice(0, MAX_TITLE);
+    if (!title) throw new ToolError("« titre » est obligatoire");
+    const due = text(input.echeance, "echeance")!.trim();
+    if (!isDay(due)) throw new ToolError(`échéance illisible : « ${due} » (attendu AAAA-MM-JJ)`);
+    if (due < localDay(ctx.now, ctx.timeZone)) throw new ToolError("l'échéance est déjà passée : demandez la date au parent");
+    const dueTime = input.heure ? String(text(input.heure, "heure", { max: 5 })) : null;
+    if (dueTime && !/^([01]\d|2[0-3]):[0-5]\d$/.test(dueTime)) throw new ToolError("heure illisible (attendu HH:MM)");
+    const repetition = input.repetition !== undefined && input.repetition !== null ? taskRepetitionOf(input.repetition) : null;
+    if (repetition?.end.kind === "date" && repetition.end.date < due) throw new ToolError("la date de fin doit être après la première échéance");
+    (ctx.taskDrafts ??= []).push({ title, due, dueTime, assigneeId: input.membre ? members(ctx, [input.membre])[0].id : null, repetition });
+    return { statut: "proposee", message: "Tâche proposée à la famille : elle l'ajoute elle-même depuis l'application." };
   },
 
   async modifier_evenement(input, ctx) {

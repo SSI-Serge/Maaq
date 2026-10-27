@@ -212,7 +212,32 @@ Migration copiée de la session « base de données » (`0006_lot4_schema.sql`).
   Licence Ouverte ; `--dry-run` pour relire). Couverture constatée le 27/10/2026 : 2025-2026 et 2026-2027 complètes pour les trois zones ; 2027-2028 sans les vacances d'été ; 2028-2029 absente. Convention : `end_date`
   est le jour de la rentrée, la dernière journée de vacances est la veille. La zone se règle dans Réglages (parents), sans zone l'option « Sauf vacances scolaires » n'est pas proposée.
 - **Pas encore fait** : alerte de l'administrateur en septembre si l'année scolaire suivante manque ; proposition de saisir l'adresse et d'activer le calcul des trajets à la création (CA 11.1, avec US-107, lot 8) ;
-  tâches liées aux séances (lot 5).
+  tâches liées aux séances (fait au lot 5).
+
+## Lot 5 du MVP2 : tâches (US-110, US-95, US-96)
+
+Schéma : `0007_lot5_schema.sql`, copie exacte de `lot_5_2_schema.sql` de la session base de données (SHA-256 `276c1261…`). Les règles vivent dans la base (`change_family_task_status`,
+`family_tasks_visible_to`, déclencheurs de plafond, d'échéance et de version, `change_family_event_status` qui promeut les tâches proposées avec le RDV) ; le code les appelle sans les recalculer.
+
+- **Tâche seule ou qui revient** (`tasks.ts`, `task-series.ts`) : titre (100), note (500), échéance (jour de la famille) et heure facultative, personne assignée, répétition (chaque jour, semaine, deux semaines, mois). Les occurrences
+  sont de vraies tâches créées 8 semaines à l'avance (jamais dans le passé), complétées par le planificateur ; chacune se coche seule. Modifier ou annuler : « cette fois », « cette fois et les suivantes » (la règle s'arrête la veille, une
+  nouvelle série prend le relais), « toutes » ; la règle suit la date déplacée (le mardi décalé au mercredi). 50 règles actives au plus (message de la base traduit). Une règle ne commence jamais avant aujourd'hui.
+- **Droits** (AT-2, D26) : les parents font tout ; un invité secondaire voit ses tâches, celles qui lui sont assignées et celles des RDV qu'il voit, coche les siennes, ne modifie que ses créations et n'assigne qu'à lui-même.
+  Une tâche assignée à un enfant (sans compte) est suivie par les deux parents et s'affiche « Mia — préparer son sac ».
+- **« En retard »** est calculé à l'affichage (jour et heure dans le fuseau de la famille, comme la vue `v_family_tasks`) : mention grise, jamais d'alerte ni de reproche (AT-9). « Faites » : 30 jours ; le cochage s'annule 10 secondes.
+- **Tâches préparatoires** (`event-tasks.ts`) : proposées avec le RDV provisoire (statut « proposée », invisibles dans l'écran Tâches), retenues à la confirmation en une transaction ; « Confirmer sans les tâches » les supprime d'abord.
+  Chaque ajout, retrait ou changement fait monter la version du RDV : une carte périmée est refusée (`stale_version`, « Mis à jour »). 10 tâches au plus par RDV ; échéance relative (« La veille »…) ou date choisie, jamais passée ni après
+  le RDV ; l'écart est conservé si le RDV est déplacé ; annulées avec le RDV (le nombre est rendu : « 2 tâches de préparation ont été retirées »). Pour une série : un modèle par tâche, proposé une fois, une occurrence par séance à la confirmation
+  (et pour les séances créées ensuite) ; un RDV devenu série emporte ses tâches proposées ; « cette séance et les suivantes » copie les modèles.
+- **Agent** : `creer_evenement_provisoire` prend `taches` (1 à 5, échéance relative ; rien pour un RDV courant ; échéance passée ignorée et signalée au modèle) ; `ajouter_tache_rdv` ; `proposer_tache` (tâche seule ou qui revient : une carte du tchat,
+  rien n'est enregistré). RDV médical : trois titres génériques seulement, composés avec le prénom (« Préparer la carte Vitale — RDV médical de Léo »). Le modèle ne reçoit jamais le titre d'une tâche (AT-4, D39).
+- **Écrans** : Tâches (`/assistant/taches`), formulaire (`/nouvelle`, `/[id]`), liste « À préparer » sur l'écran du RDV et dans la carte de proposition du tchat (« Confirmer le RDV et N tâches »), cartes « Tâche proposée »
+  (Ajouter / Modifier), filtres « Tout / RDV / Tâches » de la vue Jour, nombre de tâches des vues Semaine et Mois, « + Tâche » sur l'accueil.
+- **Planificateur** : `completeTaskSeries` à chaque passage ; `purge_expired_family_tasks` avec les purges.
+- **Pas fait / à savoir** : notifications « [Prénom] vous a confié… » (US-96 RF4, RF6) et information des parents quand un membre est retiré (RF8) : le type de notification n'existe dans la base qu'au lot 6 ; notification d'annulation
+  d'un RDV avec « tâches retirées » : aucun type de notification d'annulation n'existe, le message est affiché à l'annulation. Modifier ou retirer une tâche en l'écrivant à l'agent : impossible sans lui donner le titre des tâches (contraire à AT-4) ;
+  seul l'ajout par le tchat est fait. La carte « Tâche proposée » n'est pas conservée par le serveur (la base n'a pas de tâche proposée sans RDV) : elle disparaît quand la conversation est rechargée. « Toutes » réécrit aussi les occurrences
+  déplacées une à une. **Non mesuré avec le vrai modèle** (nouveaux cas de tâches à ajouter au banc d'essai) ; **écrans jamais essayés dans un navigateur ni sur téléphone**.
 
 ## Réglages
 Voir `.env.example`. Tout est facultatif tant que `ASSISTANT_MODE=off`.

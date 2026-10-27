@@ -324,7 +324,7 @@ describe("annuler (US-80)", () => {
   it("annule un rendez-vous confirmé : il disparaît du calendrier et ne peut pas être rétabli", async () => {
     const f = await family();
     const id = await seed(f, { start: "2054-11-03T17:00", status: "confirmed" });
-    expect(await cancelEvent(at(), f.marc, id, { expectedVersion: 1 })).toEqual({ id, status: "canceled" });
+    expect(await cancelEvent(at(), f.marc, id, { expectedVersion: 1 })).toEqual({ id, status: "canceled", retiredTasks: 0 });
     expect(await listEvents(at(), f.sophie, { from: "2054-11-03", to: "2054-11-03" })).toEqual([]);
     expect((await failure(getEvent(at(), f.sophie, id))).code).toBe("gone");
     expect((await failure(confirmEvent(at(), f.sophie, id))).code).toBe("already_handled");

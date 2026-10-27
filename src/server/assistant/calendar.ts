@@ -141,7 +141,7 @@ export async function loadCalendarEvent(db: Kysely<DB>, accountId: string, id: s
   return row ? (await hydrate(db, [row]))[0] : undefined;
 }
 
-async function loadByIds(db: Kysely<DB>, accountId: string, ids: string[]): Promise<CalendarEvent[]> {
+export async function loadCalendarEventsByIds(db: Kysely<DB>, accountId: string, ids: string[]): Promise<CalendarEvent[]> {
   if (!ids.length) return [];
   return hydrate(db, await selectEvents(db).where("e.account_id", "=", accountId).where("e.id", "in", ids).orderBy("e.starts_at").execute());
 }
@@ -164,5 +164,5 @@ export async function findConflicts(db: Kysely<DB>, accountId: string, query: Co
   const { rows } = await sql<{ id: string }>`
     select find_family_event_conflicts as id
       from find_family_event_conflicts(${accountId}::uuid, ${sql.val(query.memberIds)}::uuid[], ${query.allFamily}, ${query.from}, ${query.to}, ${query.excludeId ?? null}::uuid)`.execute(db);
-  return loadByIds(db, accountId, rows.map((r) => r.id));
+  return loadCalendarEventsByIds(db, accountId, rows.map((r) => r.id));
 }

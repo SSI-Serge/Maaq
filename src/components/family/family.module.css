@@ -865,3 +865,153 @@
     animation: none;
   }
 }
+
+/* ---- Tâches (US-110, US-96, US-95) ---- */
+.taskList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.taskRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-left-width: 5px;
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+}
+.taskCheck {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  margin-top: 2px;
+  accent-color: var(--primary);
+}
+.taskBody {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.taskTitle {
+  font-size: 15px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.taskDone .taskTitle {
+  text-decoration: line-through;
+  color: var(--ink-soft);
+}
+.taskMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+/* « En retard » n'est pas une alerte : gris, sans rouge et sans reproche (AT-9). */
+.taskLate {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--line);
+  color: var(--ink-soft);
+  font-weight: 700;
+}
+.assignee {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 12px;
+  cursor: pointer;
+}
+.assignee:disabled {
+  cursor: default;
+}
+.pastilles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+.taskHint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+.undo {
+  border: 0;
+  background: transparent;
+  color: var(--primary);
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+  min-height: 28px;
+}
+.filterBar {
+  display: flex;
+  gap: 8px;
+}
+.prepare {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+}
+.prepareItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.prepareBody {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 14px;
+}
+.prepareEditor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  border: 1px dashed var(--ink-soft);
+  border-radius: 8px;
+}
+.iconText {
+  min-height: 36px;
+  min-width: 36px;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 13px;
+  cursor: pointer;
+}
+.proposalCard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border: 1.5px dashed var(--ink-soft);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+}
+.proposalTitle {
+  font-weight: 700;
+  font-size: 15px;
+}

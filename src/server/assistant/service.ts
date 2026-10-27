@@ -11,6 +11,11 @@ import { loadPseudoMembers, requireParent } from "./family";
 import { familyTimeZone } from "./reminders";
 import { createModel, type AssistantModel } from "./model";
 import { utcToLocal } from "./local-time";
+import { loadMembers, type MemberChip } from "./member-chips";
+import { ruleLabel } from "./series";
+import { ruleFromTaskRepetition } from "./task-series";
+import type { TaskRepetition } from "./tasks";
+import type { TaskDraft } from "./tools";
 
 /**
  * Message d'un parent à l'Assistant Famille : normalise, appelle l'agent, range l'échange (chiffré). Le calendrier de référence est dans
@@ -47,6 +52,23 @@ export interface AssistantEventView {
   end: string;
 }
 
+/** Carte « Tâche proposée » du tchat (US-110 RF1) : le parent l'ajoute ou la modifie, rien n'est enregistré avant. */
+export interface TaskDraftView {
+  title: string;
+  due: string;
+  dueTime: string | null;
+  assignee: MemberChip | null;
+  repetition: TaskRepetition | null;
+  /** « Chaque mardi jusqu'au 30/06/2055 » pour une tâche qui revient. */
+  rule: string | null;
+}
+
+async function draftViews(db: Kysely<DB>, accountId: string, drafts: TaskDraft[]): Promise<TaskDraftView[]> {
+  if (!drafts.length) return [];
+  const members = await loadMembers(db, accountId);
+  return drafts.map((d) => ({ title: d.title, due: d.due, dueTime: d.dueTime, assignee: d.assigneeId ? (members.get(d.assigneeId) ?? null) : null, repetition: d.repetition, rule: d.repetition ? ruleLabel(ruleFromTaskRepetition(d.repetition, d.due)) : null }));
+}
+
 export interface AssistantReply {
   requestId: string;
   reply: string;
@@ -57,6 +79,8 @@ export interface AssistantReply {
   events: AssistantEventView[];
   /** Modifications et annulations proposées, en attente de validation. */
   proposals: number;
+  /** Tâches seules proposées, à ajouter depuis une carte (jamais enregistrées par l'assistant). */
+  taskDrafts: TaskDraftView[];
   durationMs: number;
 }
 
@@ -90,7 +114,7 @@ export async function sendAssistantMessage(
     .where("r.request_id", "=", input.requestId)
     .executeTakeFirst();
   if (answered?.content) {
-    return { requestId: input.requestId, reply: decrypt(answered.content, key()), failed: false, alreadyAnswered: true, events: [], proposals: 0, durationMs: 0 };
+    return { requestId: input.requestId, reply: decrypt(answered.content, key()), failed: false, alreadyAnswered: true, events: [], proposals: 0, taskDrafts: [], durationMs: 0 };
   }
 
   // Échanges récents, avant ce message : contexte d'une réponse à une question de l'assistant.
@@ -170,7 +194,7 @@ export async function sendAssistantMessage(
   events.sort((a, b) => a.start.localeCompare(b.start));
 
   if (result.status !== "ok") {
-    return { requestId: input.requestId, reply: result.reply, failed: true, alreadyAnswered: false, events, proposals: result.proposalIds.length, durationMs: result.durationMs };
+    return { requestId: input.requestId, reply: result.reply, failed: true, alreadyAnswered: false, events, proposals: result.proposalIds.length, taskDrafts: [], durationMs: result.durationMs };
   }
   const answeredAt = new Date(ctx.now.getTime() + result.durationMs);
   const reply = await ctx.db
@@ -180,7 +204,7 @@ export async function sendAssistantMessage(
     .executeTakeFirstOrThrow();
   await ctx.db.updateTable("assistant_requests").set({ reply_message_id: reply.id }).where("conversation_id", "=", conversation.id).where("request_id", "=", input.requestId).execute();
   await ctx.db.updateTable("agent_conversations").set({ last_message_at: answeredAt }).where("id", "=", conversation.id).execute();
-  return { requestId: input.requestId, reply: result.reply, failed: false, alreadyAnswered: false, events, proposals: result.proposalIds.length, durationMs: result.durationMs };
+  return { requestId: input.requestId, reply: result.reply, failed: false, alreadyAnswered: false, events, proposals: result.proposalIds.length, taskDrafts: await draftViews(ctx.db, accountId, result.taskDrafts), durationMs: result.durationMs };
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------
