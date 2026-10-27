@@ -1,7 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { z } from "zod";
 import { requireProfile } from "@/server/auth/http";
+import { runPlaceSearch } from "@/server/assistant/places";
 import { listAssistantMessages, sendAssistantMessage } from "@/server/assistant/service";
+import { describeError } from "@/server/safe-log";
 import { handler, parseBody } from "@/server/http";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +21,8 @@ export const POST = handler(async (request: Request) => {
   const { session, ctx } = await requireProfile();
   const body = await parseBody(request, schema);
   const reply = await sendAssistantMessage(ctx, session, body);
+  // Les recherches « Sur place » demandées à l'assistant démarrent aussitôt après la réponse ; le planificateur ne les reprend qu'en secours (US-112 RT5).
+  for (const id of reply.placeSearchIds) after(() => runPlaceSearch(ctx, id).catch((error) => console.error(`Recherche « Sur place » : ${describeError(error)}`)));
   return NextResponse.json(reply, { status: reply.failed ? 502 : 201 });
 });
 

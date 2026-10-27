@@ -77,6 +77,10 @@ export interface AgentRunResult {
   proposalIds: string[];
   /** Tâches seules proposées : cartes du tchat, rien n'est enregistré. */
   taskDrafts: TaskDraft[];
+  /** Rendez-vous créés dont le lieu est public (« oui ») ou incertain (« doute ») selon l'agent : suggestion « Sur place » (US-112 RF3). */
+  placeHints: [string, "oui" | "doute"][];
+  /** Recherches « Sur place » lancées par l'agent, à exécuter après la réponse (US-112 RF2). */
+  placeSearchIds: string[];
   toolCalls: { name: string; ms: number; isError: boolean }[];
   /** Appels d'outils détaillés (paramètres retraduits, résultat tel que vu par le modèle) : pour le banc d'essai, jamais journalisés. */
   trace: { name: string; input: unknown; output: string; isError: boolean }[];
@@ -143,7 +147,7 @@ export async function runAssistant(input: AgentRunInput): Promise<AgentRunResult
   };
   const messages: ModelMessage[] = buildMessages(input, pseudo);
   const result: AgentRunResult = {
-    reply: FAILURE_REPLY, status: "error", createdEventIds: [], proposalIds: [], taskDrafts: [], toolCalls: [], trace: [],
+    reply: FAILURE_REPLY, status: "error", createdEventIds: [], proposalIds: [], taskDrafts: [], placeHints: [], placeSearchIds: [], toolCalls: [], trace: [],
     usage: { inputTokens: 0, outputTokens: 0, cacheRead: 0, cacheWrite: 0 }, turns: 0, durationMs: 0, requestIds: [], leaks: [], unknownAliases: [],
   };
 
@@ -205,6 +209,8 @@ export async function runAssistant(input: AgentRunInput): Promise<AgentRunResult
   result.createdEventIds = toolContext.created.ids;
   result.proposalIds = toolContext.proposals;
   result.taskDrafts = toolContext.taskDrafts ?? [];
+  result.placeHints = [...(toolContext.placeHints ?? new Map())];
+  result.placeSearchIds = toolContext.placeSearchIds ?? [];
   result.durationMs = Date.now() - started;
   // Contrôle : rien d'identifiant ne doit être parti chez le modèle (instructions et messages ; les octets d'image ne comptent pas).
   result.leaks = pseudo.leaks([input.definition.instructions, ...strings(messages.filter((m) => m.role === "user"))].join("\n"));

@@ -7,6 +7,7 @@ import { changeProposedTask, dropProposedTask, insertEventTask, matchTasks, type
 import { seal, sealOptional } from "./fields";
 import { loadMembers } from "./member-chips";
 import { familyTimeZone } from "./reminders";
+import { requestPlaceSearchFor } from "./places";
 import { isDay, type TaskRepetition } from "./tasks";
 import { Rejection } from "@/server/http";
 import { isLocalDateTime, localDay, localMs, localToUtc, utcToLocal } from "./local-time";
@@ -184,6 +185,10 @@ export interface ToolContext {
   proposals: string[];
   /** Tâches seules proposées pendant cette demande : cartes du tchat, jamais enregistrées par l'agent. */
   taskDrafts?: TaskDraft[];
+  /** Jugement de l'agent sur le lieu des rendez-vous qu'il vient de créer (« oui », « doute ») : MAAQ en tire la suggestion « Sur place » (US-112 RF3). Un lieu manifestement privé n'y figure pas. */
+  placeHints?: Map<string, "oui" | "doute">;
+  /** Recherches « Sur place » lancées par l'agent pendant cette demande, à exécuter après la réponse (US-112 RF2). */
+  placeSearchIds?: string[];
 }
 
 const shortRef = (id: string) => `evt-${id.slice(0, 8)}`;
@@ -420,6 +425,8 @@ const TOOLS: Record<string, Tool> = {
       return inserted.id;
     });
     if (!ctx.created.ids.includes(id)) ctx.created.ids.push(id);
+    // Lieu public ou incertain : MAAQ proposera « Sur place » dans le tchat (une seule fois par RDV, jamais pour un rendez-vous médical).
+    if (isNew && place && (input.lieu_public === "oui" || input.lieu_public === "doute")) (ctx.placeHints ??= new Map()).set(id, input.lieu_public);
     // Un rendez-vous déjà là (même demande rejouée) n'a pas de nouvelle liste de tâches.
     const attached = isNew ? await attachTasks(ctx, (await loadCalendarEvent(ctx.db, ctx.accountId, id))!, proposedTasks) : { taches: 0 };
     return {
@@ -504,6 +511,19 @@ const TOOLS: Record<string, Tool> = {
       .executeTakeFirstOrThrow();
     ctx.proposals.push(row.id);
     return { id: input.id, statut: "modification_proposee", changements: changes };
+  },
+
+  async chercher_sur_place(input, ctx) {
+    const event = await findEvent(ctx, input.id);
+    if (event.type === "medical") throw new ToolError("pas de recherche « Sur place » pour un rendez-vous médical");
+    try {
+      const id = await requestPlaceSearchFor(ctx.db, ctx.now, { id: ctx.userId, accountId: ctx.accountId, timeZone: ctx.timeZone, parent: true }, event.id);
+      (ctx.placeSearchIds ??= []).push(id);
+    } catch (error) {
+      if (error instanceof Rejection) throw new ToolError(error.message);
+      throw error;
+    }
+    return { id: input.id, statut: "recherche_lancee", message: "Le résultat arrivera dans le tchat et dans le détail du rendez-vous." };
   },
 
   async annuler_evenement(input, ctx) {

@@ -3,11 +3,37 @@
 import { useEffect } from "react";
 import { useApiMutation, useApiQuery } from "@/client/hooks";
 import { Button, Notice, RetryNotice } from "@/components/ui";
-import type { PlaceSearchView } from "@/server/assistant/places";
+import type { PlaceBlock, PlaceSearchView } from "@/server/assistant/places";
 import { shortDate } from "./format";
 import styles from "./family.module.css";
 
 const POLL_MS = 3_000;
+
+/** Les trois blocs du résultat (Se garer, Petite faim, Grande faim) avec la date de vérification et l'avertissement : dans le détail du RDV comme dans le tchat (US-112 RF5 à RF7). */
+export function PlaceBlocks({ blocks, checkedOn }: { blocks: PlaceBlock[]; checkedOn: string }) {
+  return (
+    <div>
+      {blocks.map((block) => (
+        <div key={block.category}>
+          <div className={styles.proposalTitle}>{block.label}</div>
+          {block.items.map((item) => (
+            <div key={`${item.name}|${item.city}`} className={styles.rowValue}>
+              {item.name}
+              <span className={styles.rowSub}>
+                {item.type} · environ {item.walkMinutes} min à pied · {item.city} ·{" "}
+                <a href={item.reviewsUrl} target="_blank" rel="noopener noreferrer" className={styles.link}>
+                  Voir les avis
+                </a>
+              </span>
+            </div>
+          ))}
+          {block.note && <div className={styles.hint}>{block.note}</div>}
+        </div>
+      ))}
+      <div className={styles.hint}>Informations trouvées sur internet le {shortDate(checkedOn)} : vérifiez-les avant de partir. MAAQ ne réserve rien.</div>
+    </div>
+  );
+}
 
 /**
  * Section « Sur place » du détail d'un RDV (US-112 RF1, RF4 à RF12) : le bouton « Où se garer, où manger ? », l'état de la recherche, le résultat jusqu'à la fin du RDV, « Actualiser »
@@ -32,6 +58,7 @@ export function PlaceSection({ eventId }: { eventId: string }) {
     const result = await launch.run(`/api/family/events/${eventId}/place`, { method: "POST" });
     if (result !== undefined) reload();
   }
+  const started = launch.pending === false && launch.error === undefined && Boolean(running);
 
   if (!view || !view.available) return null;
   const atLimit = view.searches >= view.max;
@@ -50,32 +77,15 @@ export function PlaceSection({ eventId }: { eventId: string }) {
 
       {results && results.blocks.length > 0 && (
         <div>
-          {results.blocks.map((block) => (
-            <div key={block.category}>
-              <div className={styles.proposalTitle}>{block.label}</div>
-              {block.items.map((item) => (
-                <div key={`${item.name}|${item.city}`} className={styles.rowValue}>
-                  {item.name}
-                  <span className={styles.rowSub}>
-                    {item.type} · environ {item.walkMinutes} min à pied · {item.city} ·{" "}
-                    <a href={item.reviewsUrl} target="_blank" rel="noopener noreferrer" className={styles.link}>
-                      Voir les avis
-                    </a>
-                  </span>
-                </div>
-              ))}
-              {block.note && <div className={styles.hint}>{block.note}</div>}
-            </div>
-          ))}
-          <div className={styles.hint}>
-            Informations trouvées sur internet le {shortDate(results.checkedOn)} : vérifiez-les avant de partir. MAAQ ne réserve rien. Affiché jusqu&apos;à la fin du RDV.
-          </div>
+          <PlaceBlocks blocks={results.blocks} checkedOn={results.checkedOn} />
+          <div className={styles.hint}>Affiché jusqu&apos;à la fin du RDV.</div>
         </div>
       )}
 
       <Button variant="secondary" onClick={() => void start()} loading={launch.pending || running} disabled={launch.pending || running || atLimit}>
         {label}
       </Button>
+      {started && <div className={styles.hint}>✓ Recherche lancée : le résultat arrivera dans le tchat et dans le détail du RDV.</div>}
       <div className={styles.hint}>Recherches : {view.searches} sur {view.max}</div>
       {atLimit && <Notice tone="info">Nombre maximal de recherches pour ce RDV atteint ({view.max}).</Notice>}
       {launch.error && launch.error.kind !== "rejected" && <RetryNotice message={error?.kind === "server" ? "La recherche n'a pas pu être lancée." : (error?.message ?? "")} onRetry={() => void start()} />}

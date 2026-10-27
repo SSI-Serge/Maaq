@@ -3,7 +3,7 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-10-27T18:55:33Z",
+  "updated": "2026-10-27T19:12:26Z",
   "deploys": [
     {
       "at": "2026-10-27T18:29:38Z",
@@ -1979,11 +1979,11 @@
         {
           "id": "f16s12",
           "title": "US-112 · Savoir où se garer et où manger près d'un RDV",
-          "state": "building",
+          "state": "testing",
           "env": null,
-          "note": "Lot 8 : le bouton « Où se garer, où manger ? », la recherche en arrière-plan (faux service), le résultat dans le détail du RDV, les limites de 3 recherches et la notification « le résultat est prêt » sont faits. Restent le message dans le tchat, la suggestion automatique, la demande à l'agent et TomTom.",
+          "note": "Lot 8 : « Sur place » complet avec un faux service : bouton, recherche en arrière-plan, résultat dans le détail du RDV et dans le tchat, suggestion « Voulez-vous que je cherche… ? » pour un lieu public, demande à l'assistant, limites de 3 recherches, notification. Reste à brancher TomTom.",
           "at": "2026-10-27T17:32:11Z",
-          "unsure": "Jamais vu dans un navigateur ni sur un téléphone ; seul le faux service (adresses inventées) a été essayé, TomTom n'est pas écrit. Le tchat n'a pas encore de message « Sur place » ni de suggestion ; l'agent ne sait pas encore lancer la recherche. Le lien « Voir les avis » n'a jamais été ouvert."
+          "unsure": "Jamais vu dans un navigateur ni sur un téléphone ; seul le faux service (adresses inventées) a été essayé, TomTom n'est pas écrit. Le comportement de l'assistant (jugement du lieu, demande de recherche) n'a pas été mesuré avec le vrai modèle : six cas sont écrits au banc d'essai, à lancer. Le lien « Voir les avis » n'a jamais été ouvert."
         },
         {
           "id": "f16s13",
@@ -2073,6 +2073,10 @@
         {
           "at": "2026-10-27T18:55:33Z",
           "what": "« Sur place » est livré en deux temps : d'abord le bouton et la section du détail du RDV, ensuite le tchat et l'agent (qui demandent un nouveau passage du banc d'essai)."
+        },
+        {
+          "at": "2026-10-27T19:12:26Z",
+          "what": "La recherche demandée à l'assistant compte dans le plafond quotidien en plus du message du tchat ; l'assistant ne voit jamais le lieu du RDV qu'il cherche."
         }
       ],
       "unsure": [
@@ -2084,6 +2088,11 @@
         "Le suivi du trajet ne repose pour l'instant que sur un faux service : aucune durée réelle n'a été obtenue de TomTom."
       ],
       "activity": [
+        {
+          "at": "2026-10-27T19:12:26Z",
+          "kind": "building",
+          "what": "Lot 8 : « Sur place » dans le tchat et pour l'assistant (suggestion, demande, résultat) ; reste TomTom"
+        },
         {
           "at": "2026-10-27T18:55:33Z",
           "kind": "building",

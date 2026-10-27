@@ -266,7 +266,7 @@ describe("filet de sécurité et notification (US-112 RF4, RT5)", () => {
     await search(f, event, fake, "button");
     const first = await runPlaceSearches(at(), fake);
     expect(first.notified).toBe(1);
-    expect(payloads()).toEqual([expect.objectContaining({ body: "Où se garer et où manger près de Château de Chambord : le résultat est prêt.", url: `/calendrier/rdv/${event}#sur-place` })]);
+    expect(payloads()).toEqual([expect.objectContaining({ body: "Où se garer et où manger près de Château de Chambord : le résultat est prêt.", url: "/assistant/demande" })]);
     expect((await runPlaceSearches(at(), fake)).notified).toBe(0);
     send.mockClear();
     const other = await seed(f);

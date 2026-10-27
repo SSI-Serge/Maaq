@@ -9,6 +9,7 @@ import { AppShell, appStyles } from "@/components/app/AppShell";
 import { Button, Loading, Notice, RetryNotice } from "@/components/ui";
 import type { AssistantMessageView, TaskDraftView } from "@/server/assistant/service";
 import type { TaskLists } from "@/server/assistant/tasks";
+import { PlaceResultsCard, PlaceSuggestionCard } from "./PlaceCards";
 import { EventProposalCard, TaskDraftCard } from "./ProposalCards";
 import styles from "./family.module.css";
 
@@ -22,6 +23,8 @@ interface Entry {
   role: "user" | "assistant";
   text: string;
   events: AssistantMessageView["events"];
+  /** Message « Sur place » du fil : suggestion ou résultat de la recherche (US-112). */
+  place?: AssistantMessageView["place"];
   /** Tâches proposées par l'assistant : cartes à ajouter, perdues au rechargement (rien n'est enregistré, US-110 RF1). */
   drafts?: TaskDraftView[];
   /** Demande envoyée sans réponse : on peut la renvoyer avec le même identifiant, sans doublon. */
@@ -38,6 +41,8 @@ interface Reply {
   failed: boolean;
   events: { id: string; title: string; start: string; status: string }[];
   taskDrafts?: TaskDraftView[];
+  /** Messages « Sur place » posés dans le fil par cette demande : l'écran recharge le fil pour les montrer. */
+  placeMessages?: number;
 }
 
 /**
@@ -65,7 +70,7 @@ export function AssistantChat() {
   const [error, setError] = useState<ApiError>();
   const bottom = useRef<HTMLDivElement>(null);
 
-  const past: Entry[] = (history.data?.messages ?? []).map((m) => ({ key: m.id, role: m.role, text: m.text, events: m.events }));
+  const past: Entry[] = (history.data?.messages ?? []).map((m) => ({ key: m.id, role: m.role, text: m.text, events: m.events, place: m.place }));
   // Les messages envoyés pendant cette visite ne sont repris de l'historique qu'au prochain chargement.
   const knownRequests = new Set((history.data?.messages ?? []).map((m) => m.requestId));
   const thread = [...past, ...added.filter((e) => !knownRequests.has(e.key.split(":")[0]))];
@@ -86,6 +91,8 @@ export function AssistantChat() {
         onSlow: () => setSlow(true),
       });
       setAdded((current) => [...current.filter((e) => e.failedRequest !== requestId), { key: `${requestId}:reply`, role: "assistant", text: reply.reply, events: reply.events, drafts: reply.taskDrafts }]);
+      // Une recherche ou une suggestion « Sur place » a été posée dans le fil : on le recharge pour la montrer, juste après la réponse.
+      if (reply.placeMessages) history.reload();
     } catch (err) {
       const apiError = err instanceof ApiError ? err : new ApiError("server", String(err));
       setError(apiError);
@@ -133,6 +140,8 @@ export function AssistantChat() {
         {thread.map((entry) => (
           <div key={entry.key} className={`${styles.bubble} ${entry.role === "user" ? styles.bubbleUser : styles.bubbleAgent}`}>
             {entry.text}
+            {entry.place?.kind === "place_suggestion" && <PlaceSuggestionCard place={entry.place} onAnswered={history.reload} />}
+            {entry.place?.kind === "place_results" && <PlaceResultsCard place={entry.place} onRetried={history.reload} />}
             {entry.events.map((e) =>
               e.status === "provisional" ? (
                 <EventProposalCard key={e.id} eventId={e.id} />

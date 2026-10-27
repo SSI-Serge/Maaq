@@ -1,5 +1,6 @@
 import type { Ctx, SessionContext } from "@/server/auth/service";
 import { capReachedMessage, localDay } from "@/server/chat/service";
+import { conversationOf, familyAgentId } from "./conversation";
 import { Rejection } from "@/server/http";
 import { env } from "@/server/env";
 import { decrypt, encrypt } from "@/server/security/crypto";
@@ -12,6 +13,7 @@ import { familyTimeZone } from "./reminders";
 import { createModel, type AssistantModel } from "./model";
 import { utcToLocal } from "./local-time";
 import { loadMembers, type MemberChip } from "./member-chips";
+import { placeMessageView, suggestPlaceSearch, type PlaceMessageView } from "./places";
 import { ruleLabel } from "./series";
 import { ruleFromTaskRepetition } from "./task-series";
 import type { TaskRepetition } from "./tasks";
@@ -81,6 +83,10 @@ export interface AssistantReply {
   proposals: number;
   /** Tâches seules proposées, à ajouter depuis une carte (jamais enregistrées par l'assistant). */
   taskDrafts: TaskDraftView[];
+  /** Recherches « Sur place » lancées par l'assistant, à exécuter aussitôt après la réponse (US-112 RF2). */
+  placeSearchIds: string[];
+  /** Messages « Sur place » posés dans le fil (suggestion ou résultat) : l'écran recharge le fil pour les montrer. */
+  placeMessages: number;
   durationMs: number;
 }
 
@@ -114,7 +120,7 @@ export async function sendAssistantMessage(
     .where("r.request_id", "=", input.requestId)
     .executeTakeFirst();
   if (answered?.content) {
-    return { requestId: input.requestId, reply: decrypt(answered.content, key()), failed: false, alreadyAnswered: true, events: [], proposals: 0, taskDrafts: [], durationMs: 0 };
+    return { requestId: input.requestId, reply: decrypt(answered.content, key()), failed: false, alreadyAnswered: true, events: [], proposals: 0, taskDrafts: [], placeSearchIds: [], placeMessages: 0, durationMs: 0 };
   }
 
   // Échanges récents, avant ce message : contexte d'une réponse à une question de l'assistant.
@@ -194,7 +200,7 @@ export async function sendAssistantMessage(
   events.sort((a, b) => a.start.localeCompare(b.start));
 
   if (result.status !== "ok") {
-    return { requestId: input.requestId, reply: result.reply, failed: true, alreadyAnswered: false, events, proposals: result.proposalIds.length, taskDrafts: [], durationMs: result.durationMs };
+    return { requestId: input.requestId, reply: result.reply, failed: true, alreadyAnswered: false, events, proposals: result.proposalIds.length, taskDrafts: [], placeSearchIds: [], placeMessages: 0, durationMs: result.durationMs };
   }
   const answeredAt = new Date(ctx.now.getTime() + result.durationMs);
   const reply = await ctx.db
@@ -204,7 +210,20 @@ export async function sendAssistantMessage(
     .executeTakeFirstOrThrow();
   await ctx.db.updateTable("assistant_requests").set({ reply_message_id: reply.id }).where("conversation_id", "=", conversation.id).where("request_id", "=", input.requestId).execute();
   await ctx.db.updateTable("agent_conversations").set({ last_message_at: answeredAt }).where("id", "=", conversation.id).execute();
-  return { requestId: input.requestId, reply: result.reply, failed: false, alreadyAnswered: false, events, proposals: result.proposalIds.length, taskDrafts: await draftViews(ctx.db, accountId, result.taskDrafts), durationMs: result.durationMs };
+
+  // « Sur place » (US-112) : les recherches lancées par l'assistant et les suggestions pour les lieux publics ou incertains s'affichent juste après sa réponse.
+  const afterReply = new Date(answeredAt.getTime() + 1000);
+  if (result.placeSearchIds.length) {
+    await ctx.db.updateTable("agent_conversation_messages").set({ created_at: afterReply }).where("conversation_id", "=", conversation.id).where("place_search_id", "in", result.placeSearchIds).execute();
+  }
+  let suggested = 0;
+  for (const [eventId] of result.placeHints) {
+    if (await suggestPlaceSearch(ctx.db, afterReply, { id: session.user.id, accountId, timeZone: tz, parent: true }, eventId)) suggested += 1;
+  }
+  return {
+    requestId: input.requestId, reply: result.reply, failed: false, alreadyAnswered: false, events, proposals: result.proposalIds.length, taskDrafts: await draftViews(ctx.db, accountId, result.taskDrafts),
+    placeSearchIds: result.placeSearchIds, placeMessages: result.placeSearchIds.length + suggested, durationMs: result.durationMs,
+  };
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------
@@ -222,6 +241,8 @@ export interface AssistantMessageView {
   at: string;
   /** Rendez-vous provisoires créés par la demande, pour le lien « Voir la proposition de RDV ». */
   events: { id: string; title: string; start: string; status: string }[];
+  /** Message « Sur place » (US-112) : suggestion « Voulez-vous que je cherche… ? » ou résultat de la recherche ; sans texte. */
+  place?: PlaceMessageView;
 }
 
 /** Messages récents du fil de ce parent, du plus ancien au plus récent. */
@@ -240,16 +261,20 @@ export async function listAssistantMessages(ctx: Ctx, session: SessionContext): 
     .selectFrom("agent_conversation_messages as m")
     .leftJoin("assistant_requests as ru", "ru.user_message_id", "m.id")
     .leftJoin("assistant_requests as ra", "ra.reply_message_id", "m.id")
-    .select(["m.id", "m.sender", "m.content", "m.created_at", "ru.request_id as user_request", "ra.request_id as reply_request", "ra.user_message_id as origin"])
+    .select(["m.id", "m.sender", "m.kind", "m.content", "m.family_event_id", "m.place_search_id", "m.created_at", "ru.request_id as user_request", "ra.request_id as reply_request", "ra.user_message_id as origin"])
     .where("m.conversation_id", "=", conversation.id)
     .where("m.created_at", ">=", since)
-    .where("m.content", "is not", null)
+    .where((eb) => eb.or([eb("m.content", "is not", null), eb("m.kind", "in", ["place_suggestion", "place_results"])]))
     .orderBy("m.created_at")
     .orderBy("m.id")
     .execute();
   const tz = session.device.timezone || "Europe/Paris";
   const out: AssistantMessageView[] = [];
   for (const row of rows) {
+    if (row.kind === "place_suggestion" || row.kind === "place_results") {
+      out.push({ id: String(row.id), requestId: "", role: "assistant", text: "", at: row.created_at.toISOString(), events: [], place: await placeMessageView(ctx.db, accountId, { kind: row.kind, family_event_id: row.family_event_id, place_search_id: row.place_search_id }) });
+      continue;
+    }
     const events: AssistantMessageView["events"] = [];
     if (row.sender === "agent" && row.origin !== null) {
       const created = await ctx.db
@@ -273,17 +298,4 @@ export async function listAssistantMessages(ctx: Ctx, session: SessionContext): 
 // Conversation
 // ---------------------------------------------------------------------------------------------------------------------------
 
-/** Ligne de l'Assistant Famille dans la table des agents (créée avec la base) : les conversations du tchat de MAAQ s'y rattachent. */
-export async function familyAgentId(db: Kysely<DB>): Promise<string> {
-  return (await db.selectFrom("agents").select("id").where("platform", "=", "anthropic").where("platform_agent_ref", "=", "assistant-famille").executeTakeFirstOrThrow()).id;
-}
-
-/** Une conversation par parent (agent_conversations : un profil, un agent). */
-async function conversationOf(db: Kysely<DB>, accountId: string, userId: string, now: Date): Promise<{ id: string }> {
-  return db
-    .insertInto("agent_conversations")
-    .values({ account_id: accountId, user_id: userId, agent_id: await familyAgentId(db), last_message_at: now })
-    .onConflict((oc) => oc.columns(["user_id", "agent_id"]).doUpdateSet({ last_message_at: now }))
-    .returning("id")
-    .executeTakeFirstOrThrow();
-}
+export { familyAgentId };

@@ -6,6 +6,7 @@ import { describeError } from "@/server/safe-log";
 import { integerSetting } from "@/server/settings";
 import type { PlacePoint } from "./address";
 import { loadCalendarEvent, type CalendarEvent } from "./calendar";
+import { conversationOf } from "./conversation";
 import { requireFamilyProfile } from "./family";
 import { open, seal } from "./fields";
 import { utcToLocal } from "./local-time";
@@ -146,22 +147,155 @@ const REFUSALS: Record<string, { status: number; message: (max: number) => strin
   daily_limit: { status: 429, message: () => "Vous avez atteint le nombre de demandes de la journée. Réessayez demain." },
 };
 
-/**
- * Demande une recherche « Sur place » (RF1, RF2, RF9) : atomique, par la base. Elle compte dans le plafond quotidien du profil. Retourne l'identifiant de la recherche, à exécuter aussitôt
- * (`runPlaceSearch`) ; le planificateur ne la reprend que si l'exécution n'a pas eu lieu.
- */
-export async function requestPlaceSearch(ctx: Ctx, session: SessionContext, eventId: string, origin: "button" | "chat" | "suggestion", provider: PlaceProvider | null = placeProvider()): Promise<string> {
-  requireFamilyProfile(session);
-  if (!provider) throw fail("place_off", "La recherche « Sur place » n'est pas ouverte.", 409);
-  const tz = session.device.timezone || "Europe/Paris";
+/** Le profil qui demande une recherche ou reçoit une suggestion. `parent` : il a un tchat avec l'assistant (les deux parents), où le message « Sur place » est posé. */
+export interface SearchUser {
+  id: string;
+  accountId: string;
+  timeZone: string;
+  parent: boolean;
+}
+
+/** Un message de l'assistant dans le tchat du profil : sans texte pour une suggestion ou un résultat « Sur place » (leur contenu vient de la base, pas d'une copie). */
+async function postMessage(db: Db, now: Date, user: SearchUser, message: { kind: "text" | "place_suggestion" | "place_results"; eventId?: string; searchId?: string; text?: string }): Promise<void> {
+  const conversation = await conversationOf(db, user.accountId, user.id, now);
+  await db
+    .insertInto("agent_conversation_messages")
+    .values({
+      conversation_id: conversation.id, sender: "agent", kind: message.kind, content: message.text ? seal(message.text) : null, family_event_id: message.eventId ?? null,
+      place_search_id: message.searchId ?? null, created_at: now,
+    })
+    .execute();
+}
+
+async function createSearch(db: Db, now: Date, user: SearchUser, eventId: string, origin: "button" | "chat" | "suggestion"): Promise<string> {
   const { rows } = await sql<{ search_id: string | null; refusal: string | null }>`
-    select search_id, refusal from request_place_search(${eventId}::uuid, ${session.user.id}::uuid, ${origin}::place_search_origin, ${utcToLocal(ctx.now, tz).slice(0, 10)}::date)`.execute(ctx.db);
+    select search_id, refusal from request_place_search(${eventId}::uuid, ${user.id}::uuid, ${origin}::place_search_origin, ${utcToLocal(now, user.timeZone).slice(0, 10)}::date)`.execute(db);
   const out = rows[0];
   if (!out?.search_id) {
     const refusal = REFUSALS[out?.refusal ?? ""] ?? REFUSALS.not_found;
-    throw fail(out?.refusal ?? "not_found", refusal.message(await integerSetting(ctx.db, "max_place_searches_per_event", 3)), refusal.status);
+    throw fail(out?.refusal ?? "not_found", refusal.message(await integerSetting(db, "max_place_searches_per_event", 3)), refusal.status);
   }
+  // Le résultat arrive dans le tchat (RF4) : le message, posé dès la demande, montre « Je cherche… » puis le résultat.
+  if (user.parent) await postMessage(db, now, user, { kind: "place_results", eventId, searchId: out.search_id });
   return out.search_id;
+}
+
+/**
+ * Demande une recherche « Sur place » (RF1, RF2, RF9) : atomique, par la base. Elle compte dans le plafond quotidien du profil. Retourne l'identifiant de la recherche, à exécuter aussitôt
+ * (`runPlaceSearch`) ; le planificateur ne la reprend que si l'exécution n'a pas eu lieu. Un parent la retrouve dans son tchat.
+ */
+export async function requestPlaceSearch(ctx: Ctx, session: SessionContext, eventId: string, origin: "button" | "chat" | "suggestion", provider: PlaceProvider | null = placeProvider()): Promise<string> {
+  const { accountId, parent } = requireFamilyProfile(session);
+  if (!provider) throw fail("place_off", "La recherche « Sur place » n'est pas ouverte.", 409);
+  return createSearch(ctx.db, ctx.now, { id: session.user.id, accountId, timeZone: session.device.timezone || "Europe/Paris", parent }, eventId, origin);
+}
+
+/** La même demande, faite par l'agent pour le parent qui lui écrit (« Où peut-on se garer et manger près du château ? », CA 2.1). */
+export async function requestPlaceSearchFor(db: Db, now: Date, user: SearchUser, eventId: string, provider: PlaceProvider | null = placeProvider()): Promise<string> {
+  if (!provider) throw fail("place_off", "La recherche « Sur place » n'est pas ouverte.", 409);
+  return createSearch(db, now, user, eventId, "chat");
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------
+// Suggestion automatique (RF3, D60)
+// ---------------------------------------------------------------------------------------------------------------------------
+
+/**
+ * « Voulez-vous que je cherche où se garer et où manger près de [lieu] ? » : proposée une seule fois par RDV, dans le tchat du parent qui a demandé le RDV, pour un RDV familial ou
+ * personnel avec un lieu (règle de la base). Le caractère public du lieu est jugé par l'agent quand il propose le RDV ; un lieu manifestement privé n'est jamais suggéré. Retourne vrai quand la
+ * suggestion est posée.
+ */
+export async function suggestPlaceSearch(db: Db, now: Date, user: SearchUser, eventId: string, provider: PlaceProvider | null = placeProvider()): Promise<boolean> {
+  if (!provider || !user.parent) return false;
+  try {
+    const row = await db
+      .insertInto("event_place_suggestions")
+      .values({ event_id: eventId, account_id: user.accountId, suggested_to_user_id: user.id })
+      .onConflict((oc) => oc.column("event_id").doNothing())
+      .returning("event_id")
+      .executeTakeFirst();
+    if (!row) return false;
+    await postMessage(db, now, user, { kind: "place_suggestion", eventId });
+    return true;
+  } catch (error) {
+    // Un RDV qui n'est ni familial ni personnel, ou sans lieu : la base refuse la suggestion, sans conséquence.
+    if ((error as { code?: string }).code === "23514") return false;
+    throw error;
+  }
+}
+
+/** « Oui » lance la recherche (origine « suggestion ») ; « Non, merci » est mémorisé et l'assistant répond (CA 3.2). La réponse ne se donne qu'une fois, par le parent à qui la suggestion a été faite. */
+export async function answerPlaceSuggestion(ctx: Ctx, session: SessionContext, eventId: string, answer: "accepted" | "declined", provider: PlaceProvider | null = placeProvider()): Promise<{ searchId: string | null }> {
+  const { accountId, parent } = requireFamilyProfile(session);
+  const suggestion = await ctx.db.selectFrom("event_place_suggestions").select(["answer", "suggested_to_user_id"]).where("event_id", "=", eventId).where("account_id", "=", accountId).executeTakeFirst();
+  if (!suggestion || suggestion.suggested_to_user_id !== session.user.id) throw fail("not_found", "Cette suggestion n'existe plus.", 404);
+  if (suggestion.answer !== "pending") throw fail("already_answered", "Vous avez déjà répondu à cette suggestion.", 409);
+  const user: SearchUser = { id: session.user.id, accountId, timeZone: session.device.timezone || "Europe/Paris", parent };
+  let searchId: string | null = null;
+  if (answer === "accepted") {
+    if (!provider) throw fail("place_off", "La recherche « Sur place » n'est pas ouverte.", 409);
+    searchId = await createSearch(ctx.db, ctx.now, user, eventId, "suggestion");
+  }
+  const done = await ctx.db
+    .updateTable("event_place_suggestions")
+    .set({ answer, answered_at: ctx.now, search_id: searchId })
+    .where("event_id", "=", eventId)
+    .where("answer", "=", "pending")
+    .returning("event_id")
+    .executeTakeFirst();
+  if (!done) throw fail("already_answered", "Vous avez déjà répondu à cette suggestion.", 409);
+  if (answer === "declined") await postMessage(ctx.db, ctx.now, user, { kind: "text", text: "D'accord. Vous pourrez lancer la recherche depuis le détail du RDV." });
+  return { searchId };
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------
+// Messages du tchat
+// ---------------------------------------------------------------------------------------------------------------------------
+
+export interface PlaceSearchDetail {
+  id: string;
+  status: "queued" | "running" | "done" | "no_result" | "failed" | "obsolete";
+  failureReason: string | null;
+  checkedOn: string | null;
+  place: string;
+  blocks: PlaceBlock[];
+}
+
+async function searchDetail(db: Db, accountId: string, searchId: string): Promise<PlaceSearchDetail | null> {
+  const s = await db.selectFrom("event_place_searches").select(["id", "event_id", "status", "failure_reason", "checked_on", "result_payload"]).where("id", "=", searchId).where("account_id", "=", accountId).executeTakeFirst();
+  if (!s) return null;
+  const e = await loadCalendarEvent(db, accountId, s.event_id);
+  return {
+    id: s.id, status: s.status, failureReason: s.failure_reason, checkedOn: s.checked_on ? String(s.checked_on) : null, place: e?.place ?? "",
+    blocks: s.status === "done" && s.result_payload ? blocksOf(JSON.parse(open(s.result_payload)) as PlacePayload) : [],
+  };
+}
+
+/** L'état d'une recherche, pour la carte du tchat qui se met à jour pendant la recherche : réservé aux profils qui voient le RDV. */
+export async function placeSearchById(ctx: Ctx, session: SessionContext, searchId: string): Promise<PlaceSearchDetail> {
+  const { accountId } = requireFamilyProfile(session);
+  const s = await ctx.db.selectFrom("event_place_searches").select("event_id").where("id", "=", searchId).where("account_id", "=", accountId).executeTakeFirst();
+  const visible = s ? await sql<{ id: string }>`select id from family_events_visible_to(${session.user.id}::uuid) where id = ${s.event_id}::uuid`.execute(ctx.db) : null;
+  const detail = visible?.rows[0] ? await searchDetail(ctx.db, accountId, searchId) : null;
+  if (!detail) throw fail("not_found", "Cette recherche n'existe plus.", 404);
+  return detail;
+}
+
+/** Ce que montre un message « Sur place » du tchat : la suggestion et sa réponse, ou la recherche et son résultat. */
+export interface PlaceMessageView {
+  kind: "place_suggestion" | "place_results";
+  eventId: string | null;
+  /** Le lieu du RDV, tel que saisi : « Château de Chambord ». */
+  place: string | null;
+  suggestion: "pending" | "accepted" | "declined" | null;
+  search: PlaceSearchDetail | null;
+}
+
+export async function placeMessageView(db: Db, accountId: string, row: { kind: "place_suggestion" | "place_results"; family_event_id: string | null; place_search_id: string | null }): Promise<PlaceMessageView> {
+  const e = row.family_event_id ? await loadCalendarEvent(db, accountId, row.family_event_id) : undefined;
+  const suggestion = row.kind === "place_suggestion" && row.family_event_id ? (await db.selectFrom("event_place_suggestions").select("answer").where("event_id", "=", row.family_event_id).executeTakeFirst())?.answer ?? null : null;
+  const search = row.place_search_id ? await searchDetail(db, accountId, row.place_search_id) : null;
+  return { kind: row.kind, eventId: e?.id ?? null, place: e?.place ?? search?.place ?? null, suggestion, search };
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------
@@ -248,7 +382,7 @@ async function sendReadyNotices(ctx: Ctx): Promise<number> {
         continue;
       }
       const body = `Où se garer et où manger près de ${e.place ?? "ce lieu"} : le résultat est prêt.`;
-      const out = await dispatch(ctx, row.account_id, to, { kind: "place_search_ready", userId: to.id, eventId: e.id, dueAt: ctx.now }, { body, url: `/calendrier/rdv/${e.id}#sur-place`, tag: `place-${e.id}`, subject: body, lines: [body] }, false);
+      const out = await dispatch(ctx, row.account_id, to, { kind: "place_search_ready", userId: to.id, eventId: e.id, dueAt: ctx.now }, { body, url: to.parent ? "/assistant/demande" : `/calendrier/rdv/${e.id}#sur-place`, tag: `place-${e.id}`, subject: body, lines: [body] }, false);
       if (out === "sent") sent += 1;
     } catch (error) {
       console.error(`Notification « Sur place » : ${describeError(error)}`);

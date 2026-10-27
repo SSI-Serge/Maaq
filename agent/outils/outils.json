@@ -80,6 +80,7 @@
         "journee_entiere": {"type": "boolean"},
         "membres": {"type": "array", "items": {"type": "string"}, "description": "Références des membres concernés."},
         "lieu": {"type": "string", "description": "Jamais pour un rendez-vous médical."},
+        "lieu_public": {"type": "string", "enum": ["oui", "doute", "non"], "description": "Seulement pour un rendez-vous familial ou personnel avec un lieu. « oui » : lieu public identifiable (monument, musée, parc, salle de spectacle, stade, établissement nommé). « doute » : une adresse seule, qui peut être celle d'un particulier. « non » : lieu manifestement privé (« chez Mamie », « chez les Martin »). MAAQ en tire une proposition de recherche « où se garer, où manger »."},
         "notes": {"type": "string", "description": "Préparation nécessaire, informations utiles. Jamais pour un rendez-vous médical."},
         "repetition": {
           "type": "object",
@@ -135,6 +136,18 @@
         "motif": {"type": "string", "description": "Raison du changement, ex. « report demandé par le cabinet »."}
       },
       "required": ["id", "motif"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "chercher_sur_place",
+    "description": "Lance la recherche « où se garer, où manger » près du lieu d'un rendez-vous existant (« Où peut-on se garer et manger près du château ? »). La recherche se fait en arrière-plan : le résultat arrive dans le tchat et dans le détail du rendez-vous, pas dans ta réponse. Jamais pour un rendez-vous médical. Retrouve d'abord le rendez-vous (rechercher_doublon ou lister_evenements) ; ne l'utilise pas pour créer ou modifier un rendez-vous.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "string", "description": "Identifiant du rendez-vous existant."}
+      },
+      "required": ["id"],
       "additionalProperties": false
     }
   },

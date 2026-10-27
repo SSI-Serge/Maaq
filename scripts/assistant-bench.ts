@@ -45,6 +45,7 @@ process.env.ENCRYPTION_KEY ??= throwaway(32);
 process.env.HMAC_KEY ??= throwaway(32);
 process.env.AUTH_SECRET ??= throwaway(32);
 process.env.CRON_SECRET ??= randomBytes(24).toString("hex");
+process.env.TRAVEL_MODE ??= "fake"; // « Sur place » (US-112) : l'outil de recherche existe, avec le faux service
 process.env.DATABASE_URL ??= "postgres://maaq:maaq@localhost:5432/inutilise";
 const provider = "anthropic" as const;
 const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -70,12 +71,18 @@ interface Case {
     /** Une tâche enregistrée sur un rendez-vous du calendrier de départ. */
     ajout_tache?: { evenement: string; titre_contient: string };
     /** Cartes de tâche seule proposées dans le tchat (rien n'est enregistré). */
+    /** Jugement de l'agent sur le lieu d'un RDV créé (`lieu_public`) : « oui », « doute », « non » ou « absent » (non renseigné) ; plusieurs choix séparés par « | ». */
+    lieu_public?: string;
+    /** Recherche « Sur place » lancée par l'agent pour un RDV du calendrier de départ (ou, avec `aucune`, non lancée). */
+    sur_place?: { evenement: string; aucune?: boolean };
     brouillons?: { nombre: number; due?: string; heure?: string; membre?: string; titre_contient?: string; repetition?: { frequence?: string; jours?: string[]; fin?: string; fin_date?: string; fin_nombre?: number } };
   };
   /** Échange rejoué d'abord avec le vrai modèle ; le message testé reçoit cet échange en historique. */
   precedent?: { message: string; source: "saisie" | "dictee" | "capture" | "mail"; question?: boolean };
   /** Tâches déjà enregistrées (« à faire ») sur un rendez-vous du calendrier de départ. */
   taches_initiales?: { evenement: string; titre: string; jours_avant: number }[];
+  /** Rendez-vous ajoutés au calendrier de départ pour ce cas seulement. */
+  evenements_initiaux?: (typeof data.calendrier_initial)[number][];
 }
 const data = JSON.parse(readFileSync(path.join(process.cwd(), "agent", "tests", "cas_de_test.json"), "utf8")) as {
   contexte: { maintenant: string; fuseau: string; utilisateur: string };
@@ -158,7 +165,7 @@ async function seedFamily() {
   return { accountId: account.id, userId: ids.get(data.contexte.utilisateur)! };
 }
 
-async function seedCalendar(accountId: string, userId: string, tasks: Case["taches_initiales"] = []) {
+async function seedCalendar(accountId: string, userId: string, tasks: Case["taches_initiales"] = [], extraEvents: NonNullable<Case["evenements_initiaux"]> = []) {
   await db.deleteFrom("family_event_change_proposals").where("account_id", "=", accountId).execute();
   // Les séries et les tâches du cas précédent partent avec leurs rendez-vous (tâches, modèles, rendez-vous, séries : dans cet ordre).
   await db.deleteFrom("family_tasks").where("account_id", "=", accountId).execute();
@@ -168,7 +175,7 @@ async function seedCalendar(accountId: string, userId: string, tasks: Case["tach
   const members = await db.selectFrom("family_members").select(["id", "first_name"]).where("account_id", "=", accountId).execute();
   const types = new Map((await db.selectFrom("event_types").select(["id", "code"]).execute()).map((t) => [t.code, t.id]));
   const { localToUtc } = await import("../src/server/assistant/local-time");
-  for (const e of data.calendrier_initial) {
+  for (const e of [...data.calendrier_initial, ...extraEvents]) {
     await db
       .insertInto("family_events")
       .values({
@@ -287,6 +294,16 @@ async function evaluate(c: Case, result: AgentRunResult, accountId: string): Pro
     if (!titles.some((t) => normalize(t).includes(normalize(w.titre_contient)))) failures.push(`tâche « ${w.titre_contient} » non enregistrée sur ${w.evenement}`);
   }
 
+  if (a.lieu_public !== undefined) {
+    const created = calls("creer_evenement_provisoire");
+    const got = created.length ? String(created[created.length - 1].lieu_public ?? "absent") : "(aucune création)";
+    if (!a.lieu_public.split("|").includes(got)) failures.push(`lieu_public « ${got} » au lieu de « ${a.lieu_public} »`);
+  }
+  if (a.sur_place) {
+    const n = (await db.selectFrom("event_place_searches").select("id").where("event_id", "=", seedUuid(a.sur_place.evenement)).execute()).length;
+    if (a.sur_place.aucune ? n > 0 : n === 0) failures.push(a.sur_place.aucune ? `recherche « Sur place » lancée pour ${a.sur_place.evenement}` : `aucune recherche « Sur place » lancée pour ${a.sur_place.evenement}`);
+  }
+
   if (a.brouillons) {
     const w = a.brouillons;
     const drafts = result.taskDrafts;
@@ -330,7 +347,7 @@ try {
   console.log(`Modèle ${process.env.MODELE ?? "claude-sonnet-5-5"} via ${provider} — ${cases.length} cas × ${runs} passage(s) — code de production de MAAQ\n`);
   for (let run = 1; run <= runs; run++) {
     for (const c of cases) {
-      await seedCalendar(accountId, userId, c.taches_initiales);
+      await seedCalendar(accountId, userId, c.taches_initiales, c.evenements_initiaux);
       await db.deleteFrom("family_event_change_proposals").where("account_id", "=", accountId).execute();
       const base = { db, model, definition, accountId, userId, members, authorMemberId: author, timeZone: TZ, now: NOW };
       const before: string[] = [];
