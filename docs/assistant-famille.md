@@ -305,6 +305,11 @@ enregistrée intouchable) ; tâches seules (simple, avec heure et personne, qui 
 enregistré (nombre et titres des tâches, prénoms absents, titres médicaux génériques) et les cartes de tâche. Un cas peut rejouer d'abord un échange avec le vrai modèle (`precedent`) : les cas 39 et 52 dépendent donc aussi
 de la réponse de l'étape préalable. Les cas ont été essayés à vide (fausse clé, aucun appel facturé) pour vérifier le décor et les contrôles.
 
+**Coût dans les journaux** (`src/server/assistant/cost.ts`) : chaque demande à l'assistant écrit une ligne `assistant_turn` avec le modèle, les jetons (neufs, lus du cache, écrits dans le cache, en sortie) et `costUsd`, une
+estimation aux tarifs publics du 06/10/2026 (Sonnet 5.5 : 2 $ et 10 $ par million de jetons en entrée et en sortie, lecture du cache 0,20 $, écriture 1,25 fois l'entrée). Le résumé du point écrit une ligne
+`assistant_digest` du même genre. Des chiffres seulement, jamais de contenu ; un modèle absent de la table donne `costUsd: null`. La ligne ne porte pas l'identifiant du foyer : le coût par foyer se déduit des heures,
+tant que le pilote reste petit. Le rapport du banc d'essai donne maintenant la part neuve, lue et écrite du cache et le coût estimé. La facture de l'API Anthropic fait foi.
+
 ## Pour déployer plus tard (rien de fait)
 1. Appliquer la migration `0007` sur Supabase, puis relancer `deploy/supabase-securiser.sql` (nouvelles tables).
 2. Ranger les clés dans Secret Manager et les passer à Cloud Run avec les réglages `ASSISTANT_*`.

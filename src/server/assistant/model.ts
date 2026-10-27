@@ -28,6 +28,8 @@ export interface ModelResponse {
 }
 
 export interface AssistantModel {
+  /** Identifiant du modèle, pour le coût estimé des journaux (absent d'un faux modèle de test). */
+  readonly id?: string;
   send(request: ModelRequest): Promise<ModelResponse>;
 }
 
@@ -64,6 +66,7 @@ export function createModel(config: ModelConfig): AssistantModel {
   const url = `${config.baseUrl ?? "https://api.anthropic.com"}/v1/messages`;
 
   return {
+    id: config.model,
     async send(request) {
       const body = {
         model: config.model,

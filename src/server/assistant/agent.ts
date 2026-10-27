@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import type { Kysely } from "kysely";
 import type { DB } from "@/server/db/schema.generated";
+import { estimateCostUsd } from "./cost";
 import { describeNow } from "./local-time";
 import type { AssistantModel, ContentBlock, ModelMessage, TextBlock, ToolResultBlock, ToolUseBlock } from "./model";
 import { Pseudonymizer, type PseudoMember } from "./pseudonymize";
@@ -211,7 +212,7 @@ export async function runAssistant(input: AgentRunInput): Promise<AgentRunResult
   console.info(
     JSON.stringify({
       event: "assistant_turn", status: result.status, durationMs: result.durationMs, turns: result.turns, tools: result.toolCalls.map((c) => c.name),
-      toolErrors: result.toolCalls.filter((c) => c.isError).length, tokens: result.usage, requestIds: result.requestIds,
+      toolErrors: result.toolCalls.filter((c) => c.isError).length, model: input.model.id ?? null, tokens: result.usage, costUsd: estimateCostUsd(input.model.id, result.usage), requestIds: result.requestIds,
       leaks: result.leaks.length, unknownAliases: result.unknownAliases.length,
     }),
   );

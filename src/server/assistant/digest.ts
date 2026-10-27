@@ -12,6 +12,7 @@ import { presentedQuestions, type QuestionView } from "./anticipation";
 import { loadPseudoMembers } from "./family";
 import { open, seal } from "./fields";
 import { localDay, localToUtc, utcToLocal } from "./local-time";
+import { estimateCostUsd } from "./cost";
 import { createModel, type AssistantModel } from "./model";
 import { getPersonalSettings } from "./notices";
 import { Pseudonymizer } from "./pseudonymize";
@@ -267,6 +268,8 @@ export async function prepareDigest(ctx: Ctx, accountId: string, weekStart: stri
       model.send({ system: instructions(), tools: [], messages: [{ role: "user", content: input.text }] }),
       new Promise<never>((_resolve, reject) => setTimeout(() => reject(new Error("délai dépassé")), SUMMARY_TIMEOUT_MS)),
     ]);
+    // Trace d'exploitation : métadonnées seulement, jamais le contenu du résumé.
+    console.info(JSON.stringify({ event: "assistant_digest", model: model.id ?? null, tokens: answer.usage, costUsd: estimateCostUsd(model.id, answer.usage), requestId: answer.requestId }));
     const text = answer.content.filter((b): b is { type: "text"; text: string } => b.type === "text").map((b) => b.text).join("\n").trim();
     if (!text || answer.stopReason !== "end_turn") throw new Error("réponse inutilisable");
     await ctx.db.updateTable("weekly_digests").set({ summary_status: "generated", agent_summary: seal(text), generated_at: ctx.now, events_count: input.events, tasks_count: input.tasks }).where("id", "=", claimed).execute();

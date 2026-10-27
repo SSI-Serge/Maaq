@@ -19,6 +19,7 @@ import { open, seal, sealOptional } from "../src/server/assistant/fields";
 import { loadPseudoMembers } from "../src/server/assistant/family";
 import { loadCalendarEvent, STATUS_CODE, TYPE_CODE } from "../src/server/assistant/calendar";
 import { utcToLocal } from "../src/server/assistant/local-time";
+import { estimateCostUsd } from "../src/server/assistant/cost";
 import { createModel } from "../src/server/assistant/model";
 import { migrate } from "../src/server/db/migrate";
 import type { DB } from "../src/server/db/schema.generated";
@@ -359,12 +360,22 @@ try {
   const missed = duplicates.filter((o) => o.result.createdEventIds.length > 0);
   const tokensIn = outcomes.reduce((n, o) => n + o.result.usage.inputTokens + o.result.usage.cacheRead + o.result.usage.cacheWrite, 0);
   const tokensOut = outcomes.reduce((n, o) => n + o.result.usage.outputTokens, 0);
+  const fresh = outcomes.reduce((n, o) => n + o.result.usage.inputTokens, 0);
+  const cacheRead = outcomes.reduce((n, o) => n + o.result.usage.cacheRead, 0);
+  const cacheWrite = outcomes.reduce((n, o) => n + o.result.usage.cacheWrite, 0);
+  const modelId = process.env.MODELE ?? "claude-sonnet-5-5";
+  const costs = outcomes.map((o) => estimateCostUsd(modelId, o.result.usage)).filter((c): c is number => c !== null);
+  const totalCost = costs.reduce((n, c) => n + c, 0);
+  const costMedian = [...costs].sort((x, y) => x - y)[Math.floor(costs.length / 2)] ?? 0;
   const lines = [
     `# Banc d'essai de bout en bout — ${new Date().toLocaleString("fr-FR")}`, "",
     `- Modèle : \`${process.env.MODELE ?? "claude-sonnet-5-5"}\` via \`${provider}\` ; code de production de MAAQ (boucle, outils, pseudonymisation), base de test jetable`,
     `- Résultat : **${passed} / ${outcomes.length}** (${((100 * passed) / outcomes.length).toFixed(0)} %)`,
     `- Durée par demande : médiane ${pct(50).toFixed(1)} s, 95e centile ${pct(95).toFixed(1)} s, ${times.filter((t) => t < SECONDS_LIMIT).length} / ${times.length} sous ${SECONDS_LIMIT} s`,
-    `- Jetons : ${tokensIn} en entrée, ${tokensOut} en sortie ; erreurs d'outils : ${outcomes.reduce((n, o) => n + o.result.toolCalls.filter((t) => t.isError).length, 0)}`,
+    `- Jetons : ${tokensIn} en entrée (dont ${fresh} neufs, ${cacheRead} lus du cache, ${cacheWrite} écrits dans le cache), ${tokensOut} en sortie ; erreurs d'outils : ${outcomes.reduce((n, o) => n + o.result.toolCalls.filter((t) => t.isError).length, 0)}`,
+    costs.length === outcomes.length
+      ? `- **Coût estimé : ${totalCost.toFixed(2)} $** au total, ${(totalCost / outcomes.length).toFixed(3)} $ par demande en moyenne (médiane ${costMedian.toFixed(3)} $) ; ${cacheRead > 0 ? "demandes rapprochées : le cache est plus chaud qu'au quotidien" : "sans lecture du cache"}`
+      : `- Coût estimé : tarif inconnu pour le modèle ${modelId}`,
     `- **Doublons manqués : ${missed.length} / ${duplicates.length}**`, "",
     "| Cas | Passage | Résultat | Durée (s) | Outils | Problèmes |", "|---|---|---|---|---|---|",
     ...outcomes.map((o) => `| ${o.id} | ${o.run} | ${o.failures.length ? "ÉCHEC" : "OK"} | ${o.seconds.toFixed(1)} | ${o.result.trace.length} | ${o.failures.join(" ; ") || "–"} |`), "",
