@@ -1,3 +1,4 @@
+import { describeError } from "@/server/safe-log";
 import type { Kysely } from "kysely";
 import { createHash } from "node:crypto";
 import webpush from "web-push";
@@ -141,7 +142,7 @@ export async function sendPush(ctx: Ctx, userId: string, payload: PushPayload): 
           break;
         }
         if (!temporary(status) || attempt === 2) {
-          console.error("Notification non envoyée :", status ?? error);
+          console.error(`Notification non envoyée : ${describeError(error)}`);
           break;
         }
       }

@@ -562,6 +562,39 @@ describe("message d'un parent à l'assistant", () => {
     expect(reply.events).toEqual([expect.objectContaining({ title: "Judo", type: "personal", status: "provisional", start: "2054-11-07T10:00", end: "2054-11-07T11:00" })]);
   });
 
+  it("plafonne les demandes du jour par profil (US-70, AF-7) : un renvoi ne recompte pas, la demande refusée n'enregistre rien", async () => {
+    const f = await family();
+    await db.updateTable("accounts").set({ daily_request_limit: 2 }).where("id", "=", f.accountId).execute();
+    const model = answering();
+    const ask = (requestId: string, session = f.session, ctx: Ctx = ctxAt()) => sendAssistantMessage(ctx, session, { requestId, text: "Bonjour" }, { model });
+    const first = randomUUID();
+    await ask(first);
+    await ask(first); // renvoi : la réponse déjà donnée, sans nouveau décompte
+    await ask(randomUUID());
+    const refused = await rejectionOf(ask(randomUUID()));
+    expect([refused.status, refused.code]).toEqual([429, "daily_cap_reached"]);
+    expect(refused.message).toContain("(2)");
+    expect(model.requests).toHaveLength(2); // la demande refusée n'a pas atteint le modèle
+    const stored = () => db.selectFrom("agent_conversation_messages as m").innerJoin("agent_conversations as c", "c.id", "m.conversation_id").select("m.id").where("c.account_id", "=", f.accountId).execute();
+    expect(await stored()).toHaveLength(4); // deux échanges, rien pour la demande refusée
+    // Le plafond est propre à chaque profil, et repart le lendemain (jour du fuseau de l'appareil).
+    expect((await ask(randomUUID(), await sessionFor(db, f.marc.id))).failed).toBe(false);
+    const tomorrow: Ctx = { db, now: new Date(NOW.getTime() + 24 * 3_600_000) };
+    expect((await ask(randomUUID(), f.session, tomorrow)).failed).toBe(false);
+  });
+
+  it("compte une demande dont le modèle échoue une seule fois, même renvoyée", async () => {
+    const f = await family();
+    await db.updateTable("accounts").set({ daily_request_limit: 1 }).where("id", "=", f.accountId).execute();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const down: AssistantModel = { send: async () => { throw new ModelError("hors service", 503, true); } };
+    const requestId = randomUUID();
+    expect((await sendAssistantMessage(ctxAt(), f.session, { requestId, text: "Dentiste" }, { model: down })).failed).toBe(true);
+    expect((await sendAssistantMessage(ctxAt(), f.session, { requestId, text: "Dentiste" }, { model: answering("Reçu.") })).reply).toBe("Reçu."); // même demande : pas de nouveau décompte
+    expect((await rejectionOf(sendAssistantMessage(ctxAt(), f.session, { requestId: randomUUID(), text: "Autre" }, { model: answering() }))).code).toBe("daily_cap_reached");
+    vi.restoreAllMocks();
+  });
+
   it("réserve l'assistant aux parents, refuse les messages vides ou trop longs et reste fermé sans ASSISTANT_MODE=live", async () => {
     const f = await family();
     const model = answering();
@@ -632,6 +665,61 @@ describe("message d'un parent à l'assistant", () => {
       expect(await db.selectFrom(table).select("account_id").where("account_id", "=", f.accountId).execute()).toHaveLength(0);
     }
     expect(await db.selectFrom("agent_conversation_messages").select("id").where("conversation_id", "in", conversations).execute()).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------------------------------------
+describe("journaux sans contenu (M-25, AIPD)", () => {
+  const SECRET = "Dentiste-de-Léo-secretariat@cabinet.example";
+
+  /** Tout ce qui est écrit dans les journaux pendant l'exécution, avec les objets d'erreur sérialisés comme le fait la console. */
+  async function logged(run: () => Promise<unknown>): Promise<string> {
+    const lines: string[] = [];
+    const record = (...args: unknown[]) => lines.push(args.map((a) => (a instanceof Error ? `${a.name}: ${a.message}\n${a.stack}` : typeof a === "string" ? a : JSON.stringify(a))).join(" "));
+    const spies = (["error", "warn", "info", "log"] as const).map((level) => vi.spyOn(console, level).mockImplementation(record));
+    try {
+      await run();
+    } finally {
+      spies.forEach((s) => s.mockRestore());
+    }
+    return lines.join("\n");
+  }
+
+  it("n'écrit jamais le texte d'une erreur d'outil, même quand la base le reprend dans son message", async () => {
+    const f = await family();
+    const leaky = { selectFrom: () => { throw Object.assign(new Error(`duplicate key value violates unique constraint — Key (title)=(${SECRET})`), { code: "23505", constraint: "ux_x" }); } } as unknown as Kysely<DB>;
+    const model = scripted((req, n) => (n === 0 ? [use("t1", "lister_evenements", { date_debut: "2054-11-02", date_fin: "2054-11-09" })] : say("Désolé.")));
+    const output = await logged(async () => runAssistant(await runInput(f, model, { db: leaky, text: `Note ${SECRET}` })));
+    expect(output).toContain("outil lister_evenements en échec");
+    expect(output).toContain("code=23505");
+    expect(output).toContain("contrainte=ux_x");
+    expect(output).not.toContain("Dentiste");
+    expect(output).not.toContain("secretariat");
+    expect(output).not.toContain("Léo");
+  });
+
+  it("n'écrit jamais le texte d'une erreur du modèle, ni celui d'une erreur de route", async () => {
+    const f = await family();
+    const failing: AssistantModel = { send: async () => { throw Object.assign(new Error(`réponse illisible : ${SECRET}`), { status: 502 }); } };
+    const output = await logged(async () => {
+      await runAssistant(await runInput(f, failing, { text: `Note ${SECRET}` }));
+      const { handler } = await import("@/server/http");
+      await handler(async () => { throw new Error(`échec sur ${SECRET}`); })();
+    });
+    expect(output).toContain("échec de la demande");
+    expect(output).toContain("http=502");
+    expect(output).not.toContain("secretariat");
+    expect(output).not.toContain("Dentiste");
+    expect(output).not.toContain("réponse illisible");
+  });
+
+  it("la trace d'une demande ne contient que des métadonnées", async () => {
+    const f = await family();
+    const model = scripted(() => say("Noté, rendez-vous chez le Dr Martin."));
+    const output = await logged(async () => runAssistant(await runInput(f, model, { text: `Note ${SECRET}` })));
+    expect(output).toContain("assistant_turn");
+    expect(output).not.toContain("Martin");
+    expect(output).not.toContain("secretariat");
   });
 });
 

@@ -1,3 +1,4 @@
+import { describeError } from "@/server/safe-log";
 import { sql, type Kysely } from "kysely";
 import { messenger, type OutgoingEmail } from "@/server/adapters/messaging";
 import type { Ctx, SessionContext } from "@/server/auth/service";
@@ -290,7 +291,7 @@ async function deliver(ctx: Ctx, accountId: string, eventId: string, kind: Remin
       await markSent(ctx, eventId, kind, dueAt, to.id, { push: pushed > 0, email });
       totals.sent += 1;
     } catch (error) {
-      console.error("Rappel non envoyé :", error);
+      console.error(`Rappel non envoyé : ${describeError(error)}`);
       if (pushed > 0) {
         // La notification est partie : on garde l'envoi pour ne pas la rejouer ; seul l'email de J-1 manque.
         await markSent(ctx, eventId, kind, dueAt, to.id, { push: true, email: false });

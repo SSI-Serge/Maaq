@@ -1,9 +1,10 @@
 import type { Ctx, SessionContext } from "@/server/auth/service";
+import { capReachedMessage, localDay } from "@/server/chat/service";
 import { Rejection } from "@/server/http";
 import { env } from "@/server/env";
 import { decrypt, encrypt } from "@/server/security/crypto";
 import type { DB } from "@/server/db/schema.generated";
-import type { Kysely } from "kysely";
+import { sql, type Kysely } from "kysely";
 import { loadCalendarEvent } from "./calendar";
 import { loadAgentDefinition, runAssistant, type AgentDefinition, type AgentLimits, type AgentSource } from "./agent";
 import { loadPseudoMembers, requireParent } from "./family";
@@ -114,14 +115,29 @@ export async function sendAssistantMessage(
   // Message du parent : conservé chiffré (vrais prénoms), puis relié à sa demande. Une demande renvoyée avant sa réponse retrouve le même message.
   let userMessageId = (await ctx.db.selectFrom("assistant_requests").select("user_message_id").where("conversation_id", "=", conversation.id).where("request_id", "=", input.requestId).executeTakeFirst())?.user_message_id;
   if (userMessageId === undefined) {
-    userMessageId = (
-      await ctx.db
-        .insertInto("agent_conversation_messages")
-        .values({ conversation_id: conversation.id, sender: "profile", kind: source === "dictation" ? "voice_transcript" : "text", content: encrypt(text, key()), created_at: ctx.now })
-        .returning("id")
-        .executeTakeFirstOrThrow()
-    ).id;
-    await ctx.db.insertInto("assistant_requests").values({ conversation_id: conversation.id, request_id: input.requestId, user_message_id: userMessageId }).execute();
+    // Première fois que cette demande arrive : elle compte dans le plafond quotidien du profil (US-70, AF-7). Un renvoi (« Réessayer ») ne recompte pas.
+    const day = localDay(ctx.now, session.device.timezone || "Europe/Paris");
+    const accepted = await sql<{ accepted: boolean }>`select register_agent_request(${session.user.id}::uuid, ${day}::date) as accepted`.execute(ctx.db);
+    if (!accepted.rows[0]?.accepted) {
+      const { daily_request_limit: limit } = await ctx.db.selectFrom("accounts").select("daily_request_limit").where("id", "=", accountId).executeTakeFirstOrThrow();
+      throw new Rejection("daily_cap_reached", capReachedMessage(limit), 429, { limit });
+    }
+    try {
+      userMessageId = (
+        await ctx.db
+          .insertInto("agent_conversation_messages")
+          .values({ conversation_id: conversation.id, sender: "profile", kind: source === "dictation" ? "voice_transcript" : "text", content: encrypt(text, key()), created_at: ctx.now })
+          .returning("id")
+          .executeTakeFirstOrThrow()
+      ).id;
+      await ctx.db.insertInto("assistant_requests").values({ conversation_id: conversation.id, request_id: input.requestId, user_message_id: userMessageId }).execute();
+    } catch (error) {
+      // La demande n'a pas pu être enregistrée (la même est déjà en cours chez un autre appareil) : elle ne compte pas.
+      await ctx.db.updateTable("daily_request_counters").set({ request_count: sql`greatest(request_count - 1, 0)` }).where("user_id", "=", session.user.id).where("request_date", "=", sql<Date>`${day}::date`).execute();
+      if (userMessageId !== undefined) await ctx.db.deleteFrom("agent_conversation_messages").where("id", "=", userMessageId).execute();
+      if ((error as { code?: string }).code === "23505") throw new Rejection("request_in_progress", "Cette demande est déjà en cours de traitement.", 409);
+      throw error;
+    }
   }
 
   const members = await loadPseudoMembers(ctx.db, accountId);

@@ -1,3 +1,4 @@
+import { describeError } from "@/server/safe-log";
 import { NextResponse } from "next/server";
 import type { z } from "zod";
 
@@ -30,7 +31,8 @@ export function handler<Args extends unknown[]>(
       return await fn(...args);
     } catch (error) {
       if (error instanceof Rejection) return rejected(error.code, error.message, error.status, error.details);
-      console.error(error);
+      // Jamais le message : une erreur de base ou de service peut reprendre des valeurs saisies (titres, emails).
+      console.error(`[api] erreur : ${describeError(error)}`);
       return NextResponse.json({ error: { code: "server_error", message: "Erreur interne" } }, { status: 500 });
     }
   };

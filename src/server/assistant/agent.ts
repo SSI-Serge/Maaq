@@ -1,3 +1,4 @@
+import { describeError } from "@/server/safe-log";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import type { Kysely } from "kysely";
@@ -172,7 +173,7 @@ export async function runAssistant(input: AgentRunInput): Promise<AgentRunResult
           try {
             outcome = await executeTool(use.name, use.input, toolContext);
           } catch (error) {
-            console.error(`[assistant] outil ${use.name} en échec :`, error);
+            console.error(`[assistant] outil ${use.name} en échec : ${describeError(error)}`);
             outcome = { content: "Erreur : l'outil a rencontré un problème, réessayez ou posez la question au parent.", isError: true };
           }
           result.toolCalls.push({ name: use.name, ms: Date.now() - t0, isError: outcome.isError });
@@ -195,7 +196,7 @@ export async function runAssistant(input: AgentRunInput): Promise<AgentRunResult
     }
   } catch (error) {
     result.status = "error";
-    console.error("[assistant] échec de la demande :", (error as Error).message);
+    console.error(`[assistant] échec de la demande : ${describeError(error)}`);
   }
 
   result.createdEventIds = toolContext.created.ids;
