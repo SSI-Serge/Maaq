@@ -1,7 +1,7 @@
 import { sql } from "kysely";
 import { Rejection } from "@/server/http";
 import { integerSetting } from "@/server/settings";
-import { seal } from "./fields";
+import { open, openOptional, seal } from "./fields";
 import { localDay } from "./local-time";
 import { addDays, expandOccurrences, isoWeekday, ruleOf, type Db, type SeriesRule } from "./series";
 import { ruleFromRepetition, repetitionOf, type RepetitionInput } from "./series-ops";
@@ -150,14 +150,30 @@ const ruleColumns = (rule: SeriesRule) => ({
   month_weekday: rule.monthWeekday ?? null, end_kind: rule.end.kind, until_date: rule.end.kind === "date" ? rule.end.date : null, occurrence_count: rule.end.kind === "count" ? rule.end.count : null,
 });
 
-/** « Toutes » : le modèle et la règle sont remplacés, les occurrences à venir qui restent à faire sont recréées ; les passées, les faites et les annulées ne bougent pas. */
-export async function rewriteOwnSeries(db: Db, series: TaskSeriesRow, edit: SeriesTaskEdit, today: string): Promise<void> {
+/**
+ * « Toutes » : le modèle et la règle sont remplacés, les occurrences à venir qui restent à faire et qui suivent le modèle sont recréées ; les passées, les faites, les annulées et
+ * celles déjà modifiées seules (autre date, autre titre, autre personne, autre heure) ne bougent pas (D47, D61). L'occurrence d'où l'on modifie est toujours réécrite.
+ */
+export async function rewriteOwnSeries(db: Db, series: TaskSeriesRow, edit: SeriesTaskEdit, today: string, anchorId?: string): Promise<void> {
+  const title = open(series.title);
+  const note = openOptional(series.note);
+  const time = series.due_time ? series.due_time.slice(0, 5) : null;
+  const upcoming = await db
+    .selectFrom("family_tasks")
+    .select(["id", "title", "note", "assigned_member_id", sql<string>`due_date::text`.as("due"), sql<string | null>`due_time::text`.as("due_time"), sql<string>`occurrence_date::text`.as("occurrence")])
+    .where("series_id", "=", series.id)
+    .where("status", "=", "todo")
+    .where((eb) => eb.or([eb("due_date", ">=", sql<Date>`${today}::date`), eb("occurrence_date", ">=", sql<Date>`${today}::date`)]))
+    .execute();
+  const replaceable = upcoming
+    .filter((t) => t.id === anchorId || (t.due === t.occurrence && open(t.title) === title && openOptional(t.note) === note && t.assigned_member_id === series.assigned_member_id && (t.due_time ? t.due_time.slice(0, 5) : null) === time))
+    .map((t) => t.id);
   await db
     .updateTable("family_task_series")
     .set({ title: seal(edit.title), note: edit.note ? seal(edit.note) : null, assigned_member_id: edit.assigneeId, due_time: edit.dueTime, ...ruleColumns(edit.rule), materialized_until: null })
     .where("id", "=", series.id)
     .execute();
-  await db.deleteFrom("family_tasks").where("series_id", "=", series.id).where("status", "=", "todo").where("due_date", ">=", sql<Date>`${today}::date`).execute();
+  if (replaceable.length) await db.deleteFrom("family_tasks").where("id", "in", replaceable).execute();
   const fresh = (await loadTaskSeries(db, series.account_id, series.id))!;
   await materializeOwnSeries(db, fresh, today, await taskHorizon(db, today));
 }

@@ -6,7 +6,7 @@ import { cancelEvent, confirmEvent, getEvent, updateEvent } from "@/server/assis
 import { addEventTask, removeEventTask, updateEventTask } from "@/server/assistant/event-tasks";
 import { loadAgentDefinition } from "@/server/assistant/agent";
 import { addChild, listFamilyMembers, loadPseudoMembers, removeMember } from "@/server/assistant/family";
-import { seal } from "@/server/assistant/fields";
+import { open, seal } from "@/server/assistant/fields";
 import { localToUtc } from "@/server/assistant/local-time";
 import { Pseudonymizer } from "@/server/assistant/pseudonymize";
 import { createSeries, type SeriesRule } from "@/server/assistant/series";
@@ -249,11 +249,24 @@ describe("tâche récurrente (US-110 RF3 à RF5, RF11, RT2)", () => {
     const series = (await db.selectFrom("family_tasks").select("series_id").where("id", "=", first.id).executeTakeFirstOrThrow()).series_id!;
     const later = new Date("2054-11-12T08:00:00Z"); // vendredi 12 : l'occurrence du 10 est en retard, celles à partir du 17 sont à venir
     const next = await db.selectFrom("family_tasks").select(["id", "version"]).where("series_id", "=", series).where("due_date", "=", "2054-11-17" as unknown as Date).executeTakeFirstOrThrow();
+    // La séance du 1er décembre a déjà été modifiée seule : « Toutes » n'y touche pas (D47, D61). Celle du 8 est déplacée au 9.
+    const special = await db.selectFrom("family_tasks").select(["id", "version"]).where("series_id", "=", series).where("due_date", "=", "2054-12-01" as unknown as Date).executeTakeFirstOrThrow();
+    await updateTask(at(later), f.sophie, special.id, { title: "Bac spécial", due: "2054-12-01" }, { expectedVersion: special.version, scope: "this" });
+    const moved = await db.selectFrom("family_tasks").select(["id", "version"]).where("series_id", "=", series).where("due_date", "=", "2054-12-08" as unknown as Date).executeTakeFirstOrThrow();
+    await updateTask(at(later), f.sophie, moved.id, { title: "Sortir les poubelles", due: "2054-12-09" }, { expectedVersion: moved.version, scope: "this" });
     const changed = await updateTask(at(later), f.sophie, next.id, { title: "Sortir les bacs", due: "2054-11-17", dueTime: "19:00", assigneeId: f.ids.marc }, { expectedVersion: next.version, scope: "all" });
     expect(changed).toMatchObject({ title: "Sortir les bacs", dueTime: "19:00", rule: "Chaque mardi" });
     const titles = await db.selectFrom("family_tasks").select(["title", "assigned_member_id"]).select((eb) => eb.fn<string>("to_char", ["due_date", eb.val("YYYY-MM-DD")]).as("day")).where("series_id", "=", series).orderBy("due_date").execute();
     expect(titles[0].assigned_member_id).toBeNull(); // 3/11 : passée, intacte
-    expect(titles.filter((t) => t.day >= "2054-11-17").every((t) => t.assigned_member_id === f.ids.marc)).toBe(true);
+    const kept = titles.filter((t) => t.day === "2054-12-01" || t.day === "2054-12-09");
+    expect(kept).toHaveLength(2); // les deux occurrences déjà modifiées seules sont intactes
+    expect(open(kept[0].title)).toBe("Bac spécial");
+    expect(kept.every((t) => t.assigned_member_id === null)).toBe(true);
+    const followed = titles.filter((t) => t.day >= "2054-11-17" && !kept.includes(t));
+    expect(followed.length).toBeGreaterThan(3);
+    expect(followed.every((t) => t.assigned_member_id === f.ids.marc && open(t.title) === "Sortir les bacs")).toBe(true);
+    // Rien n'est dupliqué : une occurrence déplacée ne redonne pas une occurrence à sa date d'origine.
+    expect(titles.filter((t) => t.day === "2054-12-08")).toHaveLength(0);
   });
 
   it("annule une occurrence, les suivantes ou toute la tâche (RF5)", async () => {
@@ -704,10 +717,38 @@ describe("l'agent et les tâches (US-95 RF1, RT1, RT5 ; US-110 RF1)", () => {
     expect(created).toMatchObject({ title: "Payer la cantine", dueTime: "08:15" });
   });
 
+  it("ajuste ou retire une tâche encore proposée, désignée par son titre ; refuse une tâche enregistrée (D61)", async () => {
+    const f = await family();
+    const c = await tools(f);
+    await executeTool("creer_evenement_provisoire", { ...birthday, taches: [{ titre: "Commander le gâteau", echeance: "2_jours_avant" }, { titre: "Acheter un cadeau", echeance: "3_jours_avant" }] }, c);
+    const eventId = c.created.ids[0];
+    const id = `evt-${eventId.slice(0, 8)}`;
+    const ok = await executeTool("modifier_tache_proposee", { id, titre: "gâteau", echeance: "la_veille", membre: "Parent 1" }, c);
+    expect(ok.isError).toBe(false);
+    let items = (await getEvent(at(), f.sophie, eventId)).tasks!.items;
+    expect(items.find((t) => t.title === "Commander le gâteau")).toMatchObject({ relative: "La veille", due: "2054-11-06", status: "proposed", assignee: expect.objectContaining({ firstName: "Sophie" }) });
+    expect((await executeTool("modifier_tache_proposee", { id, titre: "cadeau", nouveau_titre: "Acheter un jeu de société" }, c)).isError).toBe(false);
+    expect((await executeTool("modifier_tache_proposee", { id, titre: "cadeau" }, c)).content).toContain("aucune tâche proposée"); // le titre a changé
+    expect((await executeTool("modifier_tache_proposee", { id, titre: "jeu" }, c)).content).toContain("rien à changer");
+    expect((await executeTool("modifier_tache_proposee", { id, titre: "jeu", echeance: "1_semaine_avant" }, c)).content).toContain("déjà passée");
+    expect((await executeTool("retirer_tache_proposee", { id, titre: "jeu de société" }, c)).isError).toBe(false);
+    items = (await getEvent(at(), f.sophie, eventId)).tasks!.items;
+    expect(items.map((t) => t.title)).toEqual(["Commander le gâteau"]);
+    expect((await executeTool("retirer_tache_proposee", { id, titre: "salle" }, c)).content).toContain("aucune tâche proposée");
+    // Une fois le RDV confirmé, la tâche est enregistrée : l'agent ne la modifie pas et renvoie vers l'écran Tâches.
+    const shown = await getEvent(at(), f.sophie, eventId);
+    await confirmEvent(at(), f.sophie, eventId, { expectedVersion: shown.version });
+    const refused = await executeTool("modifier_tache_proposee", { id, titre: "gâteau", echeance: "le_jour_meme" }, c);
+    expect(refused.isError).toBe(true);
+    expect(refused.content).toContain("ouvrez-la dans Tâches");
+    expect((await executeTool("retirer_tache_proposee", { id, titre: "gâteau" }, c)).content).toContain("ouvrez-la dans Tâches");
+    expect((await getEvent(at(), f.sophie, eventId)).tasks!.items).toHaveLength(1);
+  });
+
   it("l'agent connaît les outils de tâches et leurs règles", () => {
     const definition = loadAgentDefinition();
     const names = (definition.tools as { name: string }[]).map((t) => t.name);
-    expect(names).toEqual(expect.arrayContaining(["ajouter_tache_rdv", "proposer_tache"]));
+    expect(names).toEqual(expect.arrayContaining(["ajouter_tache_rdv", "proposer_tache", "modifier_tache_proposee", "retirer_tache_proposee"]));
     const create = (definition.tools as { name: string; input_schema: { properties: Record<string, unknown> } }[]).find((t) => t.name === "creer_evenement_provisoire")!;
     expect(Object.keys(create.input_schema.properties)).toContain("taches");
     expect(definition.instructions).toContain("Tâches préparatoires");

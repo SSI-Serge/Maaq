@@ -1,6 +1,6 @@
 -- =====================================================================
 -- Socle de la base MAAQ (lot 0 du MVP2), copié TEL QUEL de la session « base de données » :
---   Base de données/Maaq - BD/migrations/lot_0_2_schema.sql (SHA-256 fd4227fe9393e6280bcaf69b86d5a18154476228c8f8674fc55ec688c8c1e073, le 27/10/2026).
+--   Base de données/Maaq - BD/migrations/lot_0_2_schema.sql (SHA-256 47c4c6a033c69c4e7dd7384886c53626f27197dd87c32049171fa38472fccc7b, le 27/10/2026 ; commentaires du fuseau de la famille corrigés, structure inchangée).
 -- Le schéma de référence est maaq_schema.sql ; ce fichier n'est jamais modifié à la main. Il porte désormais tout ce dont l'application a besoin :
 -- il n'y a plus de migration propre à l'application. Les lots suivants (2 à 8) sont copiés de la même façon, dans des fichiers numérotés à la suite.
 -- =====================================================================
@@ -674,7 +674,7 @@ CREATE TABLE chat_erasure_requests (
   requested_at     timestamptz NOT NULL DEFAULT now()
 );
 -- Compteur de demandes aux agents par profil et par jour : applique le plafond quotidien (décision du 01/10/2026, O2).
--- Une ligne par profil et par jour ; la journée est celle du fuseau de l'appareil au moment de la demande.
+-- Une ligne par profil et par jour ; la journée est celle du fuseau de la famille (accounts.family_timezone) au moment de la demande (H35 remplacée).
 CREATE TABLE daily_request_counters (
   user_id        uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE,
   request_date   date NOT NULL,
@@ -702,7 +702,7 @@ CREATE TABLE chat_requests (
   user_id       uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE,
   request_id    uuid NOT NULL,
   agent_id      bigint NOT NULL REFERENCES agents (id) ON DELETE CASCADE,
-  -- Jour (fuseau de l'appareil) sur lequel la demande a été comptée
+  -- Jour (fuseau de la famille, accounts.family_timezone) sur lequel la demande a été comptée
   counted_date  date NOT NULL,
   created_at    timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (user_id, request_id)
@@ -2243,10 +2243,11 @@ COMMENT ON TABLE erasure_traces IS $$Preuve minimale et non nominative d'une sup
 COMMENT ON TABLE chat_erasure_requests IS $$File des effacements d'historique de tchat demandés à Digitorn (déconnexion, révocation d'appareil, retrait d'agent), avec réessais. [US-9, 28, 43, 53]$$;
 COMMENT ON TABLE daily_request_counters IS $$Nombre de demandes envoyées aux agents par un profil un jour donné, pour appliquer le plafond quotidien du compte. Purgé après quelques jours. [US-38]$$;
 COMMENT ON COLUMN daily_request_counters.request_count IS $$Nombre de demandes déjà acceptées ce jour-là ; borné par accounts.daily_request_limit via register_agent_request()$$;
-COMMENT ON COLUMN daily_request_counters.request_date IS $$Jour calendaire dans le fuseau de l'appareil au moment de la demande (hypothèse H35)$$;
+COMMENT ON COLUMN daily_request_counters.request_date IS $$Jour calendaire dans le fuseau de la famille (accounts.family_timezone) au moment de la demande, pour le tchat des agents comme pour l'assistant (hypothèse H35 remplacée, US-70 RF5)$$;
 COMMENT ON TABLE idempotency_keys IS $$Réponses déjà produites pour une clé d'idempotence, conservées 24 h (CC-7). Table technique, purgée par purge_expired_request_records().$$;
 COMMENT ON COLUMN idempotency_keys.response_body IS $$Copie de la réponse renvoyée au client, chiffrée par l'application (bytea ; décision du PO du 27/10/2026). Selon l'action, la réponse peut contenir des données personnelles : adresses en copie d'un agent, détail d'un contrat et de ses champs, nom de fichier d'un document. Limite : 24 h, puis suppression ; supprimée aussi avec le profil. Seules les réponses réussies sont enregistrées. NULL pour une réponse sans corps (204)$$;
 COMMENT ON TABLE chat_requests IS $$Demandes déjà comptées dans le plafond quotidien : un renvoi (même identifiant) n'est pas recompté. Aucun texte, aucun contenu : un identifiant de demande, l'agent et le jour. Purgée après 24 h. [US-38 RT2, US-70 RF6]$$;
+COMMENT ON COLUMN chat_requests.counted_date IS $$Jour calendaire dans le fuseau de la famille (accounts.family_timezone) sur lequel la demande a été comptée (hypothèse H35 remplacée, US-70 RF5)$$;
 COMMENT ON TABLE platform_settings IS $$Réglages de la plateforme modifiables depuis la console admin (fréquence de synchro, délais, emails, limites). [US-27, 62, 65]$$;
 COMMENT ON TABLE platform_setting_changes IS $$Historique des modifications de paramètres : ancien/nouveau, administrateur, date. [US-65 RF4]$$;
 COMMENT ON TABLE admin_audit_log IS $$Journal d'administration : actions de l'administrateur sur agents, contrats et comptes. [US-45, 46, 47, 48, 64]$$;

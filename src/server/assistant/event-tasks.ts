@@ -6,6 +6,7 @@ import { loadCalendarEvent, type CalendarEvent } from "./calendar";
 import { open, openOptional, seal, sealOptional } from "./fields";
 import { localDay } from "./local-time";
 import { loadMembers, type MemberChip } from "./member-chips";
+import { fold } from "./pseudonymize";
 import { addDays, loadSeries } from "./series";
 import { notifyTaskAssigned } from "./task-notices";
 import { materializeEventTemplates } from "./task-series";
@@ -302,4 +303,66 @@ export async function copyTemplates(db: Kysely<DB>, fromSeriesId: string, toSeri
   for (const t of templates) {
     await db.insertInto("family_task_series").values({ ...t, event_series_id: toSeriesId, proposed }).execute();
   }
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------
+// Ajustements demandés à l'agent sur ses propres propositions (D61)
+// ---------------------------------------------------------------------------------------------------------------------------
+
+export interface ProposedTarget {
+  id: string;
+  kind: "task" | "template";
+}
+
+const normal = (text: string) => fold(text).replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+
+/**
+ * Retrouve, parmi les tâches d'un RDV, celles dont le titre correspond à ce que l'agent a écrit : le serveur compare, l'agent ne lit jamais un titre (AT-4). Seules les tâches
+ * encore « proposées » peuvent être changées par l'agent ; le nombre de tâches déjà enregistrées qui correspondent est rendu pour qu'il renvoie le parent vers « Tâches ».
+ */
+export async function matchTasks(db: Kysely<DB>, e: CalendarEvent, wanted: string): Promise<{ proposed: ProposedTarget[]; registered: number }> {
+  const needle = normal(wanted);
+  const same = (title: string) => {
+    const t = normal(title);
+    return needle.length > 0 && (t === needle || t.includes(needle) || (t.length > 3 && needle.includes(t)));
+  };
+  const proposed: ProposedTarget[] = [];
+  let registered = 0;
+  if (e.seriesId) {
+    const templates = await db.selectFrom("family_task_series").select(["id", "title", "proposed"]).where("event_series_id", "=", e.seriesId).where("ended_at", "is", null).execute();
+    for (const t of templates) if (same(open(t.title))) (t.proposed ? proposed.push({ id: t.id, kind: "template" }) : registered++);
+  } else {
+    const rows = await selectTasks(db).where("t.event_id", "=", e.id).where("t.series_id", "is", null).where("t.status", "in", ["proposed", "todo", "done"]).execute();
+    for (const r of rows) if (same(open(r.title))) (r.status === "proposed" ? proposed.push({ id: r.id, kind: "task" }) : registered++);
+  }
+  return { proposed, registered };
+}
+
+/** Change une tâche proposée : titre, échéance relative, personne. Une erreur de la base (échéance passée…) est traduite en refus lisible. */
+export async function changeProposedTask(db: Kysely<DB>, w: WriteContext, e: CalendarEvent, target: ProposedTarget, input: { title?: string; daysBefore?: number; assigneeId?: string | null }): Promise<void> {
+  try {
+    if (target.kind === "template") {
+      const patch: { title?: Buffer; days_before_event?: number; assigned_member_id?: string | null } = {};
+      if (input.title) patch.title = seal(input.title);
+      if (input.daysBefore !== undefined) patch.days_before_event = input.daysBefore;
+      if (input.assigneeId !== undefined) patch.assigned_member_id = input.assigneeId;
+      await db.updateTable("family_task_series").set(patch).where("id", "=", target.id).execute();
+      return;
+    }
+    const row = await selectTasks(db).where("t.id", "=", target.id).executeTakeFirstOrThrow();
+    const due = dueFor(e, input.daysBefore !== undefined ? { title: "", daysBefore: input.daysBefore } : row.days_before_event !== null ? { title: "", daysBefore: row.days_before_event } : { title: "", due: row.due_date }, w);
+    await db
+      .updateTable("family_tasks")
+      .set({ title: seal(input.title ?? open(row.title)), due_date: due.due, days_before_event: due.daysBefore, assigned_member_id: input.assigneeId !== undefined ? input.assigneeId : row.assigned_member_id })
+      .where("id", "=", target.id)
+      .execute();
+  } catch (error) {
+    throw translateDbError(error);
+  }
+}
+
+/** Retire une tâche proposée par l'agent (elle n'a jamais été enregistrée : suppression, comme avec la croix de la carte). */
+export async function dropProposedTask(db: Kysely<DB>, target: ProposedTarget): Promise<void> {
+  if (target.kind === "template") await db.deleteFrom("family_task_series").where("id", "=", target.id).where("proposed", "=", true).execute();
+  else await db.deleteFrom("family_tasks").where("id", "=", target.id).where("status", "=", "proposed").execute();
 }

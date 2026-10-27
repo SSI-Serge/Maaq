@@ -3,7 +3,7 @@ import type { DB } from "@/server/db/schema.generated";
 import { SOURCE_CODE, TYPE_CODE, eventTypeIds, findConflicts, fingerprintOf, loadCalendarEvent, loadCalendarEvents, type CalendarEvent, type EventSource, type EventStatus, type EventType } from "./calendar";
 import { createSeries, SeriesError } from "./series";
 import { ruleFromRepetition, type RepetitionInput } from "./series-ops";
-import { insertEventTask, type WriteContext } from "./event-tasks";
+import { changeProposedTask, dropProposedTask, insertEventTask, matchTasks, type ProposedTarget, type WriteContext } from "./event-tasks";
 import { seal, sealOptional } from "./fields";
 import { loadMembers } from "./member-chips";
 import { familyTimeZone } from "./reminders";
@@ -90,12 +90,9 @@ interface AgentTask {
   assigneeId: string | null;
 }
 
-function agentTask(raw: unknown, ctx: ToolContext, medical: boolean, firstName: string | null): AgentTask {
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new ToolError("chaque tâche doit être un objet {titre, echeance}");
-  const t = raw as Record<string, unknown>;
-  const daysBefore = DUE_DAYS[String(t.echeance)];
-  if (daysBefore === undefined) throw new ToolError(`échéance inconnue : « ${String(t.echeance)} » (attendu : ${Object.keys(DUE_DAYS).join(", ")})`);
-  let title = ctx.pseudo.fromModel(text(t.titre, "titre de la tâche", { max: 200 })!).trim();
+/** Titre d'une tâche écrit par l'agent : prénoms retraduits ; pour un RDV médical, un des trois titres génériques, composé avec le prénom (AT-4). */
+function agentTitle(raw: unknown, ctx: ToolContext, medical: boolean, firstName: string | null): string {
+  let title = ctx.pseudo.fromModel(text(raw, "titre de la tâche", { max: 200 })!).trim();
   if (medical) {
     const allowed = MEDICAL_TASKS.get(fold(title).replace(/[^a-z ]/g, " ").replace(/\s+/g, " ").trim());
     if (!allowed) throw new ToolError(`pour un rendez-vous médical, seuls ces titres sont acceptés : ${[...MEDICAL_TASKS.values()].join(" ; ")}`);
@@ -103,7 +100,33 @@ function agentTask(raw: unknown, ctx: ToolContext, medical: boolean, firstName: 
   }
   title = title.slice(0, MAX_TITLE);
   if (!title) throw new ToolError("le titre de la tâche est vide");
-  return { title, daysBefore, assigneeId: t.membre ? members(ctx, [t.membre])[0].id : null };
+  return title;
+}
+
+function dueDays(value: unknown): number {
+  const days = DUE_DAYS[String(value)];
+  if (days === undefined) throw new ToolError(`échéance inconnue : « ${String(value)} » (attendu : ${Object.keys(DUE_DAYS).join(", ")})`);
+  return days;
+}
+
+function agentTask(raw: unknown, ctx: ToolContext, medical: boolean, firstName: string | null): AgentTask {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new ToolError("chaque tâche doit être un objet {titre, echeance}");
+  const t = raw as Record<string, unknown>;
+  const daysBefore = dueDays(t.echeance);
+  return { title: agentTitle(t.titre, ctx, medical, firstName), daysBefore, assigneeId: t.membre ? members(ctx, [t.membre])[0].id : null };
+}
+
+/**
+ * La tâche « proposée » que l'agent désigne par le titre qu'il a écrit (D61). Le serveur compare ; une tâche déjà enregistrée n'est jamais modifiée par l'agent, qui renvoie le parent
+ * vers l'écran Tâches (il n'en voit pas le titre, AT-4).
+ */
+async function proposedTask(ctx: ToolContext, event: CalendarEvent, wanted: unknown): Promise<ProposedTarget> {
+  const typed = ctx.pseudo.fromModel(text(wanted, "titre", { max: 300 })!);
+  const { proposed, registered } = await matchTasks(ctx.db, event, typed);
+  if (proposed.length === 1) return proposed[0];
+  if (proposed.length > 1) throw new ToolError("plusieurs tâches proposées correspondent : précise laquelle avec son titre complet");
+  if (registered > 0) throw new ToolError("cette tâche est déjà enregistrée : tu ne peux pas la modifier ni la retirer. Réponds poliment : « Je ne peux pas modifier une tâche enregistrée : ouvrez-la dans Tâches. »");
+  throw new ToolError("aucune tâche proposée ne correspond à ce titre : redemande au parent de quelle tâche il parle");
 }
 
 function agentTasks(value: unknown, ctx: ToolContext, medical: boolean, firstName: string | null): AgentTask[] {
@@ -415,6 +438,35 @@ const TOOLS: Record<string, Tool> = {
     const done = await attachTasks(ctx, event, [task]);
     if (!done.taches) throw new ToolError(done.taches_ignorees?.[0]?.raison ?? "la tâche n'a pas pu être ajoutée");
     return { id: input.id, statut: event.status === "confirmed" ? "tache_ajoutee" : "tache_proposee", message: "Tâche ajoutée à la liste « À préparer » du rendez-vous." };
+  },
+
+  async modifier_tache_proposee(input, ctx) {
+    const event = await findEvent(ctx, input.id);
+    const medical = event.type === "medical";
+    const first = event.memberIds[0] ? (ctx.pseudo.active.find((m) => m.id === event.memberIds[0])?.firstName ?? null) : null;
+    const target = await proposedTask(ctx, event, input.titre);
+    const changes: { title?: string; daysBefore?: number; assigneeId?: string | null } = {};
+    if (input.nouveau_titre) changes.title = agentTitle(input.nouveau_titre, ctx, medical, first);
+    if (input.echeance) changes.daysBefore = dueDays(input.echeance);
+    if (input.membre) changes.assigneeId = members(ctx, [input.membre])[0].id;
+    if (!Object.keys(changes).length) throw new ToolError("rien à changer : donne un nouveau titre, une échéance ou une personne");
+    const write: WriteContext = {
+      accountId: ctx.accountId, userId: ctx.userId, timeZone: await familyTimeZone(ctx.db, ctx.accountId), now: ctx.now, members: await loadMembers(ctx.db, ctx.accountId), parent: true,
+      memberId: ctx.authorMemberId ?? null, source: "agent",
+    };
+    try {
+      await changeProposedTask(ctx.db, write, event, target, changes);
+    } catch (error) {
+      if (error instanceof Rejection) throw new ToolError(error.message);
+      throw error;
+    }
+    return { id: input.id, statut: "tache_proposee_modifiee", message: "La tâche proposée est modifiée dans la carte du rendez-vous." };
+  },
+
+  async retirer_tache_proposee(input, ctx) {
+    const event = await findEvent(ctx, input.id);
+    await dropProposedTask(ctx.db, await proposedTask(ctx, event, input.titre));
+    return { id: input.id, statut: "tache_proposee_retiree", message: "La tâche proposée est retirée de la carte du rendez-vous." };
   },
 
   async proposer_tache(input, ctx) {

@@ -374,7 +374,7 @@ export async function updateTask(ctx: Ctx, session: SessionContext, id: string, 
         const edit: SeriesTaskEdit = { title: task.title, note: task.note, assigneeId: task.assigneeId, dueTime: task.dueTime, rule: shiftRule(oldRule, row.due_date, task.due), by: v.userId };
         let target = series.id;
         // L'occurrence est la première de la règle : « cette fois et les suivantes » revient à « toutes ».
-        if (scope === "all" || occurrencesBefore(oldRule, series.first_date!, anchor) === 0) await rewriteOwnSeries(trx, series, edit, v.today);
+        if (scope === "all" || occurrencesBefore(oldRule, series.first_date!, anchor) === 0) await rewriteOwnSeries(trx, series, edit, v.today, id);
         else target = await splitOwnSeries(trx, series, anchor, addDays(anchor, Math.round((Date.parse(task.due) - Date.parse(row.due_date)) / 86_400_000)), edit, v.today);
         // Une occurrence déjà en retard n'est pas recréée : c'est elle qu'on rend. Sinon, la première occurrence à venir du modèle modifié.
         const next = row.due_date < v.today ? undefined : await trx.selectFrom("family_tasks").select("id").where("series_id", "=", target).where("status", "=", "todo").where("due_date", ">=", sql<Date>`${v.today}::date`).orderBy("due_date").limit(1).executeTakeFirst();

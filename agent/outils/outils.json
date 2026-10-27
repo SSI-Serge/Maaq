@@ -167,6 +167,35 @@
     }
   },
   {
+    "name": "modifier_tache_proposee",
+    "description": "Modifie une tâche encore « proposée » (non enregistrée) d'un rendez-vous, celle que tu viens de proposer (« décale le gâteau à la veille »). Désigne-la par le titre que tu avais écrit. Impossible pour une tâche déjà enregistrée.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "string", "description": "Identifiant du rendez-vous."},
+        "titre": {"type": "string", "description": "Titre (ou mots du titre) de la tâche proposée à modifier."},
+        "nouveau_titre": {"type": "string", "description": "Nouveau titre, facultatif."},
+        "echeance": {"type": "string", "enum": ["le_jour_meme", "la_veille", "2_jours_avant", "3_jours_avant", "1_semaine_avant"], "description": "Nouvelle échéance relative au rendez-vous, facultative."},
+        "membre": {"type": "string", "description": "Nouvelle personne suggérée, facultatif."}
+      },
+      "required": ["id", "titre"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "retirer_tache_proposee",
+    "description": "Retire une tâche encore « proposée » (non enregistrée) d'un rendez-vous, celle que tu viens de proposer. Désigne-la par le titre que tu avais écrit. Impossible pour une tâche déjà enregistrée.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "string", "description": "Identifiant du rendez-vous."},
+        "titre": {"type": "string", "description": "Titre (ou mots du titre) de la tâche proposée à retirer."}
+      },
+      "required": ["id", "titre"],
+      "additionalProperties": false
+    }
+  },
+  {
     "name": "proposer_tache",
     "description": "Propose une tâche seule (« Rappelle-moi de payer la cantine avant le 5 ») ou qui revient (« sortir les poubelles chaque mardi »). Rien n'est enregistré : la famille voit une carte et l'ajoute elle-même. Pour une tâche liée à un rendez-vous, utilise plutôt `taches` ou `ajouter_tache_rdv`.",
     "input_schema": {
