@@ -62,7 +62,8 @@ async function seedProfiles(client: PoolClient): Promise<boolean> {
 
 /** Deux agents publiés, comme dans la maquette Administration des agents. */
 async function seedCatalog(client: PoolClient): Promise<boolean> {
-  const { rowCount } = await client.query("SELECT 1 FROM agents LIMIT 1");
+  // L'agent de l'Assistant Famille (plateforme anthropic) est créé par les migrations : seuls les agents Digitorn comptent ici.
+  const { rowCount } = await client.query("SELECT 1 FROM agents WHERE platform = 'digitorn' LIMIT 1");
   if (rowCount) return false;
 
   const agents = [
