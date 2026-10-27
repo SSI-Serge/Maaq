@@ -3,7 +3,7 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-10-27T11:30:33Z",
+  "updated": "2026-10-27T12:01:12Z",
   "deploys": [
     {
       "at": "2026-10-25T08:05:53Z",
@@ -175,6 +175,15 @@
       ],
       "what": "Lot 3 sur https://test.maaq.fr : enregistrement d'un RDV resté sans réponse, livré éteint. Pas la production.",
       "note": "Rien ne change pour les familles tant que l'interrupteur reste éteint."
+    },
+    {
+      "at": "2026-10-27T12:01:12Z",
+      "env": "preview",
+      "storyIds": [
+        "f16s3"
+      ],
+      "what": "Lot 4 sur https://test.maaq.fr : RDV récurrents. Pas la production.",
+      "note": "À essayer : demander à l'assistant « Foot pour Léo tous les mercredis à 14 h jusqu'en juin », confirmer la série, déplacer une séance."
     }
   ],
   "features": [
@@ -1859,9 +1868,11 @@
         {
           "id": "f16s3",
           "title": "US-109 · Créer un RDV récurrent (séries)",
-          "state": "planning",
-          "env": null,
-          "note": "Lot 4. Séances créées à 6 mois glissants ; vacances scolaires importées de la source officielle."
+          "state": "testing",
+          "env": "preview",
+          "note": "Série de RDV : une règle (chaque semaine, toutes les deux semaines, chaque mois), des séances créées 6 mois à l'avance, une confirmation pour toutes. Modifier ou annuler « cette séance », « les suivantes » ou « toute la série ». Rappels allégés, relance unique, vacances scolaires par zone.",
+          "at": "2026-10-27T12:01:12Z",
+          "unsure": "Jamais essayé sur un téléphone ni dans un navigateur : le formulaire de répétition et le choix de la portée n'ont été vérifiés que par des tests de la partie serveur. L'agent n'a pas été remesuré avec le vrai modèle."
         },
         {
           "id": "f16s4",
@@ -1962,14 +1973,24 @@
         {
           "at": "2026-10-27T11:30:33Z",
           "what": "L'enregistrement sans réponse est livré éteint (AUTO_CONFIRM_MODE=off) ; il s'allume par un réglage du serveur, sur accord du responsable produit."
+        },
+        {
+          "at": "2026-10-27T12:01:12Z",
+          "what": "Vacances scolaires : source officielle de l'Éducation nationale, chargée par script à la main. 2025-2026 et 2026-2027 complètes, 2027-2028 sans les vacances d'été, 2028-2029 absente."
         }
       ],
       "unsure": [
         "Rien n'est encore construit : tout est en planification ; le lot 0 n'a pas démarré.",
         "La recette sur iPhone attend un utilisateur équipé, que le responsable produit doit recruter.",
-        "L'offre gratuite de TomTom (2 500 requêtes par jour) est à reconfirmer : la grille a changé le 1er juillet 2026."
+        "L'offre gratuite de TomTom (2 500 requêtes par jour) est à reconfirmer : la grille a changé le 1er juillet 2026.",
+        "Les vacances scolaires de l'année suivante ne sont pas connues d'avance : l'alerte de septembre pour l'administrateur reste à faire."
       ],
       "activity": [
+        {
+          "at": "2026-10-27T12:01:12Z",
+          "kind": "live",
+          "what": "Lot 4 en ligne sur la zone de test : RDV récurrents, vacances scolaires 2025 à 2028 chargées"
+        },
         {
           "at": "2026-10-27T11:30:33Z",
           "kind": "live",
