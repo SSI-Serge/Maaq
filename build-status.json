@@ -3,7 +3,7 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-10-27T14:11:42Z",
+  "updated": "2026-10-27T16:24:10Z",
   "deploys": [
     {
       "at": "2026-10-25T08:05:53Z",
@@ -1956,7 +1956,7 @@
           "state": "testing",
           "env": "preview",
           "note": "Au MVP2, le catalogue est chargé par l'équipe technique depuis un fichier de données, avec les contrôles de la future console (code unique, âges, source et validation pour le médical), un aperçu avant d'appliquer, et le chargement par code sans jamais supprimer. La console Excel est reportée.",
-          "unsure": "Le fichier du dépôt n'est pas encore chargé sur la zone de test.",
+          "unsure": "Les 8 rappels du fichier sont chargés sur la zone de test depuis le 27/10 (le suivi dentaire reste désactivé). Chargement sur la zone de test jamais refait après une modification du fichier.",
           "at": "2026-10-27T14:11:42Z"
         },
         {
@@ -2030,10 +2030,13 @@
         {
           "at": "2026-10-27T14:11:42Z",
           "what": "Pas de notification d'anticipation dans le registre de la base : l'avis « N échéances à anticiper ce mois-ci » part directement aux parents qui ont un téléphone autorisé."
+        },
+        {
+          "at": "2026-10-27T16:24:10Z",
+          "what": "La recette de la vague V2 porte sur les lots 4 à 6 ; le lot 7, déjà en ligne, sera recetté avec la vague V3."
         }
       ],
       "unsure": [
-        "Rien n'est encore construit : tout est en planification ; le lot 0 n'a pas démarré.",
         "La recette sur iPhone attend un utilisateur équipé, que le responsable produit doit recruter.",
         "L'offre gratuite de TomTom (2 500 requêtes par jour) est à reconfirmer : la grille a changé le 1er juillet 2026.",
         "Les vacances scolaires de l'année suivante ne sont pas connues d'avance : l'alerte de septembre pour l'administrateur reste à faire.",
@@ -2042,6 +2045,11 @@
         "Le mois et l'année de naissance manquants : le choix « Pas maintenant » reste sur l'appareil, pas côté serveur."
       ],
       "activity": [
+        {
+          "at": "2026-10-27T16:24:10Z",
+          "kind": "live",
+          "what": "Résumé de recette de la vague V2 prêt (docs/recette-v2.md) : 4 lots, scénarios A à G, limites à trancher"
+        },
         {
           "at": "2026-10-27T14:11:42Z",
           "kind": "live",
