@@ -6,7 +6,7 @@ import { adminName } from "./audit";
 
 export interface Setting {
   key: string;
-  type: "integer" | "email";
+  type: "integer" | "email" | "timestamp";
   value: string | null;
   min: number | null;
   max: number | null;
@@ -55,6 +55,11 @@ export function validateSetting(setting: Setting, raw: string): string | null {
   if (setting.type === "email") {
     if (value === "") return null; // adresse non renseignée : autorisé
     return EMAIL_FORMAT.test(value) ? null : "Adresse email invalide";
+  }
+  if (setting.type === "timestamp") {
+    // Horodatage ISO 8601 avec fuseau (ex. 2026-11-02T08:00:00+01:00) ; vide = fonction désactivée.
+    if (value === "") return null;
+    return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/.test(value) && !Number.isNaN(Date.parse(value)) ? null : "Indiquez une date et une heure, par exemple 2026-11-02T08:00:00+01:00.";
   }
   if (!/^\d{1,9}$/.test(value)) return "Indiquez un nombre entier.";
   const n = Number(value);

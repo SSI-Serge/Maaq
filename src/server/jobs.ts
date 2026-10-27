@@ -1,9 +1,11 @@
 import { sql } from "kysely";
 import type { Ctx } from "@/server/auth/service";
+import { runEventNotices, type NoticesResult } from "@/server/assistant/notices";
 import { runReminders, type RemindersResult } from "@/server/assistant/reminders";
 import { cleanupExports } from "@/server/compliance/exports";
 import { runLifecycle, type LifecycleResult } from "@/server/compliance/lifecycle";
 import { syncLogbook, type SyncResult } from "@/server/logbook/service";
+import { describeError } from "@/server/safe-log";
 import { integerSetting } from "@/server/settings";
 
 /**
@@ -20,6 +22,8 @@ export interface JobsResult {
   exports: { expired: number; failed: number };
   /** Rappels et relances de l'Assistant Famille envoyés, rendez-vous sans réponse passés à « Ignoré » (US-81, US-83). */
   reminders: RemindersResult;
+  /** Notifications « RDV ajouté » et « RDV à confirmer » réservées et envoyées à l'autre parent (US-113). */
+  notices: NoticesResult;
 }
 
 /** Synchronise le carnet toutes les X heures (US-40 RT2) puis nettoie les données expirées (US-40 RT6, US-61 RT2, US-70 RT3). */
@@ -32,14 +36,19 @@ export async function runDueJobs(ctx: Ctx, options: { force?: boolean } = {}): P
   const lifecycle = await runLifecycle(ctx);
   const exports = await cleanupExports(ctx);
   // Les rappels partent à l'heure dite : à chaque passage. Une panne de ce traitement ne doit pas bloquer les autres.
+  // Ordre d'un passage de 5 minutes : notifications de RDV (la base les remet en accord avec l'état des RDV, les réserve, puis on les envoie), puis rappels et relances.
+  const notices = await runEventNotices(ctx).catch((error) => {
+    console.error(`Notifications de RDV : ${describeError(error)}`);
+    return { planned: 0, sent: 0, failed: 0, abandoned: 0 };
+  });
   const reminders = await runReminders(ctx).catch((error) => {
-    console.error("Rappels de l'Assistant Famille :", error);
+    console.error(`Rappels de l'Assistant Famille : ${describeError(error)}`);
     return { sent: 0, failed: 0, ignored: 0 };
   });
-  if (!due) return { logbook: "not_due", purged: null, lifecycle, exports, reminders };
+  if (!due) return { logbook: "not_due", purged: null, lifecycle, exports, reminders, notices };
 
   const logbook = await syncLogbook(ctx);
-  return { logbook, purged: await purgeExpired(ctx), lifecycle, exports, reminders };
+  return { logbook, purged: await purgeExpired(ctx), lifecycle, exports, reminders, notices };
 }
 
 /** Supprime les données arrivées au bout de leur durée de conservation. */

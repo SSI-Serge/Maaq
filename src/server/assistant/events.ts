@@ -6,6 +6,7 @@ import { EVENT_TYPES, MEDICAL_TITLE, STATUS_CODE, TYPE_CODE, eventTypeIds, findC
 import { seal, sealOptional } from "./fields";
 import { MEMBER_COLORS, isParent } from "./family";
 import { isLocalDateTime, localMs, localToUtc, utcToLocal } from "./local-time";
+import { notifyAfterConfirmation } from "./notices";
 import { cancelPendingNotices, reminderDetails, type NudgeView, type ReminderView } from "./reminders";
 
 /**
@@ -299,6 +300,8 @@ export async function confirmEvent(ctx: Ctx, session: SessionContext, id: string
     await changeStatus(trx, e, "confirmed", v.userId);
     await cancelPendingNotices(trx, id, ["follow_up_24h", "follow_up_48h"]);
   });
+  // L'autre parent est prévenu tout de suite, une fois la confirmation enregistrée (US-113 RT1) ; le planificateur reprend en cas d'échec.
+  await notifyAfterConfirmation(ctx, id);
   return getEvent(ctx, session, id);
 }
 

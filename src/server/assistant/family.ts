@@ -13,6 +13,14 @@ export function isParent(session: SessionContext): boolean {
   return session.user.role === "primary_user" || (session.user.role === "guest" && session.user.guestRank === "core");
 }
 
+/** Tout profil d'un foyer, invités secondaires compris (administrateur exclu) : réglages personnels et lecture des réglages familiaux (D58, RT6). */
+export function requireFamilyProfile(session: SessionContext): { accountId: string; parent: boolean } {
+  if (!session.user.accountId || session.user.role === "admin") {
+    throw new Rejection("forbidden", "Les réglages de l'Assistant Famille sont réservés aux profils d'un foyer.", 403);
+  }
+  return { accountId: session.user.accountId, parent: isParent(session) };
+}
+
 export function requireParent(session: SessionContext): string {
   if (!isParent(session) || !session.user.accountId) {
     throw new Rejection("forbidden", "Seuls les parents du foyer ont accès à l'Assistant Famille.", 403);

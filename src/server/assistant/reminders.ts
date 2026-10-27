@@ -6,7 +6,7 @@ import type { DB } from "@/server/db/schema.generated";
 import { env } from "@/server/env";
 import { Rejection } from "@/server/http";
 import { EVENT_TYPES, TYPE_CODE, eventTypeIds, loadCalendarEvent, typeOfCode, type CalendarEvent, type EventType } from "./calendar";
-import { requireParent } from "./family";
+import { requireFamilyProfile, requireParent } from "./family";
 import { localToUtc, utcToLocal } from "./local-time";
 import { nudgeEmail, nudgeHeadline, reminderEmail, reminderPushBody, type NotifiedEvent, type NudgeKind, type ReminderKind } from "./reminder-text";
 import { pushConfigured, sendPush, type PushPayload } from "@/server/push/service";
@@ -126,9 +126,10 @@ async function loadSettings(db: Db, accountId: string): Promise<Map<EventType, R
 
 /** US-82 : les six types avec leurs trois interrupteurs. Valeurs par défaut : tout actif. */
 export async function getReminderSettings(ctx: Ctx, session: SessionContext): Promise<{ settings: Omit<ReminderSetting, "updatedAt">[]; canEdit: boolean }> {
-  const accountId = requireParent(session);
+  // Lisibles par tout profil de la famille, modifiables par les seuls parents (D58, US-113 RT6).
+  const { accountId, parent } = requireFamilyProfile(session);
   const settings = await loadSettings(ctx.db, accountId);
-  return { settings: [...settings.values()].map(({ type, d7, d1, d0 }) => ({ type, d7, d1, d0 })), canEdit: true };
+  return { settings: [...settings.values()].map(({ type, d7, d1, d0 }) => ({ type, d7, d1, d0 })), canEdit: parent };
 }
 
 /** US-82 RF5, RF6 : un interrupteur est enregistré dès qu'il est touché ; il s'applique aux rappels non encore envoyés. */

@@ -24,6 +24,59 @@ const KINDS: { kind: ReminderKind; label: string }[] = [
   { kind: "d0", label: "Jour J" },
 ];
 
+interface PersonalSettings {
+  notifyEventsAdded: boolean;
+  audience: "parent" | "guest";
+}
+
+/**
+ * Carte « Mes notifications » (US-113 RF14, D58) : l'interrupteur « Être prévenu des RDV ajoutés » est propre à chaque profil, invités secondaires compris.
+ * Pendant l'enregistrement il est grisé avec un indicateur ; en cas d'échec il garde sa position précédente et le message s'affiche (RF15).
+ */
+function MyNotifications({ pushState }: { pushState: string }) {
+  const query = useApiQuery<{ settings: PersonalSettings }>("/api/family/personal-settings");
+  const mutation = useApiMutation();
+  const [confirmed, setConfirmed] = useState<boolean | null>(null);
+  const [pending, setPending] = useState(false);
+  const current = confirmed ?? query.data?.settings.notifyEventsAdded ?? null;
+  const guest = query.data?.settings.audience === "guest";
+
+  async function toggle(next: boolean) {
+    setPending(true);
+    const result = await mutation.run<{ settings: PersonalSettings }>("/api/family/personal-settings", { method: "PATCH", body: { notifyEventsAdded: next } });
+    setPending(false);
+    if (result) setConfirmed(result.settings.notifyEventsAdded);
+  }
+
+  const error = mutation.error;
+  return (
+    <Section title="Mes notifications">
+      {query.loading && current === null && <Loading slow={query.slow} />}
+      {query.error && <RetryNotice message={query.error.kind === "server" ? "Vos notifications n'ont pas pu être chargées." : query.error.message} onRetry={query.reload} />}
+      {current !== null && (
+        <div className={styles.settingRow} role="group" aria-label="Notification des RDV ajoutés">
+          <div className={styles.settingType}>{guest ? "Être prévenu des RDV ajoutés qui me concernent" : "Être prévenu des RDV ajoutés par l'autre parent"}</div>
+          <div className={styles.switches}>
+            <button type="button" role="switch" aria-checked={current} aria-busy={pending} aria-label={guest ? "Être prévenu des RDV ajoutés qui me concernent" : "Être prévenu des RDV ajoutés par l'autre parent"} className={styles.switch} disabled={pending} onClick={() => void toggle(!current)}>
+              {pending ? "Enregistrement…" : current ? "Oui" : "Non"}
+            </button>
+          </div>
+          <span className={styles.hint}>Une seule notification par RDV, pour vous seul·e. Les relances et rappels ne changent pas.</span>
+        </div>
+      )}
+      {error && !error.body?.code && <RetryNotice message={error.kind === "server" ? "Le réglage n'a pas pu être enregistré." : error.message} onRetry={() => void toggle(!(current ?? true))} />}
+      {error && error.body?.code && <Notice tone="error">{error.message}</Notice>}
+      <Link href="/assistant/rappels" className={styles.linkRow}>
+        <span>
+          Activer mes notifications
+          <span className={styles.linkRowSub}>{pushState === "enabled" ? "✓ Activées sur cet appareil" : "Recevoir les notifications sur ce téléphone"}</span>
+        </span>
+        <span aria-hidden>›</span>
+      </Link>
+    </Section>
+  );
+}
+
 /**
  * Réglages de l'Assistant Famille. Pour l'instant : les délais de rappel par type de rendez-vous (US-82) et l'accès aux membres de la famille.
  * Chaque interrupteur est enregistré dès qu'on le touche ; il garde sa position précédente tant que le serveur n'a pas répondu, et en cas d'échec.
@@ -64,11 +117,13 @@ export function SettingsScreen() {
 
   return (
     <AppShell title="Réglages" subtitle="Assistant Famille" back={{ href: "/assistant", label: "Assistant Famille" }}>
+      <MyNotifications pushState={push} />
+
       <Section title="Délais de rappel par type de RDV">
         <p className={styles.hint}>Les rappels et les relances sont envoyés par email aux deux parents du foyer. Ces réglages valent pour toute la famille.</p>
         {query.loading && !values && <Loading slow={query.slow} />}
         {query.error && !forbidden && <RetryNotice message={query.error.kind === "server" ? "Les réglages n'ont pas pu être chargés." : query.error.message} onRetry={query.reload} />}
-        {forbidden && <Notice tone="info">L&apos;Assistant Famille est réservé aux deux parents du foyer.</Notice>}
+        {forbidden && <Notice tone="info">Ces réglages sont réservés aux profils d&apos;un foyer.</Notice>}
         {values && !editable && <Notice tone="info">Lecture seule — seuls les parents peuvent modifier ces réglages.</Notice>}
         {saved && <Notice tone="success">Réglage enregistré</Notice>}
         {error && !error.body?.code && last && (
@@ -103,25 +158,17 @@ export function SettingsScreen() {
         })}
       </Section>
 
-      <Section title="Notifications">
-        <Link href="/assistant/rappels" className={styles.linkRow}>
-          <span>
-            Activer mes rappels
-            <span className={styles.linkRowSub}>{push === "enabled" ? "✓ Activés sur cet appareil" : "Recevoir les rappels par notification sur ce téléphone"}</span>
-          </span>
-          <span aria-hidden>›</span>
-        </Link>
-      </Section>
-
-      <Section title="Famille">
-        <Link href="/assistant/membres" className={styles.linkRow}>
-          <span>
-            Membres de la famille
-            <span className={styles.linkRowSub}>Personnes concernées par les RDV et tâches</span>
-          </span>
-          <span aria-hidden>›</span>
-        </Link>
-      </Section>
+      {editable && (
+        <Section title="Famille">
+          <Link href="/assistant/membres" className={styles.linkRow}>
+            <span>
+              Membres de la famille
+              <span className={styles.linkRowSub}>Personnes concernées par les RDV et tâches</span>
+            </span>
+            <span aria-hidden>›</span>
+          </Link>
+        </Section>
+      )}
     </AppShell>
   );
 }

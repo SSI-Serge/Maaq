@@ -53,6 +53,16 @@ export function nudgeHeadline(event: NotifiedEvent, timeZone: string, now: Date)
   return `À confirmer : ${event.title}, ${weekdayOf(event, timeZone, now)} ${timeOf(event, timeZone)}`;
 }
 
+/** « Camille a ajouté : Réunion parents-professeurs — Léa, jeudi 18h00 » (US-113 RF2, RF10) : l'autre parent prévenu d'un RDV confirmé. */
+export function eventAddedBody(event: NotifiedEvent, requester: string, timeZone: string, now: Date): string {
+  return `${requester} a ajouté : ${event.title}, ${weekdayOf(event, timeZone, now)} ${timeOf(event, timeZone)}`;
+}
+
+/** « À confirmer — Camille a demandé : Réunion parents-professeurs — Léa, jeudi 18h00 » (US-113 RF3) : RDV encore provisoire 10 minutes après sa proposition. */
+export function eventToConfirmBody(event: NotifiedEvent, requester: string, timeZone: string, now: Date): string {
+  return `À confirmer — ${requester} a demandé : ${event.title}, ${weekdayOf(event, timeZone, now)} ${timeOf(event, timeZone)}`;
+}
+
 /** Texte d'une notification : même contenu que l'email, lieu des RDV médicaux exclu (D31). */
 export function reminderPushBody(event: NotifiedEvent, timeZone: string, now: Date): string {
   return `${reminderHeadline(event, timeZone, now)}${event.place && event.type !== "medical" ? `\n${event.place}` : ""}`;

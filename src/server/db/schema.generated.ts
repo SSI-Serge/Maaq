@@ -97,7 +97,9 @@ export type MessageKind = "event_proposal" | "image" | "text" | "voice_transcrip
 
 export type MessageSender = "agent" | "profile";
 
-export type NotificationKind = "follow_up_24h" | "follow_up_48h" | "reminder_d1" | "reminder_d7" | "reminder_day_of";
+export type NotificationChannel = "none" | "push";
+
+export type NotificationKind = "event_added" | "event_to_confirm" | "follow_up_24h" | "follow_up_48h" | "reminder_d1" | "reminder_d7" | "reminder_day_of";
 
 export type NotificationStatus = "abandoned" | "cancelled" | "not_applicable" | "scheduled" | "sent";
 
@@ -119,7 +121,7 @@ export type SecurityEventType = "device_revoked" | "device_verified" | "login_em
 
 export type SessionEndReason = "account_grace_period" | "device_revoked" | "expired" | "guest_removed" | "logout";
 
-export type SettingValueType = "email" | "integer";
+export type SettingValueType = "email" | "integer" | "timestamp";
 
 export type SyncStatus = "failed" | "running" | "succeeded";
 
@@ -972,6 +974,7 @@ export interface PushSubscriptions {
 
 export interface ScheduledNotifications {
   attempts: Generated<number>;
+  channel: NotificationChannel | null;
   created_at: Generated<Timestamp>;
   due_at: Timestamp;
   email_sent_at: Timestamp | null;
@@ -1046,6 +1049,13 @@ export interface UserAgentInfoValues {
   updated_by_user_id: string | null;
   user_id: string;
   value_encrypted: Buffer;
+}
+
+export interface UserAssistantSettings {
+  account_id: string;
+  notify_events_added: Generated<boolean>;
+  updated_at: Generated<Timestamp>;
+  user_id: string;
 }
 
 export interface Users {
@@ -1244,6 +1254,7 @@ export interface DB {
   sessions: Sessions;
   storage_deletion_queue: StorageDeletionQueue;
   user_agent_info_values: UserAgentInfoValues;
+  user_assistant_settings: UserAssistantSettings;
   users: Users;
   v_account_guest_quota: VAccountGuestQuota;
   v_dashboard_agents: VDashboardAgents;

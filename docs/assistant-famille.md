@@ -165,6 +165,21 @@ Les tests de la famille datent leurs rendez-vous de 2054 (décalage de 28 ans : 
 lisent l'horloge réelle : un rendez-vous « à venir » ne doit pas devenir passé avec le temps. `scripts/db-backup.ts` sauvegarde une base avant toute migration.
 Base de développement locale : `npm run db:reset` après ce lot (l'ancien schéma n'est pas converti).
 
+## Lot 2 du MVP2 : prévenir l'autre parent quand un RDV est ajouté (US-113)
+
+Migrations copiées de la session « base de données » (`0002_lot2_valeurs_enumerees.sql`, `0003_lot2_schema.sql`). La base porte les règles : `plan_event_notices` réserve
+les envois (une ligne par RDV et par destinataire, jamais le demandeur ni celui qui confirme, seulement après la mise en service, réglage personnel respecté),
+`revalidate_event_notices` les remet en accord avec l'état du RDV, `shift_to_morning` reporte à 8 h ce qui tombe entre 21 h et 8 h (fuseau de la famille).
+`src/server/assistant/notices.ts` envoie les notifications réservées : par notification seulement, jamais par email ; la ligne est verrouillée pendant l'envoi
+(deux passages en même temps n'envoient qu'une fois) ; si rien n'est joint, la ligne reste et sera reprise tant que le RDV n'a pas commencé.
+- **Tentative immédiate** : après `confirmEvent`, attente de 3 secondes au plus ; sinon le planificateur (toutes les 5 minutes, avant les rappels) envoie.
+- **Mise en service** : le réglage de plateforme `event_notice_activation_at` (vide = désactivé) limite la notification aux RDV proposés après la date. À renseigner par
+  une requête SQL tant que la console ne le propose pas.
+- **Réglage personnel** : `/api/family/personal-settings`, ouvert à tout profil de la famille (invités secondaires compris) ; carte « Mes notifications » en tête de `/assistant/reglages`.
+  Les réglages familiaux (délais de rappel) sont lisibles par tout profil et modifiables par les parents seuls.
+- Texte : « Camille a ajouté : titre, jeudi 18h00 » ; « À confirmer — Camille a demandé : titre, jeudi 18h00 ». Un RDV médical porte son titre générique, le lieu n'est jamais repris.
+- Reste pour les lots suivants : l'avis de l'enregistrement d'office (lot 3, CA 7.2) et les séries (lot 4, CA 9.1).
+
 ## Réglages
 Voir `.env.example`. Tout est facultatif tant que `ASSISTANT_MODE=off`.
 ```

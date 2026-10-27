@@ -312,12 +312,13 @@ describe("délais de rappel par type (US-82)", () => {
     expect(canEdit).toBe(true);
   });
 
-  it("est commun aux deux parents, qui peuvent tous deux le modifier ; pas l'invitée secondaire (CA 3.1, 4.1, 4.2)", async () => {
+  it("est commun aux deux parents, qui peuvent tous deux le modifier ; l'invitée secondaire le lit sans le modifier (CA 3.1, 4.1, 4.2)", async () => {
     const f = await family();
     const now = ctxAt("2054-11-02T09:00");
     expect(await setReminderSetting(now, f.julienSession, { type: "family", kind: "d7", enabled: false })).toEqual({ type: "family", d7: false, d1: true, d0: true });
     expect((await getReminderSettings(now, f.session)).settings.find((s) => s.type === "family")).toMatchObject({ d7: false });
-    expect((await failure(getReminderSettings(now, f.elodieSession))).status).toBe(403);
+    // Lisibles par l'invitée secondaire (D58, US-113 RT6), mais en lecture seule.
+    expect((await getReminderSettings(now, f.elodieSession)).canEdit).toBe(false);
     expect((await failure(setReminderSetting(now, f.elodieSession, { type: "family", kind: "d7", enabled: true }))).status).toBe(403);
     expect((await failure(setReminderSetting(now, f.session, { type: "inconnu", kind: "d7", enabled: true }))).code).toBe("invalid_type");
     expect((await failure(setReminderSetting(now, f.session, { type: "family", kind: "d3", enabled: true }))).code).toBe("invalid_kind");
