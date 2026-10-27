@@ -1911,7 +1911,7 @@
           "state": "testing",
           "env": "preview",
           "note": "L'agent propose les tâches avec le RDV. La carte du tchat et l'écran du RDV ont une liste « À préparer » (retirer, modifier, ajouter), puis « Confirmer le RDV et N tâches » ou « Confirmer sans les tâches ». Les tâches suivent le RDV déplacé ou annulé.",
-          "unsure": "Jamais essayé dans un navigateur ni sur un téléphone. Pas de modification ni de retrait d'une tâche en l'écrivant à l'agent (il ne voit pas les titres des tâches, règle AT-4). Pas de notification d'annulation avec « tâches retirées » : le message s'affiche à l'annulation.",
+          "unsure": "Essayé dans un navigateur local le 27/10 (création et cochage d'une tâche, liste « À préparer » et confirmation avec la tâche, vue Jour, point de la semaine, question d'anticipation) ; jamais sur un téléphone. Pas de modification ni de retrait d'une tâche en l'écrivant à l'agent (il ne voit pas les titres des tâches, règle AT-4). Pas de notification d'annulation avec « tâches retirées » : le message s'affiche à l'annulation.",
           "at": "2026-10-27T13:00:13Z"
         },
         {
@@ -1948,7 +1948,7 @@
           "env": "preview",
           "note": "Chaque mois, MAAQ pose aux parents des questions sur les échéances à prévoir (impôts, rentrée, entretien…), au plus 5 par semaine. Trois choix : « Oui, c'est fait ou prévu », « Non, à faire » (une tâche est créée) ou « Me le rappeler dans 1, 3 ou 6 mois ». Section « À anticiper » de l'accueil, questions du point de la semaine, réglages (catalogue activé ou non, situation de la famille).",
           "at": "2026-10-27T14:11:42Z",
-          "unsure": "Jamais essayé sur un téléphone ni dans un navigateur. Le contenu du catalogue (7 échéances non médicales) est une proposition à relire par l'équipe produit. Le suivi dentaire est désactivé : le contenu médical attend la validation du référent santé. Les textes des questions (« Avez-vous prévu : … ? ») et des tâches (« À prévoir : … ») sont à relire."
+          "unsure": "Essayé dans un navigateur local le 27/10 (création et cochage d'une tâche, liste « À préparer » et confirmation avec la tâche, vue Jour, point de la semaine, question d'anticipation) ; jamais sur un téléphone. Le contenu du catalogue (7 échéances non médicales) est une proposition à relire par l'équipe produit. Le suivi dentaire est désactivé : le contenu médical attend la validation du référent santé. Les textes des questions (« Avez-vous prévu : … ? ») et des tâches (« À prévoir : … ») sont à relire."
         },
         {
           "id": "f16s10",

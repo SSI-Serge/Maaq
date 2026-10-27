@@ -237,7 +237,7 @@ Schéma : `0007_lot5_schema.sql`, copie exacte de `lot_5_2_schema.sql` de la ses
 - **Pas fait / à savoir** : notifications « [Prénom] vous a confié… » (US-96 RF4, RF6) et information des parents quand un membre est retiré (RF8) : le type de notification n'existe dans la base qu'au lot 6 ; notification d'annulation
   d'un RDV avec « tâches retirées » : aucun type de notification d'annulation n'existe, le message est affiché à l'annulation. Modifier ou retirer une tâche en l'écrivant à l'agent : impossible sans lui donner le titre des tâches (contraire à AT-4) ;
   seul l'ajout par le tchat est fait. La carte « Tâche proposée » n'est pas conservée par le serveur (la base n'a pas de tâche proposée sans RDV) : elle disparaît quand la conversation est rechargée. « Toutes » réécrit aussi les occurrences
-  déplacées une à une. **Non mesuré avec le vrai modèle** (nouveaux cas de tâches à ajouter au banc d'essai) ; **écrans jamais essayés dans un navigateur ni sur téléphone**.
+  déplacées une à une. **Non mesuré avec le vrai modèle** (nouveaux cas de tâches à ajouter au banc d'essai) ; **écrans essayés dans un navigateur local le 27/10 (tâches, « À préparer », vue Jour, point de la semaine, anticipation), jamais sur téléphone**.
 
 ## Lot 6 du MVP2 : rappels de tâches et point de la semaine (US-97, US-98, US-96 RF4/RF6)
 
@@ -257,7 +257,7 @@ La base ne porte aucune fonction de planification pour ces notifications : MAAQ 
   Le point du dernier envoi reste consultable jusqu'au suivant (lien sur l'accueil).
 - **Semaine couverte** : le lundi-dimanche qui suit l'envoi (D47 et schéma `week_start`), y compris pour un point réglé au milieu de la semaine ; la US-98 RF7 et le CA 7.1 disent « les 7 jours qui suivent » (mercredi 12 h → jeudi au mercredi) : écart signalé à la session des user stories.
 - **Pas fait** : questions de rappel du point (US-102, lot 7) et RDV rapprochés de moins de 30 minutes (US-107, lot 8) ; information des parents quand un membre est retiré (US-96 RF8) : aucun type de notification pour cela dans la base ; notification de tâches proposées devenues « à faire » à la confirmation d'un RDV.
-  **Résumé non mesuré avec le vrai modèle** (le PO l'a demandé « après essai sur des semaines fictives », US-98 RT2) ; **écrans jamais essayés dans un navigateur ni sur téléphone**.
+  **Résumé non mesuré avec le vrai modèle** (le PO l'a demandé « après essai sur des semaines fictives », US-98 RT2) ; **écrans essayés dans un navigateur local le 27/10 (tâches, « À préparer », vue Jour, point de la semaine, anticipation), jamais sur téléphone**.
 
 ## Lot 7 du MVP2 : anticipation (US-102, US-111 réduite)
 
@@ -274,7 +274,7 @@ Schéma : `0010_lot7_schema.sql`, copie exacte de `lot_7_2_schema.sql` de la ses
   pour la famille (l'autre reçoit « déjà traitée »). La question garde le libellé du catalogue avec le repère {membre} : jamais de prénom conservé.
 - **Écrans** : section « À anticiper » de l'accueil (parents), « Questions de la semaine » du point de la semaine, cartes « Indiquez le mois et l'année de naissance de Léo… » (« Pas maintenant » gardé sur l'appareil), et Réglages ▸ Anticipation (interrupteur du catalogue, questionnaire « Situation de la famille »).
 - **Pas fait / à savoir** : pas de type de notification mensuelle dans la base : l'avis est envoyé directement aux parents qui ont un appareil, sans registre ni email ; le texte de la tâche et de la question est composé par MAAQ à partir du libellé (« Avez-vous prévu : … ? » / « Pensez-vous à : … ? ») : à relire avec l'équipe produit ;
-  « Pas maintenant » n'est pas conservé côté serveur. **Écrans jamais essayés dans un navigateur ni sur téléphone.**
+  « Pas maintenant » n'est pas conservé côté serveur. **Écrans essayés dans un navigateur local le 27/10, jamais sur téléphone.**
 
 ## Réglages
 Voir `.env.example`. Tout est facultatif tant que `ASSISTANT_MODE=off`.
