@@ -3,36 +3,6 @@
 -- (Décision du 27/10/2026 : ils vivent dans cette migration, appliquée après le socle.)
 -- =====================================================================
 
--- Clés d'idempotence (comportement commun CC-7) : une action renvoyée avec la même clé
--- (double toucher, « Réessayer » après une coupure) n'est jamais exécutée deux fois ;
--- le serveur renvoie la réponse déjà produite. Table technique, purgée après 24 h.
-CREATE TABLE idempotency_keys (
-  user_id          uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-  idempotency_key  text NOT NULL CHECK (length(idempotency_key) BETWEEN 8 AND 100),
-  request_path     text NOT NULL,
-  response_status  smallint NOT NULL,
-  response_body    jsonb,
-  created_at       timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (user_id, idempotency_key)
-);
-CREATE INDEX idx_idempotency_keys_created_at ON idempotency_keys (created_at);
-COMMENT ON TABLE idempotency_keys IS $$Réponses déjà produites pour une clé d'idempotence, conservées 24 h (CC-7).$$;
-
--- Demandes envoyées dans le tchat embarqué (US-38, US-70). Une demande est comptée une seule fois dans le
--- plafond quotidien, même si elle est renvoyée après une erreur ou un délai sans réponse (RT2).
--- Table technique : aucune copie du texte. Purgée après 24 h.
-CREATE TABLE chat_requests (
-  user_id       uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-  request_id    uuid NOT NULL,
-  agent_id      bigint NOT NULL REFERENCES agents (id) ON DELETE CASCADE,
-  counted_date  date NOT NULL,
-  created_at    timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (user_id, request_id)
-);
-CREATE INDEX idx_chat_requests_agent_id ON chat_requests (agent_id);
-CREATE INDEX idx_chat_requests_created_at ON chat_requests (created_at);
-COMMENT ON TABLE chat_requests IS $$Demandes déjà comptées dans le plafond quotidien : un renvoi (même identifiant) n'est pas recompté. Purgée après 24 h. [US-38 RT2, US-70 RF6]$$;
-
 -- Rappel « suppression dans 7 jours » : un seul rappel par délai de grâce (US-58 RF3). Remis à vide quand le compte est repris.
 ALTER TABLE accounts ADD COLUMN grace_reminder_sent_at timestamptz;
 COMMENT ON COLUMN accounts.grace_reminder_sent_at IS $$Date d'envoi du rappel « suppression dans 7 jours » : un seul rappel par délai de grâce (US-58 RF3). Remis à vide quand le compte est repris$$;

@@ -1,12 +1,16 @@
 import { NextResponse } from "next/server";
 import type { Ctx } from "@/server/auth/service";
+import { env } from "@/server/env";
+import { decrypt, encrypt } from "@/server/security/crypto";
 
 const KEY_FORMAT = /^[A-Za-z0-9_-]{8,100}$/;
+const secret = () => Buffer.from(env().ENCRYPTION_KEY, "base64");
 
 /**
  * Exécute une action au plus une fois par clé d'idempotence (CC-7). Si la même clé revient
  * (double toucher, « Réessayer » après une réponse perdue), la réponse enregistrée est renvoyée
  * sans refaire l'action. Seules les réponses réussies sont mémorisées : un refus peut être corrigé.
+ * La réponse peut contenir des données personnelles (e-mails de tiers, contrats) : elle est rangée chiffrée, pendant 24 h au plus.
  */
 export async function idempotent(
   ctx: Ctx,
@@ -27,7 +31,7 @@ export async function idempotent(
   if (previous && previous.request_path === path) {
     return previous.response_status === 204
       ? new NextResponse(null, { status: 204 })
-      : NextResponse.json(previous.response_body, { status: previous.response_status });
+      : NextResponse.json(JSON.parse(decrypt(previous.response_body!, secret())), { status: previous.response_status });
   }
 
   const response = await action();
@@ -40,7 +44,7 @@ export async function idempotent(
         idempotency_key: key,
         request_path: path,
         response_status: response.status,
-        response_body: body === null ? null : JSON.stringify(body),
+        response_body: body === null ? null : encrypt(JSON.stringify(body), secret()),
         created_at: ctx.now,
       })
       .onConflict((oc) => oc.columns(["user_id", "idempotency_key"]).doNothing())

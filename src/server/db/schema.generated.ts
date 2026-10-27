@@ -817,7 +817,10 @@ export interface IdempotencyKeys {
   created_at: Generated<Timestamp>;
   idempotency_key: string;
   request_path: string;
-  response_body: Json | null;
+  /**
+   * Copie de la réponse renvoyée au client, chiffrée par l'application (bytea ; décision du PO du 27/10/2026). Selon l'action, la réponse peut contenir des données personnelles : adresses en copie d'un agent, détail d'un contrat et de ses champs, nom de fichier d'un document. Limite : 24 h, puis suppression ; supprimée aussi avec le profil. Seules les réponses réussies sont enregistrées. NULL pour une réponse sans corps (204)
+   */
+  response_body: Buffer | null;
   response_status: number;
   user_id: string;
 }

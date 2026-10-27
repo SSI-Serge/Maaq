@@ -1,6 +1,6 @@
 -- =====================================================================
 -- Socle de la base MAAQ (lot 0 du MVP2), copié TEL QUEL de la session « base de données » :
---   Base de données/Maaq - BD/migrations/lot_0_2_schema.sql (empreinte 8424ea2f7d7440c5, le 27/10/2026).
+--   Base de données/Maaq - BD/migrations/lot_0_2_schema.sql (SHA-256 72a25bfb40c9b4877160e5915ab8ef167d3e2abe8442835fd4ffed7ed5828a7c, le 27/10/2026).
 -- Le schéma de référence est maaq_schema.sql ; ce fichier n'est jamais modifié à la main.
 -- Les écarts propres à l'application sont dans 0002_application.sql. Les lots suivants (2 à 8)
 -- sont copiés de la même façon, dans des fichiers numérotés à la suite.
@@ -665,6 +665,32 @@ CREATE TABLE daily_request_counters (
   request_date   date NOT NULL,
   request_count  integer NOT NULL DEFAULT 0 CHECK (request_count >= 0),
   PRIMARY KEY (user_id, request_date)
+);
+-- Tables techniques de l'application (reprises des migrations 0002 et 0003, décision du PO du 27/10/2026) : aucune donnée métier durable,
+-- rattachées au profil (suppression en cascade avec lui, donc avec son foyer), purgées après 24 h par purge_expired_request_records().
+-- Pas de clé composite avec le compte : la clé est propre au profil et l'application n'écrit pas account_id.
+-- Clés d'idempotence (comportement commun CC-7) : une action renvoyée avec la même clé (double toucher, « Réessayer » après une coupure)
+-- n'est jamais exécutée deux fois ; le serveur renvoie la réponse déjà produite. Seules les réponses réussies sont mémorisées.
+CREATE TABLE idempotency_keys (
+  user_id          uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  idempotency_key  text NOT NULL CHECK (length(idempotency_key) BETWEEN 8 AND 100),
+  request_path     text NOT NULL,
+  response_status  smallint NOT NULL,
+  -- Réponse renvoyée au client, chiffrée par l'application (elle peut contenir des données personnelles ; voir le commentaire)
+  response_body    bytea,
+  created_at       timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, idempotency_key)
+);
+-- Demandes envoyées dans le tchat des agents (US-38, US-70) : une demande n'est comptée qu'une seule fois dans le plafond quotidien, même
+-- renvoyée après une erreur ou un délai sans réponse (RT2). Aucune copie du texte : l'historique reste chez la plateforme d'agents.
+CREATE TABLE chat_requests (
+  user_id       uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  request_id    uuid NOT NULL,
+  agent_id      bigint NOT NULL REFERENCES agents (id) ON DELETE CASCADE,
+  -- Jour (fuseau de l'appareil) sur lequel la demande a été comptée
+  counted_date  date NOT NULL,
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, request_id)
 );
 -- Paramètres modifiables sans nouvelle version (US-65, US-27 RT1, US-62 RT1). Clé/valeur car ce sont des
 -- réglages de plateforme peu nombreux, pas des données métier : une colonne par réglage imposerait une migration à chaque ajout.
@@ -1481,6 +1507,16 @@ BEGIN
   GET DIAGNOSTICS v_b = ROW_COUNT;
   RETURN v_a + v_b;
 END $$;
+-- Clés d'idempotence et demandes du tchat : conservées 24 h (comme l'application le faisait par DELETE direct)
+CREATE FUNCTION purge_expired_request_records() RETURNS bigint LANGUAGE plpgsql AS $$
+DECLARE v_a bigint; v_b bigint;
+BEGIN
+  DELETE FROM idempotency_keys WHERE created_at < now() - interval '24 hours';
+  GET DIAGNOSTICS v_a = ROW_COUNT;
+  DELETE FROM chat_requests WHERE created_at < now() - interval '24 hours';
+  GET DIAGNOSTICS v_b = ROW_COUNT;
+  RETURN v_a + v_b;
+END $$;
 -- Âge d'un membre en mois civils à partir du mois et de l'année de naissance (le jour n'est jamais saisi, D54). Convention :
 -- différence des mois civils entre la date donnée et le mois de naissance. NULL si la naissance n'est pas connue.
 CREATE FUNCTION family_member_age_months(p_birth_year smallint, p_birth_month smallint, p_on date DEFAULT current_date)
@@ -1878,6 +1914,9 @@ CREATE INDEX idx_erasure_traces_pending ON erasure_traces (digitorn_status) WHER
 CREATE INDEX idx_chat_erasure_requests_pending ON chat_erasure_requests (status, requested_at) WHERE status <> 'done';
 CREATE INDEX idx_chat_erasure_requests_user_id ON chat_erasure_requests (user_id);
 CREATE INDEX idx_chat_erasure_requests_agent_id ON chat_erasure_requests (agent_id);
+CREATE INDEX idx_idempotency_keys_created_at ON idempotency_keys (created_at);
+CREATE INDEX idx_chat_requests_agent_id ON chat_requests (agent_id);
+CREATE INDEX idx_chat_requests_created_at ON chat_requests (created_at);
 CREATE INDEX idx_platform_settings_updated_by_user_id ON platform_settings (updated_by_user_id);
 CREATE INDEX idx_platform_setting_changes_key ON platform_setting_changes (setting_key, changed_at DESC);
 CREATE INDEX idx_platform_setting_changes_changed_by ON platform_setting_changes (changed_by_user_id);
@@ -2146,6 +2185,9 @@ COMMENT ON TABLE chat_erasure_requests IS $$File des effacements d'historique de
 COMMENT ON TABLE daily_request_counters IS $$Nombre de demandes envoyées aux agents par un profil un jour donné, pour appliquer le plafond quotidien du compte. Purgé après quelques jours. [US-38]$$;
 COMMENT ON COLUMN daily_request_counters.request_count IS $$Nombre de demandes déjà acceptées ce jour-là ; borné par accounts.daily_request_limit via register_agent_request()$$;
 COMMENT ON COLUMN daily_request_counters.request_date IS $$Jour calendaire dans le fuseau de l'appareil au moment de la demande (hypothèse H35)$$;
+COMMENT ON TABLE idempotency_keys IS $$Réponses déjà produites pour une clé d'idempotence, conservées 24 h (CC-7). Table technique, purgée par purge_expired_request_records().$$;
+COMMENT ON COLUMN idempotency_keys.response_body IS $$Copie de la réponse renvoyée au client, chiffrée par l'application (bytea ; décision du PO du 27/10/2026). Selon l'action, la réponse peut contenir des données personnelles : adresses en copie d'un agent, détail d'un contrat et de ses champs, nom de fichier d'un document. Limite : 24 h, puis suppression ; supprimée aussi avec le profil. Seules les réponses réussies sont enregistrées. NULL pour une réponse sans corps (204)$$;
+COMMENT ON TABLE chat_requests IS $$Demandes déjà comptées dans le plafond quotidien : un renvoi (même identifiant) n'est pas recompté. Aucun texte, aucun contenu : un identifiant de demande, l'agent et le jour. Purgée après 24 h. [US-38 RT2, US-70 RF6]$$;
 COMMENT ON TABLE platform_settings IS $$Réglages de la plateforme modifiables depuis la console admin (fréquence de synchro, délais, emails, limites). [US-27, 62, 65]$$;
 COMMENT ON TABLE platform_setting_changes IS $$Historique des modifications de paramètres : ancien/nouveau, administrateur, date. [US-65 RF4]$$;
 COMMENT ON TABLE admin_audit_log IS $$Journal d'administration : actions de l'administrateur sur agents, contrats et comptes. [US-45, 46, 47, 48, 64]$$;
@@ -2203,6 +2245,7 @@ COMMENT ON FUNCTION purge_expired_inbound_emails() IS $$Supprime le contenu brut
 COMMENT ON FUNCTION purge_expired_conversation_messages() IS $$Supprime les messages conservés depuis plus de 4 jours (images en cascade). À planifier au moins chaque heure. [US-44]$$;
 COMMENT ON FUNCTION erase_agent_conversations(uuid, bigint) IS $$Supprime les messages des conversations d'un profil (tous les agents, ou un seul). Pour les agents Digitorn, l'effacement reste demandé à Digitorn (chat_erasure_requests). [US-9, 28, 43, 53]$$;
 COMMENT ON FUNCTION purge_old_daily_counters() IS $$Supprime les compteurs journaliers de demandes et de mails de plus de 7 jours. À planifier chaque jour. [US-38, 70, 87]$$;
+COMMENT ON FUNCTION purge_expired_request_records() IS $$Supprime les clés d'idempotence et les demandes du tchat de plus de 24 h. À planifier chaque heure. [CC-7, US-38 RT2]$$;
 COMMENT ON FUNCTION family_member_age_months(smallint, smallint, date) IS $$Âge d'un membre en mois civils (différence des mois, sans jour) à une date ; NULL si le mois ou l'année de naissance manque. Sert aux conditions d'âge du catalogue (US-102) et aux tranches d'âge transmises au modèle. [US-92, US-102, D54]$$;
 COMMENT ON FUNCTION purge_admin_audit_log() IS $$Supprime les entrées du journal d'administration de plus de 5 ans (réglable). À planifier chaque jour. [US-45, US-64]$$;
 COMMENT ON FUNCTION backfill_family_members() IS $$Crée la fiche « membre » des profils qui n'en ont pas (invités existants) ; une fiche archivée pour un invité retiré. Idempotent. [US-92 RF1, US-20, US-113 RT6]$$;

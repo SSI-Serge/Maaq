@@ -350,4 +350,14 @@ describe("CC-7 — pas de double exécution", () => {
     expect(second.status).toBe(201);
     expect(await second.json()).toEqual(await first.json());
   });
+
+  it("range la réponse chiffrée : elle peut contenir des données personnelles, et n'est pas lisible en base", async () => {
+    const action = async () => Response.json({ email: "tiers.confidentiel@exemple.fr" }, { status: 201 });
+    const request = new Request("http://localhost/api/admin/contracts", { method: "POST", headers: { "Idempotency-Key": "cle-chiffree-456" } });
+    await idempotent(now(), request, adminId, action);
+    const row = await db.selectFrom("idempotency_keys").select("response_body").where("user_id", "=", adminId).where("idempotency_key", "=", "cle-chiffree-456").executeTakeFirstOrThrow();
+    expect(Buffer.from(row.response_body!).toString("utf8")).not.toContain("tiers.confidentiel");
+    const again = await idempotent(now(), request, adminId, async () => Response.json({ jamais: true }));
+    expect(await again.json()).toEqual({ email: "tiers.confidentiel@exemple.fr" });
+  });
 });

@@ -46,11 +46,9 @@ export async function runDueJobs(ctx: Ctx, options: { force?: boolean } = {}): P
 export async function purgeExpired(ctx: Ctx): Promise<{ logbook: number; errorReports: number; technical: number }> {
   const logbook = await sql<{ n: string }>`select purge_expired_logbook() as n`.execute(ctx.db);
   const reports = await sql<{ n: string }>`select purge_expired_error_reports() as n`.execute(ctx.db);
-  // Tables techniques : clés d'idempotence et demandes du tchat (24 h), compteurs de demandes (7 jours).
-  const day = new Date(ctx.now.getTime() - 24 * 3_600_000);
+  // Tables techniques : clés d'idempotence et demandes du tchat (24 h, `purge_expired_request_records`), compteurs de demandes (7 jours).
   const week = sql<Date>`${ctx.now.toISOString()}::date - 7`;
-  const a = await ctx.db.deleteFrom("idempotency_keys").where("created_at", "<", day).executeTakeFirst();
-  const b = await ctx.db.deleteFrom("chat_requests").where("created_at", "<", day).executeTakeFirst();
+  const records = await sql<{ n: string }>`select purge_expired_request_records() as n`.execute(ctx.db);
   const c = await ctx.db.deleteFrom("daily_request_counters").where("request_date", "<", week).executeTakeFirst();
   // Traitements de la base à lancer régulièrement (FONCTIONS_PAR_LOT.md) : conversations de l'Assistant Famille (4 jours, D38, US-44), rendez-vous
   // annulés ou ignorés (30 jours, US-77 RT1) et passés (24 mois), images et mails bruts, compteurs journaliers, journal d'administration.
@@ -65,6 +63,6 @@ export async function purgeExpired(ctx: Ctx): Promise<{ logbook: number; errorRe
   return {
     logbook: Number(logbook.rows[0]?.n ?? 0),
     errorReports: Number(reports.rows[0]?.n ?? 0),
-    technical: Number(a.numDeletedRows) + Number(b.numDeletedRows) + Number(c.numDeletedRows) + database,
+    technical: Number(records.rows[0]?.n ?? 0) + Number(c.numDeletedRows) + database,
   };
 }
