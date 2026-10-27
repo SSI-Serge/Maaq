@@ -23,7 +23,7 @@ la première famille réelle.**
 | Pseudonymisation (alias, contacts masqués) | `src/server/assistant/pseudonymize.ts` |
 | Heure locale du foyer | `src/server/assistant/local-time.ts` |
 | Les huit outils, exécutés par MAAQ | `src/server/assistant/tools.ts` |
-| Appel du modèle (Anthropic, Foundry) | `src/server/assistant/model.ts` |
+| Appel du modèle (API Anthropic) | `src/server/assistant/model.ts` |
 | Boucle de l'agent | `src/server/assistant/agent.ts` |
 | Membres du foyer | `src/server/assistant/family.ts` |
 | Message d'un parent, historique, idempotence | `src/server/assistant/service.ts` |
@@ -129,7 +129,7 @@ Les rappels et relances partent d'abord **par notification** sur chaque appareil
 - **Badge** : `useBadgeSync` (dans `AppShell`) le met à jour à l'ouverture, au retour au premier plan et après une confirmation, un écart ou une annulation ; uniquement sur un appareil qui gère le badge et où les notifications sont autorisées.
 Tests : `tests/push.test.ts` (15, envoi simulé), `tests/push-state.test.ts` (8, détection des cas iPhone / Android).
 **À vérifier sur un vrai téléphone, en HTTPS** (ce que le navigateur de développement ne permet pas) : l'abonnement réel, la réception, le toucher qui ouvre le bon écran (y compris après le verrouillage de l'application, AF-3), le badge sur iPhone (iOS 16.4 et plus, application installée).
-**Tuile du tableau de bord** (US-84 RF6) : l'Assistant n'étant pas un agent du catalogue, sa tuile est fixe, en tête du dashboard, réservée aux deux parents, avec le nombre de confirmations en attente (`FamilyTile`). Solution provisoire : si l'Assistant devient un agent du catalogue (US-106, plateforme Foundry), la tuile passera par les cartes d'agents.
+**Tuile du tableau de bord** (US-84 RF6) : l'Assistant n'étant pas un agent du catalogue, sa tuile est fixe, en tête du dashboard, réservée aux deux parents, avec le nombre de confirmations en attente (`FamilyTile`). Solution provisoire : si l'Assistant devient un agent du catalogue (US-106, plateforme anthropic), la tuile passera par les cartes d'agents.
 
 ## Dictée d'une demande (US-71, voie rapide)
 Un bouton micro à côté du champ de « Nouvelle demande » (`src/client/speech.ts`, `AssistantChat`). Il utilise la reconnaissance vocale du **navigateur** (Chrome sur Android, Safari) : le texte s'écrit en direct dans le champ, le parent le relit et le corrige, puis l'envoie. Seul le texte part au serveur, jamais le son ; une dictée dure 2 minutes au plus. L'origine « dictée » est transmise (`source: "dictation"` dans `POST /api/assistant/messages`), enregistrée avec le message et signalée à l'assistant (`<message source="dictee">`). Le bouton n'apparaît que si le navigateur sait transcrire.
@@ -197,13 +197,13 @@ tolérance de 60 minutes, jamais en cas de conflit ou de membre à préciser). `
 Voir `.env.example`. Tout est facultatif tant que `ASSISTANT_MODE=off`.
 ```
 ASSISTANT_MODE=live
-ASSISTANT_PROVIDER=anthropic   # anthropic (tests) ou foundry (pilote)
+ASSISTANT_PROVIDER=anthropic   # seul fournisseur pour l'instant
 ASSISTANT_MODEL=claude-sonnet-5-5
 ASSISTANT_EFFORT=medium
-ANTHROPIC_API_KEY=             # ou FOUNDRY_RESOURCE + FOUNDRY_API_KEY
+ANTHROPIC_API_KEY=
 ```
-Les clés se rangent dans Secret Manager, jamais dans le dépôt ni dans une conversation. Avec Foundry, la ressource du pilote est
-`assistant-famille-pilot-resource` (East US 2) ; le quota de `claude-sonnet-5-5` est à demander à Microsoft.
+La clé se range dans Secret Manager, jamais dans le dépôt ni dans une conversation. Microsoft Foundry est abandonné (D54, pas de Claude en Europe) : le pilote
+utilise l'API Anthropic directe ; Claude sur Vertex AI en région européenne sera étudié si le pilote est concluant.
 
 ## Vérifier
 ```
@@ -218,4 +218,4 @@ npx tsx scripts/assistant-bench.ts --env agent/.env --runs 2     # vrai modèle,
 2. Ranger les clés dans Secret Manager et les passer à Cloud Run avec les réglages `ASSISTANT_*`.
 3. L'image Docker embarque désormais `agent/instructions.md` et `agent/outils/` (lus par le backend au démarrage).
 4. Une requête de l'assistant peut durer jusqu'à une minute (plusieurs appels du modèle) : vérifier le délai maximal du service Cloud Run.
-5. Informer les familles pilotes que Foundry en East US 2 traite les conversations aux États-Unis, et recueillir leur accord écrit (brief du 25 octobre).
+5. Informer les familles pilotes que leurs conversations avec l'assistant sont traitées par Anthropic (API directe), et recueillir leur accord écrit : clause du pilote (lot 9).

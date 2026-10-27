@@ -4,7 +4,6 @@
 //
 //   npx tsx scripts/assistant-bench.ts --env agent/.env              # clé ANTHROPIC_API_KEY lue dans ce fichier (jamais affichée)
 //   npx tsx scripts/assistant-bench.ts --cas 01 29 30 --runs 2
-//   npx tsx scripts/assistant-bench.ts --provider foundry            # avec FOUNDRY_RESOURCE et FOUNDRY_API_KEY (quand le quota sera accordé)
 import { randomBytes, randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -44,9 +43,9 @@ process.env.HMAC_KEY ??= throwaway(32);
 process.env.AUTH_SECRET ??= throwaway(32);
 process.env.CRON_SECRET ??= randomBytes(24).toString("hex");
 process.env.DATABASE_URL ??= "postgres://maaq:maaq@localhost:5432/inutilise";
-const provider = (option("provider") ?? process.env.FOURNISSEUR ?? "anthropic") as "anthropic" | "foundry";
-const apiKey = provider === "foundry" ? process.env.FOUNDRY_API_KEY : process.env.ANTHROPIC_API_KEY;
-if (!apiKey || (provider === "foundry" && !process.env.FOUNDRY_RESOURCE)) {
+const provider = "anthropic" as const;
+const apiKey = process.env.ANTHROPIC_API_KEY;
+if (!apiKey) {
   console.error(`Clé manquante pour ${provider} : renseignez-la dans ${envFile} (jamais dans une conversation).`);
   process.exit(2);
 }
@@ -194,7 +193,7 @@ async function evaluate(c: Case, result: AgentRunResult, accountId: string): Pro
 }
 
 // --- exécution ----------------------------------------------------------------------------------------------------------------------
-const model = createModel({ provider, apiKey, resource: process.env.FOUNDRY_RESOURCE, model: process.env.MODELE ?? "claude-sonnet-5-5", effort: (process.env.EFFORT as "low" | "medium" | "high") ?? "medium" });
+const model = createModel({ provider, apiKey, model: process.env.MODELE ?? "claude-sonnet-5-5", effort: (process.env.EFFORT as "low" | "medium" | "high") ?? "medium" });
 const definition = loadAgentDefinition();
 const cases = data.cas.filter((c) => !wanted || wanted.some((p) => c.id.startsWith(p)));
 const outcomes: { id: string; titre: string; run: number; failures: string[]; seconds: number; result: AgentRunResult; duplicate: boolean; message: string }[] = [];

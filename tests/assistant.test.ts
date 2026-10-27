@@ -753,17 +753,6 @@ describe("appel du modèle", () => {
     expect(body).not.toHaveProperty("temperature");
   });
 
-  it("appelle Microsoft Foundry avec api-key, sans mise en cache automatique", async () => {
-    const fetchMock = vi.fn(async () => ok());
-    const model = createModel({ provider: "foundry", apiKey: "cle-foundry", resource: "assistant-famille-pilot-resource", model: "claude-sonnet-5-5", fetch: fetchMock as unknown as typeof fetch });
-    await model.send(request);
-    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe("https://assistant-famille-pilot-resource.services.ai.azure.com/anthropic/v1/messages");
-    expect((init.headers as Record<string, string>)["api-key"]).toBe("cle-foundry");
-    expect(JSON.parse(init.body as string)).not.toHaveProperty("cache_control");
-    expect(() => createModel({ provider: "foundry", apiKey: "k", model: "m" })).toThrow("FOUNDRY_RESOURCE");
-  });
-
   it("réessaie après un 429 ou une erreur serveur, pas après un refus 400, et ne divulgue pas la clé", async () => {
     const sleeps: number[] = [];
     const responses = [new Response("", { status: 429, headers: { "retry-after": "2" } }), new Response("", { status: 503 }), ok()];

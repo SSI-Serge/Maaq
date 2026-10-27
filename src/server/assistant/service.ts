@@ -31,8 +31,7 @@ export function configuredModel(): AssistantModel {
   if (settings.ASSISTANT_MODE !== "live") throw new Rejection("assistant_unavailable", "L'Assistant Famille n'est pas encore ouvert.", 503);
   configured ??= createModel({
     provider: settings.ASSISTANT_PROVIDER,
-    apiKey: (settings.ASSISTANT_PROVIDER === "foundry" ? settings.FOUNDRY_API_KEY : settings.ANTHROPIC_API_KEY)!,
-    resource: settings.FOUNDRY_RESOURCE,
+    apiKey: settings.ANTHROPIC_API_KEY!,
     model: settings.ASSISTANT_MODEL,
     effort: settings.ASSISTANT_EFFORT,
   });

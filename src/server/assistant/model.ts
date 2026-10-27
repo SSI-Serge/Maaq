@@ -1,7 +1,7 @@
 /**
  * Appel du modèle Claude par l'API Messages (agent/INTEGRATION.md § 3 et 5). Sans dépendance : une requête HTTP.
- * Trois fournisseurs possibles pour le même corps de requête : l'API Anthropic directe (tests), Microsoft Foundry (pilote),
- * Vertex AI en région européenne (après le pilote : seule la création du client changera).
+ * Fournisseur : l'API Anthropic directe (tests et pilote, décision D54). Claude sur Vertex AI en région européenne pourra suivre si le pilote
+ * est concluant : le corps de la requête est le même, seule la création du client changera. Microsoft Foundry est abandonné (pas de Claude en Europe).
  */
 
 export interface TextBlock { type: "text"; text: string }
@@ -44,10 +44,8 @@ export class ModelError extends Error {
 }
 
 export interface ModelConfig {
-  provider: "anthropic" | "foundry";
+  provider: "anthropic";
   apiKey: string;
-  /** Nom de la ressource Foundry (obligatoire avec le fournisseur foundry). */
-  resource?: string;
   /** Remplace l'adresse de base (tests). */
   baseUrl?: string;
   model: string;
@@ -63,12 +61,7 @@ const RETRIES = 2;
 export function createModel(config: ModelConfig): AssistantModel {
   const doFetch = config.fetch ?? fetch;
   const sleep = config.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
-  const url =
-    (config.baseUrl ??
-      (config.provider === "foundry"
-        ? `https://${config.resource ?? ""}.services.ai.azure.com/anthropic`
-        : "https://api.anthropic.com")) + "/v1/messages";
-  if (config.provider === "foundry" && !config.resource && !config.baseUrl) throw new Error("FOUNDRY_RESOURCE est obligatoire avec le fournisseur foundry");
+  const url = `${config.baseUrl ?? "https://api.anthropic.com"}/v1/messages`;
 
   return {
     async send(request) {
@@ -80,12 +73,12 @@ export function createModel(config: ModelConfig): AssistantModel {
         messages: request.messages,
         ...(config.effort ? { output_config: { effort: config.effort } } : {}),
         // Le prompt système et les outils restent identiques d'une requête à l'autre : mis en cache côté API Anthropic.
-        ...(config.provider === "anthropic" ? { cache_control: { type: "ephemeral" } } : {}),
+        cache_control: { type: "ephemeral" },
       };
       const headers: Record<string, string> = {
         "content-type": "application/json",
         "anthropic-version": "2023-06-01",
-        ...(config.provider === "foundry" ? { "api-key": config.apiKey } : { "x-api-key": config.apiKey }),
+        "x-api-key": config.apiKey,
       };
 
       for (let attempt = 0; ; attempt++) {

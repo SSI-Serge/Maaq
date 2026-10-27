@@ -39,18 +39,16 @@ const schema = z.object({
   /** Secret de l'outil de facturation qui signale désabonnements et réabonnements (US-58 RT2). Sans lui, ce point d'entrée est fermé. */
   BILLING_WEBHOOK_SECRET: z.string().min(16, "au moins 16 caractères").optional(),
   /**
-   * Assistant Famille (rendez-vous et tâches). « off » : l'assistant est fermé. « live » : MAAQ appelle Claude, par l'API Anthropic
-   * (tests) ou par Microsoft Foundry (pilote), et exécute lui-même les outils. Les clés se rangent dans Secret Manager.
+   * Assistant Famille (rendez-vous et tâches). « off » : l'assistant est fermé. « live » : MAAQ appelle Claude par l'API Anthropic
+   * et exécute lui-même les outils. La clé se range dans Secret Manager.
    */
   ASSISTANT_MODE: z.enum(["off", "live"]).default("off"),
   /** Enregistrement sans réponse (AT-8, D49) : livré éteint. « on » : un RDV provisoire sans réponse entre dans le calendrier au bout de 72 h. */
   AUTO_CONFIRM_MODE: z.enum(["off", "on"]).default("off"),
-  ASSISTANT_PROVIDER: z.enum(["anthropic", "foundry"]).default("anthropic"),
+  ASSISTANT_PROVIDER: z.enum(["anthropic"]).default("anthropic"),
   ASSISTANT_MODEL: z.string().min(1).default("claude-sonnet-5-5"),
   ASSISTANT_EFFORT: z.enum(["low", "medium", "high"]).default("medium"),
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
-  FOUNDRY_RESOURCE: z.string().regex(/^[a-z0-9-]+$/i, "nom de ressource Foundry invalide").optional(),
-  FOUNDRY_API_KEY: z.string().min(1).optional(),
 });
 
 const checked = schema.superRefine((value, ctx) => {
@@ -63,10 +61,7 @@ const checked = schema.superRefine((value, ctx) => {
     ctx.addIssue({ code: "custom", path: ["VAPID_PRIVATE_KEY"], message: "la clé publique et la clé privée VAPID vont ensemble" });
   }
   if (value.ASSISTANT_MODE === "live") {
-    const needed = value.ASSISTANT_PROVIDER === "foundry" ? (["FOUNDRY_RESOURCE", "FOUNDRY_API_KEY"] as const) : (["ANTHROPIC_API_KEY"] as const);
-    for (const name of needed) {
-      if (!value[name]) ctx.addIssue({ code: "custom", path: [name], message: `obligatoire avec ASSISTANT_MODE=live et ASSISTANT_PROVIDER=${value.ASSISTANT_PROVIDER}` });
-    }
+    if (!value.ANTHROPIC_API_KEY) ctx.addIssue({ code: "custom", path: ["ANTHROPIC_API_KEY"], message: "obligatoire avec ASSISTANT_MODE=live" });
   }
 });
 
