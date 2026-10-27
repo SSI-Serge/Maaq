@@ -3,7 +3,7 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-10-27T11:17:15Z",
+  "updated": "2026-10-27T11:30:33Z",
   "deploys": [
     {
       "at": "2026-10-25T08:05:53Z",
@@ -166,6 +166,15 @@
       ],
       "what": "Lot 2 sur https://test.maaq.fr : l'autre parent est prévenu quand un RDV est ajouté. Seuls les RDV proposés à partir de maintenant sont notifiés. Pas la production.",
       "note": "À essayer sur téléphone : autoriser les notifications sur deux profils (Camille et dkuete), faire proposer un RDV à l'assistant, le confirmer."
+    },
+    {
+      "at": "2026-10-27T11:30:33Z",
+      "env": "preview",
+      "storyIds": [
+        "f16s2"
+      ],
+      "what": "Lot 3 sur https://test.maaq.fr : enregistrement d'un RDV resté sans réponse, livré éteint. Pas la production.",
+      "note": "Rien ne change pour les familles tant que l'interrupteur reste éteint."
     }
   ],
   "features": [
@@ -1841,9 +1850,11 @@
         {
           "id": "f16s2",
           "title": "D49 · Voir un RDV sans réponse entrer au calendrier après 72 heures",
-          "state": "planning",
-          "env": null,
-          "note": "Lot 3. Livré éteint par défaut ; séries et contenus hors application jamais enregistrés d'office."
+          "state": "testing",
+          "env": "preview",
+          "note": "Livré éteint : sur la zone de test, aucun RDV n'est confirmé sans réponse tant que l'interrupteur n'est pas allumé. Allumé, un RDV resté 72 h sans réponse entre dans le calendrier, les parents sont prévenus, et le détail le dit.",
+          "at": "2026-10-27T11:30:33Z",
+          "unsure": "Essayé par des tests automatiques seulement ; l'interrupteur n'a jamais été allumé en ligne. À essayer avec de vrais RDV avant de l'allumer pour le pilote."
         },
         {
           "id": "f16s3",
@@ -1947,6 +1958,10 @@
         {
           "at": "2026-10-27T11:17:15Z",
           "what": "La date de mise en service des notifications de RDV est réglée sur la zone de test au moment de la mise en ligne ; elle n'est pas encore modifiable dans la console."
+        },
+        {
+          "at": "2026-10-27T11:30:33Z",
+          "what": "L'enregistrement sans réponse est livré éteint (AUTO_CONFIRM_MODE=off) ; il s'allume par un réglage du serveur, sur accord du responsable produit."
         }
       ],
       "unsure": [
@@ -1955,6 +1970,11 @@
         "L'offre gratuite de TomTom (2 500 requêtes par jour) est à reconfirmer : la grille a changé le 1er juillet 2026."
       ],
       "activity": [
+        {
+          "at": "2026-10-27T11:30:33Z",
+          "kind": "live",
+          "what": "Lot 3 en ligne sur la zone de test, éteint : enregistrement d'office, avis aux parents, mention dans le détail et la seconde relance"
+        },
         {
           "at": "2026-10-27T11:17:15Z",
           "kind": "live",
@@ -1982,7 +2002,7 @@
           "title": "Retrouver ses données dans une base alignée sur le schéma de conception (lot 0)",
           "state": "testing",
           "env": "preview",
-          "note": "Fait et en ligne sur la zone de test : la base suit le schéma de la session base de données (63 tables). Contrôle fait : aucune différence avec le schéma de référence. Rendez-vous, enfants et conversations de test perdus, comme décidé.",
+          "note": "Fait et en ligne sur la zone de test : la base suit le schéma de la session base de données (63 tables). Contrôle fait : aucune différence avec le schéma de référence. Rendez-vous, enfants et conversations de test perdus, comme décidé. Le code Microsoft Foundry est retiré ; seule l'API Anthropic directe reste.",
           "unsure": "Pas encore essayé sur le téléphone après la recréation : il faut se reconnecter, recréer le schéma de déverrouillage et réactiver les notifications.",
           "at": "2026-10-27T10:43:33Z"
         },
@@ -2045,6 +2065,11 @@
         "La base de test n'a pas de sauvegarde automatique : une sauvegarde manuelle précède chaque migration."
       ],
       "activity": [
+        {
+          "at": "2026-10-27T11:30:33Z",
+          "kind": "ok",
+          "what": "Retrait du code Microsoft Foundry : fin du lot 0"
+        },
         {
           "at": "2026-10-27T10:58:10Z",
           "kind": "live",
