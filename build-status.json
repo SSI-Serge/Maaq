@@ -3,8 +3,62 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-10-02T22:25:39Z",
+  "updated": "2026-10-27T09:30:40Z",
   "deploys": [
+    {
+      "at": "2026-10-25T08:05:53Z",
+      "env": "preview",
+      "storyIds": [
+        "f10s3",
+        "f14s4"
+      ],
+      "what": "Dictée vocale de l'assistant, tuile de l'Assistant sur le tableau de bord, et correctifs de sécurité des dépendances (Next, Nodemailer, Zod, Vite) sur https://test.maaq.fr. Pas la production.",
+      "note": "Plus aucune alerte de sécurité connue sur les dépendances."
+    },
+    {
+      "at": "2026-10-25T07:36:36Z",
+      "env": "preview",
+      "storyIds": [
+        "f14s1",
+        "f14s2",
+        "f14s3"
+      ],
+      "what": "Clés de notification ajoutées à la zone de test : les notifications sur téléphone deviennent possibles.",
+      "note": "Pas encore essayé sur un vrai téléphone."
+    },
+    {
+      "at": "2026-10-25T07:32:11Z",
+      "env": "preview",
+      "storyIds": [
+        "f10s1",
+        "f10s2",
+        "f10s4",
+        "f10s5"
+      ],
+      "what": "L'assistant est allumé sur la zone de test, avec une clé dédiée à cette zone."
+    },
+    {
+      "at": "2026-10-25T07:05:22Z",
+      "env": "preview",
+      "storyIds": [
+        "f11s1",
+        "f11s2",
+        "f11s3",
+        "f11s4",
+        "f11s5",
+        "f11s6",
+        "f11s7",
+        "f12s1",
+        "f12s2",
+        "f12s3",
+        "f13s1",
+        "f13s2",
+        "f13s3",
+        "f13s4"
+      ],
+      "what": "Calendrier de la famille, rendez-vous, membres, rappels et relances par email sur https://test.maaq.fr, avec 5 nouvelles tables de base (migrations 0007 à 0011). Pas la production.",
+      "note": "Le calendrier de Camille est vide : aucune donnée de démonstration n'a été créée en ligne."
+    },
     {
       "at": "2026-10-02T22:25:39Z",
       "env": "preview",
@@ -155,6 +209,11 @@
         "Les contrôles automatiques en ligne (GitHub) n'ont pas encore tourné : ils démarreront à l'envoi."
       ],
       "activity": [
+        {
+          "at": "2026-10-25T08:03:05Z",
+          "kind": "ok",
+          "what": "Correctifs de sécurité des dépendances (Next, Nodemailer, Zod, Vite) : plus aucune alerte, 503 tests et compilation vérifiés"
+        },
         {
           "at": "2026-10-01T14:31:50Z",
           "kind": "ok",
@@ -1294,6 +1353,637 @@
         }
       ],
       "building": false
+    },
+    {
+      "id": "f10",
+      "name": "Assistant Famille : faire une demande",
+      "oneLiner": "Un parent écrit ou dicte ce qu'il aurait dit à une assistante ; l'assistant range le rendez-vous en proposition à confirmer.",
+      "stories": [
+        {
+          "id": "f10s1",
+          "title": "US-74 · Écrire une demande et recevoir une proposition de rendez-vous",
+          "state": "done",
+          "env": "preview",
+          "at": "2026-10-25T07:32:11Z",
+          "unsure": "Essayé avec le vrai modèle par le banc d'essai de l'équipe (36 cas), pas encore en ligne par un parent sur son téléphone."
+        },
+        {
+          "id": "f10s2",
+          "title": "US-74 · Être prévenu d'un conflit avec un autre rendez-vous, avec des créneaux libres proposés",
+          "state": "done",
+          "env": "preview",
+          "at": "2026-10-25T07:32:11Z"
+        },
+        {
+          "id": "f10s3",
+          "title": "US-71 · Dicter sa demande à la voix",
+          "state": "done",
+          "env": "preview",
+          "at": "2026-10-25T08:05:53Z",
+          "note": "Voie rapide : le texte apparaît dans le champ, le parent le relit puis l'envoie. Seul le texte part, jamais le son.",
+          "unsure": "C'est le navigateur qui transcrit (Google sur Chrome Android) : pas conforme au cadre du pilote, pas encore essayé sur un téléphone. Sur iPhone, le micro risque de manquer dans l'application installée."
+        },
+        {
+          "id": "f10s4",
+          "title": "D31 · Garder prénoms, emails et téléphones hors de ce que voit le modèle",
+          "state": "done",
+          "env": "preview",
+          "at": "2026-10-25T07:32:11Z",
+          "unsure": "C'est une pseudonymisation : les noms de famille, praticiens, écoles et lieux saisis restent dans les textes envoyés."
+        },
+        {
+          "id": "f10s5",
+          "title": "D38 · Retrouver sa conversation des 4 derniers jours",
+          "state": "done",
+          "env": "preview",
+          "at": "2026-10-25T07:32:11Z"
+        },
+        {
+          "id": "f10s6",
+          "title": "US-72 · Transmettre sa demande par photo ou capture d'écran",
+          "state": "idea",
+          "env": null
+        },
+        {
+          "id": "f10s7",
+          "title": "US-73 · Partager un contenu vers l'assistant depuis une autre application (Android)",
+          "state": "idea",
+          "env": null
+        },
+        {
+          "id": "f10s8",
+          "title": "US-70 · Limiter le nombre de demandes par jour",
+          "state": "idea",
+          "env": null,
+          "note": "Prévu pour l'assistant (AF-7), pas encore appliqué."
+        }
+      ],
+      "decisions": [
+        {
+          "at": "2026-10-25T02:01:57Z",
+          "what": "Claude tourne dans le serveur de MAAQ : le modèle demande des actions, MAAQ les exécute. Le calendrier de référence est dans la base de MAAQ."
+        },
+        {
+          "at": "2026-10-25T02:01:57Z",
+          "what": "Aucun rendez-vous n'entre dans le calendrier sans la confirmation d'un parent."
+        },
+        {
+          "at": "2026-10-25T07:32:11Z",
+          "what": "Pour la zone de test, l'assistant passe par l'API Anthropic en direct, avec une clé dédiée. Le pilote vise Microsoft Foundry."
+        }
+      ],
+      "unsure": [
+        "Le quota du modèle sur Microsoft Foundry est encore à zéro : rien n'a été essayé par cette voie.",
+        "La zone de test n'a pas de vraies données : le calendrier de Camille y est vide."
+      ],
+      "activity": [
+        {
+          "at": "2026-10-25T08:05:53Z",
+          "kind": "live",
+          "what": "La dictée vocale est sur la zone de test (aperçu)"
+        },
+        {
+          "at": "2026-10-25T08:03:05Z",
+          "kind": "ok",
+          "what": "Dictée vocale (voie rapide) construite et vérifiée par les tests"
+        },
+        {
+          "at": "2026-10-25T07:32:11Z",
+          "kind": "live",
+          "what": "L'assistant est allumé sur la zone de test avec une clé dédiée"
+        },
+        {
+          "at": "2026-10-25T02:01:57Z",
+          "kind": "ok",
+          "what": "Noyau de l'assistant construit : demande écrite, rendez-vous provisoire, conflits, pseudonymisation"
+        }
+      ]
+    },
+    {
+      "id": "f11",
+      "name": "Calendrier familial et rendez-vous",
+      "oneLiner": "Voir le calendrier de la famille, confirmer, modifier, ignorer ou annuler un rendez-vous.",
+      "stories": [
+        {
+          "id": "f11s1",
+          "title": "US-75 · Confirmer un rendez-vous proposé",
+          "state": "done",
+          "env": "preview",
+          "at": "2026-10-25T07:05:22Z"
+        },
+        {
+          "id": "f11s2",
+          "title": "US-76 · Modifier un rendez-vous avant de le confirmer",
+          "state": "done",
+          "env": "preview",
+          "at": "2026-10-25T07:05:22Z"
+        },
+        {
+          "id": "f11s3",
+          "title": "US-77 · Ignorer une proposition",
+          "state": "done",
+          "env": "preview",
+          "at": "2026-10-25T07:05:22Z"
+        },
+        {
+          "id": "f11s4",
+          "title": "US-78 · Voir le calendrier de la famille (semaine, mois, jour)",
+          "state": "done",
+          "env": "preview",
+          "at": "2026-10-25T07:05:22Z"
+        },
+        {
+          "id": "f11s5",
+          "title": "US-79 · Ouvrir le détail d'un rendez-vous",
+          "state": "done",
+          "env": "preview",
+          "at": "2026-10-25T07:05:22Z"
+        },
+        {
+          "id": "f11s6",
+          "title": "US-80 · Modifier ou annuler un rendez-vous confirmé",
+          "state": "done",
+          "env": "preview",
+          "at": "2026-10-25T07:05:22Z"
+        },
+        {
+          "id": "f11s7",
+          "title": "US-75 · Deux parents qui confirment en même temps : un seul l'emporte",
+          "state": "done",
+          "env": "preview",
+          "at": "2026-10-25T07:05:22Z"
+        }
+      ],
+      "decisions": [
+        {
+          "at": "2026-10-25T02:53:34Z",
+          "what": "Titres, lieux et notes sont chiffrés en base : seuls les parents du foyer les lisent."
+        },
+        {
+          "at": "2026-10-25T02:53:34Z",
+          "what": "Un rendez-vous peut être provisoire, confirmé, écarté, ignoré ou annulé ; un provisoire jamais confirmé disparaît à son début."
+        }
+      ],
+      "unsure": [
+        "Les écrans ont été vérifiés dans un navigateur de bureau en taille téléphone, pas sur un vrai téléphone.",
+        "Réservé aux deux parents : les invités secondaires n'y ont pas accès (règles de visibilité D26 pas encore déployées).",
+        "Le calendrier de Camille est vide en ligne : aucune donnée de démonstration n'y a été créée."
+      ],
+      "activity": [
+        {
+          "at": "2026-10-25T07:05:22Z",
+          "kind": "live",
+          "what": "Calendrier et écrans de rendez-vous sur la zone de test (aperçu), avec les 5 migrations de base"
+        },
+        {
+          "at": "2026-10-25T02:53:34Z",
+          "kind": "ok",
+          "what": "Boucle de rendez-vous construite : confirmation, modification, calendrier, détail, annulation"
+        }
+      ]
+    },
+    {
+      "id": "f12",
+      "name": "Membres de la famille",
+      "oneLiner": "Déclarer les enfants et les proches concernés par les rendez-vous, avec ou sans compte MAAQ.",
+      "stories": [
+        {
+          "id": "f12s1",
+          "title": "US-92 · Ajouter un membre de la famille (prénom, date de naissance facultative)",
+          "state": "done",
+          "env": "preview",
+          "at": "2026-10-25T07:05:22Z"
+        },
+        {
+          "id": "f12s2",
+          "title": "US-93 · Modifier ou retirer un membre",
+          "state": "done",
+          "env": "preview",
+          "at": "2026-10-25T07:05:22Z"
+        },
+        {
+          "id": "f12s3",
+          "title": "US-93 · Effacer définitivement un membre sans compte",
+          "state": "done",
+          "env": "preview",
+          "at": "2026-10-25T07:05:22Z",
+          "note": "Ses rendez-vous seuls sont supprimés ; dans les rendez-vous partagés, il devient « Ancien membre »."
+        },
+        {
+          "id": "f12s4",
+          "title": "US-57 · Anonymiser le membre d'un invité supprimé",
+          "state": "idea",
+          "env": null
+        },
+        {
+          "id": "f12s5",
+          "title": "US-55 · Retrouver les données de la famille dans l'export",
+          "state": "idea",
+          "env": null
+        }
+      ],
+      "decisions": [
+        {
+          "at": "2026-10-25T03:23:29Z",
+          "what": "Ajouter un membre n'est jamais obligatoire : les deux parents sont déjà membres, les enfants se déclarent si on le souhaite."
+        },
+        {
+          "at": "2026-10-25T03:23:29Z",
+          "what": "Un membre retiré garde son prénom sur ses anciens rendez-vous et ne se restaure pas."
+        }
+      ],
+      "unsure": [
+        "Le choix du rôle (parent, autre) à l'ajout n'est pas fait : à confirmer avec le product manager.",
+        "Un invité supprimé n'est pas encore retiré automatiquement de la liste des membres.",
+        "Pas encore essayé sur un téléphone."
+      ],
+      "activity": [
+        {
+          "at": "2026-10-25T07:05:22Z",
+          "kind": "live",
+          "what": "L'écran des membres est sur la zone de test (aperçu)"
+        },
+        {
+          "at": "2026-10-25T03:23:29Z",
+          "kind": "ok",
+          "what": "Écran des membres construit ; deux défauts de dates de naissance trouvés et corrigés par les tests"
+        }
+      ]
+    },
+    {
+      "id": "f13",
+      "name": "Rappels et relances par email",
+      "oneLiner": "Les deux parents sont rappelés avant un rendez-vous confirmé et relancés pour une proposition restée sans réponse.",
+      "stories": [
+        {
+          "id": "f13s1",
+          "title": "US-81 · Recevoir un rappel par email avant un rendez-vous confirmé (J-7, J-1, jour J)",
+          "state": "done",
+          "env": "preview",
+          "at": "2026-10-25T07:05:22Z"
+        },
+        {
+          "id": "f13s2",
+          "title": "US-82 · Régler les rappels de chaque type de rendez-vous",
+          "state": "done",
+          "env": "preview",
+          "at": "2026-10-25T07:05:22Z"
+        },
+        {
+          "id": "f13s3",
+          "title": "US-83 · Être relancé pour une proposition qui attend sa confirmation",
+          "state": "done",
+          "env": "preview",
+          "at": "2026-10-25T07:05:22Z"
+        },
+        {
+          "id": "f13s4",
+          "title": "US-77 · Voir une proposition restée sans réponse disparaître d'elle-même",
+          "state": "done",
+          "env": "preview",
+          "at": "2026-10-25T07:05:22Z"
+        }
+      ],
+      "decisions": [
+        {
+          "at": "2026-10-25T03:47:26Z",
+          "what": "Le lieu d'un rendez-vous médical ne figure jamais dans un rappel (ni email, ni notification)."
+        },
+        {
+          "at": "2026-10-25T03:47:26Z",
+          "what": "Après un incident, seul le rappel le plus récent est rattrapé : J-7 n'a plus de sens si J-1 est arrivé."
+        },
+        {
+          "at": "2026-10-25T03:47:26Z",
+          "what": "Pour le pilote, seuls les deux parents reçoivent les rappels (valeur choisie faute de réponse du responsable produit)."
+        }
+      ],
+      "unsure": [
+        "Vérifié en local avec une heure simulée : aucun rappel réel n'a encore été observé en ligne.",
+        "Le planificateur en ligne (toutes les 5 minutes) est actif mais n'a pas été surveillé.",
+        "La relance s'arrête si un parent modifie le rendez-vous sans le confirmer (règle de la US-83) : à confirmer avec l'analyste."
+      ],
+      "activity": [
+        {
+          "at": "2026-10-25T07:05:22Z",
+          "kind": "live",
+          "what": "Rappels et relances par email sur la zone de test (aperçu)"
+        },
+        {
+          "at": "2026-10-25T03:47:26Z",
+          "kind": "ok",
+          "what": "Rappels, relances, réglages par type et disparition automatique construits ; 29 tests dédiés"
+        }
+      ]
+    },
+    {
+      "id": "f14",
+      "name": "Notifications sur téléphone et badge",
+      "oneLiner": "Recevoir les rappels en notification sur son téléphone, avec le nombre de confirmations en attente sur l'icône.",
+      "stories": [
+        {
+          "id": "f14s1",
+          "title": "US-94 · Activer ses rappels depuis le téléphone",
+          "state": "testing",
+          "env": "preview",
+          "at": "2026-10-25T07:36:36Z",
+          "note": "En attente de l'essai sur le téléphone Android de l'utilisateur.",
+          "unsure": "Jamais essayé sur un vrai téléphone : l'abonnement, la réception et le toucher sur la notification restent à vérifier."
+        },
+        {
+          "id": "f14s2",
+          "title": "US-81, US-83 · Recevoir un rappel ou une relance en notification, par email à défaut",
+          "state": "testing",
+          "env": "preview",
+          "at": "2026-10-25T07:36:36Z",
+          "note": "Le rappel de la veille est toujours doublé par un email.",
+          "unsure": "Jamais essayé sur un vrai téléphone : l'abonnement, la réception et le toucher sur la notification restent à vérifier."
+        },
+        {
+          "id": "f14s3",
+          "title": "US-84 · Voir le nombre de confirmations en attente sur l'icône de l'application",
+          "state": "testing",
+          "env": "preview",
+          "at": "2026-10-25T07:36:36Z",
+          "unsure": "Sur iPhone, le badge exige iOS 16.4 ou plus et l'application installée ; sa fiabilité y est moindre."
+        },
+        {
+          "id": "f14s4",
+          "title": "US-84 · Voir ce nombre sur la tuile Assistant Famille du tableau de bord",
+          "state": "done",
+          "env": "preview",
+          "at": "2026-10-25T08:05:53Z"
+        }
+      ],
+      "decisions": [
+        {
+          "at": "2026-10-25T06:42:54Z",
+          "what": "Le serveur n'envoie des notifications qu'aux services d'Apple, Google, Mozilla et Microsoft, pour qu'un profil ne puisse pas lui faire appeler une adresse quelconque."
+        },
+        {
+          "at": "2026-10-25T08:05:53Z",
+          "what": "La tuile de l'Assistant est fixe, en tête du tableau de bord, en attendant que l'assistant devienne un agent du catalogue."
+        }
+      ],
+      "unsure": [
+        "Jamais essayé sur un vrai téléphone : l'abonnement, la réception et le toucher sur la notification restent à vérifier.",
+        "Le toucher sur une notification quand l'application est verrouillée n'a pas été vérifié.",
+        "Les clés de notification de la zone de test sont propres à cette zone ; la production aura les siennes."
+      ],
+      "activity": [
+        {
+          "at": "2026-10-25T07:36:36Z",
+          "kind": "live",
+          "what": "Les clés de notification sont en place sur la zone de test : les notifications deviennent possibles"
+        },
+        {
+          "at": "2026-10-25T06:42:54Z",
+          "kind": "ok",
+          "what": "Activation, envoi, badge et tuile construits ; 23 tests dédiés (envoi simulé)"
+        }
+      ]
+    },
+    {
+      "id": "f15",
+      "name": "Réception de rendez-vous par email",
+      "oneLiner": "Transférer un mail contenant un rendez-vous à une adresse dédiée à la famille.",
+      "stories": [
+        {
+          "id": "f15s1",
+          "title": "US-85 · Obtenir l'adresse de transfert de sa famille",
+          "state": "idea",
+          "env": null
+        },
+        {
+          "id": "f15s2",
+          "title": "US-86 · Être guidé pour configurer le transfert depuis sa messagerie",
+          "state": "idea",
+          "env": null
+        },
+        {
+          "id": "f15s3",
+          "title": "US-87 · Recevoir une proposition de rendez-vous à partir d'un mail transféré",
+          "state": "idea",
+          "env": null
+        },
+        {
+          "id": "f15s4",
+          "title": "US-88 · Déclarer les adresses autorisées à transférer",
+          "state": "idea",
+          "env": null
+        },
+        {
+          "id": "f15s5",
+          "title": "US-89 · Ne pas créer de doublon pour un rendez-vous reçu plusieurs fois",
+          "state": "idea",
+          "env": null
+        },
+        {
+          "id": "f15s6",
+          "title": "US-90 · Se voir proposer de supprimer ou modifier un rendez-vous après un mail d'annulation ou de report",
+          "state": "idea",
+          "env": null
+        },
+        {
+          "id": "f15s7",
+          "title": "US-91 · Recevoir une confirmation groupée pour plusieurs rendez-vous d'un même mail",
+          "state": "idea",
+          "env": null
+        }
+      ],
+      "decisions": [],
+      "unsure": [
+        "Demande un service de réception d'emails et un nom de domaine : essais préparés (Mailgun) mais jamais branchés."
+      ],
+      "activity": []
+    },
+    {
+      "id": "f16",
+      "name": "Calendrier intelligent (MVP2)",
+      "oneLiner": "Séries de RDV, tâches préparatoires, rappels et point de la semaine, anticipation, trajets et « Sur place » : rien n'est encore construit.",
+      "stories": [
+        {
+          "id": "f16s1",
+          "title": "US-113 · Être prévenu quand l'autre parent ajoute un RDV au calendrier",
+          "state": "planning",
+          "env": null,
+          "note": "Lot 2. Décisions D57 à D59 prises ; 22 critères sur 24 testables dès cette livraison."
+        },
+        {
+          "id": "f16s2",
+          "title": "D49 · Voir un RDV sans réponse entrer au calendrier après 72 heures",
+          "state": "planning",
+          "env": null,
+          "note": "Lot 3. Livré éteint par défaut ; séries et contenus hors application jamais enregistrés d'office."
+        },
+        {
+          "id": "f16s3",
+          "title": "US-109 · Créer un RDV récurrent (séries)",
+          "state": "planning",
+          "env": null,
+          "note": "Lot 4. Séances créées à 6 mois glissants ; vacances scolaires importées de la source officielle."
+        },
+        {
+          "id": "f16s4",
+          "title": "US-110 · Créer une tâche seule ou récurrente",
+          "state": "planning",
+          "env": null,
+          "note": "Lot 5."
+        },
+        {
+          "id": "f16s5",
+          "title": "US-95 · Voir les tâches préparatoires proposées dans la même réponse que le RDV",
+          "state": "planning",
+          "env": null,
+          "note": "Lot 5. Carte du tchat avec la liste « À préparer », confirmation du RDV et des tâches en une opération.",
+          "unsure": "Le délai d'une réponse avec tâches n'est pas mesuré (décision du PO) ; estimation de 8 à 10 s, 10 à 13 s pour une série."
+        },
+        {
+          "id": "f16s6",
+          "title": "US-96 · Assigner une tâche préparatoire à un membre de la famille",
+          "state": "planning",
+          "env": null,
+          "note": "Lot 5."
+        },
+        {
+          "id": "f16s7",
+          "title": "US-97 · Être rappelé des tâches dues ou en retard",
+          "state": "planning",
+          "env": null,
+          "note": "Lot 6."
+        },
+        {
+          "id": "f16s8",
+          "title": "US-98 · Consulter le point hebdomadaire du dimanche soir",
+          "state": "planning",
+          "env": null,
+          "note": "Lot 6.",
+          "unsure": "La qualité du modèle léger pour le résumé reste à essayer."
+        },
+        {
+          "id": "f16s9",
+          "title": "US-102 · Découvrir le catalogue d'anticipation mensuel",
+          "state": "planning",
+          "env": null,
+          "note": "Lot 7."
+        },
+        {
+          "id": "f16s10",
+          "title": "US-111 · Charger le catalogue d'anticipation à partir d'un fichier de données",
+          "state": "planning",
+          "env": null,
+          "note": "Lot 7. La console d'administration avec extraction et chargement Excel est reportée (D60).",
+          "unsure": "Le contenu du catalogue (les éléments d'anticipation) reste à fournir."
+        },
+        {
+          "id": "f16s11",
+          "title": "US-107 · Être prévenu des temps de trajet entre mes RDV",
+          "state": "planning",
+          "env": null,
+          "note": "Lot 8. Avec TomTom (offre gratuite) ; le suivi ne marche que lorsque l'application est ouverte.",
+          "unsure": "Jamais essayé sur un téléphone ; sur iPhone, l'autorisation de la position peut être redemandée à chaque lancement."
+        },
+        {
+          "id": "f16s12",
+          "title": "US-112 · Savoir où se garer et où manger près d'un RDV",
+          "state": "planning",
+          "env": null,
+          "note": "Lot 8. Cartographie seule, lien « Voir les avis » ; l'agent juge si le lieu est public (D60)."
+        },
+        {
+          "id": "f16s13",
+          "title": "US-108 · Recevoir des suggestions tirées de l'historique non médical",
+          "state": "idea",
+          "env": null,
+          "note": "Reportée hors du MVP2 (D60)."
+        }
+      ],
+      "decisions": [
+        {
+          "at": "2026-10-26T12:00:00Z",
+          "what": "Le pilote s'ouvre avec le MVP2 complet, pas après le lot 2. Avant, des utilisateurs de test l'essaient sans saisir de données réelles (D60)."
+        },
+        {
+          "at": "2026-10-26T12:00:00Z",
+          "what": "Le schéma de la base de conception devient la seule référence ; le lot 0 aligne la version en test dessus (option A)."
+        },
+        {
+          "at": "2026-10-26T12:00:00Z",
+          "what": "Foundry est abandonné (pas de Claude en Europe) : le pilote se fait sur l'API Anthropic directe, avec de vraies familles et une clause contractuelle (D54)."
+        },
+        {
+          "at": "2026-10-27T12:00:00Z",
+          "what": "Calendrier retenu : 3 à 3,5 semaines, recette en trois vagues, deux sessions en parallèle quand c'est possible (D60)."
+        }
+      ],
+      "unsure": [
+        "Rien n'est encore construit : tout est en planification ; le lot 0 n'a pas démarré.",
+        "La recette sur iPhone attend un utilisateur équipé, que le responsable produit doit recruter.",
+        "L'offre gratuite de TomTom (2 500 requêtes par jour) est à reconfirmer : la grille a changé le 1er juillet 2026."
+      ],
+      "activity": [
+        {
+          "at": "2026-10-27T09:30:40Z",
+          "kind": "work",
+          "what": "Plan de développement en 9 lots validé dans ses grandes lignes ; aucun développement commencé"
+        }
+      ]
+    },
+    {
+      "id": "f17",
+      "name": "Fondations du MVP2",
+      "oneLiner": "Aligner la base sur le schéma de conception, plafonner l'assistant, puis préparer l'ouverture du pilote.",
+      "stories": [
+        {
+          "id": "f17s1",
+          "title": "Retrouver ses données dans une base alignée sur le schéma de conception (lot 0)",
+          "state": "planning",
+          "env": null,
+          "note": "Environ 8 à 10 jours de développeur humain. Les données de famille de test (3 RDV, 2 membres, 1 conversation) sont abandonnées ; sauvegarde de la base avant.",
+          "unsure": "Dépend du découpage en migrations de la session base de données ; les 699 vérifications restent à rejouer sur PostgreSQL 17."
+        },
+        {
+          "id": "f17s2",
+          "title": "Plafonner le nombre de demandes de l'assistant par jour (lot 1)",
+          "state": "planning",
+          "env": null,
+          "note": "Borne la dépense avant les tâches, le point de la semaine et la recherche « Sur place »."
+        },
+        {
+          "id": "f17s3",
+          "title": "Garder les journaux d'exploitation sans aucun contenu (lot 1)",
+          "state": "planning",
+          "env": null,
+          "note": "Y compris le journal des erreurs d'outil."
+        },
+        {
+          "id": "f17s4",
+          "title": "Ouvrir le pilote : environnement séparé, clause, export des données, signatures (lot 9)",
+          "state": "idea",
+          "env": null,
+          "note": "Seulement quand le MVP2 est complet. Prérequis hors développement : engagement écrit d'Anthropic, accords Brevo et Supabase."
+        }
+      ],
+      "decisions": [
+        {
+          "at": "2026-10-27T12:00:00Z",
+          "what": "Les RDV annulés sont purgés après 30 jours, comme les ignorés."
+        },
+        {
+          "at": "2026-10-27T12:00:00Z",
+          "what": "Un doublon rare de notification est accepté si le serveur s'arrête entre l'envoi et son enregistrement."
+        }
+      ],
+      "unsure": [
+        "La base de test n'a pas de sauvegarde automatique : une sauvegarde manuelle précède chaque migration."
+      ],
+      "activity": [
+        {
+          "at": "2026-10-27T09:30:40Z",
+          "kind": "work",
+          "what": "Écart entre le schéma de conception et la base en test relevé, table par table ; plan d'alignement décidé"
+        }
+      ]
     }
   ],
   "parkingLot": [
@@ -1361,6 +2051,46 @@
       "name": "Emails mis en forme (logo, couleurs)",
       "tag": "Proposed, not built",
       "note": "Les emails sont en texte brut pour l'instant. Rien n'est perdu."
+    },
+    {
+      "name": "Dictée avec transcription européenne (Azure Speech)",
+      "tag": "Proposed, not built",
+      "note": "La dictée du navigateur est conservée pour le pilote (D55) : l'audio part chez Google sur Android, couvert par l'analyse d'impact et la clause. La transcription par le serveur sera retenue avant l'ouverture large ; Azure Speech n'est plus acquis, fournisseur à choisir. Rien n'est perdu."
+    },
+    {
+      "name": "Microsoft Foundry pour l'assistant",
+      "tag": "Started, paused",
+      "note": "Abandonné pour le pilote (D54) : Foundry n'offre pas Claude en Europe. L'architecture actuelle, avec l'API Anthropic directe, sert le pilote ; Claude sur Vertex AI en Europe sera envisagé si le pilote est concluant. Le code Foundry sera retiré au lot 0."
+    },
+    {
+      "name": "L'Assistant Famille comme agent du catalogue",
+      "tag": "Proposed, not built",
+      "note": "Aujourd'hui sa tuile est fixe sur le tableau de bord. Le choix de la plateforme de l'agent (Digitorn ou Foundry) à la publication est décrit dans la US-106, pas encore construit."
+    },
+    {
+      "name": "Invités secondaires dans l'Assistant Famille",
+      "tag": "Proposed, not built",
+      "note": "Aujourd'hui seuls les deux parents y accèdent. Voir leurs rendez-vous, agir sur leurs propres demandes et recevoir leurs rappels suppose les règles de visibilité D26."
+    },
+    {
+      "name": "Rôle « parent » ou « autre » à l'ajout d'un membre",
+      "tag": "Proposed, not built",
+      "note": "L'analyste l'a marqué à confirmer avec le product manager ; la maquette ne le montre pas."
+    },
+    {
+      "name": "Données de démonstration pour la zone de test",
+      "tag": "Proposed, not built",
+      "note": "Le script existe pour la base locale, mais il ne convient pas tel quel à la base de test (profils différents). Le calendrier de Camille se remplira avec les premières demandes."
+    },
+    {
+      "name": "Console d'administration du catalogue d'anticipation (Excel)",
+      "tag": "Proposed, not built",
+      "note": "Reportée hors du MVP2 (D60) : le catalogue sera chargé à partir d'un fichier de données, avec les mêmes contrôles. L'extraction et le chargement par la console viendront ensuite."
+    },
+    {
+      "name": "Suggestions tirées de l'historique non médical (US-108)",
+      "tag": "Proposed, not built",
+      "note": "Reportée hors du MVP2 (D60). La spécification est écrite ; rien n'est perdu."
     }
   ]
 }
