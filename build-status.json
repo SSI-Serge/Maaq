@@ -3,7 +3,7 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-10-27T18:29:38Z",
+  "updated": "2026-10-27T18:55:33Z",
   "deploys": [
     {
       "at": "2026-10-27T18:29:38Z",
@@ -1979,10 +1979,11 @@
         {
           "id": "f16s12",
           "title": "US-112 · Savoir où se garer et où manger près d'un RDV",
-          "state": "planning",
+          "state": "building",
           "env": null,
-          "note": "Lot 8 : le schéma est prêt (recherches, plafonds, suggestion). Reste à écrire la recherche en arrière-plan, le message du tchat et la section du détail. Même service TomTom que les trajets.",
-          "at": "2026-10-27T17:32:11Z"
+          "note": "Lot 8 : le bouton « Où se garer, où manger ? », la recherche en arrière-plan (faux service), le résultat dans le détail du RDV, les limites de 3 recherches et la notification « le résultat est prêt » sont faits. Restent le message dans le tchat, la suggestion automatique, la demande à l'agent et TomTom.",
+          "at": "2026-10-27T17:32:11Z",
+          "unsure": "Jamais vu dans un navigateur ni sur un téléphone ; seul le faux service (adresses inventées) a été essayé, TomTom n'est pas écrit. Le tchat n'a pas encore de message « Sur place » ni de suggestion ; l'agent ne sait pas encore lancer la recherche. Le lien « Voir les avis » n'a jamais été ouvert."
         },
         {
           "id": "f16s13",
@@ -2068,6 +2069,10 @@
         {
           "at": "2026-10-27T18:19:38Z",
           "what": "Le suivi du trajet passe par un service interchangeable (TRAVEL_MODE off, fake ou live) : le faux service permet d'essayer les écrans et les notifications avant d'avoir la clé TomTom."
+        },
+        {
+          "at": "2026-10-27T18:55:33Z",
+          "what": "« Sur place » est livré en deux temps : d'abord le bouton et la section du détail du RDV, ensuite le tchat et l'agent (qui demandent un nouveau passage du banc d'essai)."
         }
       ],
       "unsure": [
@@ -2079,6 +2084,11 @@
         "Le suivi du trajet ne repose pour l'instant que sur un faux service : aucune durée réelle n'a été obtenue de TomTom."
       ],
       "activity": [
+        {
+          "at": "2026-10-27T18:55:33Z",
+          "kind": "building",
+          "what": "Lot 8 : « Sur place » (bouton, recherche, résultat, limites) avec un faux service ; restent le tchat et l'agent"
+        },
         {
           "at": "2026-10-27T18:29:38Z",
           "kind": "live",

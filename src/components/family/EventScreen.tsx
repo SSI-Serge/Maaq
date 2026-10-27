@@ -14,6 +14,7 @@ import { pendingChanged } from "@/client/badge";
 import { clock, dayOf, longDate, reminderState, shortDate, stamp, TYPE_LABEL, whenLabel } from "./format";
 import { MemberChips, StatusChip } from "./parts";
 import { PrepareList } from "./PrepareList";
+import { PlaceSection } from "./PlaceSection";
 import { TravelSection } from "./TravelSection";
 import styles from "./family.module.css";
 
@@ -357,6 +358,9 @@ export function EventScreen({ id }: { id: string }) {
 
           {/* Suivi du trajet, propre à ce profil (US-107 RF4) */}
           {event.travel && <TravelSection event={event} consent={location.data?.consent.status ?? null} onChanged={reload} onEditAddress={() => setMode("edit")} />}
+
+          {/* « Sur place » : où se garer et où manger près du lieu (US-112) ; jamais pour un RDV médical */}
+          {event.place && event.type !== "medical" && !event.past && (provisional || event.status === "confirmed") && <PlaceSection eventId={event.id} />}
 
           {/* Liste « À préparer » : se retire, se modifie, s'ajoute ici comme dans la carte du tchat (US-95 RF3, RF5) */}
           {event.tasks && (event.tasks.items.length > 0 || event.tasks.editable) && <PrepareList event={event} onUpdated={setOverride} onStale={reload} disabled={busy} />}

@@ -6,6 +6,7 @@ import { completeTaskSeries } from "@/server/assistant/task-series";
 import { runTaskNotices, type TaskNoticesResult } from "@/server/assistant/task-notices";
 import { runDigests, type DigestsResult } from "@/server/assistant/digest";
 import { runAnticipation, type AnticipationResult } from "@/server/assistant/anticipation";
+import { runPlaceSearches, type PlacesResult } from "@/server/assistant/places";
 import { runTravelNotices, type TravelNoticesResult } from "@/server/assistant/travel";
 import { runReminders, type RemindersResult } from "@/server/assistant/reminders";
 import { cleanupExports } from "@/server/compliance/exports";
@@ -38,6 +39,8 @@ export interface JobsResult {
   anticipation: AnticipationResult;
   /** Notifications de trajet envoyées : 1 h 30 avant, puis 15 minutes avant le départ (US-107). */
   travel: TravelNoticesResult;
+  /** Recherches « Sur place » reprises, recherches bloquées échouées, notifications « le résultat est prêt » (US-112). */
+  places: PlacesResult;
 }
 
 /** Synchronise le carnet toutes les X heures (US-40 RT2) puis nettoie les données expirées (US-40 RT6, US-61 RT2, US-70 RT3). */
@@ -83,10 +86,14 @@ export async function runDueJobs(ctx: Ctx, options: { force?: boolean } = {}): P
     console.error(`Notifications de trajet : ${describeError(error)}`);
     return { first: 0, second: 0, skipped: 0, failed: 0 };
   });
-  if (!due) return { logbook: "not_due", purged: null, lifecycle, exports, reminders, notices, taskNotices, digests, anticipation, travel };
+  const places = await runPlaceSearches(ctx).catch((error) => {
+    console.error(`Recherches « Sur place » : ${describeError(error)}`);
+    return { executed: 0, failedStale: 0, notified: 0 };
+  });
+  if (!due) return { logbook: "not_due", purged: null, lifecycle, exports, reminders, notices, taskNotices, digests, anticipation, travel, places };
 
   const logbook = await syncLogbook(ctx);
-  return { logbook, purged: await purgeExpired(ctx), lifecycle, exports, reminders, notices, taskNotices, digests, anticipation, travel };
+  return { logbook, purged: await purgeExpired(ctx), lifecycle, exports, reminders, notices, taskNotices, digests, anticipation, travel, places };
 }
 
 /** Supprime les données arrivées au bout de leur durée de conservation. */
@@ -104,7 +111,7 @@ export async function purgeExpired(ctx: Ctx): Promise<{ logbook: number; errorRe
     "purge_expired_conversation_messages", "purge_expired_family_events", "purge_expired_attachments", "purge_expired_inbound_emails", "purge_old_daily_counters",
     "purge_admin_audit_log", "purge_expired_security_events", "purge_expired_family_tasks", "purge_expired_weekly_digests", "purge_old_scheduled_notifications", "purge_expired_anticipation",
     // Journal des consentements à la position au-delà de 5 ans (US-107 RT5, décision du DPO).
-    "purge_location_consent_events", "purge_travel_data",
+    "purge_location_consent_events", "purge_travel_data", "purge_place_searches",
   ]) {
     const done = await sql<{ n: string | null }>`select ${sql.ref(job)}() as n`.execute(ctx.db);
     database += Number(done.rows[0]?.n ?? 0);
