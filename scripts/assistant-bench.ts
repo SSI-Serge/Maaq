@@ -396,6 +396,7 @@ try {
     `- **Doublons manqués : ${missed.length} / ${duplicates.length}**`, "",
     "| Cas | Passage | Résultat | Durée (s) | Outils | Problèmes |", "|---|---|---|---|---|---|",
     ...outcomes.map((o) => `| ${o.id} | ${o.run} | ${o.failures.length ? "ÉCHEC" : "OK"} | ${o.seconds.toFixed(1)} | ${o.result.trace.length} | ${o.failures.join(" ; ") || "–"} |`), "",
+    ...(outcomes.some((o) => o.failures.length && o.result.status === "ok") ? ["## Réponses des cas en échec (jeu d'essai fictif)", "", ...outcomes.filter((o) => o.failures.length && o.result.status === "ok").map((o) => `- ${o.id} #${o.run} : ${o.result.reply.replace(/\s+/g, " ").slice(0, 400)}`), ""] : []),
     "## Doublons : membres passés à la recherche", "",
     ...duplicates.map((o) => `- ${o.id} #${o.run} : ${o.result.createdEventIds.length ? "MANQUÉ (créé en double)" : "reconnu"} ; membres : ${JSON.stringify(o.result.trace.filter((t) => t.name === "rechercher_doublon").map((t) => (t.input as { membres?: string[] }).membres ?? "(aucun)"))}`),
   ];

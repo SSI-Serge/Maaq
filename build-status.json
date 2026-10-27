@@ -3,7 +3,7 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-10-27T19:12:26Z",
+  "updated": "2026-10-27T19:34:25Z",
   "deploys": [
     {
       "at": "2026-10-27T18:29:38Z",
@@ -2085,9 +2085,15 @@
         "Les vacances scolaires de l'année suivante ne sont pas connues d'avance : l'alerte de septembre pour l'administrateur reste à faire.",
         "Le test d'un cas de rappel J-1 dépendait de l'heure d'exécution (fuseau d'essai) : corrigé, il tourne à toute heure.",
         "Le point de la semaine fait appel à un modèle : coût et qualité du résumé à mesurer sur des semaines fictives avant le pilote.",
-        "Le suivi du trajet ne repose pour l'instant que sur un faux service : aucune durée réelle n'a été obtenue de TomTom."
+        "Le suivi du trajet ne repose pour l'instant que sur un faux service : aucune durée réelle n'a été obtenue de TomTom.",
+        "La clé Anthropic a atteint sa limite d'usage jusqu'au 01/11/2026 : l'assistant de la zone de test est aussi arrêté. Deux cas de base du banc d'essai (22 et 23) échouent et restent à diagnostiquer."
       ],
       "activity": [
+        {
+          "at": "2026-10-27T19:34:25Z",
+          "kind": "back",
+          "what": "Banc d'essai avec le vrai modèle interrompu par la limite d'usage de la clé (jusqu'au 01/11) : premier passage 64 cas sur 66"
+        },
         {
           "at": "2026-10-27T19:12:26Z",
           "kind": "building",
