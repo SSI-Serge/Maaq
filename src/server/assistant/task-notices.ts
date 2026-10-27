@@ -19,7 +19,7 @@ import { addDays } from "./series";
 type Db = Kysely<DB>;
 
 /** Une réservation restée sans résultat au-delà de ce délai (serveur arrêté en plein envoi) est reprise. */
-const CLAIM_TTL_SECONDS = 600;
+export const CLAIM_TTL_SECONDS = 600;
 const DAILY_HOUR = "08:00";
 const DAILY_DEADLINE = "12:00";
 const ONE_HOUR = 3_600_000;
@@ -110,7 +110,7 @@ function email(to: Recipient, subject: string, lines: string[], path: string): {
 // Réservation et envoi
 // ---------------------------------------------------------------------------------------------------------------------------
 
-type Kind = "task_daily" | "task_due_1h" | "task_assigned" | "weekly_digest";
+type Kind = "task_daily" | "task_due_1h" | "task_assigned" | "weekly_digest" | "travel_first" | "travel_second";
 
 /** Réserve une notification du jour ou de la semaine : un seul passage l'obtient (US-97 RF9). Une réservation sans résultat depuis 10 minutes est reprise. */
 export async function claimDaily(ctx: Ctx, kind: "task_daily" | "weekly_digest", userId: string, day: string, dueAt: Date, deadline: Date): Promise<boolean> {
@@ -152,6 +152,8 @@ export interface Slot {
   userId: string;
   day?: string;
   taskId?: string;
+  /** Notification de trajet : liée à un RDV, une seule ligne par profil et par RDV (US-107 RT4). */
+  eventId?: string;
   dueAt: Date;
 }
 
@@ -162,13 +164,13 @@ async function finish(ctx: Ctx, slot: Slot, patch: { status: "sent" | "abandoned
     .where("kind", "=", slot.kind)
     .where("recipient_user_id", "=", slot.userId)
     .where("status", "=", "scheduled");
-  q = slot.day ? q.where("subject_date", "=", sql<Date>`${slot.day}::date`) : q.where("task_id", "=", slot.taskId!).where("due_at", "=", slot.dueAt);
+  q = slot.day ? q.where("subject_date", "=", sql<Date>`${slot.day}::date`) : slot.eventId ? q.where("event_id", "=", slot.eventId) : q.where("task_id", "=", slot.taskId!).where("due_at", "=", slot.dueAt);
   await q.execute();
 }
 
 async function release(ctx: Ctx, slot: Slot): Promise<void> {
   let q = ctx.db.deleteFrom("scheduled_notifications").where("kind", "=", slot.kind).where("recipient_user_id", "=", slot.userId).where("status", "=", "scheduled");
-  q = slot.day ? q.where("subject_date", "=", sql<Date>`${slot.day}::date`) : q.where("task_id", "=", slot.taskId!).where("due_at", "=", slot.dueAt);
+  q = slot.day ? q.where("subject_date", "=", sql<Date>`${slot.day}::date`) : slot.eventId ? q.where("event_id", "=", slot.eventId) : q.where("task_id", "=", slot.taskId!).where("due_at", "=", slot.dueAt);
   await q.execute();
 }
 

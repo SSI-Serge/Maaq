@@ -14,6 +14,7 @@ import { notifyAfterConfirmation } from "./notices";
 import { cancelPendingNotices, reminderDetails, type NudgeView, type ReminderView } from "./reminders";
 import { dropProposedTasks, loadEventTasks, type EventTasksView } from "./event-tasks";
 import { materializeEventSeriesTasks } from "./task-series";
+import { travelView, type TravelView } from "./travel";
 import { SCOPES, cancelSeries, conflictingSessions, confirmSeries, rewriteSeries, seriesView, splitSeries, transformToSeries, type RepetitionInput, type Scope, type SeriesEdit, type SeriesView } from "./series-ops";
 
 /**
@@ -97,6 +98,8 @@ export interface EventView {
   nudge: NudgeView | null;
   /** Liste « À préparer » : tâches proposées, à faire et faites du rendez-vous (US-95). Remplie dans le détail seulement. */
   tasks: EventTasksView | null;
+  /** Suivi du trajet de ce profil (US-107) ; vide tant que le service de calcul est fermé. Rempli dans le détail seulement. */
+  travel: TravelView | null;
 }
 
 interface Viewer {
@@ -160,7 +163,7 @@ function toView(v: Viewer, e: CalendarEvent, members: Map<string, MemberChip>, n
     autoConfirm: autoConfirmOf(v, e),
     recurring: Boolean(e.seriesId),
     series: null,
-    can: actionsFor(v, e, now), conflicts: [], nearby: [], alternatives: [], reminders: [], nudge: null, tasks: null,
+    can: actionsFor(v, e, now), conflicts: [], nearby: [], alternatives: [], reminders: [], nudge: null, tasks: null, travel: null,
   };
 }
 
@@ -281,7 +284,7 @@ export async function getEvent(ctx: Ctx, session: SessionContext, id: string): P
   const names = await firstNames(ctx.db, [e.createdByUserId, e.statusChangedByUserId]);
   const view = await withConflicts(ctx.db, v, toView(v, e, members, names, ctx.now), e, ctx.now);
   const taskViewer = { accountId: v.accountId, userId: v.userId, parent: v.parent, memberId: v.memberId, timeZone: v.timeZone, today: utcToLocal(ctx.now, v.timeZone).slice(0, 10), nowLocal: utcToLocal(ctx.now, v.timeZone) };
-  return { ...view, series: await seriesView(ctx.db, e, v.timeZone), tasks: await loadEventTasks(ctx.db, taskViewer, e, ctx.now, members), ...(await reminderDetails(ctx.db, v.accountId, e, v.timeZone, ctx.now)) };
+  return { ...view, series: await seriesView(ctx.db, e, v.timeZone), tasks: await loadEventTasks(ctx.db, taskViewer, e, ctx.now, members), travel: await travelView(ctx.db, v.userId, v.memberId, e, ctx.now), ...(await reminderDetails(ctx.db, v.accountId, e, v.timeZone, ctx.now)) };
 }
 
 /** Confirmations en attente d'un profil (US-75 RF4, US-84) : provisoires qu'il peut traiter, à venir. Les écartés n'y figurent plus. */

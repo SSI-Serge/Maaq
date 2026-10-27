@@ -88,3 +88,18 @@ export async function readLastPosition(ctx: Ctx, session: SessionContext): Promi
   const { rows } = await sql<{ p: Buffer | null }>`select device_last_position(${session.device.id}::uuid) as p`.execute(ctx.db);
   return rows[0]?.p ? parsePoint(JSON.parse(open(rows[0].p))) : null;
 }
+
+/**
+ * La dernière position connue d'un profil, toutes appareils confondus (la plus récente non échue, de moins de 3 heures), pour l'estimation de son propre trajet (US-107 RF5).
+ * Réservée au serveur : la position n'est lue que pour le profil lui-même, jamais pour un autre.
+ */
+export async function readLastPositionOfUser(db: Ctx["db"], userId: string, now: Date): Promise<PlacePoint | null> {
+  const row = await sql<{ device_id: string; captured_at: Date }>`
+    select p.device_id, p.captured_at from device_last_positions p join devices d on d.id = p.device_id
+     where d.user_id = ${userId}::uuid and d.revoked_at is null and p.expires_at > ${now} and p.captured_at > ${new Date(now.getTime() - KEEP_MS)}
+     order by p.captured_at desc limit 1`.execute(db);
+  const device = row.rows[0]?.device_id;
+  if (!device) return null;
+  const { rows } = await sql<{ p: Buffer | null }>`select device_last_position(${device}::uuid) as p`.execute(db);
+  return rows[0]?.p ? parsePoint(JSON.parse(open(rows[0].p))) : null;
+}

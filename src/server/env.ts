@@ -51,6 +51,11 @@ const schema = z.object({
   /** Modèle léger du résumé du point de la semaine (US-98 RT2) ; sans valeur, celui de l'assistant. */
   ASSISTANT_DIGEST_MODEL: z.string().min(1).optional(),
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
+  /**
+   * Suivi du trajet (US-107) : « off » (fermé), « fake » (durées inventées, pour essayer les écrans : essais et zone de test seulement) ou « live » (TomTom, clé dans Secret Manager).
+   */
+  TRAVEL_MODE: z.enum(["off", "fake", "live"]).default("off"),
+  TOMTOM_API_KEY: z.string().min(1).optional(),
 });
 
 const checked = schema.superRefine((value, ctx) => {
@@ -65,6 +70,7 @@ const checked = schema.superRefine((value, ctx) => {
   if (value.ASSISTANT_MODE === "live") {
     if (!value.ANTHROPIC_API_KEY) ctx.addIssue({ code: "custom", path: ["ANTHROPIC_API_KEY"], message: "obligatoire avec ASSISTANT_MODE=live" });
   }
+  if (value.TRAVEL_MODE === "live" && !value.TOMTOM_API_KEY) ctx.addIssue({ code: "custom", path: ["TOMTOM_API_KEY"], message: "obligatoire avec TRAVEL_MODE=live" });
 });
 
 export type Env = z.infer<typeof schema>;

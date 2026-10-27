@@ -3,7 +3,7 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-10-27T18:01:00Z",
+  "updated": "2026-10-27T18:19:38Z",
   "deploys": [
     {
       "at": "2026-10-25T08:05:53Z",
@@ -1962,10 +1962,10 @@
         {
           "id": "f16s11",
           "title": "US-107 · Être prévenu des temps de trajet entre mes RDV",
-          "state": "building",
+          "state": "testing",
           "env": null,
-          "note": "Lot 8 en cours : l'alerte « RDV rapproché », le champ « Adresse » avec suggestions de l'État et le consentement à la position (autoriser, retirer, journal) sont faits. Reste : suivi du trajet et notifications.",
-          "unsure": "Le champ Adresse et la carte « Position » n'ont jamais été vus dans un navigateur ni sur un téléphone. Bloqué pour la suite : compte et clé TomTom et déclaration du sous-traitant par le DPO. Sur iPhone, l'autorisation de la position peut être redemandée à chaque lancement. La phrase « commence après » de l'alerte est écrite par MAAQ, à relire. Export et suppression des données de position : lot 9 (US-55, US-56).",
+          "note": "Lot 8 : tout est fait avec un faux service de trajets (durées inventées) : alerte « RDV rapproché », champ « Adresse », consentement à la position, interrupteur « Suivre mon trajet », notifications 1 h 30 et 15 minutes avant le départ, écran « Suivi du trajet ». Reste à brancher TomTom et à l'essayer en vrai.",
+          "unsure": "Jamais vu dans un navigateur ni sur un téléphone ; la lecture réelle de la position n'a jamais tourné. Aucune durée de trajet réelle : seul le faux service a été essayé, TomTom est écrit mais jamais interrogé (compte, clé et déclaration du sous-traitant par le DPO attendus). Sur iPhone, l'autorisation de la position peut être redemandée à chaque lancement. Textes écrits par MAAQ à relire : « commence après » de l'alerte, notification du second calcul quand le trafic s'alourdit. Export et suppression des données de position : lot 9.",
           "at": "2026-10-27T17:32:11Z"
         },
         {
@@ -2056,6 +2056,10 @@
         {
           "at": "2026-10-27T17:52:09Z",
           "what": "Consentement à la position (lot 8) : politique décidée par le DPO (texte de la US-107, journal 5 ans, position chiffrée 3 heures, pas d'adresse de domicile). Reste à obtenir l'accès TomTom."
+        },
+        {
+          "at": "2026-10-27T18:19:38Z",
+          "what": "Le suivi du trajet passe par un service interchangeable (TRAVEL_MODE off, fake ou live) : le faux service permet d'essayer les écrans et les notifications avant d'avoir la clé TomTom."
         }
       ],
       "unsure": [
@@ -2063,9 +2067,15 @@
         "L'offre gratuite de TomTom (2 500 requêtes par jour) est à reconfirmer : la grille a changé le 1er juillet 2026.",
         "Les vacances scolaires de l'année suivante ne sont pas connues d'avance : l'alerte de septembre pour l'administrateur reste à faire.",
         "Le test d'un cas de rappel J-1 dépendait de l'heure d'exécution (fuseau d'essai) : corrigé, il tourne à toute heure.",
-        "Le point de la semaine fait appel à un modèle : coût et qualité du résumé à mesurer sur des semaines fictives avant le pilote."
+        "Le point de la semaine fait appel à un modèle : coût et qualité du résumé à mesurer sur des semaines fictives avant le pilote.",
+        "Le suivi du trajet ne repose pour l'instant que sur un faux service : aucune durée réelle n'a été obtenue de TomTom."
       ],
       "activity": [
+        {
+          "at": "2026-10-27T18:19:38Z",
+          "kind": "building",
+          "what": "Lot 8 : suivi du trajet complet avec un faux service (interrupteur, notifications, écran) ; reste TomTom"
+        },
         {
           "at": "2026-10-27T18:01:00Z",
           "kind": "building",

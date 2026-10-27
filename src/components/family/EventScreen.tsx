@@ -8,11 +8,13 @@ import { AppShell } from "@/components/app/AppShell";
 import { useSessionUser } from "@/components/auth/AuthGate";
 import { Button, Loading, Notice, RetryNotice } from "@/components/ui";
 import type { ConflictView, EventView, MemberChip } from "@/server/assistant/events";
+import type { LocationConsentView } from "@/server/assistant/location-consent";
 import { conflictSentence, EventForm, nearbySentence } from "./EventForm";
 import { pendingChanged } from "@/client/badge";
 import { clock, dayOf, longDate, reminderState, shortDate, stamp, TYPE_LABEL, whenLabel } from "./format";
 import { MemberChips, StatusChip } from "./parts";
 import { PrepareList } from "./PrepareList";
+import { TravelSection } from "./TravelSection";
 import styles from "./family.module.css";
 
 type Action = "confirm" | "setAside" | "cancel";
@@ -40,6 +42,7 @@ export function EventScreen({ id }: { id: string }) {
   const user = useSessionUser();
   const detail = useApiQuery<{ event: EventView }>(`/api/family/events/${id}`);
   const members = useApiQuery<{ members: MemberChip[] }>("/api/family/members");
+  const location = useApiQuery<{ consent: LocationConsentView }>("/api/family/location-consent");
   const mutation = useApiMutation();
   const [override, setOverride] = useState<EventView | null>(null);
   const [mode, setMode] = useState<Mode>("view");
@@ -351,6 +354,9 @@ export function EventScreen({ id }: { id: string }) {
               </div>
             )}
           </div>
+
+          {/* Suivi du trajet, propre à ce profil (US-107 RF4) */}
+          {event.travel && <TravelSection event={event} consent={location.data?.consent.status ?? null} onChanged={reload} onEditAddress={() => setMode("edit")} />}
 
           {/* Liste « À préparer » : se retire, se modifie, s'ajoute ici comme dans la carte du tchat (US-95 RF3, RF5) */}
           {event.tasks && (event.tasks.items.length > 0 || event.tasks.editable) && <PrepareList event={event} onUpdated={setOverride} onStale={reload} disabled={busy} />}
