@@ -3,7 +3,7 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-10-27T16:24:10Z",
+  "updated": "2026-10-27T16:30:45Z",
   "deploys": [
     {
       "at": "2026-10-25T08:05:53Z",
@@ -2034,6 +2034,10 @@
         {
           "at": "2026-10-27T16:24:10Z",
           "what": "La recette de la vague V2 porte sur les lots 4 à 6 ; le lot 7, déjà en ligne, sera recetté avec la vague V3."
+        },
+        {
+          "at": "2026-10-27T16:30:45Z",
+          "what": "Le point de la semaine couvre le lundi-dimanche qui suit l'envoi : il part le dimanche pour la semaine qui démarre (décision du PO). Le texte de la US-98 est à corriger."
         }
       ],
       "unsure": [

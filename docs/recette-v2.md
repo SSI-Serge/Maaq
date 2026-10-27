@@ -128,7 +128,7 @@ Chaque ligne se coche « oui / non / à revoir ». Les cases « Sur téléphone 
 | Modifier ou retirer une tâche en l'écrivant à l'assistant | Impossible (il ne reçoit jamais les titres, règle AT-4). Seul l'ajout par le tchat existe. | Accepter, ou ouvrir une exception. |
 | Information des parents quand un membre est retiré (US-96 RF8) | Non faite : aucun type de notification n'existe pour cela dans la base. | Demander l'ajout à la session base de données, ou reporter. |
 | Notification d'annulation « tâches retirées » | Le message s'affiche seulement à l'écran à l'annulation. | Idem. |
-| Semaine couverte par le point | Le lundi-dimanche qui suit l'envoi (schéma de référence) ; la US-98 RF7 dit « les 7 jours qui suivent ». Écart signalé à la session des user stories. | Trancher. |
+| Semaine couverte par le point | **Tranché par le PO le 27/10** : le lundi-dimanche qui suit l'envoi (le point part le dimanche pour la semaine qui démarre). La US-98 RF7 et le CA 7.1 (« les 7 jours qui suivent ») sont à corriger par la session des user stories. | Fait côté code ; texte des US à aligner. |
 | Résumé du point | Jamais produit avec le vrai modèle ; modèle léger à choisir (`ASSISTANT_DIGEST_MODEL`) ; coût à mesurer. | Choisir le modèle après la lecture de F3. |
 | Banc d'essai de l'assistant | Non relancé avec le vrai modèle depuis les séries, tâches et point (coût d'environ 1 à 3 $ par passage, sur votre clé). | Autoriser un passage avant le pilote. |
 | Alerte de septembre si les vacances de l'année suivante manquent | Non faite. | À planifier avant septembre 2027. |
