@@ -8,7 +8,7 @@ import { AppShell } from "@/components/app/AppShell";
 import { useSessionUser } from "@/components/auth/AuthGate";
 import { Button, Loading, Notice, RetryNotice } from "@/components/ui";
 import type { ConflictView, EventView, MemberChip } from "@/server/assistant/events";
-import { conflictSentence, EventForm } from "./EventForm";
+import { conflictSentence, EventForm, nearbySentence } from "./EventForm";
 import { pendingChanged } from "@/client/badge";
 import { clock, dayOf, longDate, reminderState, shortDate, stamp, TYPE_LABEL, whenLabel } from "./format";
 import { MemberChips, StatusChip } from "./parts";
@@ -240,6 +240,15 @@ export function EventScreen({ id }: { id: string }) {
                 </div>
               )}
             </div>
+          )}
+
+          {/* RDV rapproché, sans chevauchement : une information, qui n'empêche pas de confirmer (US-107 RF1) */}
+          {event.nearby.length > 0 && (provisional || setAside || event.status === "confirmed") && (
+            <Notice tone="info">
+              {event.nearby.map((n) => (
+                <div key={n.id}>{nearbySentence(n)}</div>
+              ))}
+            </Notice>
           )}
 
           {/* Bannière de conflit et créneaux alternatifs (US-74 RF5 à RF8) */}

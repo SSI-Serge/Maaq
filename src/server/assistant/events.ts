@@ -8,6 +8,7 @@ import { isParent } from "./family";
 import { loadMembers, type MemberChip } from "./member-chips";
 import { isLocalDateTime, localMs, localToUtc, utcToLocal } from "./local-time";
 import { env } from "@/server/env";
+import { integerSetting } from "@/server/settings";
 import { notifyAfterConfirmation } from "./notices";
 import { cancelPendingNotices, reminderDetails, type NudgeView, type ReminderView } from "./reminders";
 import { dropProposedTasks, loadEventTasks, type EventTasksView } from "./event-tasks";
@@ -34,6 +35,18 @@ export interface ConflictView {
   title: string | null;
   start: string;
   end: string;
+}
+
+/**
+ * Un autre rendez-vous d'un membre commun qui se termine peu avant celui-ci (`before`) ou commence peu après sa fin (`after`), sans le chevaucher (US-107 RF1) : « pensez au trajet ».
+ * L'écart se règle (`travel_gap_alert_minutes`, 30 par défaut). Vaut aussi pour un rendez-vous médical ; ne demande ni adresse ni position.
+ */
+export interface NearbyView {
+  id: string;
+  side: "before" | "after";
+  /** Heure locale où l'autre rendez-vous se termine (`before`) ou commence (`after`) : « AAAA-MM-JJTHH:MM ». */
+  at: string;
+  minutes: number;
 }
 
 export interface EventActions {
@@ -71,6 +84,8 @@ export interface EventView {
   can: EventActions;
   /** Autres rendez-vous en conflit avec celui-ci (provisoires, confirmés ; écartés et annulés ne comptent pas). */
   conflicts: ConflictView[];
+  /** Rendez-vous rapprochés, sans chevauchement (US-107 RF1). Rempli dans le détail seulement. */
+  nearby: NearbyView[];
   /** Créneaux libres proches, quand il y a un conflit (US-74 RF6). */
   alternatives: { start: string; end: string }[];
   /** Rappels J-7, J-1 et Jour J d'un rendez-vous confirmé, avec leur état (US-81). Remplis dans le détail seulement. */
@@ -142,8 +157,26 @@ function toView(v: Viewer, e: CalendarEvent, members: Map<string, MemberChip>, n
     autoConfirm: autoConfirmOf(v, e),
     recurring: Boolean(e.seriesId),
     series: null,
-    can: actionsFor(v, e, now), conflicts: [], alternatives: [], reminders: [], nudge: null, tasks: null,
+    can: actionsFor(v, e, now), conflicts: [], nearby: [], alternatives: [], reminders: [], nudge: null, tasks: null,
   };
+}
+
+/** US-107 RF1 : les rendez-vous d'un membre commun qui se terminent moins de 30 minutes avant celui-ci, ou commencent moins de 30 minutes après sa fin. */
+async function nearbyOf(db: Kysely<DB>, v: Viewer, e: CalendarEvent): Promise<NearbyView[]> {
+  if (e.allDay) return [];
+  const gap = (await integerSetting(db, "travel_gap_alert_minutes", 30)) * 60_000;
+  const end = overlapEnd(e);
+  const around = await loadCalendarEvents(db, v.accountId, { from: new Date(e.startsAt.getTime() - gap), to: new Date(end.getTime() + gap) }, ["provisional", "confirmed"]);
+  const who = new Set(e.memberIds);
+  const found: NearbyView[] = [];
+  for (const o of around) {
+    if (o.id === e.id || o.allDay || !(e.allFamily || o.allFamily || o.memberIds.some((m) => who.has(m)))) continue;
+    const before = e.startsAt.getTime() - o.endsAt.getTime();
+    const after = o.startsAt.getTime() - end.getTime();
+    if (before >= 0 && before < gap) found.push({ id: o.id, side: "before", at: utcToLocal(o.endsAt, v.timeZone), minutes: Math.round(before / 60_000) });
+    else if (after >= 0 && after < gap) found.push({ id: o.id, side: "after", at: utcToLocal(o.startsAt, v.timeZone), minutes: Math.round(after / 60_000) });
+  }
+  return found.sort((a, b) => a.at.localeCompare(b.at));
 }
 
 const overlapEnd = (e: CalendarEvent) => (e.endsAt > e.startsAt ? e.endsAt : new Date(e.startsAt.getTime() + 60_000));
@@ -185,8 +218,9 @@ async function nearestSlots(db: Kysely<DB>, v: Viewer, e: CalendarEvent, now: Da
 async function withConflicts(db: Kysely<DB>, v: Viewer, view: EventView, e: CalendarEvent, now: Date): Promise<EventView> {
   if (e.status !== "provisional" && e.status !== "set_aside" && e.status !== "confirmed") return view;
   const { views } = await conflictsOf(db, v, e);
+  const nearby = view.past ? [] : await nearbyOf(db, v, e);
   // Un RDV en conflit n'est jamais enregistré sans réponse : il reste à confirmer par une personne (AT-8).
-  return { ...view, conflicts: views, alternatives: views.length && e.status !== "confirmed" ? await nearestSlots(db, v, e, now) : [], autoConfirm: views.length && view.autoConfirm ? { never: true } : view.autoConfirm };
+  return { ...view, conflicts: views, nearby, alternatives: views.length && e.status !== "confirmed" ? await nearestSlots(db, v, e, now) : [], autoConfirm: views.length && view.autoConfirm ? { never: true } : view.autoConfirm };
 }
 
 /** Les changements de statut sont écrits dans l'historique par la base ; les modifications, ici (US-75 RT4). */

@@ -3,7 +3,7 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-10-27T17:02:26Z",
+  "updated": "2026-10-27T17:32:11Z",
   "deploys": [
     {
       "at": "2026-10-25T08:05:53Z",
@@ -1962,17 +1962,19 @@
         {
           "id": "f16s11",
           "title": "US-107 · Être prévenu des temps de trajet entre mes RDV",
-          "state": "planning",
+          "state": "building",
           "env": null,
-          "note": "Lot 8. Avec TomTom (offre gratuite) ; le suivi ne marche que lorsque l'application est ouverte.",
-          "unsure": "Jamais essayé sur un téléphone ; sur iPhone, l'autorisation de la position peut être redemandée à chaque lancement."
+          "note": "Lot 8 commencé : l'alerte « Un autre RDV se termine à 17h30, 15 min avant : pensez au trajet » est faite (écran du RDV). Reste : adresse avec suggestions, consentement à la position, suivi du trajet et notifications.",
+          "unsure": "Bloqué pour la suite : compte et clé TomTom (offre gratuite à reconfirmer) et déclaration du sous-traitant par le DPO. Jamais essayé sur un téléphone ; sur iPhone, l'autorisation de la position peut être redemandée à chaque lancement. La phrase « commence après » de l'alerte est écrite par MAAQ, à relire.",
+          "at": "2026-10-27T17:32:11Z"
         },
         {
           "id": "f16s12",
           "title": "US-112 · Savoir où se garer et où manger près d'un RDV",
           "state": "planning",
           "env": null,
-          "note": "Lot 8. Cartographie seule, lien « Voir les avis » ; l'agent juge si le lieu est public (D60)."
+          "note": "Lot 8 : le schéma est prêt (recherches, plafonds, suggestion). Reste à écrire la recherche en arrière-plan, le message du tchat et la section du détail. Même service TomTom que les trajets.",
+          "at": "2026-10-27T17:32:11Z"
         },
         {
           "id": "f16s13",
@@ -2038,6 +2040,10 @@
         {
           "at": "2026-10-27T16:30:45Z",
           "what": "Le point de la semaine couvre le lundi-dimanche qui suit l'envoi : il part le dimanche pour la semaine qui démarre (décision du PO). Le texte de la US-98 est à corriger."
+        },
+        {
+          "at": "2026-10-27T17:32:11Z",
+          "what": "Lot 8 : tout sauf l'appel à TomTom est préparé derrière une interface (faux service pour les tests), pour que l'arrivée de la clé ne change que l'adaptateur."
         }
       ],
       "unsure": [
@@ -2049,6 +2055,11 @@
         "Le mois et l'année de naissance manquants : le choix « Pas maintenant » reste sur l'appareil, pas côté serveur."
       ],
       "activity": [
+        {
+          "at": "2026-10-27T17:32:11Z",
+          "kind": "building",
+          "what": "Lot 8 commencé : schéma des trajets et de « Sur place » copié, alerte de RDV rapproché faite"
+        },
         {
           "at": "2026-10-27T17:02:26Z",
           "kind": "live",

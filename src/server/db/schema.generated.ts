@@ -89,6 +89,8 @@ export type JsonValue = JsonArray | JsonObject | JsonPrimitive;
 
 export type LegalDocumentType = "contract_challenge_consent" | "forwarded_mail_consent" | "privacy_policy" | "terms_of_use";
 
+export type LocationConsentCause = "device_deleted" | "device_revoked" | "user_action";
+
 export type LogbookEntryType = "action_done" | "action_refused" | "action_validated" | "request";
 
 export type MailClassification = "appointment" | "cancellation" | "deadline" | "irrelevant" | "report";
@@ -97,17 +99,23 @@ export type MemberRole = "child" | "other" | "parent";
 
 export type MessageDeliveryState = "failed" | "sending" | "sent" | "waiting_for_connection";
 
-export type MessageKind = "event_proposal" | "image" | "text" | "voice_transcript";
+export type MessageKind = "event_proposal" | "image" | "place_results" | "place_suggestion" | "text" | "voice_transcript";
 
 export type MessageSender = "agent" | "profile";
 
 export type NotificationChannel = "none" | "push";
 
-export type NotificationKind = "auto_confirmed" | "event_added" | "event_to_confirm" | "follow_up_24h" | "follow_up_48h" | "reminder_d1" | "reminder_d7" | "reminder_day_of" | "task_assigned" | "task_daily" | "task_due_1h" | "weekly_digest";
+export type NotificationKind = "auto_confirmed" | "event_added" | "event_to_confirm" | "follow_up_24h" | "follow_up_48h" | "place_search_ready" | "reminder_d1" | "reminder_d7" | "reminder_day_of" | "task_assigned" | "task_daily" | "task_due_1h" | "travel_first" | "travel_second" | "weekly_digest";
 
 export type NotificationStatus = "abandoned" | "cancelled" | "not_applicable" | "scheduled" | "sent";
 
 export type Numeric = ColumnType<string, number | string, number | string>;
+
+export type PlaceSearchOrigin = "button" | "chat" | "suggestion";
+
+export type PlaceSearchStatus = "done" | "failed" | "no_result" | "obsolete" | "queued" | "running";
+
+export type PlaceSuggestionAnswer = "accepted" | "declined" | "pending";
 
 export type PromptKind = "example" | "first_suggestion";
 
@@ -148,6 +156,10 @@ export type TaskSource = "agent" | "anticipation" | "user";
 export type TaskStatus = "cancelled" | "done" | "proposed" | "todo";
 
 export type Timestamp = ColumnType<Date, Date | string, Date | string>;
+
+export type TravelOrigin = "last_position" | "live_screen" | "none" | "previous_event";
+
+export type TravelStatus = "failed" | "first_done" | "pending" | "second_done" | "skipped";
 
 export type UserRole = "admin" | "guest" | "primary_user";
 
@@ -316,6 +328,10 @@ export interface AgentConversationMessages {
   family_event_id: string | null;
   id: Generated<Int8>;
   kind: Generated<MessageKind>;
+  /**
+   * Message « Sur place » : recherche dont il présente le résultat (sans copie du contenu)
+   */
+  place_search_id: string | null;
   sender: MessageSender;
 }
 
@@ -672,6 +688,38 @@ export interface DataExports {
   user_id: string;
 }
 
+export interface DeviceLastPositions {
+  captured_at: Generated<Timestamp>;
+  device_id: string;
+  /**
+   * Fin de conservation : au plus captured_at + 3 heures (contrôle en base), ramenée à la fin du RDV suivi par l'application. La purge tourne toutes les 5 minutes et la lecture ignore les lignes échues
+   */
+  expires_at: Timestamp;
+  position_encrypted: Buffer;
+}
+
+export interface DeviceLocationConsentEvents {
+  action: ConsentAction;
+  /**
+   * user_action = choix de l'utilisateur ; device_revoked = appareil révoqué ; device_deleted = appareil ou profil supprimé
+   */
+  cause: Generated<LocationConsentCause>;
+  device_id: string;
+  id: Generated<Int8>;
+  notice_version: string;
+  occurred_at: Generated<Timestamp>;
+  retain_until: Timestamp;
+  user_id: string;
+}
+
+export interface DeviceLocationConsents {
+  device_id: string;
+  granted_at: Generated<Timestamp>;
+  notice_version: string;
+  purpose: Generated<string>;
+  withdrawn_at: Timestamp | null;
+}
+
 export interface Devices {
   browser: string | null;
   created_at: Generated<Timestamp>;
@@ -751,6 +799,63 @@ export interface ErrorReports {
   user_comment: string | null;
 }
 
+export interface EventPlaceSearches {
+  account_id: string;
+  attempts: Generated<number>;
+  checked_on: Timestamp | null;
+  created_at: Generated<Timestamp>;
+  event_id: string;
+  failure_reason: string | null;
+  finished_at: Timestamp | null;
+  id: Generated<string>;
+  origin: PlaceSearchOrigin;
+  queued_at: Generated<Timestamp>;
+  requested_by_user_id: string | null;
+  /**
+   * Adresses trouvées (1 ou 2 parkings, 2 « petite faim », 2 « grande faim » : nom, type, ville, distance à pied, source), JSON chiffré par l'application. Aucun avis ni note ; aucune coordonnée
+   */
+  result_payload: Buffer | null;
+  /**
+   * Rang de la recherche pour le RDV, attribué par trigger et jamais réutilisé
+   */
+  seq: number;
+  started_at: Timestamp | null;
+  /**
+   * queued = demandée, pas encore prise ; running = en cours ; done = résultat disponible ; no_result = aucune information fiable ; failed = échec (n'est pas comptée dans les 3 par RDV) ; obsolete = l'adresse du RDV a changé, résultat effacé mais recherche comptée
+   */
+  status: Generated<PlaceSearchStatus>;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface EventPlaceSuggestions {
+  account_id: string;
+  answer: Generated<PlaceSuggestionAnswer>;
+  answered_at: Timestamp | null;
+  event_id: string;
+  search_id: string | null;
+  suggested_at: Generated<Timestamp>;
+  suggested_to_user_id: string | null;
+}
+
+export interface EventTravelAdvice {
+  account_id: string;
+  advised_departure_at: Timestamp | null;
+  estimated_at: Timestamp | null;
+  estimated_duration_minutes: number | null;
+  event_id: string;
+  first_computed_at: Timestamp | null;
+  first_duration_minutes: number | null;
+  notified_first_at: Timestamp | null;
+  notified_second_at: Timestamp | null;
+  origin_event_id: string | null;
+  origin_kind: Generated<TravelOrigin>;
+  second_computed_at: Timestamp | null;
+  second_duration_minutes: number | null;
+  status: Generated<TravelStatus>;
+  updated_at: Generated<Timestamp>;
+  user_id: string;
+}
+
 export interface EventTypes {
   code: string;
   id: Generated<number>;
@@ -824,6 +929,10 @@ export interface FamilyEvents {
    */
   is_modified: Generated<boolean>;
   location: Buffer | null;
+  /**
+   * Coordonnées chiffrées du lieu, supprimées avec le RDV. NULL pour un RDV médical (pas de suivi de trajet). Jamais une adresse de domicile (D47)
+   */
+  location_point: Buffer | null;
   note: Buffer | null;
   /**
    * Date locale d'origine de la séance dans la série (clé stable, même après un déplacement)
@@ -1351,6 +1460,17 @@ export interface StorageDeletionQueue {
   storage_key: string;
 }
 
+export interface TravelTracking {
+  account_id: string;
+  created_at: Generated<Timestamp>;
+  enabled: Generated<boolean>;
+  event_id: string | null;
+  id: Generated<Int8>;
+  series_id: string | null;
+  updated_at: Generated<Timestamp>;
+  user_id: string;
+}
+
 export interface UserAgentInfoValues {
   created_at: Generated<Timestamp>;
   id: Generated<Int8>;
@@ -1582,10 +1702,16 @@ export interface DB {
   conversation_attachments: ConversationAttachments;
   daily_request_counters: DailyRequestCounters;
   data_exports: DataExports;
+  device_last_positions: DeviceLastPositions;
+  device_location_consent_events: DeviceLocationConsentEvents;
+  device_location_consents: DeviceLocationConsents;
   devices: Devices;
   erasure_trace_targets: ErasureTraceTargets;
   erasure_traces: ErasureTraces;
   error_reports: ErrorReports;
+  event_place_searches: EventPlaceSearches;
+  event_place_suggestions: EventPlaceSuggestions;
+  event_travel_advice: EventTravelAdvice;
   event_types: EventTypes;
   family_event_change_proposals: FamilyEventChangeProposals;
   family_event_history: FamilyEventHistory;
@@ -1621,6 +1747,7 @@ export interface DB {
   security_events: SecurityEvents;
   sessions: Sessions;
   storage_deletion_queue: StorageDeletionQueue;
+  travel_tracking: TravelTracking;
   user_agent_info_values: UserAgentInfoValues;
   user_assistant_settings: UserAssistantSettings;
   users: Users;

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useApiMutation, useApiQuery } from "@/client/hooks";
 import { Button, Notice, RetryNotice } from "@/components/ui";
 import type { EventType } from "@/server/assistant/calendar";
-import type { ConflictView, EventView, MemberChip } from "@/server/assistant/events";
+import type { ConflictView, EventView, MemberChip, NearbyView } from "@/server/assistant/events";
 import { clock, dayOf, EVENT_TYPE_OPTIONS, formTime, shortDate } from "./format";
 import { FALLBACK_COLOR } from "./parts";
 import styles from "./family.module.css";
@@ -44,6 +44,13 @@ export function conflictSentence(conflict: ConflictView, day: string): string {
   return dayOf(conflict.start) === day
     ? `Ce créneau chevauche « ${conflict.title} », le même jour à ${clock(conflict.start)}.`
     : `Ce créneau chevauche « ${conflict.title} », le ${shortDate(dayOf(conflict.start))} à ${clock(conflict.start)}.`;
+}
+
+/** Phrase de l'alerte « RDV rapproché » (US-107 RF1) ; la forme « commence après » est symétrique, à relire avec l'équipe produit. */
+export function nearbySentence(n: NearbyView): string {
+  return n.side === "before"
+    ? `Un autre RDV se termine à ${clock(n.at)}, ${n.minutes} min avant : pensez au trajet.`
+    : `Un autre RDV commence à ${clock(n.at)}, ${n.minutes} min après la fin de celui-ci : pensez au trajet.`;
 }
 
 interface Props {

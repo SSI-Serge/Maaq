@@ -276,6 +276,23 @@ Schéma : `0010_lot7_schema.sql`, copie exacte de `lot_7_2_schema.sql` de la ses
 - **Pas fait / à savoir** : pas de type de notification mensuelle dans la base : l'avis est envoyé directement aux parents qui ont un appareil, sans registre ni email ; le texte de la tâche et de la question est composé par MAAQ à partir du libellé (« Avez-vous prévu : … ? » / « Pensez-vous à : … ? ») : à relire avec l'équipe produit ;
   « Pas maintenant » n'est pas conservé côté serveur. **Écrans essayés dans un navigateur local le 27/10, jamais sur téléphone.**
 
+## Lot 8 du MVP2 : trajets et « Sur place » (US-107, US-112) — en cours
+
+Schéma : `0011_lot8_valeurs_enumerees.sql` et `0012_lot8_schema.sql`, copies exactes de `lot_8_1_valeurs_enumerees.sql` / `lot_8_2_schema.sql` de la session base de données (SHA-256 `336bb3b7…` / `16d909b7…`). Appliquées sur une base neuve (12 migrations) et types régénérés ; **pas encore appliquées sur la zone de test** (à faire avec une sauvegarde vérifiée, au moment de livrer le lot).
+Le schéma porte les règles : demande de recherche « Sur place » avec plafond de 3 par RDV (hors échecs) et plafond quotidien du profil (`request_place_search`), prise et fin de recherche (`claim_place_search`, `complete_place_search`), recherches bloquées (`fail_stale_place_searches`), consentement à la position par appareil avec journal, dernière position chiffrée de 3 heures au plus, suivi de trajet interdit pour un RDV médical ou sans adresse, purges.
+
+**Fait**
+- **Alerte « RDV rapproché »** (US-107 RF1, CA 1.1 et 1.2) : `nearbyOf` (events.ts) cherche, pour un membre commun (ou toute la famille), un autre RDV qui se termine moins de 30 minutes avant (`before`) ou commence moins de 30 minutes après la fin (`after`) ; l'écart est le réglage `travel_gap_alert_minutes`. Pas de chevauchement (c'est un conflit), pas de RDV sur la journée entière, annulé ou ignoré ; vaut pour un RDV médical ; ne demande ni adresse ni position. Affichée en information sur l'écran du RDV, sans empêcher de confirmer. Phrase « commence après » écrite par MAAQ (le texte de la spécification ne donne que « se termine avant ») : à relire. 7 tests.
+
+**À faire, dans cet ordre**
+1. Champ « Adresse » avec suggestions de l'API Adresse de l'État (gratuite, sans clé), coordonnées chiffrées (`location_point`), jamais pour un RDV médical (US-107 RT2).
+2. Consentement à la position par appareil (écran d'information, version du texte, retrait, journal) et dernière position (US-107 RF11, RF12).
+3. Interrupteur « Suivre mon trajet », estimations, notifications de 1 h 30 et de 15 minutes avant le départ, écran « Suivi du trajet » (US-107 RF4 à RF13). **Bloqué : service de trajets TomTom** (compte, clé et déclaration du sous-traitant par le DPO).
+4. « Sur place » : bouton, recherche en arrière-plan, message du tchat, section du détail, suggestion automatique (US-112). **Bloqué : même service TomTom** (recherche de lieux).
+5. Planificateur (recherches bloquées, purges, notifications), export et suppression des données de position (US-55/US-56, lot 9).
+
+Le service de trajets sera derrière une interface (un faux service sert aux tests), de sorte que tout sauf l'appel à TomTom soit prêt avant d'avoir la clé.
+
 ## Réglages
 Voir `.env.example`. Tout est facultatif tant que `ASSISTANT_MODE=off`.
 ```
