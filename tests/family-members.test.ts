@@ -2,12 +2,13 @@ import type { Kysely } from "kysely";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { getEvent, updateEvent } from "@/server/assistant/events";
 import { addChild, eraseMember, familyOverview, listFamilyMembers, loadPseudoMembers, MAX_MEMBERS, removeMember, updateMember } from "@/server/assistant/family";
+import { randomBytes } from "node:crypto";
 import { seal } from "@/server/assistant/fields";
 import { Pseudonymizer } from "@/server/assistant/pseudonymize";
 import type { Ctx } from "@/server/auth/service";
 import type { DB } from "@/server/db/schema.generated";
 import { Rejection } from "@/server/http";
-import { createProfile, sessionFor, testDb } from "./helpers/fixtures";
+import { createGuest, createProfile, sessionFor, testDb } from "./helpers/fixtures";
 
 let db: Kysely<DB>;
 beforeAll(() => {
@@ -17,7 +18,7 @@ afterAll(async () => {
   await db.destroy();
 });
 
-const NOW = new Date("2026-11-02T08:00:00Z");
+const NOW = new Date("2054-11-02T08:00:00Z");
 // La base n'existe qu'une fois beforeAll passé : on la lit au moment de l'appel.
 const ctx = { get db() { return db; }, now: NOW } as Ctx;
 
@@ -35,10 +36,8 @@ async function failure(promise: Promise<unknown>): Promise<Rejection> {
 async function family() {
   const primary = await createProfile(db);
   await db.updateTable("users").set({ first_name: "Camille" }).where("id", "=", primary.id).execute();
-  const julien = await createProfile(db, { role: "guest" });
-  await db.updateTable("users").set({ first_name: "Julien", account_id: primary.accountId, guest_rank: "core" }).where("id", "=", julien.id).execute();
-  const elodie = await createProfile(db, { role: "guest" });
-  await db.updateTable("users").set({ first_name: "Élodie", account_id: primary.accountId }).where("id", "=", elodie.id).execute();
+  const julien = await createGuest(db, primary.accountId!, "Julien", "core");
+  const elodie = await createGuest(db, primary.accountId!, "Élodie");
   return {
     accountId: primary.accountId!,
     camilleId: primary.id,
@@ -50,17 +49,20 @@ async function family() {
 type Family = Awaited<ReturnType<typeof family>>;
 
 /** Rendez-vous inséré directement : à venir (le 10 novembre) par défaut. */
-async function seedEvent(f: Family, members: string[], over: { status?: "provisional" | "confirmed" | "canceled"; start?: string; allFamily?: boolean } = {}): Promise<string> {
-  const start = new Date(over.start ?? "2026-11-10T15:00:00Z");
+async function seedEvent(f: Family, members: string[], over: { status?: "provisional" | "confirmed" | "cancelled"; start?: string; allFamily?: boolean } = {}): Promise<string> {
+  const start = new Date(over.start ?? "2054-11-10T15:00:00Z");
+  const status = over.status ?? "confirmed";
+  const type = await db.selectFrom("event_types").select("id").where("code", "=", "personal").executeTakeFirstOrThrow();
   const row = await db
     .insertInto("family_events")
     .values({
-      account_id: f.accountId, title_encrypted: seal("Judo"), event_type: "personal", starts_at: start, ends_at: new Date(start.getTime() + 3_600_000), all_day: false,
-      status: over.status ?? "confirmed", source: "typed", all_family: over.allFamily ?? false, created_by_user_id: f.camilleId, status_changed_at: NOW,
+      account_id: f.accountId, event_type_id: type.id, title: seal("Judo"), starts_at: start, ends_at: new Date(start.getTime() + 3_600_000), all_day: false,
+      status, source: "chat_text", whole_family: over.allFamily ?? false, requested_by_user_id: f.camilleId, fingerprint: randomBytes(16),
+      confirmed_at: status === "provisional" ? null : NOW, confirmed_by_user_id: status === "provisional" ? null : f.camilleId,
     })
     .returning("id")
     .executeTakeFirstOrThrow();
-  if (members.length) await db.insertInto("family_event_members").values(members.map((m) => ({ event_id: row.id, member_id: m }))).execute();
+  if (members.length) await db.insertInto("family_event_members").values(members.map((m) => ({ event_id: row.id, member_id: m, account_id: f.accountId }))).execute();
   return row.id;
 }
 
@@ -73,8 +75,8 @@ describe("liste des membres (US-92)", () => {
     expect(new Set(members.map((m) => m.color)).size).toBe(2);
     expect(removed).toEqual([]);
     expect(max).toBe(12);
-    const leo = await addChild(ctx, f.julien, { firstName: "Léo", birthDate: "2018-03-12" }); // l'invité core peut ajouter (CA 3.1)
-    expect(leo).toMatchObject({ firstName: "Léo", role: "child", birthDate: "2018-03-12", badge: null, linked: false, upcoming: 0 });
+    const leo = await addChild(ctx, f.julien, { firstName: "Léo", birth: "2046-03" }); // l'invité core peut ajouter (CA 3.1)
+    expect(leo).toMatchObject({ firstName: "Léo", role: "child", birth: "2046-03", badge: null, linked: false, upcoming: 0 });
     expect(new Set((await listFamilyMembers(ctx, f.camille)).map((m) => m.color)).size).toBe(3);
   });
 
@@ -102,7 +104,7 @@ describe("ajout d'un membre (US-92)", () => {
     const f = await family();
     const invitesBefore = await db.selectFrom("users").select("id").where("account_id", "=", f.accountId).execute();
     const mia = await addChild(ctx, f.camille, { firstName: "  Mia  " });
-    expect(mia).toMatchObject({ firstName: "Mia", birthDate: null, role: "child" });
+    expect(mia).toMatchObject({ firstName: "Mia", birth: null, role: "child" });
     expect(await db.selectFrom("users").select("id").where("account_id", "=", f.accountId).execute()).toHaveLength(invitesBefore.length);
   });
 
@@ -124,10 +126,10 @@ describe("ajout d'un membre (US-92)", () => {
 
   it("refuse une date de naissance dans le futur ou invraisemblable (CA 4.3)", async () => {
     const f = await family();
-    expect(await failure(addChild(ctx, f.camille, { firstName: "Léo", birthDate: "2026-11-03" }))).toMatchObject({ code: "invalid_birth_date", message: "La date de naissance ne peut pas être dans le futur." });
-    expect((await failure(addChild(ctx, f.camille, { firstName: "Léo", birthDate: "1850-01-01" }))).code).toBe("invalid_birth_date");
-    expect((await failure(addChild(ctx, f.camille, { firstName: "Léo", birthDate: "2018-02-31" }))).code).toBe("invalid_birth_date");
-    expect((await addChild(ctx, f.camille, { firstName: "Léo", birthDate: "2026-11-02" })).birthDate).toBe("2026-11-02"); // né aujourd'hui
+    expect(await failure(addChild(ctx, f.camille, { firstName: "Léo", birth: "2054-12" }))).toMatchObject({ code: "invalid_birth_date", message: "La date de naissance ne peut pas être dans le futur." });
+    expect((await failure(addChild(ctx, f.camille, { firstName: "Léo", birth: "1850-01" }))).code).toBe("invalid_birth_date");
+    expect((await failure(addChild(ctx, f.camille, { firstName: "Léo", birth: "2046-13" }))).code).toBe("invalid_birth_date");
+    expect((await addChild(ctx, f.camille, { firstName: "Léo", birth: "2054-11" })).birth).toBe("2054-11"); // né ce mois-ci
   });
 
   it("plafonne à 12 membres actifs et réattribue la couleur d'un membre retiré (CA 7.1, US-93 CA 9.1)", async () => {
@@ -150,13 +152,13 @@ describe("ajout d'un membre (US-92)", () => {
 describe("modification d'un membre (US-93)", () => {
   it("modifie le prénom et la date d'un membre sans compte, avec les mêmes contrôles que l'ajout (CA 2.1, 2.2)", async () => {
     const f = await family();
-    const leo = await addChild(ctx, f.camille, { firstName: "Léo", birthDate: "2018-03-12" });
+    const leo = await addChild(ctx, f.camille, { firstName: "Léo", birth: "2046-03" });
     await addChild(ctx, f.camille, { firstName: "Mia" });
-    expect(await updateMember(ctx, f.julien, leo.id, { birthDate: "2018-03-21" })).toMatchObject({ firstName: "Léo", birthDate: "2018-03-21" });
-    expect(await updateMember(ctx, f.camille, leo.id, { firstName: "Léonard", birthDate: null })).toMatchObject({ firstName: "Léonard", birthDate: null });
+    expect(await updateMember(ctx, f.julien, leo.id, { birth: "2046-04" })).toMatchObject({ firstName: "Léo", birth: "2046-04" });
+    expect(await updateMember(ctx, f.camille, leo.id, { firstName: "Léonard", birth: null })).toMatchObject({ firstName: "Léonard", birth: null });
     expect((await failure(updateMember(ctx, f.camille, leo.id, { firstName: "mia" }))).code).toBe("name_taken");
     expect((await failure(updateMember(ctx, f.camille, leo.id, { firstName: "" }))).code).toBe("invalid_name");
-    expect((await failure(updateMember(ctx, f.camille, leo.id, { birthDate: "2030-01-01" }))).code).toBe("invalid_birth_date");
+    expect((await failure(updateMember(ctx, f.camille, leo.id, { birth: "2058-01" }))).code).toBe("invalid_birth_date");
     expect(await updateMember(ctx, f.camille, leo.id, { firstName: "Léonard" })).toMatchObject({ firstName: "Léonard" }); // son propre prénom n'est pas un doublon
   });
 
@@ -164,7 +166,7 @@ describe("modification d'un membre (US-93)", () => {
     const f = await family();
     const julien = (await listFamilyMembers(ctx, f.camille)).find((m) => m.firstName === "Julien")!;
     expect((await failure(updateMember(ctx, f.camille, julien.id, { firstName: "Jules" }))).code).toBe("linked_member");
-    expect(await updateMember(ctx, f.camille, julien.id, { firstName: "Julien", birthDate: "1985-05-05" })).toMatchObject({ firstName: "Julien", birthDate: "1985-05-05" });
+    expect(await updateMember(ctx, f.camille, julien.id, { firstName: "Julien", birth: "1985-05" })).toMatchObject({ firstName: "Julien", birth: "1985-05" });
     await db.updateTable("users").set({ first_name: "Jules" }).where("account_id", "=", f.accountId).where("guest_rank", "=", "core").execute();
     expect((await listFamilyMembers(ctx, f.camille)).map((m) => m.firstName)).toContain("Jules");
   });
@@ -172,7 +174,7 @@ describe("modification d'un membre (US-93)", () => {
   it("montre le nouveau prénom sur les rendez-vous passés et à venir (CA 4.1)", async () => {
     const f = await family();
     const leo = await addChild(ctx, f.camille, { firstName: "Léo" });
-    const past = await seedEvent(f, [leo.id], { start: "2026-10-01T15:00:00Z" });
+    const past = await seedEvent(f, [leo.id], { start: "2054-10-01T15:00:00Z" });
     const upcoming = await seedEvent(f, [leo.id]);
     await updateMember(ctx, f.camille, leo.id, { firstName: "Léonard" });
     for (const id of [past, upcoming]) expect((await getEvent(ctx, f.camille, id)).members.map((m) => m.firstName)).toEqual(["Léonard"]);
@@ -185,8 +187,8 @@ describe("retrait d'un membre (US-93)", () => {
     const hugo = await addChild(ctx, f.camille, { firstName: "Hugo" });
     await seedEvent(f, [hugo.id]);
     await seedEvent(f, [hugo.id], { status: "provisional" });
-    await seedEvent(f, [hugo.id], { status: "canceled" });
-    await seedEvent(f, [hugo.id], { start: "2026-10-01T15:00:00Z" });
+    await seedEvent(f, [hugo.id], { status: "cancelled" });
+    await seedEvent(f, [hugo.id], { start: "2054-10-01T15:00:00Z" });
     expect((await listFamilyMembers(ctx, f.camille)).find((m) => m.id === hugo.id)!.upcoming).toBe(2);
   });
 
@@ -204,8 +206,8 @@ describe("retrait d'un membre (US-93)", () => {
     expect((await getEvent(ctx, f.camille, id)).members.map((m) => m.firstName).sort()).toEqual(["Hugo", "Léo"]);
 
     // Plus proposé pour un rendez-vous, mais il peut rester sur celui où il figure déjà.
-    const form = (memberIds: string[]) => ({ title: "Judo", type: "personal" as const, allFamily: false, memberIds, start: "2026-11-10T16:00", end: "2026-11-10T17:00", allDay: false });
-    const other = await seedEvent(f, [leo.id], { start: "2026-11-12T15:00:00Z" });
+    const form = (memberIds: string[]) => ({ title: "Judo", type: "personal" as const, allFamily: false, memberIds, start: "2054-11-10T16:00", end: "2054-11-10T17:00", allDay: false });
+    const other = await seedEvent(f, [leo.id], { start: "2054-11-12T15:00:00Z" });
     const refused = await failure(updateEvent(ctx, f.camille, other, form([leo.id, hugo.id]), { expectedVersion: 1 }));
     expect(refused.code).toBe("invalid_members");
     const kept = await updateEvent(ctx, f.camille, id, form([leo.id, hugo.id]), { expectedVersion: 1 });
@@ -237,7 +239,7 @@ describe("retrait d'un membre (US-93)", () => {
   it("ne restaure pas un membre retiré : un nouveau membre du même prénom est un autre membre (CA 8.1)", async () => {
     const f = await family();
     const hugo = await addChild(ctx, f.camille, { firstName: "Hugo" });
-    const old = await seedEvent(f, [hugo.id], { start: "2026-10-01T15:00:00Z" });
+    const old = await seedEvent(f, [hugo.id], { start: "2054-10-01T15:00:00Z" });
     await removeMember(ctx, f.camille, hugo.id);
     const again = await addChild(ctx, f.camille, { firstName: "Hugo" });
     expect(again.id).not.toBe(hugo.id);
@@ -261,7 +263,7 @@ describe("retrait d'un membre (US-93)", () => {
 describe("effacement définitif (D34, US-93 RF13)", () => {
   it("supprime les rendez-vous du seul membre et anonymise ceux qu'il partage (CA 13.1)", async () => {
     const f = await family();
-    const hugo = await addChild(ctx, f.camille, { firstName: "Hugo", birthDate: "2019-04-04" });
+    const hugo = await addChild(ctx, f.camille, { firstName: "Hugo", birth: "2047-04" });
     const leo = await addChild(ctx, f.camille, { firstName: "Léo" });
     const alone = await seedEvent(f, [hugo.id]);
     const shared = await seedEvent(f, [hugo.id, leo.id]);
@@ -274,9 +276,9 @@ describe("effacement définitif (D34, US-93 RF13)", () => {
     await getEvent(ctx, f.camille, family_); // « toute la famille » n'est pas touché
 
     const row = await db.selectFrom("family_members").selectAll().where("id", "=", hugo.id).executeTakeFirstOrThrow();
-    expect(row).toMatchObject({ first_name: "Ancien membre", birth_date: null });
-    expect(row.erased_at).toEqual(NOW);
-    expect(row.archived_at).toEqual(NOW);
+    expect(row).toMatchObject({ first_name: null, birth_year: null, birth_month: null, user_id: null });
+    expect(row.anonymized_at).not.toBeNull();
+    expect(row.archived_at).not.toBeNull();
     const overview = await familyOverview(ctx, f.camille);
     expect([...overview.members, ...overview.removed].map((m) => m.id)).not.toContain(hugo.id);
   });

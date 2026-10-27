@@ -1,12 +1,12 @@
-import type { Kysely } from "kysely";
+import { sql, type Kysely } from "kysely";
 import type { Ctx, SessionContext } from "@/server/auth/service";
 import type { DB } from "@/server/db/schema.generated";
 import { Rejection } from "@/server/http";
-import { EVENT_TYPES, findConflicts, loadCalendarEvent, loadCalendarEvents, type CalendarEvent, type EventSource, type EventStatus, type EventType } from "./calendar";
+import { EVENT_TYPES, MEDICAL_TITLE, STATUS_CODE, TYPE_CODE, eventTypeIds, findConflicts, fingerprintOf, loadCalendarEvent, loadCalendarEvents, type CalendarEvent, type EventSource, type EventStatus, type EventType } from "./calendar";
 import { seal, sealOptional } from "./fields";
-import { ensureParentMembers, isParent } from "./family";
+import { MEMBER_COLORS, isParent } from "./family";
 import { isLocalDateTime, localMs, localToUtc, utcToLocal } from "./local-time";
-import { reminderDetails, type NudgeView, type ReminderView } from "./reminders";
+import { cancelPendingNotices, reminderDetails, type NudgeView, type ReminderView } from "./reminders";
 
 /**
  * Cycle de vie des rendez-vous du calendrier familial (US-74 à US-80) : consulter, confirmer, modifier, écarter, annuler.
@@ -23,7 +23,8 @@ const VISIBLE: EventStatus[] = ["provisional", "confirmed", "set_aside"];
 export interface MemberChip {
   id: string;
   firstName: string;
-  role: "parent" | "child";
+  /** « autre » : un invité secondaire, que l'assistant ne connaît pas encore. */
+  role: "parent" | "child" | "other";
   color: string;
   /** Membre retiré (US-93) : ses rendez-vous gardent son prénom, mais il n'est plus proposé. */
   removed?: boolean;
@@ -89,7 +90,6 @@ const NOT_FOUND = () => fail("not_found", "Ce rendez-vous n'existe plus ou ne vo
 async function viewerOf(ctx: Ctx, session: SessionContext): Promise<Viewer> {
   const accountId = session.user.accountId;
   if (!accountId || session.user.role === "admin") throw fail("forbidden", "Le calendrier familial est réservé aux profils d'un foyer.", 403);
-  if (isParent(session)) await ensureParentMembers(ctx.db, accountId);
   const member = await ctx.db.selectFrom("family_members").select("id").where("account_id", "=", accountId).where("user_id", "=", session.user.id).executeTakeFirst();
   return { accountId, userId: session.user.id, parent: isParent(session), memberId: member?.id ?? null, timeZone: session.device.timezone || "Europe/Paris" };
 }
@@ -116,10 +116,12 @@ function actionsFor(v: Viewer, e: CalendarEvent, now: Date): EventActions {
 }
 
 async function loadMembers(db: Kysely<DB>, accountId: string): Promise<Map<string, MemberChip>> {
-  const rows = await db.selectFrom("family_members").select(["id", "first_name", "role", "color", "alias_index", "archived_at"]).where("account_id", "=", accountId).orderBy("role").orderBy("alias_index").execute();
-  return new Map(rows.map((r) => [r.id, { id: r.id, firstName: r.first_name, role: r.role, color: r.color ?? FALLBACK_COLOR, ...(r.archived_at ? { removed: true } : {}) }]));
+  const rows = await db.selectFrom("family_members").select(["id", "first_name", "role", "color_index", "alias_number", "archived_at"]).where("account_id", "=", accountId).orderBy("role").orderBy("alias_number").execute();
+  return new Map(rows.map((r) => [r.id, { id: r.id, firstName: r.first_name ?? FORMER_MEMBER, role: r.role, color: MEMBER_COLORS[r.color_index % MEMBER_COLORS.length] ?? FALLBACK_COLOR, ...(r.archived_at ? { removed: true } : {}) }]));
 }
 export const FALLBACK_COLOR = "#6b7280";
+/** Prénom affiché d'un membre effacé définitivement : ses rendez-vous partagés le gardent sous ce nom (D34). */
+export const FORMER_MEMBER = "Ancien membre";
 
 async function firstNames(db: Kysely<DB>, userIds: (string | null)[]): Promise<Map<string, string>> {
   const ids = [...new Set(userIds.filter((x): x is string => Boolean(x)))];
@@ -179,9 +181,19 @@ async function withConflicts(db: Kysely<DB>, v: Viewer, view: EventView, e: Cale
   return { ...view, conflicts: views, alternatives: views.length && e.status !== "confirmed" ? await nearestSlots(db, v, e, now) : [] };
 }
 
-async function record(db: Kysely<DB>, accountId: string, eventId: string, action: "created" | "confirmed" | "modified" | "set_aside" | "ignored" | "canceled", from: EventStatus | null, to: EventStatus, userId: string | null, at: Date, reason?: string) {
-  await db.insertInto("family_event_history").values({ account_id: accountId, event_id: eventId, action, from_status: from, to_status: to, by_user_id: userId, reason: reason ?? null, created_at: at }).execute();
+/** Les changements de statut sont écrits dans l'historique par la base ; les modifications, ici (US-75 RT4). */
+async function recordModified(db: Kysely<DB>, eventId: string, status: EventStatus, userId: string | null, at: Date) {
+  await db.insertInto("family_event_history").values({ event_id: eventId, user_id: userId, action: "modified", from_status: STATUS_CODE[status], to_status: STATUS_CODE[status], occurred_at: at }).execute();
 }
+
+/** Changement de statut par la base : transition permise, historique, auteur et date de confirmation (`change_family_event_status`). */
+async function changeStatus(trx: Kysely<DB>, e: CalendarEvent, to: EventStatus, userId: string): Promise<void> {
+  const { rows } = await sql<{ ok: boolean }>`select change_family_event_status(${e.id}::uuid, ${STATUS_CODE[to]}::event_status, ${userId}::uuid, ${null}::integer, 'user_request'::event_change_reason) as ok`.execute(trx);
+  if (!rows[0]?.ok) throw await already(trx, e);
+}
+
+/** Deux rendez-vous actifs ne peuvent pas avoir le même créneau, le même type et les mêmes membres (US-89 RT3). */
+const isDuplicate = (error: unknown) => (error as { code?: string; constraint?: string }).code === "23505" && (error as { constraint?: string }).constraint === "ux_family_events_active_fingerprint";
 
 // ---------------------------------------------------------------------------------------------------------------------------
 // Lecture
@@ -284,8 +296,8 @@ export async function confirmEvent(ctx: Ctx, session: SessionContext, id: string
     // US-74 RF9 : le conflit est vérifié à nouveau au moment de la confirmation.
     const { views } = await conflictsOf(trx, v, e);
     if (views.length && !options.allowConflict) throw fail("conflict", "Ce créneau chevauche un autre rendez-vous.", 409, { conflicts: views, alternatives: await nearestSlots(trx, v, e, ctx.now) });
-    await trx.updateTable("family_events").set({ status: "confirmed", version: e.version + 1, status_changed_at: ctx.now, status_changed_by_user_id: v.userId, reminders_from: ctx.now, updated_at: ctx.now }).where("id", "=", id).execute();
-    await record(trx, v.accountId, id, "confirmed", e.status, "confirmed", v.userId, ctx.now);
+    await changeStatus(trx, e, "confirmed", v.userId);
+    await cancelPendingNotices(trx, id, ["follow_up_24h", "follow_up_48h"]);
   });
   return getEvent(ctx, session, id);
 }
@@ -297,8 +309,7 @@ export async function setAsideEvent(ctx: Ctx, session: SessionContext, id: strin
     const e = await locked(trx, v, id);
     if (e.status !== "provisional") throw await already(trx, e);
     if (options.expectedVersion !== undefined && options.expectedVersion !== e.version) throw stale(e);
-    await trx.updateTable("family_events").set({ status: "set_aside", version: e.version + 1, status_changed_at: ctx.now, status_changed_by_user_id: v.userId, updated_at: ctx.now }).where("id", "=", id).execute();
-    await record(trx, v.accountId, id, "set_aside", "provisional", "set_aside", v.userId, ctx.now);
+    await changeStatus(trx, e, "set_aside", v.userId);
   });
   return getEvent(ctx, session, id);
 }
@@ -311,8 +322,8 @@ export async function cancelEvent(ctx: Ctx, session: SessionContext, id: string,
     if (e.status !== "confirmed") throw e.status === "canceled" || e.status === "ignored" ? stale(e) : fail("not_confirmed", "Seul un rendez-vous confirmé peut être annulé.", 409);
     if (options.expectedVersion !== undefined && options.expectedVersion !== e.version) throw stale(e);
     if (isPast(e, ctx.now)) throw fail("event_past", "Ce rendez-vous est déjà passé.", 409);
-    await trx.updateTable("family_events").set({ status: "canceled", version: e.version + 1, status_changed_at: ctx.now, status_changed_by_user_id: v.userId, updated_at: ctx.now }).where("id", "=", id).execute();
-    await record(trx, v.accountId, id, "canceled", "confirmed", "canceled", v.userId, ctx.now);
+    await changeStatus(trx, e, "canceled", v.userId);
+    await cancelPendingNotices(trx, id, ["reminder_d7", "reminder_d1", "reminder_day_of"]);
   });
   return { id, status: "canceled" };
 }
@@ -330,15 +341,17 @@ export interface EventChanges {
   notes?: string | null;
 }
 
-function validated(v: Viewer, input: EventChanges, validMembers: Set<string>): { title: string; place: string | null; notes: string | null; from: Date; to: Date } {
-  const title = (input.title ?? "").trim();
-  if (!title) throw fail("invalid_title", "Le titre est obligatoire.", 422);
+function validated(v: Viewer, input: EventChanges, validMembers: Set<string>): { title: string; place: string | null; notes: string | null; from: Date; to: Date; endIsDefault: boolean } {
+  if (!EVENT_TYPES.includes(input.type)) throw fail("invalid_type", "Le type de rendez-vous est inconnu.", 422);
+  // Le titre d'un rendez-vous médical est facultatif : sans titre propre (ou avec le titre générique), « RDV médical — prénom » est composé à l'affichage (US-93 RF4).
+  const typed = (input.title ?? "").trim();
+  if (!typed && input.type !== "medical") throw fail("invalid_title", "Le titre est obligatoire.", 422);
+  const title = input.type === "medical" && (!typed || typed.startsWith(MEDICAL_TITLE)) ? "" : typed;
   if (title.length > MAX_EVENT_TITLE) throw fail("invalid_title", `Le titre ne peut pas dépasser ${MAX_EVENT_TITLE} caractères.`, 422);
   const place = input.place?.trim() || null;
   const notes = input.notes?.trim() || null;
   if (place && place.length > MAX_EVENT_PLACE) throw fail("invalid_place", `Le lieu ne peut pas dépasser ${MAX_EVENT_PLACE} caractères.`, 422);
   if (notes && notes.length > MAX_EVENT_NOTES) throw fail("invalid_notes", `La note ne peut pas dépasser ${MAX_EVENT_NOTES} caractères.`, 422);
-  if (!EVENT_TYPES.includes(input.type)) throw fail("invalid_type", "Le type de rendez-vous est inconnu.", 422);
   if (!input.allFamily) {
     if (!input.memberIds?.length) throw fail("invalid_members", "Choisissez au moins un membre concerné.", 422);
     if (input.memberIds.some((m) => !validMembers.has(m))) throw fail("invalid_members", "Un des membres choisis n'existe pas dans cette famille.", 422);
@@ -361,7 +374,7 @@ function validated(v: Viewer, input: EventChanges, validMembers: Set<string>): {
   }
   if (to <= from && !input.allDay) throw fail("invalid_range", "L'heure de fin doit être après l'heure de début.", 422);
   if (to < from) throw fail("invalid_range", "La date de fin doit être après la date de début.", 422);
-  return { title, place, notes, from, to };
+  return { title, place, notes, from, to, endIsDefault: !input.allDay && !input.end };
 }
 
 /**
@@ -387,20 +400,26 @@ export async function updateEvent(ctx: Ctx, session: SessionContext, id: string,
       const { views } = await conflictsOf(trx, v, next);
       if (views.length && !options.allowConflict) throw fail("conflict", "Ce créneau chevauche un autre rendez-vous.", 409, { conflicts: views, alternatives: await nearestSlots(trx, v, next, ctx.now) });
     }
-    await trx
-      .updateTable("family_events")
-      .set({
-        title_encrypted: seal(checked.title), event_type: changes.type, starts_at: checked.from, ends_at: checked.to, all_day: changes.allDay, place_encrypted: sealOptional(checked.place),
-        notes_encrypted: sealOptional(checked.notes), all_family: changes.allFamily, version: e.version + 1, updated_at: ctx.now,
-        // Un changement d'horaire recalcule les rappels non envoyés : ceux de l'ancienne date ne comptent plus, ceux de la nouvelle repartent (US-81 RF9).
-        ...(rescheduled ? { reminders_from: ctx.now } : {}),
-      })
-      .where("id", "=", id)
-      .execute();
-    if (rescheduled) await trx.deleteFrom("family_notifications").where("event_id", "=", id).where("kind", "in", ["d7", "d1", "d0"]).execute();
+    const typeId = (await eventTypeIds(trx)).get(TYPE_CODE[changes.type])!;
+    // Les membres d'abord : la base refuse de passer un rendez-vous en « toute la famille » tant qu'il en désigne.
     await trx.deleteFrom("family_event_members").where("event_id", "=", id).execute();
-    if (!changes.allFamily) await trx.insertInto("family_event_members").values(next.memberIds.map((m) => ({ event_id: id, member_id: m }))).execute();
-    await record(trx, v.accountId, id, "modified", e.status, e.status, v.userId, ctx.now);
+    try {
+      await trx
+        .updateTable("family_events")
+        .set({
+          title: checked.title ? seal(checked.title) : null, event_type_id: typeId, starts_at: checked.from, ends_at: checked.to, end_is_default: checked.endIsDefault, all_day: changes.allDay,
+          location: sealOptional(checked.place), note: sealOptional(checked.notes), whole_family: changes.allFamily, fingerprint: fingerprintOf({ ...next, type: changes.type }),
+        })
+        .where("id", "=", id)
+        .execute();
+    } catch (error) {
+      if (isDuplicate(error)) throw fail("duplicate", "Un rendez-vous identique existe déjà à ce créneau.", 409);
+      throw error;
+    }
+    if (!changes.allFamily) await trx.insertInto("family_event_members").values(next.memberIds.map((m) => ({ event_id: id, member_id: m, account_id: v.accountId }))).execute();
+    // Un changement d'horaire annule les rappels en cours d'envoi de l'ancienne date ; ceux de la nouvelle repartent d'eux-mêmes (US-81 RF9).
+    if (rescheduled) await cancelPendingNotices(trx, id, ["reminder_d7", "reminder_d1", "reminder_day_of"]);
+    await recordModified(trx, id, e.status, v.userId, ctx.now);
   });
   return getEvent(ctx, session, id);
 }

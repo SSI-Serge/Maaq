@@ -184,7 +184,7 @@ async function importItems(ctx: Ctx, items: LogbookItem[]): Promise<{ imported: 
       users.set(item.userRef, (await ctx.db.selectFrom("users").select(["id", "account_id"]).where("digitorn_user_ref", "=", item.userRef).executeTakeFirst()) ?? null);
     }
     if (!agents.has(item.agentRef)) {
-      agents.set(item.agentRef, (await ctx.db.selectFrom("agents").select("id").where("digitorn_agent_ref", "=", item.agentRef).executeTakeFirst())?.id ?? null);
+      agents.set(item.agentRef, (await ctx.db.selectFrom("agents").select("id").where("platform", "=", "digitorn").where("platform_agent_ref", "=", item.agentRef).executeTakeFirst())?.id ?? null);
     }
     const user = users.get(item.userRef);
     const agentId = agents.get(item.agentRef);

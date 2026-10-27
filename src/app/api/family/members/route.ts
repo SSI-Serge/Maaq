@@ -12,7 +12,7 @@ export const GET = handler(async () => {
   return NextResponse.json(await familyOverview(ctx, session));
 });
 
-const schema = z.object({ firstName: z.string().max(200), birthDate: z.iso.date().nullable().optional() });
+const schema = z.object({ firstName: z.string().max(200), birth: z.string().regex(/^\d{4}-\d{2}$/).nullable().optional() });
 
 /** Ajoute un membre sans compte (US-92). */
 export const POST = handler(async (request: Request) => {

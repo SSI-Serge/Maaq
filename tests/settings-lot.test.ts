@@ -61,10 +61,10 @@ async function agent(name = `Agent_${tag()}`) {
   const category = await db.selectFrom("agent_categories").select("id").where("code", "=", "perso").executeTakeFirstOrThrow();
   const row = await db
     .insertInto("agents")
-    .values({ digitorn_agent_ref: `lot8-${tag()}${tag()}`, name, category_id: category.id, short_description: "Agent", full_description: "Agent" })
-    .returning(["id", "digitorn_agent_ref"])
+    .values({ platform: "digitorn", platform_agent_ref: `lot8-${tag()}${tag()}`, name, category_id: category.id, short_description: "Agent", full_description: "Agent" })
+    .returning(["id", "platform_agent_ref"])
     .executeTakeFirstOrThrow();
-  return { id: row.id, ref: row.digitorn_agent_ref, name };
+  return { id: row.id, ref: row.platform_agent_ref, name };
 }
 
 /** Appareil enregistré avec sa session ouverte. */

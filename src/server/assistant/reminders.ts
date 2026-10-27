@@ -1,10 +1,10 @@
-import type { Kysely } from "kysely";
+import { sql, type Kysely } from "kysely";
 import { messenger, type OutgoingEmail } from "@/server/adapters/messaging";
 import type { Ctx, SessionContext } from "@/server/auth/service";
 import type { DB } from "@/server/db/schema.generated";
 import { env } from "@/server/env";
 import { Rejection } from "@/server/http";
-import { EVENT_TYPES, loadCalendarEvent, type CalendarEvent, type EventType } from "./calendar";
+import { EVENT_TYPES, TYPE_CODE, eventTypeIds, loadCalendarEvent, typeOfCode, type CalendarEvent, type EventType } from "./calendar";
 import { requireParent } from "./family";
 import { localToUtc, utcToLocal } from "./local-time";
 import { nudgeEmail, nudgeHeadline, reminderEmail, reminderPushBody, type NotifiedEvent, type NudgeKind, type ReminderKind } from "./reminder-text";
@@ -13,7 +13,8 @@ import { pushConfigured, sendPush, type PushPayload } from "@/server/push/servic
 /**
  * Rappels (US-81), délais par type (US-82) et relances (US-83), envoyés par email. Les échéances ne sont pas enregistrées : elles sont recalculées
  * à chaque passage du planificateur à partir du rendez-vous et des réglages, donc une modification d'horaire ou de réglage s'applique d'elle-même.
- * Seuls les envois sont enregistrés (`family_notifications`), avec une clé unique par rendez-vous, échéance et destinataire.
+ * Seuls les envois sont enregistrés (`scheduled_notifications`), avec une clé unique par rendez-vous, type, destinataire et échéance : un rendez-vous
+ * déplacé a de nouvelles échéances, donc de nouveaux rappels.
  */
 
 type Db = Kysely<DB>;
@@ -23,6 +24,11 @@ export const REMINDER_KINDS: ReminderKind[] = ["d7", "d1", "d0"];
 export const REMINDER_LABEL: Record<ReminderKind, string> = { d7: "J-7", d1: "J-1", d0: "Jour J" };
 const NUDGE_KINDS: NudgeKind[] = ["nudge24", "nudge48"];
 const NUDGE_HOURS: Record<NudgeKind, number> = { nudge24: 24, nudge48: 48 };
+/** Valeur de `notification_kind` de chaque rappel et relance. */
+const KIND_CODE = { d7: "reminder_d7", d1: "reminder_d1", d0: "reminder_day_of", nudge24: "follow_up_24h", nudge48: "follow_up_48h" } as const;
+type KindCode = (typeof KIND_CODE)[ReminderKind | NudgeKind];
+/** Colonne du réglage de chaque rappel. */
+const SETTING_COLUMN = { d7: "remind_d7", d1: "remind_d1", d0: "remind_day_of" } as const;
 
 const HOUR = 3_600_000;
 /** Une réservation d'envoi restée sans résultat (serveur arrêté en plein envoi) est reprise au bout de ce délai. */
@@ -68,19 +74,10 @@ export function setAsideExpiry(createdAt: Date, setAsideAt: Date, timeZone: stri
 // Foyer : fuseau, destinataires, réglages
 // ---------------------------------------------------------------------------------------------------------------------------
 
-/** Fuseau du foyer : celui de l'appareil de l'utilisateur principal à sa dernière connexion (AF-2). */
+/** Fuseau du foyer (AF-2) : celui de l'appareil de l'utilisateur principal à sa dernière connexion, tenu dans le compte. */
 export async function familyTimeZone(db: Db, accountId: string): Promise<string> {
-  const row = await db
-    .selectFrom("devices as d")
-    .innerJoin("users as u", "u.id", "d.user_id")
-    .select("d.timezone")
-    .where("u.account_id", "=", accountId)
-    .where("u.role", "=", "primary_user")
-    .where("d.revoked_at", "is", null)
-    .orderBy("d.last_activity_at", "desc")
-    .limit(1)
-    .executeTakeFirst();
-  return row?.timezone ?? "Europe/Paris";
+  const row = await db.selectFrom("accounts").select("family_timezone").where("id", "=", accountId).executeTakeFirst();
+  return row?.family_timezone ?? "Europe/Paris";
 }
 
 interface Recipient {
@@ -111,12 +108,17 @@ export interface ReminderSetting {
 }
 
 async function loadSettings(db: Db, accountId: string): Promise<Map<EventType, ReminderSetting>> {
-  const rows = await db.selectFrom("family_reminder_settings").select(["event_type", "d7", "d1", "d0", "updated_at"]).where("account_id", "=", accountId).execute();
-  const byType = new Map(rows.map((r) => [r.event_type, r]));
+  const rows = await db
+    .selectFrom("family_reminder_settings as s")
+    .innerJoin("event_types as t", "t.id", "s.event_type_id")
+    .select(["t.code", "s.remind_d7", "s.remind_d1", "s.remind_day_of", "s.updated_at"])
+    .where("s.account_id", "=", accountId)
+    .execute();
+  const byType = new Map(rows.map((r) => [typeOfCode(r.code), r]));
   return new Map(
     EVENT_TYPES.map((type) => {
       const r = byType.get(type);
-      return [type, { type, d7: r?.d7 ?? true, d1: r?.d1 ?? true, d0: r?.d0 ?? true, updatedAt: r ? new Date(r.updated_at) : null }];
+      return [type, { type, d7: r?.remind_d7 ?? true, d1: r?.remind_d1 ?? true, d0: r?.remind_day_of ?? true, updatedAt: r ? new Date(r.updated_at) : null }];
     }),
   );
 }
@@ -135,10 +137,12 @@ export async function setReminderSetting(ctx: Ctx, session: SessionContext, inpu
   if (!REMINDER_KINDS.includes(input.kind as ReminderKind)) throw new Rejection("invalid_kind", "Ce rappel est inconnu.", 422);
   const type = input.type as EventType;
   const kind = input.kind as ReminderKind;
+  const column = SETTING_COLUMN[kind];
+  const typeId = (await eventTypeIds(ctx.db)).get(TYPE_CODE[type])!;
   await ctx.db
     .insertInto("family_reminder_settings")
-    .values({ account_id: accountId, event_type: type, [kind]: input.enabled, updated_by_user_id: session.user.id, updated_at: ctx.now })
-    .onConflict((oc) => oc.columns(["account_id", "event_type"]).doUpdateSet({ [kind]: input.enabled, updated_by_user_id: session.user.id, updated_at: ctx.now }))
+    .values({ account_id: accountId, event_type_id: typeId, [column]: input.enabled, updated_by_user_id: session.user.id })
+    .onConflict((oc) => oc.columns(["account_id", "event_type_id"]).doUpdateSet({ [column]: input.enabled, updated_by_user_id: session.user.id }))
     .execute();
   const { d7, d1, d0 } = (await loadSettings(ctx.db, accountId)).get(type)!;
   return { type, d7, d1, d0 };
@@ -162,13 +166,13 @@ export interface NudgeView {
   sentAt: string;
 }
 
-/** Instant à partir duquel les rappels d'un rendez-vous s'appliquent : confirmation ou dernier changement d'horaire, et dernier réglage du type. */
-function cutoff(event: { remindersFrom: Date | null; statusChangedAt: Date }, setting: ReminderSetting): number {
-  return Math.max((event.remindersFrom ?? event.statusChangedAt).getTime(), setting.updatedAt?.getTime() ?? 0);
+/** Instant à partir duquel les rappels d'un rendez-vous s'appliquent : sa dernière modification (confirmation ou changement d'horaire comprises), et le dernier réglage du type. */
+function cutoff(event: { updatedAt: Date }, setting: ReminderSetting): number {
+  return Math.max(event.updatedAt.getTime(), setting.updatedAt?.getTime() ?? 0);
 }
 
 /** Rappels dus à cet instant, du plus ancien au plus récent : seul le dernier est envoyé (après un long incident, J-7 n'a plus de sens si J-1 est arrivé). */
-function dueKinds(event: { startsAt: Date; allDay: boolean; remindersFrom: Date | null; statusChangedAt: Date }, setting: ReminderSetting, timeZone: string, now: Date): ReminderKind[] {
+function dueKinds(event: { startsAt: Date; allDay: boolean; updatedAt: Date }, setting: ReminderSetting, timeZone: string, now: Date): ReminderKind[] {
   if (now >= event.startsAt) return [];
   return REMINDER_KINDS.filter((k) => setting[k])
     .map((k) => ({ k, due: reminderDueAt(k, event, timeZone) }))
@@ -179,13 +183,18 @@ function dueKinds(event: { startsAt: Date; allDay: boolean; remindersFrom: Date 
 
 export async function reminderDetails(db: Db, accountId: string, event: CalendarEvent, viewerTimeZone: string, now: Date): Promise<{ reminders: ReminderView[]; nudge: NudgeView | null }> {
   const timeZone = await familyTimeZone(db, accountId);
-  const sent = await db.selectFrom("family_notifications").select(["kind", "sent_at"]).where("event_id", "=", event.id).where("status", "=", "sent").orderBy("sent_at", "desc").execute();
-  const lastNudge = sent.find((n) => NUDGE_KINDS.includes(n.kind as NudgeKind));
-  const nudge = event.status === "provisional" && lastNudge?.sent_at ? { kind: lastNudge.kind as NudgeKind, sentAt: new Date(lastNudge.sent_at).toISOString() } : null;
+  const sent = await db
+    .selectFrom("scheduled_notifications")
+    .select(["kind", "due_at", sql<Date>`coalesce(email_sent_at, push_sent_at)`.as("sent_at")])
+    .where("event_id", "=", event.id)
+    .where("status", "=", "sent")
+    .orderBy("updated_at", "desc")
+    .execute();
+  const lastNudge = sent.find((n) => n.kind === KIND_CODE.nudge24 || n.kind === KIND_CODE.nudge48);
+  const nudge = event.status === "provisional" && lastNudge?.sent_at ? { kind: lastNudge.kind === KIND_CODE.nudge48 ? ("nudge48" as const) : ("nudge24" as const), sentAt: new Date(lastNudge.sent_at).toISOString() } : null;
   if (event.status !== "confirmed") return { reminders: [], nudge };
 
-  const row = await db.selectFrom("family_events").select("reminders_from").where("id", "=", event.id).executeTakeFirstOrThrow();
-  const timing = { startsAt: event.startsAt, allDay: event.allDay, remindersFrom: row.reminders_from ? new Date(row.reminders_from) : null, statusChangedAt: event.statusChangedAt };
+  const timing = { startsAt: event.startsAt, allDay: event.allDay, updatedAt: event.updatedAt };
   const setting = (await loadSettings(db, accountId)).get(event.type)!;
   const pending = dueKinds(timing, setting, timeZone, now);
   const reminders = REMINDER_KINDS.map((kind): ReminderView => {
@@ -193,7 +202,8 @@ export async function reminderDetails(db: Db, accountId: string, event: Calendar
     const at = utcToLocal(due, viewerTimeZone);
     const label = REMINDER_LABEL[kind];
     if (!setting[kind]) return { kind, label, state: "off", at };
-    if (sent.some((n) => n.kind === kind)) return { kind, label, state: "sent", at };
+    // Un rappel envoyé pour une ancienne date d'un rendez-vous déplacé ne compte pas : l'échéance doit être la même.
+    if (sent.some((n) => n.kind === KIND_CODE[kind] && new Date(n.due_at).getTime() === due.getTime())) return { kind, label, state: "sent", at };
     if (due.getTime() < cutoff(timing, setting)) return { kind, label, state: "not_applicable", at };
     if (due > now) return { kind, label, state: "planned", at };
     // Échéance passée sans envoi : le rappel part au prochain passage s'il est le plus récent dû, sinon il est dépassé.
@@ -219,21 +229,30 @@ interface Family {
   settings: Map<EventType, ReminderSetting>;
 }
 
-/** Réserve un envoi : un seul passage (ou serveur) l'obtient, ce qui empêche tout doublon (US-81 RT2). */
-async function claim(ctx: Ctx, accountId: string, eventId: string, kind: string, userId: string): Promise<boolean> {
+/**
+ * Réserve un envoi : un seul passage (ou serveur) l'obtient, ce qui empêche tout doublon (US-81 RT2). Une réservation restée sans résultat
+ * au-delà de `CLAIM_TTL` (serveur arrêté en plein envoi) est reprise ; l'horloge est celle de la base, qui date aussi la réservation.
+ */
+async function claim(ctx: Ctx, eventId: string, kind: KindCode, dueAt: Date, userId: string): Promise<boolean> {
   const row = await ctx.db
-    .insertInto("family_notifications")
-    .values({ account_id: accountId, event_id: eventId, kind, recipient_user_id: userId, claimed_at: ctx.now })
+    .insertInto("scheduled_notifications")
+    .values({ event_id: eventId, kind, due_at: dueAt, recipient_user_id: userId, status: "scheduled", attempts: 1 })
     .onConflict((oc) =>
       oc
-        .columns(["event_id", "kind", "recipient_user_id"])
-        .doUpdateSet({ claimed_at: ctx.now })
-        .where("family_notifications.status", "=", "claimed")
-        .where("family_notifications.claimed_at", "<", new Date(ctx.now.getTime() - CLAIM_TTL)),
+        .columns(["event_id", "kind", "recipient_user_id", "due_at"])
+        .where(sql<boolean>`event_id is not null`)
+        .doUpdateSet({ attempts: sql<number>`scheduled_notifications.attempts + 1` })
+        .where("scheduled_notifications.status", "=", "scheduled")
+        .where(sql<boolean>`scheduled_notifications.updated_at < now() - ${sql.lit(`${CLAIM_TTL / 1000} seconds`)}::interval`),
     )
     .returning("id")
     .executeTakeFirst();
   return Boolean(row);
+}
+
+/** Les envois en cours d'un rendez-vous ne servent plus quand il est déplacé, annulé ou confirmé : ils passent à « annulé » (même transaction). */
+export async function cancelPendingNotices(db: Db, eventId: string, kinds: KindCode[]): Promise<void> {
+  await db.updateTable("scheduled_notifications").set({ status: "cancelled" }).where("event_id", "=", eventId).where("status", "=", "scheduled").where("kind", "in", kinds).execute();
 }
 
 interface Message {
@@ -258,37 +277,42 @@ export async function pendingConfirmations(db: Db, accountId: string, now: Date)
  * RF11). Le rappel J-1 est toujours doublé par un email (AF-3). Après un envoi réussi par notification, un email en échec ne fait pas rejouer la
  * notification : la réservation est conservée.
  */
-async function deliver(ctx: Ctx, accountId: string, eventId: string, kind: ReminderKind | NudgeKind, recipients: Recipient[], build: (to: Recipient) => Message, totals: RemindersResult): Promise<void> {
+async function deliver(ctx: Ctx, accountId: string, eventId: string, kind: ReminderKind | NudgeKind, dueAt: Date, recipients: Recipient[], build: (to: Recipient) => Message, totals: RemindersResult): Promise<void> {
   const badge = pushConfigured() ? await pendingConfirmations(ctx.db, accountId, ctx.now) : 0;
   for (const to of recipients) {
-    if (!(await claim(ctx, accountId, eventId, kind, to.id))) continue;
+    if (!(await claim(ctx, eventId, KIND_CODE[kind], dueAt, to.id))) continue;
     const message = build(to);
     let pushed = 0;
     try {
       pushed = (await sendPush(ctx, to.id, { ...message.push, tag: `${kind}-${eventId}`, badge })).delivered;
       const email = pushed === 0 || kind === "d1";
       if (email) await messenger().sendEmail(message.email);
-      await ctx.db
-        .updateTable("family_notifications")
-        .set({ status: "sent", sent_at: ctx.now, channel: pushed > 0 && email ? "push+email" : pushed > 0 ? "push" : "email" })
-        .where("event_id", "=", eventId)
-        .where("kind", "=", kind)
-        .where("recipient_user_id", "=", to.id)
-        .execute();
+      await markSent(ctx, eventId, kind, dueAt, to.id, { push: pushed > 0, email });
       totals.sent += 1;
     } catch (error) {
       console.error("Rappel non envoyé :", error);
       if (pushed > 0) {
         // La notification est partie : on garde l'envoi pour ne pas la rejouer ; seul l'email de J-1 manque.
-        await ctx.db.updateTable("family_notifications").set({ status: "sent", sent_at: ctx.now, channel: "push" }).where("event_id", "=", eventId).where("kind", "=", kind).where("recipient_user_id", "=", to.id).execute();
+        await markSent(ctx, eventId, kind, dueAt, to.id, { push: true, email: false });
         totals.sent += 1;
         continue;
       }
       // Rien n'est parti : on libère la réservation, et le passage suivant réessaie tant que le rendez-vous n'a pas commencé (US-81 RF8).
-      await ctx.db.deleteFrom("family_notifications").where("event_id", "=", eventId).where("kind", "=", kind).where("recipient_user_id", "=", to.id).where("status", "=", "claimed").execute();
+      await ctx.db.deleteFrom("scheduled_notifications").where("event_id", "=", eventId).where("kind", "=", KIND_CODE[kind]).where("due_at", "=", dueAt).where("recipient_user_id", "=", to.id).where("status", "=", "scheduled").execute();
       totals.failed += 1;
     }
   }
+}
+
+async function markSent(ctx: Ctx, eventId: string, kind: ReminderKind | NudgeKind, dueAt: Date, userId: string, via: { push: boolean; email: boolean }): Promise<void> {
+  await ctx.db
+    .updateTable("scheduled_notifications")
+    .set({ status: "sent", push_sent_at: via.push ? ctx.now : null, email_sent_at: via.email ? ctx.now : null })
+    .where("event_id", "=", eventId)
+    .where("kind", "=", KIND_CODE[kind])
+    .where("due_at", "=", dueAt)
+    .where("recipient_user_id", "=", userId)
+    .execute();
 }
 
 async function notified(db: Db, accountId: string, id: string): Promise<NotifiedEvent | undefined> {
@@ -309,14 +333,12 @@ async function ignoreExpired(ctx: Ctx, family: (accountId: string) => Promise<Fa
       row.status === "provisional" || row.starts_at <= ctx.now || setAsideExpiry(new Date(row.created_at), new Date(row.status_changed_at), (await family(row.account_id)).timeZone) <= ctx.now;
     if (!expired) continue;
     await ctx.db.transaction().execute(async (trx) => {
-      const current = await trx.selectFrom("family_events").select(["status", "version"]).where("id", "=", row.id).forUpdate().executeTakeFirst();
+      const current = await trx.selectFrom("family_events").select(["status"]).where("id", "=", row.id).forUpdate().executeTakeFirst();
       if (!current || current.status !== row.status) return; // un parent est passé entre-temps
-      await trx.updateTable("family_events").set({ status: "ignored", version: current.version + 1, status_changed_at: ctx.now, status_changed_by_user_id: null, updated_at: ctx.now }).where("id", "=", row.id).execute();
-      await trx
-        .insertInto("family_event_history")
-        .values({ account_id: row.account_id, event_id: row.id, action: "ignored", from_status: row.status, to_status: "ignored", by_user_id: null, reason: "sans réponse", created_at: ctx.now })
-        .execute();
-      totals.ignored += 1;
+      // Par le système (aucun auteur) : « l'heure est venue » pour un provisoire, « sans réponse » pour un écarté.
+      const reason = row.status === "provisional" ? "event_started" : "no_response";
+      const done = await sql<{ ok: boolean }>`select change_family_event_status(${row.id}::uuid, 'dismissed'::event_status, ${null}::uuid, ${null}::integer, ${reason}::event_change_reason) as ok`.execute(trx);
+      if (done.rows[0]?.ok) totals.ignored += 1;
     });
   }
 }
@@ -344,22 +366,23 @@ export async function runReminders(ctx: Ctx, options: { accountId?: string } = {
 
   // Rappels : rendez-vous confirmés à venir (US-81).
   const confirmed = await ctx.db
-    .selectFrom("family_events")
-    .select(["id", "account_id", "event_type", "starts_at", "all_day", "reminders_from", "status_changed_at"])
-    .where("status", "=", "confirmed")
-    .where("starts_at", ">", ctx.now)
-    .where("starts_at", "<", horizon)
-    .$if(Boolean(options.accountId), (qb) => qb.where("account_id", "=", options.accountId!))
+    .selectFrom("family_events as e")
+    .innerJoin("event_types as t", "t.id", "e.event_type_id")
+    .select(["e.id", "e.account_id", "t.code", "e.starts_at", "e.all_day", "e.updated_at"])
+    .where("e.status", "=", "confirmed")
+    .where("e.starts_at", ">", ctx.now)
+    .where("e.starts_at", "<", horizon)
+    .$if(Boolean(options.accountId), (qb) => qb.where("e.account_id", "=", options.accountId!))
     .execute();
   for (const row of confirmed) {
     const { timeZone, recipients, settings } = await family(row.account_id);
-    const timing = { startsAt: new Date(row.starts_at), allDay: row.all_day, remindersFrom: row.reminders_from ? new Date(row.reminders_from) : null, statusChangedAt: new Date(row.status_changed_at) };
-    const due = dueKinds(timing, settings.get(row.event_type)!, timeZone, ctx.now);
+    const timing = { startsAt: new Date(row.starts_at), allDay: row.all_day, updatedAt: new Date(row.updated_at) };
+    const due = dueKinds(timing, settings.get(typeOfCode(row.code))!, timeZone, ctx.now);
     const kind = due[due.length - 1];
     if (!kind) continue;
     const event = await notified(ctx.db, row.account_id, row.id);
     if (!event) continue;
-    await deliver(ctx, row.account_id, row.id, kind, recipients, (to) => ({
+    await deliver(ctx, row.account_id, row.id, kind, reminderDueAt(kind, timing, timeZone), recipients, (to) => ({
       email: reminderEmail({ firstName: to.firstName, to: to.email, event, timeZone, now: ctx.now, appUrl }),
       push: { title: "Assistant Famille", body: reminderPushBody(event, timeZone, ctx.now), url: `/calendrier/rdv/${event.id}` },
     }), totals);
@@ -387,7 +410,7 @@ export async function runReminders(ctx: Ctx, options: { accountId?: string } = {
     if (modified) continue;
     const event = await notified(ctx.db, row.account_id, row.id);
     if (!event) continue;
-    await deliver(ctx, row.account_id, row.id, latest.k, recipients, (to) => ({
+    await deliver(ctx, row.account_id, row.id, latest.k, latest.due, recipients, (to) => ({
       email: nudgeEmail({ firstName: to.firstName, to: to.email, event, timeZone, now: ctx.now, appUrl }),
       push: { title: "Assistant Famille", body: nudgeHeadline(event, timeZone, ctx.now), url: `/calendrier/rdv/${event.id}` },
     }), totals);

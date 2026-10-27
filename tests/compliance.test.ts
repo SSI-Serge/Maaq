@@ -114,8 +114,8 @@ async function agent() {
   const category = await db.selectFrom("agent_categories").select("id").where("code", "=", "perso").executeTakeFirstOrThrow();
   return db
     .insertInto("agents")
-    .values({ digitorn_agent_ref: `comp-${tag()}${tag()}`, name: `Agent_${tag()}`, category_id: category.id, short_description: "Agent", full_description: "Agent", cc_addresses_max_count: 3 })
-    .returning(["id", "name", "digitorn_agent_ref"])
+    .values({ platform: "digitorn", platform_agent_ref: `comp-${tag()}${tag()}`, name: `Agent_${tag()}`, category_id: category.id, short_description: "Agent", full_description: "Agent", cc_addresses_max_count: 3 })
+    .returning(["id", "name", "platform_agent_ref"])
     .executeTakeFirstOrThrow();
 }
 
@@ -195,7 +195,7 @@ describe("US-55 — export des données", () => {
     await mock.submitRequest({
       requestId: randomUUID(),
       userRef: ref,
-      agentRef: a.digitorn_agent_ref,
+      agentRef: a.platform_agent_ref,
       text: "Ma demande de Thomas",
       context: { rank: "core_guest", autoParticipants: [], ccAddresses: [], info: {} },
     });
@@ -629,7 +629,7 @@ describe("US-68 — comptes et invités jamais activés", () => {
     const profile = await pendingPrimary(40, 31);
     await runLifecycle(at());
     expect(await db.selectFrom("accounts").select("id").where("id", "=", profile.accountId!).executeTakeFirst()).toBeUndefined();
-    const trace = await db.selectFrom("erasure_traces").selectAll().where("former_user_id", "=", profile.id).executeTakeFirstOrThrow();
+    const trace = await db.selectFrom("erasure_traces").selectAll().where("former_subject_id", "=", profile.id).executeTakeFirstOrThrow();
     expect(trace).toMatchObject({ former_role: "primary_user", digitorn_status: "done" });
     expect(JSON.stringify(trace)).not.toContain(profile.email);
   });

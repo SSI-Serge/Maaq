@@ -55,7 +55,7 @@ async function agentFor(userIds: string[], options: { blocked?: string; requires
   const agent = await db
     .insertInto("agents")
     .values({
-      digitorn_agent_ref: `chat-${tag()}${tag()}`,
+      platform: "digitorn", platform_agent_ref: `chat-${tag()}${tag()}`,
       name: `Agent_${tag()}`,
       category_id: category.id,
       short_description: "Agent de test",
@@ -63,7 +63,7 @@ async function agentFor(userIds: string[], options: { blocked?: string; requires
       cc_addresses_max_count: options.cc ?? 0,
       ...(options.blocked ? { status: "blocked" as const, maintenance_message: options.blocked, blocked_at: new Date() } : {}),
     })
-    .returning(["id", "name", "digitorn_agent_ref"])
+    .returning(["id", "name", "platform_agent_ref"])
     .executeTakeFirstOrThrow();
   if (options.requiresDrive) {
     const type = await db.selectFrom("connector_types").select("id").where("code", "=", "google_drive").executeTakeFirstOrThrow();
@@ -73,7 +73,7 @@ async function agentFor(userIds: string[], options: { blocked?: string; requires
     await db.insertInto("agent_sample_prompts").values({ agent_id: agent.id, kind: "first_suggestion", content, sort_order: index + 1 }).execute();
   }
   for (const userId of userIds) await db.insertInto("profile_agents").values({ user_id: userId, agent_id: agent.id }).execute();
-  return { id: agent.id, name: agent.name, ref: agent.digitorn_agent_ref };
+  return { id: agent.id, name: agent.name, ref: agent.platform_agent_ref };
 }
 
 async function household() {

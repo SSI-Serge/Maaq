@@ -189,6 +189,9 @@ gcloud run deploy maaq-test --source . --region europe-west1
 Les réglages et secrets déjà enregistrés sont conservés. Si une migration a été ajoutée : relance d'abord l'étape A5
 (`npm run db:migrate` avec `DATABASE_URL` et `DATABASE_SSL`), puis l'étape A7.
 
+Avant toute migration sur une base qui contient des données : `npx tsx scripts/db-backup.ts <dossier hors du projet>` (même `DATABASE_URL`).
+Après des migrations qui ajoutent des tables, relance aussi `deploy/supabase-securiser.sql` (SQL Editor de Supabase).
+
 ## Ce que ça coûte
 | Poste | Coût |
 |---|---|

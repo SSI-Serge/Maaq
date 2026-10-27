@@ -7,7 +7,7 @@ import { memberIdOf } from "../params";
 
 export const dynamic = "force-dynamic";
 
-const schema = z.object({ firstName: z.string().max(200).optional(), birthDate: z.iso.date().nullable().optional() });
+const schema = z.object({ firstName: z.string().max(200).optional(), birth: z.string().regex(/^\d{4}-\d{2}$/).nullable().optional() });
 
 /** Modifie un membre : prénom et date de naissance, ou la date seule pour un membre relié à un profil (US-93). */
 export const PATCH = handler(async (request: Request, context: { params: Promise<{ id: string }> }) => {

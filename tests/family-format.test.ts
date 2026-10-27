@@ -8,7 +8,7 @@ describe("formats du calendrier familial", () => {
     expect(longDate("2026-10-27")).toBe("mardi 27 octobre 2026");
     expect(shortDate("2026-11-01")).toBe("dim. 1 nov.");
     expect(monthLabel("2026-10-28")).toBe("octobre 2026");
-    expect(birthLabel("2018-03-12")).toBe("12/03/2018");
+    expect(birthLabel("2018-03")).toBe("03/2018");
   });
 
   it("décrit le moment d'un rendez-vous", () => {

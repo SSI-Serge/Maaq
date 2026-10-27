@@ -52,21 +52,21 @@ async function agentFor(
   const agent = await db
     .insertInto("agents")
     .values({
-      digitorn_agent_ref: `con-${tag()}${tag()}`,
+      platform: "digitorn", platform_agent_ref: `con-${tag()}${tag()}`,
       name,
       category_id: category.id,
       short_description: "Agent de test",
       full_description: "Agent de test",
       cc_addresses_max_count: options.cc ?? 0,
     })
-    .returning(["id", "digitorn_agent_ref"])
+    .returning(["id", "platform_agent_ref"])
     .executeTakeFirstOrThrow();
   for (const r of options.requires ?? []) {
     const type = await db.selectFrom("connector_types").select("id").where("code", "=", r.connector).executeTakeFirstOrThrow();
     await db.insertInto("agent_requirements").values({ agent_id: agent.id, connector_type_id: type.id, owner_scope: r.scope }).execute();
   }
   for (const userId of userIds) await db.insertInto("profile_agents").values({ user_id: userId, agent_id: agent.id }).execute();
-  return { id: agent.id, name, ref: agent.digitorn_agent_ref };
+  return { id: agent.id, name, ref: agent.platform_agent_ref };
 }
 
 async function account() {

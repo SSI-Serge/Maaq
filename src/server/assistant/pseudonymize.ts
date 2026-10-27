@@ -16,8 +16,8 @@ export interface PseudoMember {
   firstName: string;
   role: MemberRole;
   aliasIndex: number;
-  /** AAAA-MM-JJ */
-  birthDate: string | null;
+  /** Mois et année de naissance, « AAAA-MM » (le jour n'est jamais saisi, D54). */
+  birth: string | null;
   /** Membre retiré : plus reconnu par l'assistant, mais son alias et son prénom restent traduits dans les textes existants (US-93 RF6). */
   archived?: boolean;
   /** Membre effacé définitivement : son prénom n'existe plus (D34). */
@@ -43,11 +43,11 @@ export function fold(text: string): string {
   return [...text.normalize("NFC")].map(foldChar).join("");
 }
 
-export function ageBand(birthDate: string | null, now: Date): string {
-  if (!birthDate) return "inconnu";
-  const born = new Date(`${birthDate}T00:00:00Z`);
-  let age = now.getUTCFullYear() - born.getUTCFullYear();
-  if (now.getUTCMonth() < born.getUTCMonth() || (now.getUTCMonth() === born.getUTCMonth() && now.getUTCDate() < born.getUTCDate())) age -= 1;
+/** Âge en années révolues d'après le mois de naissance : on compte les mois civils écoulés, comme `family_member_age_months` en base. */
+export function ageBand(birth: string | null, now: Date): string {
+  if (!birth) return "inconnu";
+  const months = now.getUTCFullYear() * 12 + now.getUTCMonth() + 1 - (Number(birth.slice(0, 4)) * 12 + Number(birth.slice(5, 7)));
+  const age = Math.floor(months / 12);
   if (age < 3) return "0-2";
   if (age < 6) return "3-5";
   if (age < 11) return "6-10";

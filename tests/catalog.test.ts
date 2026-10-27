@@ -47,7 +47,7 @@ async function agent(seed: AgentSeed = {}) {
   const row = await db
     .insertInto("agents")
     .values({
-      digitorn_agent_ref: `cat-${tag()}${tag()}`,
+      platform: "digitorn", platform_agent_ref: `cat-${tag()}${tag()}`,
       name,
       category_id: category.id,
       short_description: seed.short ?? "Description courte",

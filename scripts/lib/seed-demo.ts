@@ -105,8 +105,8 @@ async function seedCatalog(client: PoolClient): Promise<boolean> {
     const {
       rows: [row],
     } = await client.query<{ id: string }>(
-      `INSERT INTO agents (digitorn_agent_ref, name, category_id, short_description, full_description, cc_addresses_max_count)
-       VALUES ($1, $2, (SELECT id FROM agent_categories WHERE code = $3), $4, $5, $6) RETURNING id`,
+      `INSERT INTO agents (platform, platform_agent_ref, name, category_id, short_description, full_description, cc_addresses_max_count)
+       VALUES ('digitorn', $1, $2, (SELECT id FROM agent_categories WHERE code = $3), $4, $5, $6) RETURNING id`,
       [agent.ref, agent.name, agent.category, agent.short, agent.full, agent.cc],
     );
     for (const [i, content] of agent.examples.entries()) {

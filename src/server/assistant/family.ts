@@ -20,70 +20,32 @@ export function requireParent(session: SessionContext): string {
   return session.user.accountId;
 }
 
-/** Couleurs des membres dans le calendrier (AF-5) : distinctes entre elles et lisibles sur fond clair comme sur fond sombre. */
-export const MEMBER_COLORS = ["#2f6b9a", "#c2562f", "#3a8a5c", "#8a4fa0", "#b8860b", "#2a7f86", "#a63d5e", "#5c6b2f", "#4a5fb5", "#b0482f", "#6b7d8f", "#8c5a2b"];
+/** Couleurs des membres dans le calendrier (AF-5) : distinctes entre elles et lisibles sur fond clair comme sur fond sombre. La base attribue le plus petit numéro libre, invités secondaires compris. */
+export const MEMBER_COLORS = ["#2f6b9a", "#c2562f", "#3a8a5c", "#8a4fa0", "#b8860b", "#2a7f86", "#a63d5e", "#5c6b2f", "#4a5fb5", "#b0482f", "#6b7d8f", "#8c5a2b", "#0f766e", "#9a3412", "#4d7c0f", "#a21caf"];
 
 /** Une famille compte au plus 12 membres actifs (US-92 RF7) : autant que de couleurs, et la couleur d'un membre retiré est réattribuable (US-93 RF9). */
 export const MAX_MEMBERS = 12;
 export const MAX_NAME = 30;
 
-async function nextColor(db: Db, accountId: string): Promise<string> {
-  const used = (await db.selectFrom("family_members").select("color").where("account_id", "=", accountId).where("archived_at", "is", null).execute()).map((r) => r.color);
-  return MEMBER_COLORS.find((c) => !used.includes(c)) ?? MEMBER_COLORS[used.length % MEMBER_COLORS.length];
-}
+/** Couleur d'un membre : la base attribue le plus petit numéro libre parmi les membres actifs (US-93 RF9) ; la palette se répète au-delà. */
+export const colorOf = (index: number): string => MEMBER_COLORS[index % MEMBER_COLORS.length];
 
-async function nextAliasIndex(db: Db, accountId: string, role: "parent" | "child"): Promise<number> {
-  const row = await db
-    .selectFrom("family_members")
-    .select(sql<number>`coalesce(max(alias_index), 0)`.as("max"))
-    .where("account_id", "=", accountId)
-    .where("role", "=", role)
-    .executeTakeFirstOrThrow();
-  return Number(row.max) + 1;
-}
+/** Valeur laissée à la base : l'alias (par rôle, jamais réutilisé) et la couleur libre sont attribués par `family_member_before_insert`. */
+const BY_DATABASE = sql<number>`null`;
 
 /**
- * Crée au besoin la fiche « membre » des parents du foyer (utilisateur principal et invité de rang core) à partir de leur profil.
- * Les alias se suivent dans l'ordre de création : Parent 1 est l'utilisateur principal.
+ * Les fiches « membre » des parents sont créées avec leur profil et suivent leur prénom, leur rang et leur retrait (déclencheurs de la base,
+ * US-92 RF1, US-93 RF3) ; Parent 1 est l'utilisateur principal. Les invités secondaires ont aussi une fiche (rôle « autre »), que l'assistant ne
+ * connaît pas encore : les listes ci-dessous se limitent aux parents et aux enfants.
  */
-export async function ensureParentMembers(db: Db, accountId: string): Promise<void> {
-  const parents = await db
-    .selectFrom("users")
-    .select(["id", "first_name", "role", "guest_rank"])
-    .where("account_id", "=", accountId)
-    .where("status", "in", ["active", "grace_period"])
-    .where((eb) => eb.or([eb("role", "=", "primary_user"), eb.and([eb("role", "=", "guest"), eb("guest_rank", "=", "core")])]))
-    .orderBy(sql`case when role = 'primary_user' then 0 else 1 end`)
-    .orderBy("created_at")
-    .execute();
-  const known = new Set(
-    (await db.selectFrom("family_members").select("user_id").where("account_id", "=", accountId).where("user_id", "is not", null).execute()).map((m) => m.user_id),
-  );
-  for (const parent of parents) {
-    if (known.has(parent.id)) {
-      // Le prénom d'un membre relié à un profil suit celui du profil (US-93 RF3, RF4).
-      await db
-        .updateTable("family_members")
-        .set({ first_name: parent.first_name, updated_at: new Date() })
-        .where("account_id", "=", accountId)
-        .where("user_id", "=", parent.id)
-        .where("first_name", "<>", parent.first_name)
-        .execute();
-      continue;
-    }
-    await db
-      .insertInto("family_members")
-      .values({ account_id: accountId, user_id: parent.id, first_name: parent.first_name, role: "parent", alias_index: await nextAliasIndex(db, accountId, "parent"), color: await nextColor(db, accountId) })
-      .onConflict((oc) => oc.doNothing())
-      .execute();
-  }
-}
+const ASSISTANT_ROLES = ["parent", "child"] as const;
 
 export interface FamilyMemberView {
   id: string;
   firstName: string;
   role: "parent" | "child";
-  birthDate: string | null;
+  /** Mois et année de naissance, « AAAA-MM » : le jour n'est jamais demandé (D54). */
+  birth: string | null;
   color: string | null;
   isYou: boolean;
   /** « Utilisateur principal » ou « Invité » pour un membre relié à un profil ; vide pour un membre sans compte (US-92 RF2). */
@@ -101,26 +63,31 @@ export interface FamilyOverview {
   max: number;
 }
 
-// Les dates de naissance sont lues en texte (AAAA-MM-JJ) : le pilote de base les rendrait en minuit local, un jour trop tôt selon le fuseau du serveur.
-const birthText = (alias: string) => sql<string | null>`${sql.ref(`${alias}birth_date`)}::text`.as("birth_text");
+/** Naissance en « AAAA-MM », ou rien si elle n'est pas connue. */
+const birthText = (alias: string) =>
+  sql<string | null>`case when ${sql.ref(`${alias}birth_year`)} is null then null else lpad(${sql.ref(`${alias}birth_year`)}::text, 4, '0') || '-' || lpad(${sql.ref(`${alias}birth_month`)}::text, 2, '0') end`.as("birth_text");
+
+/** Prénom affiché d'un membre effacé définitivement (D34). */
+const FORMER = "Ancien membre";
 
 /** Tous les membres, retirés compris : leurs alias et prénoms restent traduits dans les textes existants, mais l'assistant ne les propose plus. */
 export async function loadPseudoMembers(db: Db, accountId: string): Promise<PseudoMember[]> {
   const rows = await db
     .selectFrom("family_members")
-    .select(["id", "first_name", "role", "alias_index", birthText(""), "archived_at", "erased_at"])
+    .select(["id", "first_name", "role", "alias_number", birthText(""), "archived_at", "anonymized_at"])
     .where("account_id", "=", accountId)
+    .where("role", "in", [...ASSISTANT_ROLES])
     .orderBy("role")
-    .orderBy("alias_index")
+    .orderBy("alias_number")
     .execute();
   return rows.map((r) => ({
     id: r.id,
-    firstName: r.first_name,
+    firstName: r.first_name ?? FORMER,
     role: r.role === "child" ? "child" : "parent",
-    aliasIndex: r.alias_index,
-    birthDate: r.birth_text,
+    aliasIndex: r.alias_number,
+    birth: r.birth_text,
     archived: r.archived_at !== null,
-    erased: r.erased_at !== null,
+    erased: r.anonymized_at !== null,
   }));
 }
 
@@ -128,11 +95,12 @@ async function viewsOf(ctx: Ctx, accountId: string, session: SessionContext, sco
   const base = ctx.db
     .selectFrom("family_members as m")
     .leftJoin("users as u", "u.id", "m.user_id")
-    .select(["m.id", "m.first_name", "m.role", birthText("m."), "m.color", "m.user_id", "m.archived_at", "u.role as user_role"])
+    .select(["m.id", "m.first_name", "m.role", birthText("m."), "m.color_index", "m.user_id", "m.archived_at", "u.role as user_role"])
     .where("m.account_id", "=", accountId)
+    .where("m.role", "in", [...ASSISTANT_ROLES])
     .orderBy("m.role")
-    .orderBy("m.alias_index");
-  const rows = await (scope === "active" ? base.where("m.archived_at", "is", null) : base.where("m.archived_at", "is not", null).where("m.erased_at", "is", null)).execute();
+    .orderBy("m.alias_number");
+  const rows = await (scope === "active" ? base.where("m.archived_at", "is", null) : base.where("m.archived_at", "is not", null).where("m.anonymized_at", "is", null)).execute();
   const counts = new Map<string, number>();
   if (scope === "active" && rows.length) {
     const upcoming = await ctx.db
@@ -148,10 +116,10 @@ async function viewsOf(ctx: Ctx, accountId: string, session: SessionContext, sco
   }
   return rows.map((r) => ({
     id: r.id,
-    firstName: r.first_name,
-    role: r.role,
-    birthDate: r.birth_text,
-    color: r.color,
+    firstName: r.first_name ?? FORMER,
+    role: r.role === "child" ? "child" : "parent",
+    birth: r.birth_text,
+    color: colorOf(r.color_index),
     isYou: r.user_id === session.user.id,
     badge: r.user_id === null ? null : r.user_role === "primary_user" ? "primary" : "guest",
     linked: r.user_id !== null,
@@ -163,7 +131,6 @@ async function viewsOf(ctx: Ctx, accountId: string, session: SessionContext, sco
 /** Membres actifs, puis membres retirés (section repliée « Membres retirés », qui garde l'effacement définitif). */
 export async function familyOverview(ctx: Ctx, session: SessionContext): Promise<FamilyOverview> {
   const accountId = requireParent(session);
-  await ensureParentMembers(ctx.db, accountId);
   return { members: await viewsOf(ctx, accountId, session, "active"), removed: await viewsOf(ctx, accountId, session, "removed"), max: MAX_MEMBERS };
 }
 
@@ -178,19 +145,21 @@ async function checkedName(db: Db, accountId: string, raw: string, exceptId?: st
   if (!firstName) throw new Rejection("invalid_name", "Le prénom est obligatoire.", 422);
   if ([...firstName].length > MAX_NAME) throw new Rejection("invalid_name", `Le prénom ne peut pas dépasser ${MAX_NAME} caractères.`, 422);
   const taken = await db.selectFrom("family_members").select(["id", "first_name"]).where("account_id", "=", accountId).where("archived_at", "is", null).execute();
-  if (taken.some((m) => m.id !== exceptId && foldName(m.first_name) === foldName(firstName))) {
+  if (taken.some((m) => m.id !== exceptId && m.first_name !== null && foldName(m.first_name) === foldName(firstName))) {
     throw new Rejection("name_taken", "Un membre porte déjà ce prénom. Ajoutez une initiale pour les distinguer.", 409);
   }
   return firstName;
 }
 
-function checkedBirthDate(value: string | null | undefined, now: Date): string | null {
+/** « AAAA-MM » : mois et année de naissance, facultatifs (D54). Le mois courant est accepté, pas un mois à venir. */
+function checkedBirth(value: string | null | undefined, now: Date): { birth_year: number; birth_month: number } | null {
   if (!value) return null;
-  const born = new Date(`${value}T00:00:00Z`);
-  // Le retour en texte écarte les jours qui n'existent pas (31 février) que Date accepterait en les reportant au mois suivant.
-  if (Number.isNaN(born.getTime()) || born.toISOString().slice(0, 10) !== value || born.getUTCFullYear() < 1900) throw new Rejection("invalid_birth_date", "La date de naissance est invalide.", 422);
-  if (born > now) throw new Rejection("invalid_birth_date", "La date de naissance ne peut pas être dans le futur.", 422);
-  return value;
+  const match = /^(\d{4})-(\d{2})$/.exec(value);
+  const year = match ? Number(match[1]) : 0;
+  const month = match ? Number(match[2]) : 0;
+  if (!match || year < 1900 || month < 1 || month > 12) throw new Rejection("invalid_birth_date", "La date de naissance est invalide.", 422);
+  if (year * 12 + month > now.getUTCFullYear() * 12 + now.getUTCMonth() + 1) throw new Rejection("invalid_birth_date", "La date de naissance ne peut pas être dans le futur.", 422);
+  return { birth_year: year, birth_month: month };
 }
 
 async function viewOne(ctx: Ctx, session: SessionContext, id: string): Promise<FamilyMemberView> {
@@ -200,16 +169,15 @@ async function viewOne(ctx: Ctx, session: SessionContext, id: string): Promise<F
 }
 
 /** Ajoute un enfant au foyer (sans compte). Les deux parents peuvent gérer les membres (D33). */
-export async function addChild(ctx: Ctx, session: SessionContext, input: { firstName: string; birthDate?: string | null }): Promise<FamilyMemberView> {
+export async function addChild(ctx: Ctx, session: SessionContext, input: { firstName: string; birth?: string | null }): Promise<FamilyMemberView> {
   const accountId = requireParent(session);
-  await ensureParentMembers(ctx.db, accountId);
-  const birthDate = checkedBirthDate(input.birthDate, ctx.now);
+  const birth = checkedBirth(input.birth, ctx.now);
   const firstName = await checkedName(ctx.db, accountId, input.firstName);
-  const active = await ctx.db.selectFrom("family_members").select(sql<number>`count(*)`.as("n")).where("account_id", "=", accountId).where("archived_at", "is", null).executeTakeFirstOrThrow();
+  const active = await ctx.db.selectFrom("family_members").select(sql<number>`count(*)`.as("n")).where("account_id", "=", accountId).where("role", "in", [...ASSISTANT_ROLES]).where("archived_at", "is", null).executeTakeFirstOrThrow();
   if (Number(active.n) >= MAX_MEMBERS) throw new Rejection("member_limit", `Nombre maximal de membres atteint (${MAX_MEMBERS}).`, 409);
   const row = await ctx.db
     .insertInto("family_members")
-    .values({ account_id: accountId, first_name: firstName, role: "child", birth_date: birthDate, alias_index: await nextAliasIndex(ctx.db, accountId, "child"), color: await nextColor(ctx.db, accountId) })
+    .values({ account_id: accountId, first_name: firstName, role: "child", ...(birth ?? {}), alias_number: BY_DATABASE, color_index: BY_DATABASE, created_by_user_id: session.user.id })
     .returning("id")
     .executeTakeFirstOrThrow();
   return viewOne(ctx, session, row.id);
@@ -222,16 +190,20 @@ async function activeMember(ctx: Ctx, accountId: string, id: string) {
 }
 
 /** Modifie un membre : prénom et date de naissance pour un membre sans compte, date de naissance seule pour un membre relié à un profil (US-93 RF2, RF3). */
-export async function updateMember(ctx: Ctx, session: SessionContext, id: string, input: { firstName?: string; birthDate?: string | null }): Promise<FamilyMemberView> {
+export async function updateMember(ctx: Ctx, session: SessionContext, id: string, input: { firstName?: string; birth?: string | null }): Promise<FamilyMemberView> {
   const accountId = requireParent(session);
   const member = await activeMember(ctx, accountId, id);
-  const changes: { first_name?: string; birth_date?: string | null; updated_at: Date } = { updated_at: ctx.now };
+  const changes: { first_name?: string; birth_year?: number | null; birth_month?: number | null } = {};
   if (input.firstName !== undefined && input.firstName.trim() !== member.first_name) {
     if (member.user_id) throw new Rejection("linked_member", "Le prénom d'un membre qui a un compte se modifie depuis son profil.", 422);
     changes.first_name = await checkedName(ctx.db, accountId, input.firstName, id);
   }
-  if (input.birthDate !== undefined) changes.birth_date = checkedBirthDate(input.birthDate, ctx.now);
-  await ctx.db.updateTable("family_members").set(changes).where("id", "=", id).execute();
+  if (input.birth !== undefined) {
+    const birth = checkedBirth(input.birth, ctx.now);
+    changes.birth_year = birth?.birth_year ?? null;
+    changes.birth_month = birth?.birth_month ?? null;
+  }
+  if (Object.keys(changes).length) await ctx.db.updateTable("family_members").set(changes).where("id", "=", id).execute();
   return viewOne(ctx, session, id);
 }
 
@@ -240,7 +212,7 @@ export async function removeMember(ctx: Ctx, session: SessionContext, id: string
   const accountId = requireParent(session);
   const member = await activeMember(ctx, accountId, id);
   if (member.user_id) throw new Rejection("linked_member", "Un membre qui a un profil ne peut pas être retiré ici : supprimez son profil.", 422);
-  await ctx.db.updateTable("family_members").set({ archived_at: ctx.now, updated_at: ctx.now }).where("id", "=", id).execute();
+  await ctx.db.updateTable("family_members").set({ archived_at: ctx.now }).where("id", "=", id).execute();
 }
 
 /**
@@ -249,23 +221,11 @@ export async function removeMember(ctx: Ctx, session: SessionContext, id: string
  */
 export async function eraseMember(ctx: Ctx, session: SessionContext, id: string): Promise<{ deletedEvents: number }> {
   const accountId = requireParent(session);
-  const member = await ctx.db.selectFrom("family_members").select(["id", "user_id", "erased_at"]).where("account_id", "=", accountId).where("id", "=", id).executeTakeFirst();
-  if (!member || member.erased_at) throw new Rejection("not_found", "Ce membre n'existe pas ou a déjà été effacé.", 404);
+  const member = await ctx.db.selectFrom("family_members").select(["id", "user_id", "anonymized_at"]).where("account_id", "=", accountId).where("id", "=", id).where("role", "in", [...ASSISTANT_ROLES]).executeTakeFirst();
+  if (!member || member.anonymized_at) throw new Rejection("not_found", "Ce membre n'existe pas ou a déjà été effacé.", 404);
   if (member.user_id) throw new Rejection("linked_member", "Un membre qui a un profil ne peut pas être effacé ici : supprimez son profil.", 422);
-  return ctx.db.transaction().execute(async (trx) => {
-    const deleted = await trx
-      .deleteFrom("family_events")
-      .where("account_id", "=", accountId)
-      .where("all_family", "=", false)
-      .where(sql<boolean>`id in (select event_id from family_event_members where member_id = ${id})`)
-      .where(sql<boolean>`not exists (select 1 from family_event_members o where o.event_id = family_events.id and o.member_id <> ${id})`)
-      .returning("id")
-      .execute();
-    await trx
-      .updateTable("family_members")
-      .set({ first_name: "Ancien membre", birth_date: null, archived_at: sql`coalesce(archived_at, ${ctx.now})`, erased_at: ctx.now, updated_at: ctx.now })
-      .where("id", "=", id)
-      .execute();
-    return { deletedEvents: deleted.length };
-  });
+  // La base efface le prénom et la naissance, supprime les rendez-vous qui ne concernent que ce membre, retire les images et mails devenus inutiles
+  // et laisse la trace sans donnée personnelle (`anonymize_family_member`).
+  const { rows } = await sql<{ n: string }>`select anonymize_family_member(${id}::uuid) as n`.execute(ctx.db);
+  return { deletedEvents: Number(rows[0]?.n ?? 0) };
 }

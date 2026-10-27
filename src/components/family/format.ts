@@ -105,7 +105,8 @@ export const PERIODS = ["Matin", "Midi", "Après-midi", "Soir"] as const;
 export const formTime = (local: string) => local.slice(11, 16);
 
 /** « 12/03/2018 » */
-export const birthLabel = (day: string) => `${day.slice(8, 10)}/${day.slice(5, 7)}/${day.slice(0, 4)}`;
+/** « 04/2018 » : mois et année de naissance (le jour n'est jamais demandé, D54). */
+export const birthLabel = (month: string) => `${month.slice(5, 7)}/${month.slice(0, 4)}`;
 
 /** « les RDV personnels » : le type accordé au pluriel (US-82 RF7). */
 export const TYPE_PLURAL: Record<EventType, string> = {

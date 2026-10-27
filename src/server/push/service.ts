@@ -1,8 +1,10 @@
 import type { Kysely } from "kysely";
+import { createHash } from "node:crypto";
 import webpush from "web-push";
 import type { Ctx, SessionContext } from "@/server/auth/service";
 import type { DB } from "@/server/db/schema.generated";
 import { env } from "@/server/env";
+import { seal, open } from "@/server/assistant/fields";
 import { Rejection } from "@/server/http";
 
 /**
@@ -69,12 +71,20 @@ export async function saveSubscription(ctx: Ctx, session: SessionContext, input:
   if (!isPushEndpoint(input.endpoint) || !BASE64URL.test(input.keys.p256dh) || !BASE64URL.test(input.keys.auth)) {
     throw new Rejection("invalid_subscription", "Cet abonnement aux notifications n'est pas valide.", 422);
   }
-  await ctx.db
-    .insertInto("push_subscriptions")
-    .values({ device_id: session.device.id, endpoint: input.endpoint, p256dh: input.keys.p256dh, auth: input.keys.auth, created_at: ctx.now, updated_at: ctx.now })
-    .onConflict((oc) => oc.column("endpoint").doUpdateSet({ device_id: session.device.id, p256dh: input.keys.p256dh, auth: input.keys.auth, updated_at: ctx.now }))
-    .execute();
+  // L'adresse et les clés sont des secrets : chiffrées, avec l'empreinte de l'adresse pour la retrouver. Un appareil n'a qu'un abonnement, et une adresse
+  // n'appartient qu'à un appareil : l'ancien abonnement de l'appareil et l'ancien propriétaire de l'adresse sont remplacés.
+  const hash = endpointHash(input.endpoint);
+  await ctx.db.transaction().execute(async (trx) => {
+    await trx.deleteFrom("push_subscriptions").where((eb) => eb.or([eb("device_id", "=", session.device.id), eb("endpoint_hash", "=", hash)])).execute();
+    await trx
+      .insertInto("push_subscriptions")
+      .values({ device_id: session.device.id, endpoint_encrypted: seal(input.endpoint), endpoint_hash: hash, p256dh_encrypted: seal(input.keys.p256dh), auth_encrypted: seal(input.keys.auth), created_at: ctx.now })
+      .execute();
+  });
 }
+
+/** Empreinte de l'adresse d'un abonnement : sert à la retrouver sans la lire. */
+export const endpointHash = (endpoint: string): Buffer => createHash("sha256").update(endpoint).digest();
 
 /** Désinscrit l'appareil en cours. */
 export async function removeSubscription(ctx: Ctx, session: SessionContext): Promise<void> {
@@ -110,7 +120,7 @@ export async function sendPush(ctx: Ctx, userId: string, payload: PushPayload): 
   const subscriptions = await ctx.db
     .selectFrom("push_subscriptions as s")
     .innerJoin("devices as d", "d.id", "s.device_id")
-    .select(["s.id", "s.endpoint", "s.p256dh", "s.auth"])
+    .select(["s.id", "s.endpoint_encrypted", "s.p256dh_encrypted", "s.auth_encrypted"])
     .where("d.user_id", "=", userId)
     .where("d.revoked_at", "is", null)
     .execute();
@@ -120,8 +130,9 @@ export async function sendPush(ctx: Ctx, userId: string, payload: PushPayload): 
   for (const sub of subscriptions) {
     for (let attempt = 1; attempt <= 2; attempt += 1) {
       try {
-        await webpush.sendNotification({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } }, body, { TTL: TTL_SECONDS, urgency: "high", timeout: 10_000 });
+        await webpush.sendNotification({ endpoint: open(sub.endpoint_encrypted), keys: { p256dh: open(sub.p256dh_encrypted), auth: open(sub.auth_encrypted) } }, body, { TTL: TTL_SECONDS, urgency: "high", timeout: 10_000 });
         delivered += 1;
+        await ctx.db.updateTable("push_subscriptions").set({ last_success_at: ctx.now }).where("id", "=", sub.id).execute();
         break;
       } catch (error) {
         const status = (error as Failure).statusCode;

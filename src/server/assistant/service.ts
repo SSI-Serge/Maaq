@@ -2,9 +2,11 @@ import type { Ctx, SessionContext } from "@/server/auth/service";
 import { Rejection } from "@/server/http";
 import { env } from "@/server/env";
 import { decrypt, encrypt } from "@/server/security/crypto";
+import type { DB } from "@/server/db/schema.generated";
+import type { Kysely } from "kysely";
 import { loadCalendarEvent } from "./calendar";
 import { loadAgentDefinition, runAssistant, type AgentDefinition, type AgentLimits, type AgentSource } from "./agent";
-import { ensureParentMembers, loadPseudoMembers, requireParent } from "./family";
+import { loadPseudoMembers, requireParent } from "./family";
 import { createModel, type AssistantModel } from "./model";
 import { utcToLocal } from "./local-time";
 
@@ -76,45 +78,51 @@ export async function sendAssistantMessage(
   const model = deps.model ?? configuredModel();
   const source = input.source ?? "typed";
 
-  await ensureParentMembers(ctx.db, accountId);
-  const conversation = await ctx.db
-    .insertInto("assistant_conversations")
-    .values({ account_id: accountId, user_id: session.user.id, last_message_at: ctx.now })
-    .onConflict((oc) => oc.column("user_id").doUpdateSet({ last_message_at: ctx.now }))
-    .returning("id")
-    .executeTakeFirstOrThrow();
+  const conversation = await conversationOf(ctx.db, accountId, session.user.id, ctx.now);
 
   // Renvoi d'une demande déjà traitée : on rend la réponse donnée, sans rien refaire.
   const answered = await ctx.db
-    .selectFrom("assistant_messages")
-    .select("content_encrypted")
-    .where("conversation_id", "=", conversation.id)
-    .where("request_id", "=", input.requestId)
-    .where("role", "=", "assistant")
+    .selectFrom("assistant_requests as r")
+    .innerJoin("agent_conversation_messages as m", "m.id", "r.reply_message_id")
+    .select("m.content")
+    .where("r.conversation_id", "=", conversation.id)
+    .where("r.request_id", "=", input.requestId)
     .executeTakeFirst();
-  if (answered) {
-    return { requestId: input.requestId, reply: decrypt(answered.content_encrypted, key()), failed: false, alreadyAnswered: true, events: [], proposals: 0, durationMs: 0 };
+  if (answered?.content) {
+    return { requestId: input.requestId, reply: decrypt(answered.content, key()), failed: false, alreadyAnswered: true, events: [], proposals: 0, durationMs: 0 };
   }
 
   // Échanges récents, avant ce message : contexte d'une réponse à une question de l'assistant.
   const since = new Date(ctx.now.getTime() - HISTORY_HOURS * 3_600_000);
   const recent = (
     await ctx.db
-      .selectFrom("assistant_messages")
-      .select(["role", "source", "content_encrypted", "request_id", "created_at"])
-      .where("conversation_id", "=", conversation.id)
-      .where("created_at", ">=", since)
-      .where("request_id", "<>", input.requestId)
-      .orderBy("created_at", "desc")
-      .limit(HISTORY_MESSAGES)
+      .selectFrom("agent_conversation_messages as m")
+      .leftJoin("assistant_requests as r", "r.user_message_id", "m.id")
+      .select(["m.id", "m.sender", "m.kind", "m.content", "m.created_at", "r.request_id as own_request"])
+      .where("m.conversation_id", "=", conversation.id)
+      .where("m.created_at", ">=", since)
+      .where("m.content", "is not", null)
+      .orderBy("m.created_at", "desc")
+      .orderBy("m.id", "desc")
+      .limit(HISTORY_MESSAGES + 1)
       .execute()
-  ).reverse();
+  )
+    .filter((m) => m.own_request !== input.requestId)
+    .slice(0, HISTORY_MESSAGES)
+    .reverse();
 
-  await ctx.db
-    .insertInto("assistant_messages")
-    .values({ conversation_id: conversation.id, account_id: accountId, role: "user", source, request_id: input.requestId, content_encrypted: encrypt(text, key()), created_at: ctx.now })
-    .onConflict((oc) => oc.doNothing())
-    .execute();
+  // Message du parent : conservé chiffré (vrais prénoms), puis relié à sa demande. Une demande renvoyée avant sa réponse retrouve le même message.
+  let userMessageId = (await ctx.db.selectFrom("assistant_requests").select("user_message_id").where("conversation_id", "=", conversation.id).where("request_id", "=", input.requestId).executeTakeFirst())?.user_message_id;
+  if (userMessageId === undefined) {
+    userMessageId = (
+      await ctx.db
+        .insertInto("agent_conversation_messages")
+        .values({ conversation_id: conversation.id, sender: "profile", kind: source === "dictation" ? "voice_transcript" : "text", content: encrypt(text, key()), created_at: ctx.now })
+        .returning("id")
+        .executeTakeFirstOrThrow()
+    ).id;
+    await ctx.db.insertInto("assistant_requests").values({ conversation_id: conversation.id, request_id: input.requestId, user_message_id: userMessageId }).execute();
+  }
 
   const members = await loadPseudoMembers(ctx.db, accountId);
   const author = await ctx.db.selectFrom("family_members").select("id").where("account_id", "=", accountId).where("user_id", "=", session.user.id).executeTakeFirst();
@@ -129,9 +137,10 @@ export async function sendAssistantMessage(
     timeZone: session.device.timezone || "Europe/Paris",
     now: ctx.now,
     requestId: input.requestId,
+    sourceMessageId: Number(userMessageId),
     source,
     text,
-    history: recent.map((m) => ({ role: m.role, text: decrypt(m.content_encrypted, key()), source: m.source })),
+    history: recent.map((m) => ({ role: m.sender === "agent" ? ("assistant" as const) : ("user" as const), text: decrypt(m.content!, key()), source: m.kind === "voice_transcript" ? ("dictation" as const) : ("typed" as const) })),
     limits: deps.limits,
   });
 
@@ -147,12 +156,13 @@ export async function sendAssistantMessage(
     return { requestId: input.requestId, reply: result.reply, failed: true, alreadyAnswered: false, events, proposals: result.proposalIds.length, durationMs: result.durationMs };
   }
   const answeredAt = new Date(ctx.now.getTime() + result.durationMs);
-  await ctx.db
-    .insertInto("assistant_messages")
-    .values({ conversation_id: conversation.id, account_id: accountId, role: "assistant", source: "typed", request_id: input.requestId, content_encrypted: encrypt(result.reply, key()), created_at: answeredAt })
-    .onConflict((oc) => oc.doNothing())
-    .execute();
-  await ctx.db.updateTable("assistant_conversations").set({ last_message_at: answeredAt }).where("id", "=", conversation.id).execute();
+  const reply = await ctx.db
+    .insertInto("agent_conversation_messages")
+    .values({ conversation_id: conversation.id, sender: "agent", kind: "text", content: encrypt(result.reply, key()), created_at: answeredAt })
+    .returning("id")
+    .executeTakeFirstOrThrow();
+  await ctx.db.updateTable("assistant_requests").set({ reply_message_id: reply.id }).where("conversation_id", "=", conversation.id).where("request_id", "=", input.requestId).execute();
+  await ctx.db.updateTable("agent_conversations").set({ last_message_at: answeredAt }).where("id", "=", conversation.id).execute();
   return { requestId: input.requestId, reply: result.reply, failed: false, alreadyAnswered: false, events, proposals: result.proposalIds.length, durationMs: result.durationMs };
 }
 
@@ -176,27 +186,36 @@ export interface AssistantMessageView {
 /** Messages récents du fil de ce parent, du plus ancien au plus récent. */
 export async function listAssistantMessages(ctx: Ctx, session: SessionContext): Promise<AssistantMessageView[]> {
   const accountId = requireParent(session);
-  const conversation = await ctx.db.selectFrom("assistant_conversations").select("id").where("user_id", "=", session.user.id).executeTakeFirst();
+  const conversation = await ctx.db
+    .selectFrom("agent_conversations")
+    .select("id")
+    .where("user_id", "=", session.user.id)
+    .where("agent_id", "=", await familyAgentId(ctx.db))
+    .executeTakeFirst();
   if (!conversation) return [];
   const since = new Date(ctx.now.getTime() - ASSISTANT_HISTORY_DAYS * 86_400_000);
+  // Un message du parent et la réponse qui lui correspond partagent l'identifiant de la demande.
   const rows = await ctx.db
-    .selectFrom("assistant_messages")
-    .select(["id", "request_id", "role", "content_encrypted", "created_at"])
-    .where("conversation_id", "=", conversation.id)
-    .where("created_at", ">=", since)
-    .orderBy("created_at")
-    .orderBy("role", "desc")
+    .selectFrom("agent_conversation_messages as m")
+    .leftJoin("assistant_requests as ru", "ru.user_message_id", "m.id")
+    .leftJoin("assistant_requests as ra", "ra.reply_message_id", "m.id")
+    .select(["m.id", "m.sender", "m.content", "m.created_at", "ru.request_id as user_request", "ra.request_id as reply_request", "ra.user_message_id as origin"])
+    .where("m.conversation_id", "=", conversation.id)
+    .where("m.created_at", ">=", since)
+    .where("m.content", "is not", null)
+    .orderBy("m.created_at")
+    .orderBy("m.id")
     .execute();
   const tz = session.device.timezone || "Europe/Paris";
   const out: AssistantMessageView[] = [];
   for (const row of rows) {
     const events: AssistantMessageView["events"] = [];
-    if (row.role === "assistant") {
+    if (row.sender === "agent" && row.origin !== null) {
       const created = await ctx.db
         .selectFrom("family_events")
         .select("id")
         .where("account_id", "=", accountId)
-        .where("source_ref", "like", `${row.request_id}:%`)
+        .where("source_message_id", "=", row.origin)
         .where("status", "in", ["provisional", "confirmed", "set_aside"])
         .execute();
       for (const c of created) {
@@ -204,7 +223,26 @@ export async function listAssistantMessages(ctx: Ctx, session: SessionContext): 
         if (e) events.push({ id: e.id, title: e.title, start: utcToLocal(e.startsAt, tz), status: e.status });
       }
     }
-    out.push({ id: row.id, requestId: row.request_id, role: row.role, text: decrypt(row.content_encrypted, key()), at: row.created_at.toISOString(), events });
+    out.push({ id: String(row.id), requestId: row.user_request ?? row.reply_request ?? "", role: row.sender === "agent" ? "assistant" : "user", text: decrypt(row.content!, key()), at: row.created_at.toISOString(), events });
   }
   return out;
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------
+// Conversation
+// ---------------------------------------------------------------------------------------------------------------------------
+
+/** Ligne de l'Assistant Famille dans la table des agents (créée avec la base) : les conversations du tchat de MAAQ s'y rattachent. */
+export async function familyAgentId(db: Kysely<DB>): Promise<string> {
+  return (await db.selectFrom("agents").select("id").where("platform", "=", "anthropic").where("platform_agent_ref", "=", "assistant-famille").executeTakeFirstOrThrow()).id;
+}
+
+/** Une conversation par parent (agent_conversations : un profil, un agent). */
+async function conversationOf(db: Kysely<DB>, accountId: string, userId: string, now: Date): Promise<{ id: string }> {
+  return db
+    .insertInto("agent_conversations")
+    .values({ account_id: accountId, user_id: userId, agent_id: await familyAgentId(db), last_message_at: now })
+    .onConflict((oc) => oc.columns(["user_id", "agent_id"]).doUpdateSet({ last_message_at: now }))
+    .returning("id")
+    .executeTakeFirstOrThrow();
 }

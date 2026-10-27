@@ -293,7 +293,8 @@ async function leaveTrace(db: Executor, people: Leaving[], now: Date): Promise<v
     await db
       .insertInto("erasure_traces")
       .values({
-        former_user_id: person.id,
+        former_subject_id: person.id,
+        subject_kind: "profile",
         former_account_id: person.account_id,
         former_role: person.role,
         deleted_at: now,

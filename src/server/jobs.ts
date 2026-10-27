@@ -52,15 +52,19 @@ export async function purgeExpired(ctx: Ctx): Promise<{ logbook: number; errorRe
   const a = await ctx.db.deleteFrom("idempotency_keys").where("created_at", "<", day).executeTakeFirst();
   const b = await ctx.db.deleteFrom("chat_requests").where("created_at", "<", day).executeTakeFirst();
   const c = await ctx.db.deleteFrom("daily_request_counters").where("request_date", "<", week).executeTakeFirst();
-  // Conversations avec l'Assistant Famille : 4 jours au plus (D38, US-44). Les rendez-vous restent dans le calendrier.
-  const four = new Date(ctx.now.getTime() - 4 * 86_400_000);
-  const d = await ctx.db.deleteFrom("assistant_messages").where("created_at", "<", four).executeTakeFirst();
-  // Rendez-vous ignorés : supprimés 30 jours après être passés au statut Ignoré (US-77 RT1).
-  const month = new Date(ctx.now.getTime() - 30 * 86_400_000);
-  await ctx.db.deleteFrom("family_events").where("status", "=", "ignored").where("status_changed_at", "<", month).execute();
+  // Traitements de la base à lancer régulièrement (FONCTIONS_PAR_LOT.md) : conversations de l'Assistant Famille (4 jours, D38, US-44), rendez-vous
+  // annulés ou ignorés (30 jours, US-77 RT1) et passés (24 mois), images et mails bruts, compteurs journaliers, journal d'administration.
+  let database = 0;
+  for (const job of [
+    "purge_expired_conversation_messages", "purge_expired_family_events", "purge_expired_attachments", "purge_expired_inbound_emails", "purge_old_daily_counters",
+    "purge_admin_audit_log", "purge_expired_security_events",
+  ]) {
+    const done = await sql<{ n: string | null }>`select ${sql.ref(job)}() as n`.execute(ctx.db);
+    database += Number(done.rows[0]?.n ?? 0);
+  }
   return {
     logbook: Number(logbook.rows[0]?.n ?? 0),
     errorReports: Number(reports.rows[0]?.n ?? 0),
-    technical: Number(a.numDeletedRows) + Number(b.numDeletedRows) + Number(c.numDeletedRows) + Number(d.numDeletedRows),
+    technical: Number(a.numDeletedRows) + Number(b.numDeletedRows) + Number(c.numDeletedRows) + database,
   };
 }

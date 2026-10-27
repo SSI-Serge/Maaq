@@ -42,10 +42,12 @@ export async function listAgents(ctx: Ctx, search = ""): Promise<AgentRow[]> {
     .selectFrom("agents as a")
     .innerJoin("agent_categories as c", "c.id", "a.category_id")
     .leftJoin("users as b", "b.id", "a.blocked_by_user_id")
+    .leftJoin("agent_digitorn_projects as p", "p.agent_id", "a.id")
+    .where("a.platform", "=", "digitorn")
     .select([
       "a.id",
       "a.name",
-      "a.digitorn_agent_ref",
+      "a.platform_agent_ref",
       "c.code",
       "c.label",
       "a.short_description",
@@ -53,8 +55,8 @@ export async function listAgents(ctx: Ctx, search = ""): Promise<AgentRow[]> {
       "a.maintenance_message",
       "a.blocked_at",
       "a.published_at",
-      "a.digitorn_app_url",
-      sql<boolean>`a.digitorn_api_key_encrypted is not null`.as("has_project"),
+      "p.app_url",
+      sql<boolean>`p.api_key_encrypted is not null`.as("has_project"),
       "b.first_name as blocker_first",
       "b.last_name as blocker_last",
     ])
@@ -71,7 +73,7 @@ export async function listAgents(ctx: Ctx, search = ""): Promise<AgentRow[]> {
   return rows.map((r) => ({
     id: r.id,
     name: r.name,
-    digitornRef: r.digitorn_agent_ref,
+    digitornRef: r.platform_agent_ref,
     category: r.code as CategoryCode,
     categoryLabel: r.label,
     shortDescription: r.short_description,
@@ -81,7 +83,7 @@ export async function listAgents(ctx: Ctx, search = ""): Promise<AgentRow[]> {
     blockedBy: r.blocked_at ? adminName(r.blocker_first, r.blocker_last) : null,
     publishedAt: new Date(r.published_at).toISOString(),
     digitornProject: r.has_project,
-    chat: r.has_project ? "identified" : r.digitorn_app_url ? "visitor" : "simulated",
+    chat: r.has_project ? "identified" : r.app_url ? "visitor" : "simulated",
   }));
 }
 
@@ -113,7 +115,7 @@ export async function lookupAgent(ctx: Ctx, input: { name: string; apiKey?: stri
     .catch((error) => {
       throw asRejection(error);
     });
-  const published = await ctx.db.selectFrom("agents").select("id").where("digitorn_agent_ref", "=", agent.ref).executeTakeFirst();
+  const published = await ctx.db.selectFrom("agents").select("id").where("platform", "=", "digitorn").where("platform_agent_ref", "=", agent.ref).executeTakeFirst();
   return { agent, alreadyPublished: published !== undefined };
 }
 
@@ -156,7 +158,7 @@ export async function publishAgent(ctx: Ctx, adminId: string, input: PublishInpu
         throw asRejection(error);
       });
   }
-  const taken = await ctx.db.selectFrom("agents").select("id").where("digitorn_agent_ref", "=", input.digitornRef).executeTakeFirst();
+  const taken = await ctx.db.selectFrom("agents").select("id").where("platform", "=", "digitorn").where("platform_agent_ref", "=", input.digitornRef).executeTakeFirst();
   if (!card || taken) {
     throw new Rejection("agent_unavailable", "Cet agent n'est pas disponible chez Digitorn ou est déjà publié.", 409);
   }
@@ -175,9 +177,8 @@ export async function publishAgent(ctx: Ctx, adminId: string, input: PublishInpu
     const agent = await trx
       .insertInto("agents")
       .values({
-        digitorn_agent_ref: input.digitornRef,
-        digitorn_api_key_encrypted: apiKey ? encrypt(apiKey, Buffer.from(env().ENCRYPTION_KEY, "base64")) : null,
-        digitorn_app_url: appUrl,
+        platform: "digitorn",
+        platform_agent_ref: input.digitornRef,
         name: input.name.trim(),
         category_id: category.id,
         short_description: input.shortDescription.trim(),
@@ -188,6 +189,17 @@ export async function publishAgent(ctx: Ctx, adminId: string, input: PublishInpu
       })
       .returning("id")
       .executeTakeFirstOrThrow();
+
+    if (apiKey || appUrl) {
+      await trx
+        .insertInto("agent_digitorn_projects")
+        .values({
+          agent_id: agent.id,
+          api_key_encrypted: apiKey ? encrypt(apiKey, Buffer.from(env().ENCRYPTION_KEY, "base64")) : null,
+          app_url: appUrl,
+        })
+        .execute();
+    }
 
     const prompts = [
       ...input.examples.map((content, i) => ({ agent_id: agent.id, kind: "example" as const, content, sort_order: i + 1 })),

@@ -54,6 +54,8 @@ export interface AgentRunInput {
   timeZone: string;
   now: Date;
   requestId: string;
+  /** Message du parent qui déclenche la demande : les rendez-vous créés s'y rattachent. */
+  sourceMessageId?: number | null;
   source: AgentSource;
   text: string;
   /** Échanges récents du même fil (le plus ancien d'abord), pour qu'une réponse à une question de l'assistant garde son contexte. */
@@ -133,7 +135,7 @@ export async function runAssistant(input: AgentRunInput): Promise<AgentRunResult
   const started = Date.now();
   const toolContext: ToolContext = {
     db: input.db, accountId: input.accountId, userId: input.userId, authorMemberId: input.authorMemberId, timeZone: input.timeZone, now: input.now, requestId: input.requestId,
-    source: input.source, pseudo, created: { count: 0, ids: [] }, proposals: [],
+    source: input.source, sourceMessageId: input.sourceMessageId, pseudo, created: { ids: [] }, proposals: [],
   };
   const messages: ModelMessage[] = buildMessages(input, pseudo);
   const result: AgentRunResult = {

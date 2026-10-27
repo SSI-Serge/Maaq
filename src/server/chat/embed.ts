@@ -77,13 +77,13 @@ export async function openEmbeddedChat(ctx: Ctx, session: SessionContext, agentI
   if (viaProject) {
     const userRef = await ensureDigitornRef(ctx.db, session.user.id);
     opened = await digitorn()
-      .openChat({ userRef, agentRef: agent.digitorn_agent_ref, name: session.user.firstName, claims: buildClaims(session, members) })
+      .openChat({ userRef, agentRef: agent.platform_agent_ref, name: session.user.firstName, claims: buildClaims(session, members) })
       .catch((error) => {
         throw asRejection(error);
       });
   }
   const identified = opened !== null;
-  opened ??= agent.digitorn_app_url ? { url: agent.digitorn_app_url, expiresAt: null } : null;
+  opened ??= agent.app_url ? { url: agent.app_url, expiresAt: null } : null;
   if (!opened) throw new Rejection("not_embedded", "Cet agent n'a pas de tchat Digitorn intégré.", 409);
   if (!/^https:\/\/[^\s]+$/.test(opened.url)) throw new Rejection("invalid_launch_url", "Digitorn a renvoyé un lien de tchat inattendu.", 502);
 

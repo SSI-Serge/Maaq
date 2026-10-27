@@ -136,6 +136,35 @@ Un bouton micro à côté du champ de « Nouvelle demande » (`src/client/speech
 **Limite à connaître :** sur Chrome Android, le navigateur envoie l'audio aux serveurs de Google pour le transcrire : hors du cadre prévu pour le pilote (transcription européenne, audio en mémoire, jamais stocké). À ne pas utiliser avec de vraies données. La voie cible (enregistrement WAV dans le téléphone, transcription Azure Speech par le serveur) remplacera la transcription du navigateur sans changer l'écran ni le circuit « dictée » de l'assistant ; `AZURE_SPEECH_KEY` et `AZURE_SPEECH_REGION` sont déjà dans Secret Manager depuis l'essai voix.
 Tests : `tests/speech.test.ts` (assemblage du texte), `tests/assistant.test.ts` (origine de la demande). Pas de test automatique de la reconnaissance : à essayer sur un téléphone.
 
+## Lot 0 du MVP2 : la base suit le schéma de référence (27/10/2026)
+
+La base de MAAQ n'est plus écrite à la main : `db/migrations/0001_socle_lot0.sql` est la copie **telle quelle** du lot 0 de la session « base de données »
+(`Base de données/Maaq - BD/migrations/lot_0_2_schema.sql`, empreinte `8424ea2f7d7440c5`, 59 tables). Les lots suivants (2 à 8) se copient de la même façon,
+dans des fichiers numérotés à la suite, dans l'ordre de `ordre_d_application.txt` (un fichier `_1_valeurs_enumerees` toujours avant son `_2_schema`).
+Les migrations « reportées » (US-108, US-111) ne sont pas appliquées au MVP2. `0002_application.sql` garde ce que le schéma de référence ne connaît pas :
+`idempotency_keys`, `chat_requests`, `accounts.grace_reminder_sent_at`, `agent_digitorn_projects` (clé et adresse du projet Digitorn de chaque agent), le texte de
+consentement du challenge de contrat, la ligne de l'agent « Assistant Famille » (plateforme `anthropic`) et `assistant_requests` (renvoi d'une demande).
+
+Ce qui a changé dans le code (la base porte les règles, le code les appelle) :
+- **Rendez-vous** : statut changé par `change_family_event_status` (transition, historique, auteur, date de confirmation) ; conflits par `find_family_event_conflicts` ;
+  empreinte (créneau, type, membres) calculée par le code, la base refuse deux rendez-vous actifs identiques ; titre, lieu et note chiffrés dans `title`, `location`, `note`.
+  Un rendez-vous **médical** n'a pas de titre en base : « RDV médical — prénom » est composé à la lecture ; un titre saisi par un parent reste conservé.
+  Le code garde ses noms (`canceled`, `ignored`, `work`, `admin`, `typed`…) et les traduit à la frontière (`calendar.ts` : `STATUS_CODE`, `TYPE_CODE`, `SOURCE_CODE`).
+- **Membres** : fiche créée avec le profil (déclencheurs), alias par rôle et couleur attribués par la base, naissance en **mois et année** (D54), effacement par
+  `anonymize_family_member`. Les invités secondaires ont une fiche (rôle « autre ») que l'assistant ne connaît pas encore. La palette passe à 16 couleurs.
+- **Conversation** : `agent_conversations` / `agent_conversation_messages` (4 jours, chiffrés) ; `assistant_requests` relie la demande à sa réponse ; les rendez-vous créés
+  se rattachent au message du parent (`source_message_id`).
+- **Rappels** : `scheduled_notifications` (clé : rendez-vous, type, destinataire, échéance ; un rendez-vous déplacé a donc de nouveaux rappels). Les rappels valent à partir de la
+  dernière modification du rendez-vous. Une réservation sans résultat est reprise au bout de 10 minutes (horloge de la base). Un rendez-vous déplacé ou annulé passe ses envois
+  en cours à « annulé » dans la même transaction (décision du PO du 27/10). Fuseau : `accounts.family_timezone`.
+- **Notifications web** : adresse et clés chiffrées, empreinte de l'adresse pour la retrouver.
+- **Traitements périodiques** : les purges de la base (messages 4 jours, rendez-vous annulés/ignorés 30 jours et passés 24 mois, images, mails bruts, compteurs, journaux).
+- Le catalogue et l'administration des agents ne montrent que les agents de plateforme Digitorn (l'Assistant Famille y entrera avec US-106).
+
+Les tests de la famille datent leurs rendez-vous de 2054 (décalage de 28 ans : mêmes jours de la semaine et mêmes changements d'heure) parce que les fonctions de la base
+lisent l'horloge réelle : un rendez-vous « à venir » ne doit pas devenir passé avec le temps. `scripts/db-backup.ts` sauvegarde une base avant toute migration.
+Base de développement locale : `npm run db:reset` après ce lot (l'ancien schéma n'est pas converti).
+
 ## Réglages
 Voir `.env.example`. Tout est facultatif tant que `ASSISTANT_MODE=off`.
 ```

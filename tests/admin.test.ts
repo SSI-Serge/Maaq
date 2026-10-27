@@ -119,10 +119,10 @@ describe("US-45 — mettre un agent à disposition", () => {
     );
 
     const id = await publishAgent(now(), adminId, agentInput({ digitornRef: "contrats_challenge", name: "Contrats_Challenge", digitornApiKey: secret, digitornAppUrl: "https://agent.exemple.fr" }));
-    const row = await db.selectFrom("agents").select(["digitorn_api_key_encrypted", "digitorn_app_url"]).where("id", "=", id).executeTakeFirstOrThrow();
-    expect(row.digitorn_app_url).toBe("https://agent.exemple.fr");
-    expect(Buffer.from(row.digitorn_api_key_encrypted!).includes(Buffer.from(secret))).toBe(false);
-    expect(decrypt(Buffer.from(row.digitorn_api_key_encrypted!), Buffer.from(process.env.ENCRYPTION_KEY!, "base64"))).toBe(secret);
+    const row = await db.selectFrom("agent_digitorn_projects").select(["api_key_encrypted", "app_url"]).where("agent_id", "=", id).executeTakeFirstOrThrow();
+    expect(row.app_url).toBe("https://agent.exemple.fr");
+    expect(Buffer.from(row.api_key_encrypted!).includes(Buffer.from(secret))).toBe(false);
+    expect(decrypt(Buffer.from(row.api_key_encrypted!), Buffer.from(process.env.ENCRYPTION_KEY!, "base64"))).toBe(secret);
     expect((await listAgents(now(), "Contrats_Challenge")).find((a) => a.id === id)?.digitornProject).toBe(true);
     // La clé ne ressort nulle part dans la liste des agents.
     expect(JSON.stringify(await listAgents(now(), "Contrats_Challenge"))).not.toContain(secret);
@@ -132,8 +132,8 @@ describe("US-45 — mettre un agent à disposition", () => {
     const url = "https://bcac-qx42y7yq112zy-d600d2.digitorn.app";
     const ref = "app:bcac-qx42y7yq112zy-d600d2.digitorn.app";
     const id = await publishAgent(now(), adminId, agentInput({ digitornRef: ref, name: "Admin_Visiteur", digitornAppUrl: url }));
-    const row = await db.selectFrom("agents").select(["digitorn_agent_ref", "digitorn_api_key_encrypted", "digitorn_app_url"]).where("id", "=", id).executeTakeFirstOrThrow();
-    expect(row).toMatchObject({ digitorn_agent_ref: ref, digitorn_api_key_encrypted: null, digitorn_app_url: url });
+    const row = await db.selectFrom("agents as a").innerJoin("agent_digitorn_projects as p", "p.agent_id", "a.id").select(["a.platform_agent_ref", "p.api_key_encrypted", "p.app_url"]).where("a.id", "=", id).executeTakeFirstOrThrow();
+    expect(row).toMatchObject({ platform_agent_ref: ref, api_key_encrypted: null, app_url: url });
     expect((await listAgents(now(), "Admin_Visiteur")).find((a) => a.id === id)).toMatchObject({ chat: "visitor", digitornProject: false });
 
     // Déjà publié, adresse absente ou qui ne correspond pas, clé jointe : refusés.

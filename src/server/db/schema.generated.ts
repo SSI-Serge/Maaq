@@ -9,11 +9,11 @@ export type AccountStatus = "activation_pending" | "active" | "grace_period";
 
 export type ActivationLinkKind = "account_activation" | "guest_invitation";
 
+export type AgentPlatform = "anthropic" | "digitorn" | "vertex";
+
 export type AgentStatus = "available" | "blocked";
 
 export type AnonymizationStatus = "done" | "none" | "pending";
-
-export type AssistantMessageRole = "assistant" | "user";
 
 export type AuditAction = "account_created" | "account_updated" | "activation_link_resent" | "agent_blocked" | "agent_published" | "agent_reactivated" | "contract_archived" | "contract_created" | "contract_field_changed" | "contract_updated" | "device_revoked_by_admin";
 
@@ -23,7 +23,7 @@ export type ClassificationStatus = "classified" | "failed" | "pending";
 
 export type CodeChannel = "email" | "sms";
 
-export type CodePurpose = "access_recovery" | "device_verification" | "password_reset" | "validation_mailbox";
+export type CodePurpose = "access_recovery" | "device_verification" | "forwarding_sender" | "password_reset" | "validation_mailbox";
 
 export type ConnectionStatus = "connected" | "partial" | "pending" | "reconnect_required" | "refused";
 
@@ -41,21 +41,19 @@ export type DeviceType = "android" | "desktop" | "iphone" | "other";
 
 export type ErasureStatus = "done" | "failed" | "pending";
 
+export type ErasureSubject = "family_member" | "profile";
+
+export type EventAction = "cancelled" | "completed_by_email" | "confirmed" | "created" | "dismissed" | "modified" | "set_aside";
+
+export type EventChangeReason = "cancellation_mail" | "completed_by_email" | "event_started" | "no_response" | "report_mail" | "user_request";
+
+export type EventSource = "android_share" | "calendar_sync" | "chat_text" | "forwarded_email" | "photo" | "voice" | "whatsapp";
+
+export type EventStatus = "cancelled" | "confirmed" | "dismissed" | "provisional" | "set_aside";
+
 export type ExecutionStatus = "failed" | "not_started" | "running" | "succeeded";
 
 export type ExportStatus = "expired" | "failed" | "preparing" | "ready" | "requested";
-
-export type FamilyEventSource = "capture" | "dictation" | "mail" | "typed";
-
-export type FamilyEventStatus = "canceled" | "confirmed" | "ignored" | "provisional" | "set_aside";
-
-export type FamilyEventType = "admin" | "family" | "medical" | "personal" | "school" | "work";
-
-export type FamilyMemberRole = "child" | "parent";
-
-export type FamilyProposalKind = "cancellation" | "modification";
-
-export type FamilyProposalStatus = "applied" | "pending" | "refused";
 
 export type Generated<T> = T extends ColumnType<infer S, infer I, infer U>
   ? ColumnType<S, I | undefined, U>
@@ -64,6 +62,8 @@ export type Generated<T> = T extends ColumnType<infer S, infer I, infer U>
 export type GraceOrigin = "billing_unsubscribe" | "in_app_request";
 
 export type GuestRank = "core" | "secondary";
+
+export type InboundStatus = "failed" | "irrelevant" | "known_event" | "no_date_found" | "no_matching_event" | "processed" | "received" | "rejected_unauthorized" | "verification_mail";
 
 export type InfoDataType = "email" | "past_date" | "phone" | "postal_code" | "text";
 
@@ -83,13 +83,31 @@ export type JsonPrimitive = boolean | number | string | null;
 
 export type JsonValue = JsonArray | JsonObject | JsonPrimitive;
 
-export type LegalDocumentType = "contract_challenge_consent" | "privacy_policy" | "terms_of_use";
+export type LegalDocumentType = "contract_challenge_consent" | "forwarded_mail_consent" | "privacy_policy" | "terms_of_use";
 
 export type LogbookEntryType = "action_done" | "action_refused" | "action_validated" | "request";
+
+export type MailClassification = "appointment" | "cancellation" | "deadline" | "irrelevant" | "report";
+
+export type MemberRole = "child" | "other" | "parent";
+
+export type MessageDeliveryState = "failed" | "sending" | "sent" | "waiting_for_connection";
+
+export type MessageKind = "event_proposal" | "image" | "text" | "voice_transcript";
+
+export type MessageSender = "agent" | "profile";
+
+export type NotificationKind = "follow_up_24h" | "follow_up_48h" | "reminder_d1" | "reminder_d7" | "reminder_day_of";
+
+export type NotificationStatus = "abandoned" | "cancelled" | "not_applicable" | "scheduled" | "sent";
 
 export type Numeric = ColumnType<string, number | string, number | string>;
 
 export type PromptKind = "example" | "first_suggestion";
+
+export type ProposalKind = "cancellation" | "modification" | "reschedule";
+
+export type ProposalStatus = "accepted" | "declined" | "expired" | "pending";
 
 export type ReportCategory = "incorrect_response" | "other" | "wrong_action";
 
@@ -148,6 +166,10 @@ export interface Accounts {
    * Nombre maximum de demandes aux agents par jour et par profil du compte (50 par défaut), fixé selon le plan et réglable par l'administrateur ; voir register_agent_request()
    */
   daily_request_limit: Generated<number>;
+  /**
+   * Fuseau IANA de la famille (appareil de l'utilisateur principal à sa dernière connexion), utilisé pour les heures des RDV, rappels et relances
+   */
+  family_timezone: Generated<string>;
   /**
    * in_app_request = bouton Désabonnement (annulable immédiatement) ; billing_unsubscribe = outil de facturation (reprise = nouvel abonnement hors app) — US-59 RF2/RF3
    */
@@ -255,6 +277,41 @@ export interface AgentConnections {
   user_id: string;
 }
 
+export interface AgentConversationMessages {
+  /**
+   * Contenu chiffré avec les vrais prénoms (texte, ou transcription d'une dictée : l'enregistrement audio n'est jamais conservé, US-71 RT2)
+   */
+  content: Buffer | null;
+  conversation_id: string;
+  created_at: Generated<Timestamp>;
+  /**
+   * État d'envoi du message : sending, sent, failed, waiting_for_connection (US-38 RF2, RF14)
+   */
+  delivery_state: Generated<MessageDeliveryState>;
+  expires_at: Generated<Timestamp>;
+  family_event_id: string | null;
+  id: Generated<Int8>;
+  kind: Generated<MessageKind>;
+  sender: MessageSender;
+}
+
+export interface AgentConversations {
+  account_id: string;
+  agent_id: Int8;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  last_message_at: Timestamp | null;
+  updated_at: Generated<Timestamp>;
+  user_id: string;
+}
+
+export interface AgentDigitornProjects {
+  agent_id: Int8;
+  api_key_encrypted: Buffer | null;
+  app_url: string | null;
+  updated_at: Generated<Timestamp>;
+}
+
 export interface AgentInfoFields {
   agent_id: Int8;
   created_at: Generated<Timestamp>;
@@ -292,18 +349,6 @@ export interface Agents {
    */
   cc_addresses_max_count: Generated<number>;
   created_at: Generated<Timestamp>;
-  /**
-   * Identifiant de l'agent chez Digitorn, choisi parmi ceux hébergés et non encore publiés (US-45 RF2)
-   */
-  digitorn_agent_ref: string;
-  /**
-   * Clé secrète (sk_…) du projet Digitorn de cet agent, chiffrée avec la clé de l'application ; jamais affichée ni journalisée. Null = agent sans projet Digitorn réel (simulateur)
-   */
-  digitorn_api_key_encrypted: Buffer | null;
-  /**
-   * Domaine personnalisé de l'application Digitorn publiée, facultatif : transmis au lien de lancement du tchat embarqué. Null = adresse publiée par défaut
-   */
-  digitorn_app_url: string | null;
   full_description: string;
   id: Generated<Int8>;
   /**
@@ -311,6 +356,14 @@ export interface Agents {
    */
   maintenance_message: string | null;
   name: string;
+  /**
+   * digitorn = tchat de Digitorn intégré à MAAQ ; anthropic = API Anthropic directe, vertex = Claude sur Vertex AI en UE : tchat de MAAQ, conversations conservées par MAAQ (US-106 RF5, D29, D54)
+   */
+  platform: AgentPlatform;
+  /**
+   * Identifiant de l'agent chez sa plateforme, choisi parmi ceux hébergés et non encore publiés (US-45 RF2, US-106 RF2)
+   */
+  platform_agent_ref: string;
   published_at: Generated<Timestamp>;
   published_by_user_id: string | null;
   short_description: string;
@@ -339,23 +392,12 @@ export interface AgentValidatedActions {
   sort_order: Generated<number>;
 }
 
-export interface AssistantConversations {
-  account_id: string;
-  created_at: Generated<Timestamp>;
-  id: Generated<string>;
-  last_message_at: Generated<Timestamp>;
-  user_id: string;
-}
-
-export interface AssistantMessages {
-  account_id: string;
-  content_encrypted: Buffer;
+export interface AssistantRequests {
   conversation_id: string;
   created_at: Generated<Timestamp>;
-  id: Generated<string>;
+  reply_message_id: Int8 | null;
   request_id: string;
-  role: AssistantMessageRole;
-  source: Generated<FamilyEventSource>;
+  user_message_id: Int8;
 }
 
 export interface CcAddresses {
@@ -490,6 +532,21 @@ export interface ContractFieldValues {
   value_text: string | null;
 }
 
+export interface ConversationAttachments {
+  created_at: Generated<Timestamp>;
+  deleted_at: Timestamp | null;
+  expires_at: Timestamp;
+  id: Generated<Int8>;
+  message_id: Int8;
+  mime_type: string;
+  scan_status: Generated<ScanStatus>;
+  size_bytes: Int8;
+  /**
+   * Chemin de l'objet dans le stockage chiffré ; NULL après suppression. Les suppressions passent par storage_deletion_queue
+   */
+  storage_key: string | null;
+}
+
 export interface DailyRequestCounters {
   /**
    * Nombre de demandes déjà acceptées ce jour-là ; borné par accounts.daily_request_limit via register_agent_request()
@@ -558,11 +615,24 @@ export interface ErasureTraces {
   digitorn_status: Generated<ErasureStatus>;
   digitorn_user_ref: string | null;
   former_account_id: string | null;
-  former_role: UserRole;
-  former_user_id: string;
+  former_role: UserRole | null;
+  former_subject_id: string;
   id: Generated<Int8>;
   last_attempt_at: Timestamp | null;
   last_error: string | null;
+  subject_kind: Generated<ErasureSubject>;
+}
+
+export interface ErasureTraceTargets {
+  attempts: Generated<number>;
+  completed_at: Timestamp | null;
+  erasure_trace_id: Int8;
+  external_ref: string | null;
+  id: Generated<Int8>;
+  last_attempt_at: Timestamp | null;
+  last_error: string | null;
+  platform: AgentPlatform;
+  status: Generated<ErasureStatus>;
 }
 
 export interface ErrorReports {
@@ -581,140 +651,166 @@ export interface ErrorReports {
   user_comment: string | null;
 }
 
-export interface FamilyEventHistory {
-  account_id: string;
-  action: string;
-  by_user_id: string | null;
-  created_at: Generated<Timestamp>;
-  event_id: string;
-  from_status: FamilyEventStatus | null;
-  id: Generated<string>;
-  reason: string | null;
-  to_status: FamilyEventStatus;
+export interface EventTypes {
+  code: string;
+  id: Generated<number>;
+  label: string;
+  sort_order: Generated<number>;
 }
 
-export interface FamilyEventMembers {
-  event_id: string;
-  member_id: string;
-}
-
-export interface FamilyEventProposals {
+export interface FamilyEventChangeProposals {
   account_id: string;
-  changes: Json | null;
   created_at: Generated<Timestamp>;
   decided_at: Timestamp | null;
   decided_by_user_id: string | null;
   event_id: string;
   id: Generated<string>;
-  kind: FamilyProposalKind;
-  reason: string | null;
-  status: Generated<FamilyProposalStatus>;
+  kind: ProposalKind;
+  new_ends_at: Timestamp | null;
+  new_starts_at: Timestamp | null;
+  proposed_changes: Buffer | null;
+  requested_by_user_id: string | null;
+  source_inbound_email_id: string | null;
+  status: Generated<ProposalStatus>;
+}
+
+export interface FamilyEventHistory {
+  action: EventAction;
+  event_id: string;
+  from_status: EventStatus | null;
+  id: Generated<Int8>;
+  occurred_at: Generated<Timestamp>;
+  reason: EventChangeReason | null;
+  to_status: EventStatus | null;
+  user_id: string | null;
+}
+
+export interface FamilyEventMembers {
+  account_id: string;
+  event_id: string;
+  member_id: string;
 }
 
 export interface FamilyEvents {
   account_id: string;
   all_day: Generated<boolean>;
+  confirmed_at: Timestamp | null;
   /**
-   * Concerne toute la famille (D27) : en conflit avec tout rendez-vous qui le chevauche
+   * Profil qui a confirmé le RDV ; vide si la confirmation est automatique (auto_confirmed) ou si le profil a été supprimé
    */
-  all_family: Generated<boolean>;
+  confirmed_by_user_id: string | null;
   created_at: Generated<Timestamp>;
-  created_by_user_id: string | null;
+  created_via_agent_id: Int8 | null;
+  end_is_default: Generated<boolean>;
   ends_at: Timestamp;
-  event_type: FamilyEventType;
+  event_type_id: number;
+  /**
+   * Empreinte du RDV (créneau, type, membres) calculée par l'application ; unique parmi les RDV actifs d'un foyer. Pour une séance de série, l'application y inclut series_id : une séance identique à un RDV déjà saisi devient un conflit signalé, pas une erreur
+   */
+  fingerprint: Buffer;
   id: Generated<string>;
-  /**
-   * Note chiffrée. Jamais transmise à l'assistant (D31).
-   */
-  notes_encrypted: Buffer | null;
-  /**
-   * Lieu chiffré. Jamais transmis à l'assistant (D31).
-   */
-  place_encrypted: Buffer | null;
-  recurrence: string | null;
-  /**
-   * Les rappels dont l'échéance précède cet instant sont « Non applicables » ; vide : date du dernier changement de statut [US-81 RF5, RF9]
-   */
-  reminders_from: Timestamp | null;
-  source: FamilyEventSource;
-  /**
-   * Identifiant de la demande (et rang dans la demande) qui a créé le rendez-vous : rend la création idempotente
-   */
-  source_ref: string | null;
-  /**
-   * Début en UTC ; l'assistant raisonne en heure locale du foyer (fuseau de l'appareil de l'utilisateur principal, D35)
-   */
+  location: Buffer | null;
+  note: Buffer | null;
+  requested_by_user_id: string | null;
+  source: EventSource;
+  source_at: Timestamp | null;
+  source_group_id: string | null;
+  source_inbound_email_id: string | null;
+  source_message_id: Int8 | null;
   starts_at: Timestamp;
-  status: Generated<FamilyEventStatus>;
+  /**
+   * provisional = proposé par l'agent (gris) ; set_aside = écarté (reste visible et confirmable jusqu'à la relance suivante) ; confirmed ; cancelled ; dismissed (retiré du calendrier). Transitions : provisional → confirmed/set_aside/dismissed ; set_aside → confirmed/dismissed ; confirmed → cancelled
+   */
+  status: Generated<EventStatus>;
   status_changed_at: Generated<Timestamp>;
   /**
-   * Auteur du dernier changement de statut ; vide pour un changement fait par le système
+   * Titre chiffré. NULL pour un RDV médical : le titre générique « RDV médical — [prénom] » est calculé, jamais stocké
    */
-  status_changed_by_user_id: string | null;
-  /**
-   * Titre chiffré (AES-256-GCM, clé de l'application) : peut contenir un prénom ou une donnée de santé. [US-75 RT5]
-   */
-  title_encrypted: Buffer;
+  title: Buffer | null;
   updated_at: Generated<Timestamp>;
   /**
-   * Numéro de version : incrémenté à chaque modification ou changement de statut ; une modification fondée sur une version dépassée est refusée [US-76 RT1]
+   * Incrémentée à chaque modification ; l'application ne met à jour que si la version lue est encore la bonne (US-76 RT1)
    */
   version: Generated<number>;
-}
-
-/**
- * Rappels (d7, d1, d0) et relances (nudge24, nudge48) envoyés pour un rendez-vous. Ne contient aucun titre ni lieu. [US-81 RT2, US-83 RT1]
- */
-export interface FamilyNotifications {
-  account_id: string;
-  channel: Generated<string>;
-  claimed_at: Generated<Timestamp>;
-  event_id: string;
-  id: Generated<string>;
-  kind: string;
-  recipient_user_id: string;
-  sent_at: Timestamp | null;
-  status: Generated<string>;
-}
-
-/**
- * Rappels J-7, J-1 et Jour J actifs, par famille et par type de rendez-vous. [US-82]
- */
-export interface FamilyReminderSettings {
-  account_id: string;
-  d0: Generated<boolean>;
-  d1: Generated<boolean>;
-  d7: Generated<boolean>;
-  event_type: FamilyEventType;
-  updated_at: Generated<Timestamp>;
-  updated_by_user_id: string | null;
+  whole_family: Generated<boolean>;
 }
 
 export interface FamilyMembers {
   account_id: string;
   /**
-   * Numéro de l'alias « Parent N » / « Enfant N » donné au modèle à la place du prénom ; attribué à la création du membre, propre au compte et au rôle
+   * Numéro d'alias par compte et par rôle, jamais réutilisé, même après archivage ou anonymisation
    */
-  alias_index: number;
+  alias_number: number;
   /**
-   * Date de retrait : le membre n'est plus proposé ni reconnu par l'assistant, mais ses rendez-vous gardent son prénom. Définitif (pas de restauration). [US-93 RF6, RF8]
+   * Date d'effacement des données du membre (prénom et naissance vidés) ; il reste affiché « Ancien membre » dans les RDV partagés (US-93 RF13)
    */
+  anonymized_at: Timestamp | null;
   archived_at: Timestamp | null;
-  birth_date: Timestamp | null;
   /**
-   * Couleur du membre dans le calendrier (AF-5), au format #rrggbb
+   * Mois de naissance (1 à 12), facultatif, renseigné avec l'année ; le jour n'existe pas en base (D54)
    */
-  color: string | null;
+  birth_month: number | null;
+  /**
+   * Année de naissance, facultative, avec le mois (jamais le jour, D54). Les âges sont transmis au modèle par tranche, calculés sans stockage supplémentaire (D37, family_member_age_months). Donnée d'un mineur : incluse dans l'export (US-92 RT4)
+   */
+  birth_year: number | null;
+  color_index: number;
   created_at: Generated<Timestamp>;
-  /**
-   * Date d'effacement définitif : prénom et date de naissance effacés, rendez-vous du seul membre supprimés, rendez-vous partagés conservés sous « Ancien membre ». [US-93 RF13, D34]
-   */
-  erased_at: Timestamp | null;
-  first_name: string;
+  created_by_user_id: string | null;
+  first_name: string | null;
   id: Generated<string>;
-  role: FamilyMemberRole;
+  /**
+   * parent (utilisateur principal, invité 1) ; child ; other (invité secondaire par défaut). Un changement de rôle attribue un nouvel alias
+   */
+  role: Generated<MemberRole>;
   updated_at: Generated<Timestamp>;
+  /**
+   * Profil lié, NULL pour un membre sans compte. Coupé à la suppression du profil, ce qui déclenche l'anonymisation du membre
+   */
   user_id: string | null;
+}
+
+export interface FamilyReminderSettings {
+  account_id: string;
+  event_type_id: number;
+  remind_d1: Generated<boolean>;
+  remind_d7: Generated<boolean>;
+  remind_day_of: Generated<boolean>;
+  updated_at: Generated<Timestamp>;
+  updated_by_user_id: string | null;
+}
+
+export interface ForwardingAuthorizedSenders {
+  account_id: string;
+  added_by_user_id: string | null;
+  created_at: Generated<Timestamp>;
+  email: string;
+  id: Generated<Int8>;
+  user_id: string;
+  verified_at: Timestamp | null;
+}
+
+export interface ForwardingConsentEvents {
+  account_id: string;
+  action_type: ConsentAction;
+  actor_email_hash: Buffer;
+  actor_user_id: string | null;
+  id: Generated<Int8>;
+  legal_version_id: Int8;
+  occurred_at: Generated<Timestamp>;
+  retain_until: Timestamp | null;
+}
+
+export interface ForwardingMailboxes {
+  account_id: string;
+  activated_at: Timestamp | null;
+  activated_by_user_id: string | null;
+  address: string;
+  created_at: Generated<Timestamp>;
+  id: Generated<Int8>;
+  last_mail_received_at: Timestamp | null;
+  revoked_at: Timestamp | null;
+  revoked_by_user_id: string | null;
 }
 
 export interface IdempotencyKeys {
@@ -724,6 +820,41 @@ export interface IdempotencyKeys {
   response_body: Json | null;
   response_status: number;
   user_id: string;
+}
+
+export interface InboundEmailDailyCounters {
+  account_id: string;
+  email_date: Timestamp;
+  mail_count: Generated<number>;
+  over_limit_alerted_at: Timestamp | null;
+}
+
+export interface InboundEmails {
+  account_id: string;
+  attempts: Generated<number>;
+  classification: MailClassification | null;
+  created_at: Generated<Timestamp>;
+  envelope_sender: string | null;
+  events_created: Generated<number>;
+  forwarded_by_user_id: string | null;
+  id: Generated<string>;
+  last_error: string | null;
+  mailbox_id: Int8;
+  message_id_hash: Buffer;
+  parents_alerted_at: Timestamp | null;
+  raw_deleted_at: Timestamp | null;
+  raw_expires_at: Timestamp | null;
+  /**
+   * Objet chiffré contenant le mail et ses pièces jointes ; NULL après suppression (raw_deleted_at). Supprimé via storage_deletion_queue
+   */
+  raw_storage_key: string | null;
+  received_at: Generated<Timestamp>;
+  scan_status: Generated<ScanStatus>;
+  /**
+   * received ; rejected_unauthorized (jamais de contenu conservé, suivi 30 jours) ; irrelevant ; processed ; known_event (RDV déjà connu) ; no_date_found ; no_matching_event (annulation sans RDV correspondant) ; failed ; verification_mail (mail de vérification d'une messagerie)
+   */
+  status: Generated<InboundStatus>;
+  updated_at: Generated<Timestamp>;
 }
 
 export interface LegalAcceptances {
@@ -822,19 +953,32 @@ export interface ProfileAgents {
   user_id: string;
 }
 
-/**
- * Abonnement aux notifications web d'un appareil. Les clés servent à chiffrer chaque notification pour cet appareil seul. [US-94 RT2]
- */
 export interface PushSubscriptions {
-  auth: string;
+  auth_encrypted: Buffer;
   created_at: Generated<Timestamp>;
   device_id: string;
+  endpoint_encrypted: Buffer;
+  endpoint_hash: Buffer;
+  id: Generated<Int8>;
+  last_success_at: Timestamp | null;
+  p256dh_encrypted: Buffer;
+}
+
+export interface ScheduledNotifications {
+  attempts: Generated<number>;
+  created_at: Generated<Timestamp>;
+  due_at: Timestamp;
+  email_sent_at: Timestamp | null;
+  event_id: string;
+  id: Generated<Int8>;
+  kind: NotificationKind;
+  last_error: string | null;
+  push_sent_at: Timestamp | null;
+  recipient_user_id: string;
   /**
-   * Adresse du service de notification du navigateur ; une adresse devenue invalide (404, 410) entraîne la suppression de l'abonnement [US-81 RT4]
+   * scheduled ; sent ; not_applicable (échéance déjà passée à la confirmation) ; abandoned (non parti avant le début du RDV) ; cancelled (RDV annulé ou date changée)
    */
-  endpoint: string;
-  id: Generated<string>;
-  p256dh: string;
+  status: Generated<NotificationStatus>;
   updated_at: Generated<Timestamp>;
 }
 
@@ -874,6 +1018,16 @@ export interface Sessions {
   user_id: string;
 }
 
+export interface StorageDeletionQueue {
+  attempts: Generated<number>;
+  completed_at: Timestamp | null;
+  id: Generated<Int8>;
+  last_error: string | null;
+  queued_at: Generated<Timestamp>;
+  status: Generated<ErasureStatus>;
+  storage_key: string;
+}
+
 export interface UserAgentInfoValues {
   created_at: Generated<Timestamp>;
   id: Generated<Int8>;
@@ -897,7 +1051,7 @@ export interface Users {
   created_at: Generated<Timestamp>;
   deletion_requested_at: Timestamp | null;
   /**
-   * Identifiant de ce profil chez Digitorn (format à valider avec Digitorn, hypothèse H11)
+   * Identifiant de ce profil chez Digitorn, facultatif (inutile pour un agent appelé par API directe, hypothèse H11)
    */
   digitorn_user_ref: string | null;
   /**
@@ -957,6 +1111,10 @@ export interface VDashboardAgents {
 
 export interface VerificationCodes {
   agent_connection_id: Int8 | null;
+  /**
+   * Adresse autorisée en cours de vérification (usage forwarding_sender, code valable 15 minutes)
+   */
+  authorized_sender_id: Int8 | null;
   channel: CodeChannel;
   code_hash: Buffer;
   consumed_at: Timestamp | null;
@@ -975,6 +1133,15 @@ export interface VerificationCodes {
   purpose: CodePurpose;
   target: string;
   user_id: string;
+}
+
+export interface VFamilyLogbook {
+  account_id: string | null;
+  actor_user_id: string | null;
+  entry_kind: string | null;
+  family_event_id: string | null;
+  inbound_email_id: string | null;
+  occurred_at: Timestamp | null;
 }
 
 export interface VGuestDisplayStatus {
@@ -1017,13 +1184,15 @@ export interface DB {
   admin_audit_log: AdminAuditLog;
   agent_categories: AgentCategories;
   agent_connections: AgentConnections;
+  agent_conversation_messages: AgentConversationMessages;
+  agent_conversations: AgentConversations;
+  agent_digitorn_projects: AgentDigitornProjects;
   agent_info_fields: AgentInfoFields;
   agent_requirements: AgentRequirements;
   agent_sample_prompts: AgentSamplePrompts;
   agent_validated_actions: AgentValidatedActions;
   agents: Agents;
-  assistant_conversations: AssistantConversations;
-  assistant_messages: AssistantMessages;
+  assistant_requests: AssistantRequests;
   cc_addresses: CcAddresses;
   chat_erasure_requests: ChatErasureRequests;
   chat_requests: ChatRequests;
@@ -1034,19 +1203,26 @@ export interface DB {
   contract_field_definitions: ContractFieldDefinitions;
   contract_field_options: ContractFieldOptions;
   contract_field_values: ContractFieldValues;
+  conversation_attachments: ConversationAttachments;
   daily_request_counters: DailyRequestCounters;
   data_exports: DataExports;
   devices: Devices;
+  erasure_trace_targets: ErasureTraceTargets;
   erasure_traces: ErasureTraces;
   error_reports: ErrorReports;
+  event_types: EventTypes;
+  family_event_change_proposals: FamilyEventChangeProposals;
   family_event_history: FamilyEventHistory;
   family_event_members: FamilyEventMembers;
-  family_event_proposals: FamilyEventProposals;
   family_events: FamilyEvents;
   family_members: FamilyMembers;
-  family_notifications: FamilyNotifications;
   family_reminder_settings: FamilyReminderSettings;
+  forwarding_authorized_senders: ForwardingAuthorizedSenders;
+  forwarding_consent_events: ForwardingConsentEvents;
+  forwarding_mailboxes: ForwardingMailboxes;
   idempotency_keys: IdempotencyKeys;
+  inbound_email_daily_counters: InboundEmailDailyCounters;
+  inbound_emails: InboundEmails;
   legal_acceptances: LegalAcceptances;
   legal_document_versions: LegalDocumentVersions;
   logbook_entries: LogbookEntries;
@@ -1056,13 +1232,16 @@ export interface DB {
   platform_settings: PlatformSettings;
   profile_agents: ProfileAgents;
   push_subscriptions: PushSubscriptions;
+  scheduled_notifications: ScheduledNotifications;
   schema_migrations: SchemaMigrations;
   security_events: SecurityEvents;
   sessions: Sessions;
+  storage_deletion_queue: StorageDeletionQueue;
   user_agent_info_values: UserAgentInfoValues;
   users: Users;
   v_account_guest_quota: VAccountGuestQuota;
   v_dashboard_agents: VDashboardAgents;
+  v_family_logbook: VFamilyLogbook;
   v_guest_display_status: VGuestDisplayStatus;
   v_info_prefill_suggestions: VInfoPrefillSuggestions;
   v_never_activated_purge_candidates: VNeverActivatedPurgeCandidates;

@@ -31,7 +31,7 @@ async function agentWithFields(name: string, fields: { label: string; type: stri
   const agent = await db
     .insertInto("agents")
     .values({
-      digitorn_agent_ref: `test-${name}-${Math.random().toString(36).slice(2, 8)}`,
+      platform: "digitorn", platform_agent_ref: `test-${name}-${Math.random().toString(36).slice(2, 8)}`,
       name,
       category_id: (await db.selectFrom("agent_categories").select("id").where("code", "=", "perso").executeTakeFirstOrThrow()).id,
       short_description: "Agent de test",

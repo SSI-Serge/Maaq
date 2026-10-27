@@ -73,15 +73,16 @@ export async function loadAgent(ctx: Ctx, session: SessionContext, agentId: stri
   const agent = await ctx.db
     .selectFrom("profile_agents as pa")
     .innerJoin("agents as a", "a.id", "pa.agent_id")
+    .leftJoin("agent_digitorn_projects as p", "p.agent_id", "a.id")
     .select([
       "a.id",
       "a.name",
       "a.short_description",
       "a.status",
       "a.maintenance_message",
-      "a.digitorn_agent_ref",
-      "a.digitorn_app_url",
-      sql<boolean>`a.digitorn_api_key_encrypted is not null`.as("has_project"),
+      "a.platform_agent_ref",
+      "p.app_url",
+      sql<boolean>`p.api_key_encrypted is not null`.as("has_project"),
     ])
     .where("pa.user_id", "=", session.user.id)
     .where("pa.agent_id", "=", agentId)
@@ -98,7 +99,7 @@ type LoadedAgent = Awaited<ReturnType<typeof loadAgent>>;
  * anonyme) ou, avec le client réel, son projet Digitorn (utilisateur identifié par un lien de lancement).
  */
 export function isEmbedded(agent: LoadedAgent): boolean {
-  return agent.digitorn_app_url !== null || (agent.has_project && digitorn().embeddedChat);
+  return agent.app_url !== null || (agent.has_project && digitorn().embeddedChat);
 }
 
 /** Les demandes, les cartes d'action et les signalements du tchat construit par MAAQ ne servent plus avec le tchat embarqué. */
@@ -193,7 +194,7 @@ function recent(events: ChatEvent[], now: Date): ChatEvent[] {
 async function conversationOf(ctx: Ctx, session: SessionContext, agent: LoadedAgent): Promise<ChatEvent[]> {
   requireLegacyChat(agent);
   const userRef = await ensureDigitornRef(ctx.db, session.user.id);
-  return recent(await digitorn().getConversation(userRef, agent.digitorn_agent_ref), ctx.now);
+  return recent(await digitorn().getConversation(userRef, agent.platform_agent_ref), ctx.now);
 }
 
 /** Texte conservé avec un signalement pour une carte d'action. */
@@ -357,7 +358,7 @@ export async function sendMessage(
     await digitorn().submitRequest({
       requestId: input.requestId,
       userRef,
-      agentRef: agent.digitorn_agent_ref,
+      agentRef: agent.platform_agent_ref,
       text,
       context: {
         rank: rankOf(session),

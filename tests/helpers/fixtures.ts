@@ -70,6 +70,18 @@ export async function createProfile(db: Kysely<DB>, options: ProfileOptions = {}
   return { id: user.id, email, accountId };
 }
 
+/** Invité du foyer d'un compte, inséré directement dans ce compte (sa fiche « membre » est créée avec lui). */
+export async function createGuest(db: Kysely<DB>, accountId: string, firstName: string, rank: "core" | "secondary" = "secondary") {
+  passwordHash ??= hashSecret(PASSWORD);
+  const email = `guest-${randomUUID().slice(0, 8)}@maaq.test`;
+  const user = await db
+    .insertInto("users")
+    .values({ account_id: accountId, role: "guest", guest_rank: rank, first_name: firstName, last_name: "Test", email, phone: "+33612345678", password_hash: await passwordHash, status: "active", activated_at: new Date() })
+    .returning("id")
+    .executeTakeFirstOrThrow();
+  return { id: user.id, email, accountId };
+}
+
 /** Dernier code à 6 chiffres envoyé à cette adresse, lu dans la boîte de test. */
 export async function lastCodeSentTo(to: string): Promise<string | null> {
   const message = (await devOutbox().list(500)).find((m) => m.to === to);

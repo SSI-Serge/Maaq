@@ -11,11 +11,12 @@ import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { config } from "dotenv";
-import { Kysely, PostgresDialect } from "kysely";
+import { Kysely, PostgresDialect, sql } from "kysely";
 import { Pool } from "pg";
 import { loadAgentDefinition, runAssistant, type AgentRunResult } from "../src/server/assistant/agent";
-import { open, openOptional, seal, sealOptional } from "../src/server/assistant/fields";
-import { ensureParentMembers, loadPseudoMembers } from "../src/server/assistant/family";
+import { open, seal, sealOptional } from "../src/server/assistant/fields";
+import { loadPseudoMembers } from "../src/server/assistant/family";
+import { loadCalendarEvent, STATUS_CODE, TYPE_CODE } from "../src/server/assistant/calendar";
 import { utcToLocal } from "../src/server/assistant/local-time";
 import { createModel } from "../src/server/assistant/model";
 import { migrate } from "../src/server/db/migrate";
@@ -101,31 +102,34 @@ async function seedFamily() {
       .executeTakeFirstOrThrow();
     ids.set(parent.prenom, user.id);
   }
-  await ensureParentMembers(db, account.id);
+  // Les fiches « membre » des parents sont créées avec leurs profils ; l'alias et la couleur des enfants sont attribués par la base.
   for (const child of data.famille.filter((m) => m.role === "enfant")) {
     const born = new Date(NOW);
     born.setUTCFullYear(born.getUTCFullYear() - child.age);
     born.setUTCMonth(born.getUTCMonth() - 1);
-    const alias = (await loadPseudoMembers(db, account.id)).filter((m) => m.role === "child").length + 1;
-    await db.insertInto("family_members").values({ account_id: account.id, first_name: child.prenom, role: "child", birth_date: born.toISOString().slice(0, 10), alias_index: alias }).execute();
+    await db
+      .insertInto("family_members")
+      .values({ account_id: account.id, first_name: child.prenom, role: "child", birth_year: born.getUTCFullYear(), birth_month: born.getUTCMonth() + 1, alias_number: sql<number>`null`, color_index: sql<number>`null` })
+      .execute();
   }
   return { accountId: account.id, userId: ids.get(data.contexte.utilisateur)! };
 }
 
 async function seedCalendar(accountId: string) {
-  await db.deleteFrom("family_event_proposals").where("account_id", "=", accountId).execute();
+  await db.deleteFrom("family_event_change_proposals").where("account_id", "=", accountId).execute();
   await db.deleteFrom("family_events").where("account_id", "=", accountId).execute();
   const members = await db.selectFrom("family_members").select(["id", "first_name"]).where("account_id", "=", accountId).execute();
+  const types = new Map((await db.selectFrom("event_types").select(["id", "code"]).execute()).map((t) => [t.code, t.id]));
   const { localToUtc } = await import("../src/server/assistant/local-time");
   for (const e of data.calendrier_initial) {
     await db
       .insertInto("family_events")
       .values({
-        id: seedUuid(e.id), account_id: accountId, title_encrypted: seal(e.titre), event_type: TYPE[e.type] as never, starts_at: localToUtc(e.debut, TZ), ends_at: localToUtc(e.fin, TZ),
-        all_day: Boolean(e.journee_entiere), place_encrypted: sealOptional(e.lieu), status: "confirmed", source: "typed",
+        id: seedUuid(e.id), account_id: accountId, title: seal(e.titre), event_type_id: types.get(TYPE_CODE[TYPE[e.type] as keyof typeof TYPE_CODE])!, starts_at: localToUtc(e.debut, TZ), ends_at: localToUtc(e.fin, TZ),
+        all_day: Boolean(e.journee_entiere), location: sealOptional(e.lieu), status: STATUS_CODE.confirmed, source: "chat_text", confirmed_at: NOW, fingerprint: randomBytes(16),
       })
       .execute();
-    await db.insertInto("family_event_members").values(e.membres.map((m) => ({ event_id: seedUuid(e.id), member_id: members.find((x) => x.first_name === m)!.id }))).execute();
+    await db.insertInto("family_event_members").values(e.membres.map((m) => ({ event_id: seedUuid(e.id), member_id: members.find((x) => x.first_name === m)!.id, account_id: accountId }))).execute();
   }
 }
 
@@ -134,17 +138,12 @@ async function evaluate(c: Case, result: AgentRunResult, accountId: string): Pro
   const a = c.attendu;
   const failures: string[] = [];
   const names = result.trace.map((t) => t.name);
-  const created = result.createdEventIds.length
-    ? await db
-        .selectFrom("family_events")
-        .select(["id", "title_encrypted", "event_type", "starts_at", "ends_at", "all_day", "place_encrypted", "notes_encrypted"])
-        .where("id", "in", result.createdEventIds)
-        .execute()
-    : [];
-  const links = created.length ? await db.selectFrom("family_event_members as l").innerJoin("family_members as m", "m.id", "l.member_id").select(["l.event_id", "m.first_name"]).where("l.event_id", "in", created.map((e) => e.id)).execute() : [];
-  const rows = created.map((e) => ({
-    ...e, title: open(e.title_encrypted), place: openOptional(e.place_encrypted), notes: openOptional(e.notes_encrypted), start: utcToLocal(e.starts_at, TZ), end: utcToLocal(e.ends_at, TZ), who: links.filter((l) => l.event_id === e.id).map((l) => normalize(l.first_name)),
-  }));
+  const firstNames = new Map((await db.selectFrom("family_members").select(["id", "first_name"]).where("account_id", "=", accountId).execute()).map((m) => [m.id, m.first_name ?? ""]));
+  const rows: { id: string; title: string; place: string | null; notes: string | null; start: string; end: string; all_day: boolean; event_type: string; who: string[] }[] = [];
+  for (const id of result.createdEventIds) {
+    const e = await loadCalendarEvent(db, accountId, id);
+    if (e) rows.push({ id: e.id, title: e.title, place: e.place, notes: e.notes, start: utcToLocal(e.startsAt, TZ), end: utcToLocal(e.endsAt, TZ), all_day: e.allDay, event_type: e.type, who: e.memberIds.map((m) => normalize(firstNames.get(m) ?? "")) });
+  }
 
   if (result.status !== "ok") failures.push(`état ${result.status}`);
   if (a.creations !== undefined && rows.length !== a.creations) failures.push(`${rows.length} création(s) au lieu de ${a.creations}`);
@@ -161,10 +160,12 @@ async function evaluate(c: Case, result: AgentRunResult, accountId: string): Pro
   for (const n of a.outils_requis ?? []) if (!names.includes(n)) failures.push(`outil non appelé : ${n}`);
   for (const n of a.outils_interdits ?? []) if (names.includes(n)) failures.push(`outil interdit appelé : ${n}`);
 
-  const proposals = await db.selectFrom("family_event_proposals").select(["event_id", "kind", "changes"]).where("account_id", "=", accountId).execute();
+  const proposals = await db.selectFrom("family_event_change_proposals").select(["event_id", "kind", "new_starts_at", "proposed_changes"]).where("account_id", "=", accountId).execute();
   if (a.modification) {
     const m = a.modification;
-    const ok = proposals.some((p) => p.kind === "modification" && p.event_id === seedUuid(m.id) && String((p.changes as Record<string, string> | null)?.debut ?? "").startsWith(`${m.date}T${m.heure}`));
+    const startsAt = (p: (typeof proposals)[number]) =>
+      p.kind === "reschedule" && p.new_starts_at ? utcToLocal(p.new_starts_at, TZ) : String((p.proposed_changes ? (JSON.parse(open(p.proposed_changes)) as Record<string, string>) : {}).debut ?? "");
+    const ok = proposals.some((p) => (p.kind === "modification" || p.kind === "reschedule") && p.event_id === seedUuid(m.id) && startsAt(p).startsWith(`${m.date}T${m.heure}`));
     if (!ok) failures.push(`modification attendue de ${m.id} vers ${m.date} ${m.heure}`);
   }
   if (a.annulation && !proposals.some((p) => p.kind === "cancellation" && p.event_id === seedUuid(a.annulation!))) failures.push(`annulation attendue de ${a.annulation}`);
@@ -208,7 +209,7 @@ try {
   for (let run = 1; run <= runs; run++) {
     for (const c of cases) {
       await seedCalendar(accountId);
-      await db.deleteFrom("family_event_proposals").where("account_id", "=", accountId).execute();
+      await db.deleteFrom("family_event_change_proposals").where("account_id", "=", accountId).execute();
       console.info = () => {}; // les traces d'exploitation ne sont pas affichées ici
       const result = await runAssistant({
         db, model, definition, accountId, userId, members, authorMemberId: author, timeZone: TZ, now: NOW, requestId: randomUUID(), source: SOURCE[c.source], text: c.message,

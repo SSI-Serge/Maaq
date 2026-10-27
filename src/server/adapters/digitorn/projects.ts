@@ -15,21 +15,25 @@ export function projectsFrom(database: () => Kysely<DB>): Pick<LiveOptions, "pro
   return {
     async projectOf(agentRef) {
       const row = await database()
-        .selectFrom("agents")
-        .select(["digitorn_api_key_encrypted", "digitorn_app_url"])
-        .where("digitorn_agent_ref", "=", agentRef)
+        .selectFrom("agents as a")
+        .innerJoin("agent_digitorn_projects as p", "p.agent_id", "a.id")
+        .select(["p.api_key_encrypted", "p.app_url"])
+        .where("a.platform", "=", "digitorn")
+        .where("a.platform_agent_ref", "=", agentRef)
         .executeTakeFirst();
-      if (!row?.digitorn_api_key_encrypted) return null;
-      return { apiKey: decrypt(Buffer.from(row.digitorn_api_key_encrypted), key()), appUrl: row.digitorn_app_url };
+      if (!row?.api_key_encrypted) return null;
+      return { apiKey: decrypt(Buffer.from(row.api_key_encrypted), key()), appUrl: row.app_url };
     },
 
     async allProjects() {
       const rows = await database()
-        .selectFrom("agents")
-        .select(["digitorn_agent_ref", "digitorn_api_key_encrypted"])
-        .where("digitorn_api_key_encrypted", "is not", null)
+        .selectFrom("agents as a")
+        .innerJoin("agent_digitorn_projects as p", "p.agent_id", "a.id")
+        .select(["a.platform_agent_ref", "p.api_key_encrypted"])
+        .where("a.platform", "=", "digitorn")
+        .where("p.api_key_encrypted", "is not", null)
         .execute();
-      return rows.map((row) => ({ agentRef: row.digitorn_agent_ref, apiKey: decrypt(Buffer.from(row.digitorn_api_key_encrypted!), key()) }));
+      return rows.map((row) => ({ agentRef: row.platform_agent_ref, apiKey: decrypt(Buffer.from(row.api_key_encrypted!), key()) }));
     },
   };
 }

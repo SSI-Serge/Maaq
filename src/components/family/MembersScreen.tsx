@@ -63,24 +63,24 @@ const Bin = () => (
   </svg>
 );
 
-/** Prénom et date de naissance : le formulaire de l'ajout et de la modification (mêmes contrôles, US-93 RF2). */
+/** Prénom et mois de naissance : le formulaire de l'ajout et de la modification (mêmes contrôles, US-93 RF2). */
 function MemberForm({ title, member, submitLabel, pendingLabel, hint, onSubmit, onCancel, mutation }: {
   title: string;
   member?: FamilyMemberView;
   submitLabel: string;
   pendingLabel: string;
   hint?: string;
-  onSubmit: (values: { firstName: string; birthDate: string | null }) => void;
+  onSubmit: (values: { firstName: string; birth: string | null }) => void;
   onCancel: () => void;
   mutation: MutationState;
 }) {
   const [name, setName] = useState(member?.firstName ?? "");
-  const [birth, setBirth] = useState(member?.birthDate ?? "");
+  const [birth, setBirth] = useState(member?.birth ?? "");
   const today = todayLocal();
   const nameError = !name.trim() ? "Le prénom est obligatoire." : [...name.trim()].length > MAX_NAME ? `Le prénom ne peut pas dépasser ${MAX_NAME} caractères.` : null;
-  const birthError = birth && birth > today ? "La date de naissance ne peut pas être dans le futur." : null;
+  const birthError = birth && birth > today.slice(0, 7) ? "La date de naissance ne peut pas être dans le futur." : null;
   const invalid = Boolean(nameError || birthError);
-  const values = () => ({ firstName: name.trim(), birthDate: birth || null });
+  const values = () => ({ firstName: name.trim(), birth: birth || null });
 
   return (
     <form
@@ -105,9 +105,9 @@ function MemberForm({ title, member, submitLabel, pendingLabel, hint, onSubmit, 
           />
         )}
       </Field>
-      <Field label="Date de naissance (facultatif)" error={birthError}>
+      <Field label="Mois et année de naissance (facultatif)" error={birthError}>
         {(a11y) => (
-          <input {...a11y} type="date" className={`${styles.input} ${birthError ? styles.inputError : ""}`} value={birth} max={today} onChange={(e) => setBirth(e.target.value)} disabled={mutation.pending} />
+          <input {...a11y} type="month" className={`${styles.input} ${birthError ? styles.inputError : ""}`} value={birth} max={today.slice(0, 7)} onChange={(e) => setBirth(e.target.value)} disabled={mutation.pending} />
         )}
       </Field>
       {hint && <span className={styles.hint}>{hint}</span>}
@@ -126,7 +126,7 @@ function MemberForm({ title, member, submitLabel, pendingLabel, hint, onSubmit, 
 
 function AddMember({ onAdded, onCancel }: { onAdded: (member: FamilyMemberView) => void; onCancel: () => void }) {
   const mutation = useApiMutation();
-  async function add(values: { firstName: string; birthDate: string | null }) {
+  async function add(values: { firstName: string; birth: string | null }) {
     const result = await mutation.run<{ member: FamilyMemberView }>("/api/family/members", { method: "POST", body: values });
     if (result) onAdded(result.member);
   }
@@ -210,9 +210,9 @@ function MemberCard({ member, onChanged }: { member: FamilyMemberView; onChanged
   const [mode, setMode] = useState<Mode>("view");
   const mutation = useApiMutation();
 
-  async function save(values: { firstName: string; birthDate: string | null }) {
+  async function save(values: { firstName: string; birth: string | null }) {
     // Le prénom d'un membre relié à un profil ne s'envoie pas : il suit le profil (US-93 RF3).
-    const body = member.linked ? { birthDate: values.birthDate } : values;
+    const body = member.linked ? { birth: values.birth } : values;
     const result = await mutation.run<{ member: FamilyMemberView }>(`/api/family/members/${member.id}`, { method: "PATCH", body });
     if (result) {
       setMode("view");
@@ -250,7 +250,7 @@ function MemberCard({ member, onChanged }: { member: FamilyMemberView; onChanged
             {member.firstName}
             {member.badge && <span className={`${styles.rank} ${member.badge === "guest" ? styles.rankGuest : ""}`}>{RANK[member.badge]}</span>}
           </div>
-          {member.birthDate && <div className={styles.memberMeta}>Né(e) le {birthLabel(member.birthDate)}</div>}
+          {member.birth && <div className={styles.memberMeta}>Né(e) en {birthLabel(member.birth)}</div>}
         </div>
         <div className={styles.iconButtons}>
           <button type="button" className={styles.iconButton} aria-label={`Modifier ${member.firstName}`} onClick={() => setMode("edit")}>

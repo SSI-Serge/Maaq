@@ -55,7 +55,7 @@ async function agentInDashboard(ctx: Ctx, userId: string, agentId: string) {
   const agent = await ctx.db
     .selectFrom("profile_agents as pa")
     .innerJoin("agents as a", "a.id", "pa.agent_id")
-    .select(["a.id", "a.name", "a.digitorn_agent_ref"])
+    .select(["a.id", "a.name", "a.platform_agent_ref"])
     .where("pa.user_id", "=", userId)
     .where("pa.agent_id", "=", agentId)
     .where("pa.removed_at", "is", null)
@@ -233,7 +233,7 @@ export async function saveAgentInfo(
 
   // Transmission immédiate à Digitorn (US-12 RF5) : le profil reçoit son identifiant Digitorn au besoin.
   const info = Object.fromEntries(fields.map((f) => [f.label, f.max_items > 1 ? (clean.get(f.id) ?? []) : (clean.get(f.id)?.[0] ?? "")]));
-  await digitorn().updateProfileInfo(await ensureDigitornRef(ctx.db, target.id), agent.digitorn_agent_ref, info);
+  await digitorn().updateProfileInfo(await ensureDigitornRef(ctx.db, target.id), agent.platform_agent_ref, info);
   return getAgentInfoForm(ctx, viewer, targetUserId, agentId);
 }
 

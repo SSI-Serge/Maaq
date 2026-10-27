@@ -32,10 +32,10 @@ beforeAll(async () => {
   projects = {};
   server = await startFakeDigitorn(projects);
   // Base partagée entre les fichiers de test : seuls les agents créés ici doivent avoir une clé Digitorn.
-  await db.updateTable("agents").set({ digitorn_api_key_encrypted: null }).where("digitorn_api_key_encrypted", "is not", null).execute();
+  await db.deleteFrom("agent_digitorn_projects").execute();
 });
 afterAll(async () => {
-  await db.updateTable("agents").set({ digitorn_api_key_encrypted: null }).where("digitorn_api_key_encrypted", "is not", null).execute();
+  await db.deleteFrom("agent_digitorn_projects").execute();
   await server.close();
   await db.destroy();
 });
@@ -74,9 +74,7 @@ async function agentFor(
   const agent = await db
     .insertInto("agents")
     .values({
-      digitorn_agent_ref: withProject ? `${PROJECT}:${agentId}` : options.appUrl ? `app:${tag()}${tag()}.digitorn.app` : `simule-${tag()}`,
-      digitorn_app_url: options.appUrl ?? null,
-      digitorn_api_key_encrypted: withProject ? encrypt(KEY, Buffer.from(process.env.ENCRYPTION_KEY!, "base64")) : null,
+      platform: "digitorn", platform_agent_ref: withProject ? `${PROJECT}:${agentId}` : options.appUrl ? `app:${tag()}${tag()}.digitorn.app` : `simule-${tag()}`,
       name: `Agent_${tag()}`,
       category_id: category.id,
       short_description: "Agent de test",
@@ -84,8 +82,14 @@ async function agentFor(
       cc_addresses_max_count: options.cc ?? 0,
       ...(options.blocked ? { status: "blocked" as const, maintenance_message: options.blocked, blocked_at: new Date() } : {}),
     })
-    .returning(["id", "name", "digitorn_agent_ref"])
+    .returning(["id", "name", "platform_agent_ref"])
     .executeTakeFirstOrThrow();
+  if (withProject || options.appUrl) {
+    await db
+      .insertInto("agent_digitorn_projects")
+      .values({ agent_id: agent.id, api_key_encrypted: withProject ? encrypt(KEY, Buffer.from(process.env.ENCRYPTION_KEY!, "base64")) : null, app_url: options.appUrl ?? null })
+      .execute();
+  }
   if (options.requiresDrive) {
     const type = await db.selectFrom("connector_types").select("id").where("code", "=", "google_drive").executeTakeFirstOrThrow();
     await db.insertInto("agent_requirements").values({ agent_id: agent.id, connector_type_id: type.id, owner_scope: "each_profile" }).execute();
@@ -100,7 +104,7 @@ async function agentFor(
     fieldId = field.id;
   }
   for (const userId of userIds) await db.insertInto("profile_agents").values({ user_id: userId, agent_id: agent.id }).execute();
-  return { id: agent.id, name: agent.name, ref: agent.digitorn_agent_ref, agentId, fieldId };
+  return { id: agent.id, name: agent.name, ref: agent.platform_agent_ref, agentId, fieldId };
 }
 
 async function household() {
@@ -274,7 +278,7 @@ describe("adresse de l'application publiée seule : visiteur anonyme", () => {
   it("la base refuse une adresse qui n'est pas en https : elle ne peut jamais être placée dans le cadre", async () => {
     const { primary } = await household();
     const agent = await agentFor([primary.id], { appUrl: "https://bcac-qx42y7yq112zy-d600d2.digitorn.app" });
-    await expect(db.updateTable("agents").set({ digitorn_app_url: "http://exemple.fr" }).where("id", "=", agent.id).execute()).rejects.toThrow();
+    await expect(db.updateTable("agent_digitorn_projects").set({ app_url: "http://exemple.fr" }).where("agent_id", "=", agent.id).execute()).rejects.toThrow();
   });
 
   it("avec la clé du projet, l'utilisateur est reconnu : lien de lancement, adresse publiée non transmise", async () => {

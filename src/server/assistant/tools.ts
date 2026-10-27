@@ -1,6 +1,6 @@
 import { sql, type Kysely } from "kysely";
 import type { DB } from "@/server/db/schema.generated";
-import { findConflicts, loadCalendarEvent, loadCalendarEvents, type CalendarEvent, type EventSource, type EventStatus, type EventType } from "./calendar";
+import { SOURCE_CODE, TYPE_CODE, eventTypeIds, findConflicts, fingerprintOf, loadCalendarEvent, loadCalendarEvents, type CalendarEvent, type EventSource, type EventStatus, type EventType } from "./calendar";
 import { seal, sealOptional } from "./fields";
 import { isLocalDateTime, localDay, localMs, localToUtc, utcToLocal } from "./local-time";
 import { ageBand, fold, Pseudonymizer, type PseudoMember } from "./pseudonymize";
@@ -41,8 +41,10 @@ export interface ToolContext {
   requestId: string;
   source: EventSource;
   pseudo: Pseudonymizer;
-  /** Nombre de créations déjà faites pendant cette demande (rang dans source_ref). */
-  created: { count: number; ids: string[] };
+  /** Message du parent qui a déclenché la demande : les rendez-vous créés s'y rattachent (source_message_id). */
+  sourceMessageId?: number | null;
+  /** Rendez-vous créés pendant cette demande. */
+  created: { ids: string[] };
   proposals: string[];
 }
 
@@ -140,7 +142,7 @@ const TOOLS: Record<string, Tool> = {
         ref: Pseudonymizer.aliasOf(m),
         role: m.role === "child" ? "enfant" : "parent",
         // Un parent sans date de naissance est un adulte ; pour un enfant, la tranche reste inconnue.
-        tranche_age: m.birthDate || m.role === "child" ? ageBand(m.birthDate, ctx.now) : "18+",
+        tranche_age: m.birth || m.role === "child" ? ageBand(m.birth, ctx.now) : "18+",
       })),
     };
   },
@@ -228,31 +230,29 @@ const TOOLS: Record<string, Tool> = {
     if (!title) throw new ToolError("« titre » est obligatoire");
     const place = medical ? null : (text(input.lieu, "lieu", { required: false, max: MAX_PLACE * 2 }) && ctx.pseudo.fromModel(String(input.lieu)).slice(0, MAX_PLACE));
     const notes = medical ? null : (text(input.notes, "notes", { required: false, max: MAX_NOTES * 2 }) && ctx.pseudo.fromModel(String(input.notes)).slice(0, MAX_NOTES));
-    const recurrence = text(input.recurrence, "recurrence", { required: false, max: 300 });
     const ignored = medical && (input.lieu || input.notes);
 
-    const sourceRef = `${ctx.requestId}:${ctx.created.count + 1}`;
-    ctx.created.count += 1;
-    const inserted = await ctx.db
-      .insertInto("family_events")
-      .values({
-        account_id: ctx.accountId, title_encrypted: seal(title), event_type: type, starts_at: from, ends_at: to, all_day: allDay,
-        place_encrypted: sealOptional(place), notes_encrypted: sealOptional(notes), recurrence, status: "provisional", source: ctx.source,
-        source_ref: sourceRef, created_by_user_id: ctx.userId, status_changed_at: ctx.now,
-      })
-      .onConflict((oc) => oc.columns(["account_id", "source_ref"]).where("source_ref", "is not", null).doNothing())
-      .returning("id")
-      .executeTakeFirst();
-    // Même demande traitée deux fois : on rend le rendez-vous déjà créé, sans rien ajouter.
-    const id = inserted?.id ?? (await ctx.db.selectFrom("family_events").select("id").where("account_id", "=", ctx.accountId).where("source_ref", "=", sourceRef).executeTakeFirstOrThrow()).id;
-    if (inserted) {
-      await ctx.db.insertInto("family_event_members").values(who.map((m) => ({ event_id: id, member_id: m.id }))).execute();
-      await ctx.db
-        .insertInto("family_event_history")
-        .values({ account_id: ctx.accountId, event_id: id, action: "created", from_status: null, to_status: "provisional", by_user_id: ctx.userId, created_at: ctx.now })
-        .execute();
-    }
-    ctx.created.ids.push(id);
+    // Un rendez-vous actif identique (créneau, type, membres) existe déjà : on le rend, sans rien ajouter. C'est aussi ce qui rend la création
+    // idempotente quand la même demande est rejouée (US-89 RT3).
+    const memberIds = who.map((m) => m.id);
+    const fingerprint = fingerprintOf({ startsAt: from, endsAt: to, type, allFamily: false, memberIds });
+    const typeId = (await eventTypeIds(ctx.db)).get(TYPE_CODE[type])!;
+    const id = await ctx.db.transaction().execute(async (trx) => {
+      const inserted = await trx
+        .insertInto("family_events")
+        .values({
+          account_id: ctx.accountId, event_type_id: typeId, title: medical ? null : seal(title), location: sealOptional(place), note: sealOptional(notes), starts_at: from, ends_at: to,
+          all_day: allDay, status: "provisional", source: SOURCE_CODE[ctx.source], requested_by_user_id: ctx.userId, source_at: ctx.now, source_message_id: ctx.sourceMessageId ?? null, fingerprint,
+        })
+        .onConflict((oc) => oc.columns(["account_id", "fingerprint"]).where(sql<boolean>`status in ('provisional', 'set_aside', 'confirmed')`).doNothing())
+        .returning("id")
+        .executeTakeFirst();
+      if (!inserted) return (await trx.selectFrom("family_events").select("id").where("account_id", "=", ctx.accountId).where("fingerprint", "=", fingerprint).where("status", "in", ["provisional", "set_aside", "confirmed"]).executeTakeFirstOrThrow()).id;
+      await trx.insertInto("family_event_members").values(memberIds.map((member_id) => ({ event_id: inserted.id, member_id, account_id: ctx.accountId }))).execute();
+      await trx.insertInto("family_event_history").values({ event_id: inserted.id, user_id: ctx.userId, action: "created", from_status: null, to_status: "provisional", occurred_at: ctx.now }).execute();
+      return inserted.id;
+    });
+    if (!ctx.created.ids.includes(id)) ctx.created.ids.push(id);
     return {
       id: shortRef(id),
       statut: "provisoire",
@@ -267,9 +267,17 @@ const TOOLS: Record<string, Tool> = {
     for (const key of ["debut", "fin"] as const) if (input[key]) changes[key] = local(input[key], key);
     for (const key of ["lieu", "notes"] as const) if (input[key]) changes[key] = ctx.pseudo.fromModel(text(input[key], key)!);
     const reason = text(input.motif, "motif", { max: 500 })!;
+    // Un changement d'horaire seul est un report ; sinon c'est une modification, dont les champs sont conservés chiffrés avec le motif.
+    const { debut, fin, ...others } = changes;
+    const reschedule = Boolean(debut || fin) && Object.keys(others).length === 0;
     const row = await ctx.db
-      .insertInto("family_event_proposals")
-      .values({ account_id: ctx.accountId, event_id: event.id, kind: "modification", changes: JSON.stringify(changes), reason })
+      .insertInto("family_event_change_proposals")
+      .values({
+        account_id: ctx.accountId, event_id: event.id, kind: reschedule ? "reschedule" : "modification", requested_by_user_id: ctx.userId,
+        new_starts_at: reschedule ? (debut ? toUtc(ctx, debut) : event.startsAt) : null,
+        new_ends_at: reschedule ? (fin ? toUtc(ctx, fin.length === 10 ? `${fin}T23:59` : fin) : event.endsAt) : null,
+        proposed_changes: reschedule ? null : seal(JSON.stringify({ ...changes, motif: reason })),
+      })
       .returning("id")
       .executeTakeFirstOrThrow();
     ctx.proposals.push(row.id);
@@ -278,10 +286,10 @@ const TOOLS: Record<string, Tool> = {
 
   async annuler_evenement(input, ctx) {
     const event = await findEvent(ctx, input.id);
-    const reason = text(input.motif, "motif", { max: 500 })!;
+    text(input.motif, "motif", { max: 500 });
     const row = await ctx.db
-      .insertInto("family_event_proposals")
-      .values({ account_id: ctx.accountId, event_id: event.id, kind: "cancellation", reason })
+      .insertInto("family_event_change_proposals")
+      .values({ account_id: ctx.accountId, event_id: event.id, kind: "cancellation", requested_by_user_id: ctx.userId })
       .returning("id")
       .executeTakeFirstOrThrow();
     ctx.proposals.push(row.id);
@@ -326,25 +334,8 @@ export async function expandEventRefs(db: Kysely<DB>, accountId: string, textWit
       .limit(2)
       .execute();
     if (rows.length !== 1 || !canSee(rows[0].id)) continue;
-    const event = (await loadCalendarEvent(db, accountId, rows[0].id))!;
-    if (event.type === "medical") {
-      // Les rendez-vous créés par l'assistant portent déjà leur titre générique ; sinon on le recompose avec la première personne concernée.
-      if (event.title.startsWith("RDV médical")) {
-        titles.set(prefix, event.title);
-        continue;
-      }
-      const who = await db
-        .selectFrom("family_members")
-        .select("first_name")
-        .where("id", "in", event.memberIds.length ? event.memberIds : ["00000000-0000-0000-0000-000000000000"])
-        .orderBy("role")
-        .orderBy("alias_index")
-        .limit(1)
-        .executeTakeFirst();
-      titles.set(prefix, who ? `RDV médical — ${who.first_name}` : "RDV médical");
-    } else {
-      titles.set(prefix, event.title);
-    }
+    // Un rendez-vous médical n'a pas de titre en base : il est composé à la lecture (« RDV médical — prénom »).
+    titles.set(prefix, (await loadCalendarEvent(db, accountId, rows[0].id))!.title);
   }
   return textWithRefs.replace(/\[\[evt-([0-9a-f]{8})\]\]/g, (_all, prefix: string) => titles.get(prefix) ?? "un rendez-vous");
 }

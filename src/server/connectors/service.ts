@@ -185,7 +185,7 @@ async function requireAgentConnector(ctx: Ctx, session: SessionContext, agentId:
   const agent = await ctx.db
     .selectFrom("profile_agents as pa")
     .innerJoin("agents as a", "a.id", "pa.agent_id")
-    .select(["a.id", "a.name", "a.digitorn_agent_ref", "a.cc_addresses_max_count"])
+    .select(["a.id", "a.name", "a.platform_agent_ref", "a.cc_addresses_max_count"])
     .where("pa.user_id", "=", session.user.id)
     .where("pa.agent_id", "=", agentId)
     .where("pa.removed_at", "is", null)
@@ -600,7 +600,7 @@ export async function removeCcAddress(ctx: Ctx, session: SessionContext, input: 
  */
 export async function syncAgentConfiguration(ctx: Ctx, userId: string, agentId: string): Promise<AgentConfiguration> {
   const user = await ctx.db.selectFrom("users").select(["id", "account_id", "role"]).where("id", "=", userId).executeTakeFirstOrThrow();
-  const agent = await ctx.db.selectFrom("agents").select("digitorn_agent_ref").where("id", "=", agentId).executeTakeFirstOrThrow();
+  const agent = await ctx.db.selectFrom("agents").select("platform_agent_ref").where("id", "=", agentId).executeTakeFirstOrThrow();
   const primaryId = user.account_id ? (await primaryOf(ctx.db, user.account_id)).id : user.id;
 
   const config: AgentConfiguration = { validationMailbox: null, googleAccounts: {}, ccAddresses: [] };
@@ -617,6 +617,6 @@ export async function syncAgentConfiguration(ctx: Ctx, userId: string, agentId: 
   const cc = await ctx.db.selectFrom("cc_addresses").select("email").where("user_id", "=", userId).where("agent_id", "=", agentId).orderBy("created_at").orderBy("id").execute();
   config.ccAddresses = cc.map((c) => c.email);
 
-  await digitorn().updateAgentConfiguration(await ensureDigitornRef(ctx.db, userId), agent.digitorn_agent_ref, config);
+  await digitorn().updateAgentConfiguration(await ensureDigitornRef(ctx.db, userId), agent.platform_agent_ref, config);
   return config;
 }
