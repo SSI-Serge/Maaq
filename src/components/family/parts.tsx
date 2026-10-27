@@ -54,6 +54,11 @@ export function EventLine({ event, showConflict = false }: { event: CalendarList
       <span className={styles.eventTime}>{event.allDay ? "Journée" : clock(event.start)}</span>
       <Dots members={event.members} />
       <span className={styles.eventTitle}>{event.title}</span>
+      {event.recurring && (
+        <span className={styles.tag} title="Séance d'une série" aria-label="Séance d'une série">
+          ↻
+        </span>
+      )}
       {showConflict && event.conflictsWith.length > 0 && (
         <span className={styles.conflictMark} title="Conflit avec un autre rendez-vous" aria-label="Conflit avec un autre rendez-vous">
           !

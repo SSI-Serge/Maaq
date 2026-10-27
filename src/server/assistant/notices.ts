@@ -8,7 +8,8 @@ import { pushConfigured, sendPush } from "@/server/push/service";
 import { describeError } from "@/server/safe-log";
 import { loadCalendarEvent, type EventType } from "./calendar";
 import { requireFamilyProfile } from "./family";
-import { autoConfirmedEmail, autoConfirmedHeadline, eventAddedAutoBody, eventAddedBody, eventToConfirmBody } from "./reminder-text";
+import { autoConfirmedEmail, autoConfirmedHeadline, eventAddedAutoBody, eventAddedBody, eventToConfirmBody, seriesAddedBody, seriesToConfirmBody } from "./reminder-text";
+import { loadSeries, ruleBase, ruleOf } from "./series";
 import { familyTimeZone, pendingConfirmations } from "./reminders";
 
 /**
@@ -87,7 +88,12 @@ async function deliver(ctx: Ctx, id: string, totals: NoticesResult): Promise<voi
       // Le lieu n'est jamais repris : une notification s'affiche sur l'écran verrouillé (D31, RF8).
       // Un invité secondaire concerné par un RDV enregistré d'office reçoit un texte sans demandeur (RF10).
       const auto = await trx.selectFrom("family_events").select("auto_confirmed").where("id", "=", row.event_id).executeTakeFirstOrThrow();
-      const body = row.kind === "event_to_confirm" ? eventToConfirmBody(notified, name, timeZone, ctx.now) : auto.auto_confirmed ? eventAddedAutoBody(notified, timeZone, ctx.now) : eventAddedBody(notified, name, timeZone, ctx.now);
+      let body = row.kind === "event_to_confirm" ? eventToConfirmBody(notified, name, timeZone, ctx.now) : auto.auto_confirmed ? eventAddedAutoBody(notified, timeZone, ctx.now) : eventAddedBody(notified, name, timeZone, ctx.now);
+      // Une série n'a qu'une notification, qui dit la règle de répétition et la première séance (US-113 RF9).
+      if (event.seriesId) {
+        const series = await loadSeries(trx, meta.account_id, event.seriesId);
+        if (series) body = (row.kind === "event_to_confirm" ? seriesToConfirmBody : seriesAddedBody)(notified, name, ruleBase(ruleOf(series)), timeZone);
+      }
       const badge = pushConfigured() ? await pendingConfirmations(trx, meta.account_id, ctx.now) : 0;
       const sent = await sendPush(ctx, row.recipient_user_id, { title: "Assistant Famille", body, url: `/calendrier/rdv/${event.id}`, tag: `notice-${event.id}`, badge });
       if (sent.delivered > 0) {

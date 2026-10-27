@@ -63,6 +63,23 @@ export function eventToConfirmBody(event: NotifiedEvent, requester: string, time
   return `À confirmer — ${requester} a demandé : ${event.title}, ${weekdayOf(event, timeZone, now)} ${timeOf(event, timeZone)}`;
 }
 
+const lowerFirst = (text: string) => text.charAt(0).toLowerCase() + text.slice(1);
+
+/** « Camille a ajouté : Foot — Léo, chaque mercredi à 14h00, à partir du 05/11 » : une série n'a qu'une notification (US-113 RF9). */
+export function seriesAddedBody(event: NotifiedEvent, requester: string, rule: string, timeZone: string): string {
+  return `${requester} a ajouté : ${seriesPhrase(event, rule, timeZone)}`;
+}
+
+/** « À confirmer — Camille a demandé : Foot — Léo, chaque mercredi à 14h00, à partir du 05/11 » (US-113 RF9, RF3). */
+export function seriesToConfirmBody(event: NotifiedEvent, requester: string, rule: string, timeZone: string): string {
+  return `À confirmer — ${requester} a demandé : ${seriesPhrase(event, rule, timeZone)}`;
+}
+
+function seriesPhrase(event: NotifiedEvent, rule: string, timeZone: string): string {
+  const local = utcToLocal(event.startsAt, timeZone);
+  return `${event.title}, ${lowerFirst(rule)} ${event.allDay ? "toute la journée" : `à ${clock(local)}`}, à partir du ${local.slice(8, 10)}/${local.slice(5, 7)}`;
+}
+
 /** « jeudi 5 novembre à 18h00 » : jour entier et heure, pour un avis qui ne dit pas « demain » (AT-8). */
 function dayAndTime(event: NotifiedEvent, timeZone: string): string {
   const day = new Intl.DateTimeFormat("fr-FR", { timeZone, weekday: "long", day: "numeric", month: "long" }).format(event.startsAt);

@@ -77,6 +77,52 @@ function MyNotifications({ pushState }: { pushState: string }) {
   );
 }
 
+interface ZoneSetting {
+  zone: "A" | "B" | "C" | null;
+  canEdit: boolean;
+  holidaysLoaded: boolean;
+}
+
+/** Zone scolaire de la famille, pour « Sauf vacances scolaires » des RDV récurrents (US-109 RF4) : lue par tous, réglée par les parents. */
+function SchoolZone() {
+  const query = useApiQuery<{ setting: ZoneSetting }>("/api/family/school-zone");
+  const mutation = useApiMutation();
+  const [confirmed, setConfirmed] = useState<ZoneSetting | null>(null);
+  const [pending, setPending] = useState(false);
+  const setting = confirmed ?? query.data?.setting ?? null;
+
+  async function change(zone: string) {
+    setPending(true);
+    const result = await mutation.run<{ setting: ZoneSetting }>("/api/family/school-zone", { method: "PATCH", body: { zone: zone || null } });
+    setPending(false);
+    if (result) setConfirmed(result.setting);
+  }
+
+  return (
+    <Section title="Zone scolaire">
+      <p className={styles.hint}>Sert à l&apos;option « Sauf vacances scolaires » des rendez-vous qui se répètent. Sans zone choisie, l&apos;option n&apos;est pas proposée.</p>
+      {query.loading && !setting && <Loading slow={query.slow} />}
+      {query.error && <RetryNotice message={query.error.kind === "server" ? "La zone scolaire n'a pas pu être chargée." : query.error.message} onRetry={query.reload} />}
+      {setting && (
+        <div className={styles.settingRow}>
+          <label className={styles.settingType} htmlFor="school-zone">
+            Zone de la famille
+          </label>
+          <select id="school-zone" className={styles.select} value={setting.zone ?? ""} disabled={!setting.canEdit || pending} onChange={(e) => void change(e.target.value)}>
+            <option value="">Non réglée</option>
+            <option value="A">Zone A</option>
+            <option value="B">Zone B</option>
+            <option value="C">Zone C</option>
+          </select>
+          {!setting.canEdit && <span className={styles.hint}>Lecture seule — seuls les parents peuvent la modifier.</span>}
+          {setting.zone && !setting.holidaysLoaded && <span className={styles.hint}>Les dates de vacances de cette zone ne sont pas encore chargées : l&apos;option ne retirerait aucune séance.</span>}
+        </div>
+      )}
+      {mutation.error && <Notice tone="error">{mutation.error.kind === "server" ? "La zone n'a pas pu être enregistrée." : mutation.error.message}</Notice>}
+    </Section>
+  );
+}
+
 /**
  * Réglages de l'Assistant Famille. Pour l'instant : les délais de rappel par type de rendez-vous (US-82) et l'accès aux membres de la famille.
  * Chaque interrupteur est enregistré dès qu'on le touche ; il garde sa position précédente tant que le serveur n'a pas répondu, et en cas d'échec.
@@ -118,6 +164,8 @@ export function SettingsScreen() {
   return (
     <AppShell title="Réglages" subtitle="Assistant Famille" back={{ href: "/assistant", label: "Assistant Famille" }}>
       <MyNotifications pushState={push} />
+
+      <SchoolZone />
 
       <Section title="Délais de rappel par type de RDV">
         <p className={styles.hint}>Les rappels et les relances sont envoyés par email aux deux parents du foyer. Ces réglages valent pour toute la famille.</p>

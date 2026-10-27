@@ -1,6 +1,7 @@
 import { sql } from "kysely";
 import type { Ctx } from "@/server/auth/service";
 import { runAutoConfirm, runEventNotices, type NoticesResult } from "@/server/assistant/notices";
+import { completeSeries } from "@/server/assistant/series";
 import { runReminders, type RemindersResult } from "@/server/assistant/reminders";
 import { cleanupExports } from "@/server/compliance/exports";
 import { runLifecycle, type LifecycleResult } from "@/server/compliance/lifecycle";
@@ -37,6 +38,8 @@ export async function runDueJobs(ctx: Ctx, options: { force?: boolean } = {}): P
   const exports = await cleanupExports(ctx);
   // Les rappels partent à l'heure dite : à chaque passage. Une panne de ce traitement ne doit pas bloquer les autres.
   // Ordre d'un passage de 5 minutes : notifications de RDV (la base les remet en accord avec l'état des RDV, les réserve, puis on les envoie), puis rappels et relances.
+  // Séries de RDV : séances complétées vers l'avant, séries sans réponse fermées à leur première séance (US-109).
+  await completeSeries(ctx.db, ctx.now).catch((error) => console.error(`Séries de RDV : ${describeError(error)}`));
   // Enregistrement sans réponse (AT-8) : éteint tant que AUTO_CONFIRM_MODE n'est pas « on ».
   await runAutoConfirm(ctx).catch((error) => console.error(`Enregistrement sans réponse : ${describeError(error)}`));
   const notices = await runEventNotices(ctx).catch((error) => {

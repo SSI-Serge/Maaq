@@ -1,13 +1,38 @@
 "use client";
 
 import { useState } from "react";
-import { useApiMutation } from "@/client/hooks";
+import { useApiMutation, useApiQuery } from "@/client/hooks";
 import { Button, Notice, RetryNotice } from "@/components/ui";
 import type { EventType } from "@/server/assistant/calendar";
 import type { ConflictView, EventView, MemberChip } from "@/server/assistant/events";
 import { clock, dayOf, EVENT_TYPE_OPTIONS, formTime, shortDate } from "./format";
 import { FALLBACK_COLOR } from "./parts";
 import styles from "./family.module.css";
+
+type Frequency = "weekly" | "biweekly" | "monthly_day" | "monthly_weekday";
+type Scope = "this" | "following" | "all";
+
+const FREQUENCIES: { value: "none" | Frequency; label: string }[] = [
+  { value: "none", label: "Ne se répète pas" },
+  { value: "weekly", label: "Chaque semaine" },
+  { value: "biweekly", label: "Toutes les deux semaines" },
+  { value: "monthly_day", label: "Chaque mois, le même jour du mois" },
+  { value: "monthly_weekday", label: "Chaque mois, le même jour de la semaine" },
+];
+const WEEKDAYS = [
+  { value: 1, label: "L", name: "lundi" },
+  { value: 2, label: "M", name: "mardi" },
+  { value: 3, label: "M", name: "mercredi" },
+  { value: 4, label: "J", name: "jeudi" },
+  { value: 5, label: "V", name: "vendredi" },
+  { value: 6, label: "S", name: "samedi" },
+  { value: 7, label: "D", name: "dimanche" },
+];
+const SCOPES: { value: Scope; label: string }[] = [
+  { value: "this", label: "Cette séance" },
+  { value: "following", label: "Cette séance et les suivantes" },
+  { value: "all", label: "Toute la série" },
+];
 
 const MAX_TITLE = 100;
 const MAX_PLACE = 200;
@@ -48,13 +73,29 @@ export function EventForm({ event, members, onSaved, onCancel, onStale }: Props)
   const [notes, setNotes] = useState(event.notes ?? "");
   const save = useApiMutation();
 
+  // Répétition (US-109 RF7) : un RDV provisoire peut devenir une série ; une série se modifie pour la portée choisie (RF8).
+  const series = event.series;
+  const confirmedSeries = series?.status === "confirmed";
+  const [frequency, setFrequency] = useState<"none" | Frequency>(series?.repetition.frequency ?? "none");
+  const [weekdays, setWeekdays] = useState<number[]>(series?.repetition.weekdays ?? []);
+  const [endKind, setEndKind] = useState<"date" | "count" | "never">(series?.repetition.end.kind ?? "date");
+  const [untilDate, setUntilDate] = useState(series?.repetition.end.kind === "date" ? series.repetition.end.date : "");
+  const [count, setCount] = useState(series?.repetition.end.kind === "count" ? String(series.repetition.end.count) : "10");
+  const [skipHolidays, setSkipHolidays] = useState(series?.repetition.skipSchoolHolidays ?? false);
+  const [scope, setScope] = useState<Scope>("this");
+  const zone = useApiQuery<{ setting: { zone: string | null } }>("/api/family/school-zone");
+  const canRepeat = event.status === "provisional" || Boolean(series);
+  const repeating = frequency !== "none";
+  const endError = !repeating ? null : endKind === "date" ? (!untilDate ? "Indiquez la date de fin, ou choisissez « Sans fin »." : untilDate < date ? "La date de fin doit être après la première séance." : null) : endKind === "count" ? (!/^\d+$/.test(count) || Number(count) < 1 || Number(count) > 400 ? "Indiquez un nombre de séances entre 1 et 400." : null) : null;
+  const scopeAll = !series || !confirmedSeries || scope !== "this";
+
   const multiDay = dayOf(event.start) !== dayOf(event.end);
   const lastDay = multiDay || allDay ? endDate : date;
   const rangeError = !allDay && endTime && lastDay === date && endTime <= startTime ? "L'heure de fin doit être après l'heure de début." : null;
   const dateError = allDay && endDate < date ? "La date de fin doit être après la date de début." : !date ? "La date est obligatoire." : null;
   const titleError = !title.trim() ? "Le titre est obligatoire." : title.length > MAX_TITLE ? `Le titre ne peut pas dépasser ${MAX_TITLE} caractères.` : null;
   const membersError = !allFamily && memberIds.length === 0 ? "Choisissez au moins un membre concerné." : null;
-  const invalid = Boolean(titleError || rangeError || dateError || membersError || place.length > MAX_PLACE || notes.length > MAX_NOTES);
+  const invalid = Boolean(titleError || rangeError || dateError || membersError || endError || place.length > MAX_PLACE || notes.length > MAX_NOTES);
 
   function toggleMember(id: string) {
     setMemberIds((current) => (current.includes(id) ? current.filter((m) => m !== id) : [...current, id]));
@@ -68,6 +109,18 @@ export function EventForm({ event, members, onSaved, onCancel, onStale }: Props)
         start: allDay ? date : `${date}T${startTime}`,
         end: allDay ? endDate : multiDay ? `${endDate}T${endTime}` : endTime ? `${date}T${endTime}` : null,
         place: place.trim() || null, notes: notes.trim() || null,
+        ...(confirmedSeries ? { scope } : {}),
+        // Pas de nouvelle règle pour « cette séance » seule : elle reste une séance de la série.
+        ...(repeating && scopeAll && canRepeat
+          ? {
+              repetition: {
+                frequency,
+                ...(frequency === "weekly" || frequency === "biweekly" ? { weekdays: weekdays.length ? weekdays : undefined } : {}),
+                end: endKind === "date" ? { kind: "date", date: untilDate } : endKind === "count" ? { kind: "count", count: Number(count) } : { kind: "never" },
+                skipSchoolHolidays: skipHolidays && Boolean(zone.data?.setting.zone),
+              },
+            }
+          : {}),
       },
     });
     if (result) onSaved(result.event);
@@ -138,6 +191,66 @@ export function EventForm({ event, members, onSaved, onCancel, onStale }: Props)
             <input type="time" className={`${styles.input} ${rangeError ? styles.inputError : ""}`} value={endTime} onChange={(e) => setEndTime(e.target.value)} disabled={save.pending} />
           </Field>
         </div>
+      )}
+
+      {canRepeat && (
+        <fieldset className={styles.field} disabled={save.pending}>
+          <legend className={styles.label}>Répétition</legend>
+          {confirmedSeries && (
+            <div className={styles.members} role="radiogroup" aria-label="Portée de la modification">
+              {SCOPES.map((s) => (
+                <button key={s.value} type="button" role="radio" aria-checked={scope === s.value} className={styles.chipToggle} onClick={() => setScope(s.value)}>
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          )}
+          {scopeAll ? (
+            <>
+              <select className={styles.select} value={frequency} onChange={(e) => setFrequency(e.target.value as "none" | Frequency)} aria-label="Répétition" disabled={Boolean(series)}>
+                {FREQUENCIES.filter((o) => !series || o.value !== "none").map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+              {(frequency === "weekly" || frequency === "biweekly") && (
+                <div className={styles.members} role="group" aria-label="Jours de la semaine">
+                  {WEEKDAYS.map((w) => (
+                    <button key={w.value} type="button" className={styles.chipToggle} aria-pressed={weekdays.includes(w.value)} aria-label={w.name} onClick={() => setWeekdays((cur) => (cur.includes(w.value) ? cur.filter((x) => x !== w.value) : [...cur, w.value]))}>
+                      {w.label}
+                    </button>
+                  ))}
+                  <span className={styles.hint}>Sans jour choisi, le jour de la première séance.</span>
+                </div>
+              )}
+              {repeating && (
+                <>
+                  <select className={styles.select} value={endKind} onChange={(e) => setEndKind(e.target.value as "date" | "count" | "never")} aria-label="Fin de la répétition">
+                    <option value="date">Jusqu&apos;à une date</option>
+                    <option value="count">Après un nombre de séances</option>
+                    <option value="never">Sans fin</option>
+                  </select>
+                  {endKind === "date" && <input type="date" className={styles.input} value={untilDate} min={date} onChange={(e) => setUntilDate(e.target.value)} aria-label="Date de fin" />}
+                  {endKind === "count" && <input type="number" className={styles.input} value={count} min={1} max={400} onChange={(e) => setCount(e.target.value)} aria-label="Nombre de séances" />}
+                  {endError && (
+                    <span className={styles.fieldError} role="alert">
+                      {endError}
+                    </span>
+                  )}
+                  {zone.data?.setting.zone && (
+                    <label className={styles.check}>
+                      <input type="checkbox" checked={skipHolidays} onChange={(e) => setSkipHolidays(e.target.checked)} />
+                      Sauf vacances scolaires (zone {zone.data.setting.zone})
+                    </label>
+                  )}
+                </>
+              )}
+            </>
+          ) : (
+            <span className={styles.hint}>Cette séance seule est modifiée ; elle reste rattachée à la série avec la mention « Modifiée ».</span>
+          )}
+        </fieldset>
       )}
 
       <Field label="Lieu" error={place.length > MAX_PLACE ? `Le lieu ne peut pas dépasser ${MAX_PLACE} caractères.` : null}>

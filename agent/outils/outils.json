@@ -81,7 +81,25 @@
         "membres": {"type": "array", "items": {"type": "string"}, "description": "Références des membres concernés."},
         "lieu": {"type": "string", "description": "Jamais pour un rendez-vous médical."},
         "notes": {"type": "string", "description": "Préparation nécessaire, informations utiles. Jamais pour un rendez-vous médical."},
-        "recurrence": {"type": "string", "description": "Si le rendez-vous se répète, ex. « hebdomadaire, le mercredi » (facultatif)."},
+        "repetition": {
+          "type": "object",
+          "description": "Si le rendez-vous se répète (« tous les mercredis »). `debut` et `fin` décrivent la première séance. Une seule série est créée, que la famille confirme d'un geste.",
+          "properties": {
+            "frequence": {"type": "string", "enum": ["hebdomadaire", "toutes_les_2_semaines", "mensuelle_jour_du_mois", "mensuelle_jour_de_la_semaine"], "description": "mensuelle_jour_du_mois : chaque mois le même jour (le 5). mensuelle_jour_de_la_semaine : chaque mois le même jour de la semaine (le premier mardi)."},
+            "jours": {"type": "array", "items": {"type": "string", "enum": ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]}, "description": "Jours de la semaine, pour hebdomadaire et toutes_les_2_semaines. Par défaut, le jour de `debut`."},
+            "fin": {
+              "type": "object",
+              "properties": {
+                "type": {"type": "string", "enum": ["date", "seances", "jamais"]},
+                "date": {"type": "string", "description": "AAAA-MM-JJ, dernier jour possible (type date)."},
+                "nombre": {"type": "integer", "description": "Nombre de séances (type seances)."}
+              },
+              "required": ["type"]
+            },
+            "sauf_vacances_scolaires": {"type": "boolean", "description": "Vrai seulement si la famille le demande."}
+          },
+          "required": ["frequence", "fin"]
+        },
         "source": {"type": "string", "enum": ["saisie", "dictee", "capture", "mail"]}
       },
       "required": ["titre", "type", "debut", "fin", "journee_entiere", "membres", "source"],

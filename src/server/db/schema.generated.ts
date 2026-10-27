@@ -17,6 +17,8 @@ export type AnonymizationStatus = "done" | "none" | "pending";
 
 export type AuditAction = "account_created" | "account_updated" | "activation_link_resent" | "agent_blocked" | "agent_published" | "agent_reactivated" | "contract_archived" | "contract_created" | "contract_field_changed" | "contract_updated" | "device_revoked_by_admin";
 
+export type ChangeScope = "all" | "following" | "this";
+
 export type ChatErasureReason = "agent_removed" | "device_revoked" | "logout";
 
 export type ClassificationStatus = "classified" | "failed" | "pending";
@@ -118,6 +120,12 @@ export type RequirementOwner = "account" | "each_profile" | "primary_user";
 export type ScanStatus = "clean" | "infected" | "pending";
 
 export type SecurityEventType = "device_revoked" | "device_verified" | "login_email_changed" | "login_locked" | "password_changed" | "pattern_locked" | "pattern_recovered";
+
+export type SeriesEndKind = "count" | "date" | "never";
+
+export type SeriesMonthMode = "day_of_month" | "nth_weekday";
+
+export type SeriesRepeatUnit = "day" | "month" | "week";
 
 export type SessionEndReason = "account_grace_period" | "device_revoked" | "expired" | "guest_removed" | "logout";
 
@@ -686,6 +694,8 @@ export interface FamilyEventHistory {
   id: Generated<Int8>;
   occurred_at: Generated<Timestamp>;
   reason: EventChangeReason | null;
+  scope: ChangeScope | null;
+  series_id: string | null;
   to_status: EventStatus | null;
   user_id: string | null;
 }
@@ -722,9 +732,21 @@ export interface FamilyEvents {
    */
   fingerprint: Buffer;
   id: Generated<string>;
+  /**
+   * Séance modifiée seule : elle reste rattachée à la série avec la mention « Modifiée » et n'est plus touchée par « Toute la série » (D47)
+   */
+  is_modified: Generated<boolean>;
   location: Buffer | null;
   note: Buffer | null;
+  /**
+   * Date locale d'origine de la séance dans la série (clé stable, même après un déplacement)
+   */
+  occurrence_date: Timestamp | null;
   requested_by_user_id: string | null;
+  /**
+   * Série dont ce RDV est une séance (US-109). Série supprimée : la séance devient un RDV ordinaire
+   */
+  series_id: string | null;
   source: EventSource;
   source_at: Timestamp | null;
   source_group_id: string | null;
@@ -746,6 +768,85 @@ export interface FamilyEvents {
    */
   version: Generated<number>;
   whole_family: Generated<boolean>;
+}
+
+export interface FamilyEventSeries {
+  account_id: string;
+  all_day: Generated<boolean>;
+  confirmed_at: Timestamp | null;
+  confirmed_by_user_id: string | null;
+  created_at: Generated<Timestamp>;
+  created_via_agent_id: Int8 | null;
+  duration_minutes: Generated<number>;
+  end_kind: Generated<SeriesEndKind>;
+  /**
+   * Série terminée ou annulée : elle ne compte plus parmi les 30 séries actives et sera supprimée quand il ne lui restera plus de séance
+   */
+  ended_at: Timestamp | null;
+  event_type_id: number;
+  /**
+   * Première date de la règle (ancre de « toutes les deux semaines »)
+   */
+  first_date: Timestamp;
+  id: Generated<string>;
+  location: Buffer | null;
+  /**
+   * Coordonnées chiffrées du lieu (proposées par l'API Adresse), supprimées avec la série. NULL pour un RDV médical (pas de suivi de trajet). Jamais une adresse de domicile (D47)
+   */
+  location_point: Buffer | null;
+  /**
+   * Dernière date pour laquelle les séances sont créées (6 mois glissants) ; le planificateur ne complète que vers l'avant, sans recréer une séance déjà purgée
+   */
+  materialized_until: Timestamp | null;
+  month_day: number | null;
+  month_mode: SeriesMonthMode | null;
+  /**
+   * Série mensuelle « n-ième jour de la semaine » : 1 à 4, ou -1 pour le dernier
+   */
+  month_nth: number | null;
+  month_weekday: number | null;
+  note: Buffer | null;
+  /**
+   * Fin « après N séances » : compte les séances réellement tenues, hors vacances sautées (D47)
+   */
+  occurrence_count: number | null;
+  repeat_interval: Generated<number>;
+  repeat_unit: SeriesRepeatUnit;
+  requested_by_user_id: string | null;
+  series_timezone: Generated<string>;
+  skip_school_holidays: Generated<boolean>;
+  source: EventSource;
+  source_at: Timestamp | null;
+  source_inbound_email_id: string | null;
+  source_message_id: Int8 | null;
+  /**
+   * Série d'origine quand « Cette séance et les suivantes » a scindé la série
+   */
+  split_from_series_id: string | null;
+  /**
+   * Heure locale de début, dans le fuseau de la série : un changement d'heure ne décale pas l'heure locale d'une séance
+   */
+  start_time: string;
+  /**
+   * provisional, confirmed, cancelled ou dismissed. La confirmation est atomique (confirm_family_series) : toutes les séances à venir sont confirmées, ou aucune
+   */
+  status: Generated<EventStatus>;
+  status_changed_at: Generated<Timestamp>;
+  title: Buffer | null;
+  until_date: Timestamp | null;
+  updated_at: Generated<Timestamp>;
+  version: Generated<number>;
+  /**
+   * Jours de la semaine (ISO, 1 = lundi à 7 = dimanche) d'une série hebdomadaire
+   */
+  weekdays: number[] | null;
+  whole_family: Generated<boolean>;
+}
+
+export interface FamilyEventSeriesMembers {
+  account_id: string;
+  member_id: string;
+  series_id: string;
 }
 
 export interface FamilyMembers {
@@ -789,6 +890,14 @@ export interface FamilyReminderSettings {
   remind_d1: Generated<boolean>;
   remind_d7: Generated<boolean>;
   remind_day_of: Generated<boolean>;
+  updated_at: Generated<Timestamp>;
+  updated_by_user_id: string | null;
+}
+
+export interface FamilySettings {
+  account_id: string;
+  created_at: Generated<Timestamp>;
+  school_zone: string | null;
   updated_at: Generated<Timestamp>;
   updated_by_user_id: string | null;
 }
@@ -1002,6 +1111,15 @@ export interface ScheduledNotifications {
 export interface SchemaMigrations {
   applied_at: Generated<Timestamp>;
   name: string;
+}
+
+export interface SchoolHolidayPeriods {
+  ends_on: Timestamp;
+  id: Generated<number>;
+  label: string;
+  school_year: string;
+  starts_on: Timestamp;
+  zone: string;
 }
 
 export interface SecurityEvents {
@@ -1238,9 +1356,12 @@ export interface DB {
   family_event_change_proposals: FamilyEventChangeProposals;
   family_event_history: FamilyEventHistory;
   family_event_members: FamilyEventMembers;
+  family_event_series: FamilyEventSeries;
+  family_event_series_members: FamilyEventSeriesMembers;
   family_events: FamilyEvents;
   family_members: FamilyMembers;
   family_reminder_settings: FamilyReminderSettings;
+  family_settings: FamilySettings;
   forwarding_authorized_senders: ForwardingAuthorizedSenders;
   forwarding_consent_events: ForwardingConsentEvents;
   forwarding_mailboxes: ForwardingMailboxes;
@@ -1258,6 +1379,7 @@ export interface DB {
   push_subscriptions: PushSubscriptions;
   scheduled_notifications: ScheduledNotifications;
   schema_migrations: SchemaMigrations;
+  school_holiday_periods: SchoolHolidayPeriods;
   security_events: SecurityEvents;
   sessions: Sessions;
   storage_deletion_queue: StorageDeletionQueue;

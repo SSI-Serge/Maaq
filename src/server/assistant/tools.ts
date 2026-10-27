@@ -1,6 +1,8 @@
 import { sql, type Kysely } from "kysely";
 import type { DB } from "@/server/db/schema.generated";
 import { SOURCE_CODE, TYPE_CODE, eventTypeIds, findConflicts, fingerprintOf, loadCalendarEvent, loadCalendarEvents, type CalendarEvent, type EventSource, type EventStatus, type EventType } from "./calendar";
+import { createSeries, SeriesError } from "./series";
+import { ruleFromRepetition, type RepetitionInput } from "./series-ops";
 import { seal, sealOptional } from "./fields";
 import { isLocalDateTime, localDay, localMs, localToUtc, utcToLocal } from "./local-time";
 import { ageBand, fold, Pseudonymizer, type PseudoMember } from "./pseudonymize";
@@ -21,6 +23,34 @@ export const TYPE_TO_DB: Record<string, EventType> = {
   ecole: "school", medical: "medical", pro: "work", familial: "family", perso: "personal", admin: "admin",
 };
 const TYPE_FROM_DB: Record<EventType, string> = Object.fromEntries(Object.entries(TYPE_TO_DB).map(([fr, en]) => [en, fr])) as Record<EventType, string>;
+const DAYS_FR: Record<string, number> = { lundi: 1, mardi: 2, mercredi: 3, jeudi: 4, vendredi: 5, samedi: 6, dimanche: 7 };
+const FREQUENCY: Record<string, RepetitionInput["frequency"]> = {
+  hebdomadaire: "weekly", toutes_les_2_semaines: "biweekly", mensuelle_jour_du_mois: "monthly_day", mensuelle_jour_de_la_semaine: "monthly_weekday",
+};
+
+/** Répétition décrite par l'agent → règle de l'application ; toute incohérence revient au modèle comme une erreur d'outil. */
+function repetitionOf(value: unknown): RepetitionInput {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new ToolError("« repetition » doit être un objet");
+  const input = value as Record<string, unknown>;
+  const frequency = FREQUENCY[String(input.frequence)];
+  if (!frequency) throw new ToolError(`fréquence inconnue : « ${String(input.frequence)} » (attendu : ${Object.keys(FREQUENCY).join(", ")})`);
+  const days = Array.isArray(input.jours) ? input.jours.map((d) => DAYS_FR[String(d)]) : undefined;
+  if (days?.some((d) => !d)) throw new ToolError("jour de la semaine inconnu dans « jours »");
+  const end = input.fin as Record<string, unknown> | undefined;
+  if (!end || typeof end !== "object") throw new ToolError("« fin » est obligatoire : demandez « Jusqu'à quand ? » à l'utilisateur");
+  let fin: RepetitionInput["end"];
+  if (end.type === "date") {
+    if (typeof end.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(end.date)) throw new ToolError("date de fin illisible (attendu AAAA-MM-JJ)");
+    fin = { kind: "date", date: end.date };
+  } else if (end.type === "seances") {
+    const n = Number(end.nombre);
+    if (!Number.isInteger(n) || n < 1 || n > 400) throw new ToolError("nombre de séances invalide (1 à 400)");
+    fin = { kind: "count", count: n };
+  } else if (end.type === "jamais") fin = { kind: "never" };
+  else throw new ToolError("type de fin inconnu (attendu : date, seances, jamais)");
+  return { frequency, ...(days ? { weekdays: days } : {}), end: fin, skipSchoolHolidays: input.sauf_vacances_scolaires === true };
+}
+
 const STATUS_FR: Partial<Record<EventStatus, string>> = { provisional: "provisoire", confirmed: "confirme" };
 
 /** Limites des écrans (US-76 RF2) : titre 100 caractères, lieu 200, note 500. */
@@ -231,6 +261,29 @@ const TOOLS: Record<string, Tool> = {
     const place = medical ? null : (text(input.lieu, "lieu", { required: false, max: MAX_PLACE * 2 }) && ctx.pseudo.fromModel(String(input.lieu)).slice(0, MAX_PLACE));
     const notes = medical ? null : (text(input.notes, "notes", { required: false, max: MAX_NOTES * 2 }) && ctx.pseudo.fromModel(String(input.notes)).slice(0, MAX_NOTES));
     const ignored = medical && (input.lieu || input.notes);
+
+    // Un rendez-vous qui se répète devient une série : une seule proposition, confirmée d'un geste (US-109).
+    if (input.repetition !== undefined && input.repetition !== null) {
+      const repetition = repetitionOf(input.repetition);
+      const firstDate = start.slice(0, 10);
+      try {
+        const result = await createSeries(ctx.db, {
+          accountId: ctx.accountId, userId: ctx.userId, type, title: medical ? "" : title, place, notes, startTime: allDay ? "00:00" : start.slice(11, 16),
+          durationMinutes: allDay ? 1440 : Math.max(1, Math.round((to.getTime() - from.getTime()) / 60_000)), allDay, allFamily: false, memberIds: who.map((m) => m.id), firstDate,
+          rule: ruleFromRepetition(repetition, firstDate), timeZone: ctx.timeZone, source: ctx.source, sourceMessageId: ctx.sourceMessageId ?? null, now: ctx.now,
+        });
+        if (!ctx.created.ids.includes(result.eventIds[0])) ctx.created.ids.push(result.eventIds[0]);
+        return {
+          id: shortRef(result.eventIds[0]), statut: "provisoire", seances: result.eventIds.length,
+          message: "Série créée en provisoire, en attente de confirmation par la famille : une seule confirmation vaut pour toutes les séances.",
+          ...(ignored ? { avis: "Pour un rendez-vous médical, le lieu et les notes ne sont pas enregistrés par l'assistant." } : {}),
+        };
+      } catch (error) {
+        if (error instanceof SeriesError) throw new ToolError(error.message);
+        if ((error as { code?: string }).code === "23505") throw new ToolError("une série identique existe déjà à ces dates");
+        throw error;
+      }
+    }
 
     // Un rendez-vous actif identique (créneau, type, membres) existe déjà : on le rend, sans rien ajouter. C'est aussi ce qui rend la création
     // idempotente quand la même demande est rejouée (US-89 RT3).

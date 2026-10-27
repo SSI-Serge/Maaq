@@ -48,6 +48,8 @@ export function EventScreen({ id }: { id: string }) {
   const [pendingLabel, setPendingLabel] = useState<Action | null>(null);
   /** « Garder le créneau demandé » : choix explicite, exigé quand un conflit est affiché (US-74 RF7, CA 9.1). */
   const [kept, setKept] = useState(false);
+  /** Portée de l'annulation d'une séance de série (US-109 RF8). */
+  const [cancelScope, setCancelScope] = useState<"this" | "following" | "all">("this");
 
   const event = override ?? detail.data?.event;
 
@@ -82,11 +84,12 @@ export function EventScreen({ id }: { id: string }) {
   // Un conflit apparu entre-temps arrive avec la réponse refusée : la bannière est mise à jour avant toute confirmation (US-74 RF9).
   const error: ApiError | undefined = mutation.error;
   const code = error?.body?.code;
-  const fresh = code === "conflict" ? (error?.body?.details as { conflicts?: ConflictView[]; alternatives?: Slot[] } | undefined) : undefined;
+  const fresh = code === "conflict" ? (error?.body?.details as { conflicts?: ConflictView[]; alternatives?: Slot[]; sessions?: string[] } | undefined) : undefined;
+  const clashSessions = fresh?.sessions ?? event.series?.conflicts.sessions.map((s) => s.start) ?? [];
   const day = dayOf(event.start);
   const conflicts = fresh?.conflicts ?? event.conflicts;
   const alternatives = fresh?.alternatives ?? event.alternatives;
-  const mustChoose = conflicts.length > 0 && !slot && !kept;
+  const mustChoose = (conflicts.length > 0 || clashSessions.length > 0) && !slot && !kept;
   const provisional = event.status === "provisional";
   const setAside = event.status === "set_aside";
   const busy = mutation.pending;
@@ -114,7 +117,7 @@ export function EventScreen({ id }: { id: string }) {
     }
     const result = await mutation.run<{ event: EventView } | { id: string; status: "canceled" }>(`/api/family/events/${event.id}/${PATH[action]}`, {
       method: "POST",
-      body: { version, ...(action === "confirm" && kept ? { allowConflict: true } : {}) },
+      body: { version, ...(action === "confirm" && kept ? { allowConflict: true } : {}), ...(action === "cancel" && event.series ? { scope: cancelScope } : {}) },
     });
     if (!result) return;
     setKept(false);
@@ -215,6 +218,23 @@ export function EventScreen({ id }: { id: string }) {
             </Notice>
           )}
 
+          {/* Séances d'une série en conflit : « 3 séances sur 24 sont en conflit » (US-109 RF5) */}
+          {event.series && clashSessions.length > 0 && (provisional || setAside) && (
+            <div className={`${styles.alert} ${styles.alertWarning}`} role="alert" style={{ flexDirection: "column" }}>
+              <div>
+                {clashSessions.length} séance{clashSessions.length > 1 ? "s" : ""} sur {event.series.sessions} {clashSessions.length > 1 ? "sont" : "est"} en conflit avec un autre rendez-vous :
+              </div>
+              <div>{clashSessions.slice(0, 8).map((s) => `${shortDate(dayOf(s))} à ${clock(s)}`).join(" · ")}{clashSessions.length > 8 ? " …" : ""}</div>
+              {conflicts.length === 0 && (
+                <div className={styles.slots}>
+                  <button type="button" className={styles.slot} aria-pressed={kept} onClick={() => setKept(!kept)} disabled={busy}>
+                    Garder ces séances quand même
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Bannière de conflit et créneaux alternatifs (US-74 RF5 à RF8) */}
           {conflicts.length > 0 && (provisional || setAside || event.status === "confirmed") && (
             <div className={`${styles.alert} ${styles.alertWarning}`} role="alert" style={{ flexDirection: "column" }}>
@@ -255,6 +275,17 @@ export function EventScreen({ id }: { id: string }) {
                 </span>
               </span>
             </div>
+            {event.series && (
+              <div className={styles.row}>
+                <span className={styles.rowLabel}>Répétition</span>
+                <span className={styles.rowValue}>
+                  {event.series.rule}
+                  <span className={styles.rowSub}>
+                    <span className={styles.tag}>↻ Série</span> {event.series.modified && <span className={styles.tag}>Modifiée</span>}
+                  </span>
+                </span>
+              </div>
+            )}
             <div className={styles.row}>
               <span className={styles.rowLabel}>Qui</span>
               <span className={styles.rowValue}>
@@ -353,7 +384,21 @@ export function EventScreen({ id }: { id: string }) {
           {mode === "cancelConfirm" && (
             <div className={styles.dialog} role="alertdialog" aria-label="Annuler ce rendez-vous ?">
               <div className={styles.dialogTitle}>Annuler ce rendez-vous ?</div>
-              <div>Il sera retiré du calendrier familial.</div>
+              {event.series ? (
+                <div className={styles.members} role="radiogroup" aria-label="Portée de l'annulation">
+                  {[
+                    { value: "this" as const, label: "Cette séance" },
+                    { value: "following" as const, label: "Cette séance et les suivantes" },
+                    { value: "all" as const, label: "Toute la série" },
+                  ].map((s) => (
+                    <button key={s.value} type="button" role="radio" aria-checked={cancelScope === s.value} className={styles.chipToggle} onClick={() => setCancelScope(s.value)}>
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div>Il sera retiré du calendrier familial.</div>
+              )}
               <div className={styles.actionsRow}>
                 <Button variant="secondary" onClick={() => setMode("view")} disabled={busy}>
                   Revenir

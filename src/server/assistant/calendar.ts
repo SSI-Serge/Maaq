@@ -25,6 +25,7 @@ export const typeOfCode = (code: string): EventType => fromCode(TYPE_CODE, code)
 
 export interface CalendarEvent {
   id: string;
+  accountId: string;
   /** Titre affiché : celui du parent, ou « RDV médical — prénom » pour un rendez-vous médical, dont le titre n'est pas conservé. */
   title: string;
   type: EventType;
@@ -47,6 +48,11 @@ export interface CalendarEvent {
   autoConfirmed: boolean;
   /** Échéance d'enregistrement sans réponse d'un RDV provisoire ; vide = jamais (série, source hors tchat, proposé trop tard). */
   autoConfirmAt: Date | null;
+  /** Série dont ce RDV est une séance, et date locale d'origine de la séance (US-109). */
+  seriesId: string | null;
+  occurrenceDate: string | null;
+  /** Séance modifiée seule, qui reste rattachée à la série (mention « Modifiée »). */
+  isModified: boolean;
   memberIds: string[];
 }
 
@@ -80,8 +86,8 @@ function selectEvents(db: Kysely<DB>) {
     .selectFrom("family_events as e")
     .innerJoin("event_types as t", "t.id", "e.event_type_id")
     .select([
-      "e.id", "e.title", "t.code as type_code", "e.starts_at", "e.ends_at", "e.all_day", "e.location", "e.note", "e.status", "e.whole_family",
-      "e.version", "e.source", "e.requested_by_user_id", "e.status_changed_at", "e.updated_at", "e.auto_confirmed", "e.auto_confirm_at", changedBy,
+      "e.id", "e.account_id", "e.title", "t.code as type_code", "e.starts_at", "e.ends_at", "e.all_day", "e.location", "e.note", "e.status", "e.whole_family",
+      "e.version", "e.source", "e.requested_by_user_id", "e.status_changed_at", "e.updated_at", "e.auto_confirmed", "e.auto_confirm_at", "e.series_id", sql<string | null>`e.occurrence_date::text`.as("occurrence_date"), "e.is_modified", changedBy,
     ]);
 }
 
@@ -108,10 +114,10 @@ async function hydrate(db: Kysely<DB>, rows: Row[]): Promise<CalendarEvent[]> {
     return name && !r.whole_family ? `${MEDICAL_TITLE} — ${name}` : MEDICAL_TITLE;
   };
   return rows.map((r) => ({
-    id: r.id, title: titleOf(r), type: fromCode(TYPE_CODE, r.type_code), startsAt: r.starts_at, endsAt: r.ends_at, allDay: r.all_day,
+    id: r.id, accountId: r.account_id, title: titleOf(r), type: fromCode(TYPE_CODE, r.type_code), startsAt: r.starts_at, endsAt: r.ends_at, allDay: r.all_day,
     place: openOptional(r.location), notes: openOptional(r.note), status: fromCode(STATUS_CODE, r.status), allFamily: r.whole_family, version: r.version,
     source: fromCode(SOURCE_CODE, r.source), createdByUserId: r.requested_by_user_id, statusChangedAt: r.status_changed_at,
-    statusChangedByUserId: r.changed_by_user_id, updatedAt: r.updated_at, autoConfirmed: r.auto_confirmed, autoConfirmAt: r.auto_confirm_at, memberIds: byEvent.get(r.id) ?? [],
+    statusChangedByUserId: r.changed_by_user_id, updatedAt: r.updated_at, autoConfirmed: r.auto_confirmed, autoConfirmAt: r.auto_confirm_at, seriesId: r.series_id, occurrenceDate: r.occurrence_date, isModified: r.is_modified, memberIds: byEvent.get(r.id) ?? [],
   }));
 }
 

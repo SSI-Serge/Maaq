@@ -193,6 +193,27 @@ tolérance de 60 minutes, jamais en cas de conflit ou de membre à préciser). `
 - **Seconde relance** : ajoute « Sans réponse de votre part, ce RDV sera ajouté à votre calendrier dans 24 h. » quand l'enregistrement est en service pour ce RDV.
 - Reste pour le lot 5 : les tâches proposées passent à « à faire » avec le RDV ; pour le lot 4 : une série jamais confirmée est fermée à sa première séance.
 
+## Lot 4 du MVP2 : RDV récurrents (US-109)
+
+Migration copiée de la session « base de données » (`0006_lot4_schema.sql`). Une **série** est une règle et un modèle ; ses **séances sont de vrais RDV**, créées à l'avance sur 6 mois glissants
+(réglage `event_series_horizon_months`) : conflits, rappels et tâches s'appliquent à chacune.
+- **Code** : `series.ts` (calcul des dates, libellé de la règle, création, complétion par le planificateur), `series-ops.ts` (présentation, confirmation, annulation et modification avec portée),
+  `school-zone.ts`, `scripts/import-school-holidays.ts`. Règles de statut, tout-ou-rien de la confirmation et plafond de 30 séries actives : dans la base.
+- **Calcul** : par jours locaux, donc un changement d'heure ne décale pas l'heure locale d'une séance. Chaque semaine (un ou plusieurs jours), toutes les deux semaines, chaque mois le même jour du mois
+  (le 31 se replie sur le dernier jour) ou le même jour de la semaine (premier… dernier). Fin : date, nombre de séances tenues (vacances sautées exclues), ou sans fin.
+- **Agent** : l'outil `creer_evenement_provisoire` prend une `repetition` structurée (à la place du texte libre `recurrence`) ; les consignes lui font demander « Jusqu'à quand ? » si la fin manque.
+  **Non mesuré avec le vrai modèle** : il faut relancer le banc d'essai (`scripts/assistant-bench.ts`) et ajouter des cas de série avant le pilote.
+- **Confirmation** : « Confirmer le rendez-vous » confirme la série entière (toutes les séances ou aucune) ; les séances en conflit sont comptées et listées (« 3 séances sur 24 »), à garder explicitement. « Ignorer » ferme toute la série.
+- **Portée** (formulaire et annulation) : « Cette séance » (reste rattachée, mention « Modifiée »), « Cette séance et les suivantes » (la série est scindée, l'ancienne s'arrête la veille), « Toute la série »
+  (les séances modifiées seules ne sont pas touchées). Un RDV provisoire peut devenir une série depuis le formulaire (CA 7.1).
+- **Rappels** : une série hebdomadaire n'envoie que J-1 par séance ; toutes les deux semaines et mensuelle suivent les délais du type. **Relance** : une seule, pour la première séance. Notification de l'autre parent :
+  une seule pour toute la série (« Camille a ajouté : Foot — Léo, chaque mercredi à 14h00, à partir du 05/11 »). Jamais d'enregistrement sans réponse pour une série ; une série jamais confirmée est fermée au début de sa première séance.
+- **Vacances** : `school_holiday_periods` est chargée à la main avec `npx tsx scripts/import-school-holidays.ts --annees 2025-2026,2026-2027,2027-2028` (source : calendrier scolaire de l'Éducation nationale,
+  Licence Ouverte ; `--dry-run` pour relire). Couverture constatée le 27/10/2026 : 2025-2026 et 2026-2027 complètes pour les trois zones ; 2027-2028 sans les vacances d'été ; 2028-2029 absente. Convention : `end_date`
+  est le jour de la rentrée, la dernière journée de vacances est la veille. La zone se règle dans Réglages (parents), sans zone l'option « Sauf vacances scolaires » n'est pas proposée.
+- **Pas encore fait** : alerte de l'administrateur en septembre si l'année scolaire suivante manque ; proposition de saisir l'adresse et d'activer le calcul des trajets à la création (CA 11.1, avec US-107, lot 8) ;
+  tâches liées aux séances (lot 5).
+
 ## Réglages
 Voir `.env.example`. Tout est facultatif tant que `ASSISTANT_MODE=off`.
 ```

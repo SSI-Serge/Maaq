@@ -9,6 +9,7 @@ import { isLocalDateTime, localMs, localToUtc, utcToLocal } from "./local-time";
 import { env } from "@/server/env";
 import { notifyAfterConfirmation } from "./notices";
 import { cancelPendingNotices, reminderDetails, type NudgeView, type ReminderView } from "./reminders";
+import { SCOPES, cancelSeries, conflictingSessions, confirmSeries, rewriteSeries, seriesView, splitSeries, transformToSeries, type RepetitionInput, type Scope, type SeriesEdit, type SeriesView } from "./series-ops";
 
 /**
  * Cycle de vie des rendez-vous du calendrier familial (US-74 à US-80) : consulter, confirmer, modifier, écarter, annuler.
@@ -69,6 +70,9 @@ export interface EventView {
   statusChange: { byFirstName: string | null; at: string; auto: boolean } | null;
   /** Pour un RDV provisoire, quand l'enregistrement sans réponse est en service : l'échéance (heure locale), ou « jamais » (US-95, UX). */
   autoConfirm: { at: string } | { never: true } | null;
+  /** Séance d'une série (US-109) : la règle, la mention « Modifiée », les séances en conflit. Rempli dans le détail seulement ; `recurring` partout. */
+  recurring: boolean;
+  series: SeriesView | null;
   can: EventActions;
   /** Autres rendez-vous en conflit avec celui-ci (provisoires, confirmés ; écartés et annulés ne comptent pas). */
   conflicts: ConflictView[];
@@ -147,6 +151,8 @@ function toView(v: Viewer, e: CalendarEvent, members: Map<string, MemberChip>, n
     place: e.place, notes: e.notes, allFamily: e.allFamily, members: chips, source: e.source, requestedBy: e.createdByUserId ? (names.get(e.createdByUserId) ?? null) : null,
     version: e.version, past: isPast(e, now), statusChange: { byFirstName: e.statusChangedByUserId ? (names.get(e.statusChangedByUserId) ?? null) : null, at: e.statusChangedAt.toISOString(), auto: e.autoConfirmed },
     autoConfirm: autoConfirmOf(v, e),
+    recurring: Boolean(e.seriesId),
+    series: null,
     can: actionsFor(v, e, now), conflicts: [], alternatives: [], reminders: [], nudge: null,
   };
 }
@@ -248,7 +254,7 @@ export async function getEvent(ctx: Ctx, session: SessionContext, id: string): P
   const members = await loadMembers(ctx.db, v.accountId);
   const names = await firstNames(ctx.db, [e.createdByUserId, e.statusChangedByUserId]);
   const view = await withConflicts(ctx.db, v, toView(v, e, members, names, ctx.now), e, ctx.now);
-  return { ...view, ...(await reminderDetails(ctx.db, v.accountId, e, v.timeZone, ctx.now)) };
+  return { ...view, series: await seriesView(ctx.db, e, v.timeZone), ...(await reminderDetails(ctx.db, v.accountId, e, v.timeZone, ctx.now)) };
 }
 
 /** Confirmations en attente d'un profil (US-75 RF4, US-84) : provisoires qu'il peut traiter, à venir. Les écartés n'y figurent plus. */
@@ -257,6 +263,7 @@ export async function listPending(ctx: Ctx, session: SessionContext): Promise<Ev
   const events = (await loadCalendarEvents(ctx.db, v.accountId, { from: ctx.now, to: new Date(ctx.now.getTime() + 800 * 86_400_000) }, ["provisional"]))
     .filter((e) => canSee(v, e) && canAct(v, e) && !isPast(e, ctx.now));
   const members = await loadMembers(ctx.db, v.accountId);
+  events.splice(0, events.length, ...firstOfEachSeries(events));
   const names = await firstNames(ctx.db, events.flatMap((e) => [e.createdByUserId, e.statusChangedByUserId]));
   return events.map((e) => toView(v, e, members, names, ctx.now));
 }
@@ -265,11 +272,26 @@ export async function listPending(ctx: Ctx, session: SessionContext): Promise<Ev
 export async function listUpcoming(ctx: Ctx, session: SessionContext, limit = 10): Promise<EventView[]> {
   const v = await viewerOf(ctx, session);
   const events = (await loadCalendarEvents(ctx.db, v.accountId, { from: ctx.now, to: new Date(ctx.now.getTime() + 400 * 86_400_000) }, ["provisional", "confirmed"]))
-    .filter((e) => canSee(v, e))
-    .slice(0, limit);
+    .filter((e) => canSee(v, e));
+  events.splice(limit);
   const members = await loadMembers(ctx.db, v.accountId);
   const names = await firstNames(ctx.db, events.flatMap((e) => [e.createdByUserId, e.statusChangedByUserId]));
   return events.map((e) => toView(v, e, members, names, ctx.now));
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------
+// Séries
+// ---------------------------------------------------------------------------------------------------------------------------
+
+/** Une série provisoire n'attend qu'une confirmation : seule sa première séance figure dans les confirmations en attente (US-109 RF6). */
+function firstOfEachSeries(events: CalendarEvent[]): CalendarEvent[] {
+  const seen = new Set<string>();
+  return events.filter((e) => {
+    if (!e.seriesId) return true;
+    if (seen.has(e.seriesId)) return false;
+    seen.add(e.seriesId);
+    return true;
+  });
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------
@@ -281,6 +303,8 @@ export interface ChangeOptions {
   expectedVersion?: number;
   /** Confirmer ou enregistrer malgré un conflit (US-74 RF7, US-80 RF3). */
   allowConflict?: boolean;
+  /** Portée sur une série : « cette séance » (par défaut), « cette séance et les suivantes », « toute la série » (US-109 RF8). */
+  scope?: Scope;
 }
 
 async function already(db: Kysely<DB>, e: CalendarEvent): Promise<Rejection> {
@@ -308,11 +332,22 @@ export async function confirmEvent(ctx: Ctx, session: SessionContext, id: string
     if (isPast(e, ctx.now)) throw fail("event_past", "Ce rendez-vous est déjà passé.", 409);
     // US-74 RF9 : le conflit est vérifié à nouveau au moment de la confirmation.
     const { views } = await conflictsOf(trx, v, e);
+    if (e.seriesId) {
+      // Une série se confirme d'un geste, toutes ses séances ou aucune (US-109 RF6, RT2) ; les séances en conflit sont signalées (RF5).
+      const clashes = await conflictingSessions(trx, e.seriesId);
+      if ((views.length || clashes.length) && !options.allowConflict) {
+        throw fail("conflict", "Une ou plusieurs séances chevauchent un autre rendez-vous.", 409, { conflicts: views, alternatives: [], sessions: clashes.map((c) => utcToLocal(c.startsAt, v.timeZone)) });
+      }
+      await confirmSeries(trx, e, v.userId);
+      await cancelPendingNotices(trx, id, ["follow_up_24h", "follow_up_48h"]);
+      return;
+    }
     if (views.length && !options.allowConflict) throw fail("conflict", "Ce créneau chevauche un autre rendez-vous.", 409, { conflicts: views, alternatives: await nearestSlots(trx, v, e, ctx.now) });
     await changeStatus(trx, e, "confirmed", v.userId);
     await cancelPendingNotices(trx, id, ["follow_up_24h", "follow_up_48h"]);
   });
   // L'autre parent est prévenu tout de suite, une fois la confirmation enregistrée (US-113 RT1) ; le planificateur reprend en cas d'échec.
+  // Une série n'a qu'une notification, celle de sa première séance (US-113 RF9).
   await notifyAfterConfirmation(ctx, id);
   return getEvent(ctx, session, id);
 }
@@ -324,8 +359,15 @@ export async function setAsideEvent(ctx: Ctx, session: SessionContext, id: strin
     const e = await locked(trx, v, id);
     if (e.status !== "provisional") throw await already(trx, e);
     if (options.expectedVersion !== undefined && options.expectedVersion !== e.version) throw stale(e);
-    await changeStatus(trx, e, "set_aside", v.userId);
+    // « Ignorer » une série provisoire l'écarte tout entière : ses séances sont ignorées (US-109).
+    if (e.seriesId) await cancelSeries(trx, e, "all", v.userId);
+    else await changeStatus(trx, e, "set_aside", v.userId);
   });
+  if (!(await loadCalendarEvent(ctx.db, v.accountId, id).then((e) => e && VISIBLE.includes(e.status)))) {
+    // La série ignorée n'est plus visible : on rend l'état de la séance, sans le détail.
+    const e = (await loadCalendarEvent(ctx.db, v.accountId, id))!;
+    return toView(v, e, await loadMembers(ctx.db, v.accountId), await firstNames(ctx.db, [e.createdByUserId]), ctx.now);
+  }
   return getEvent(ctx, session, id);
 }
 
@@ -337,6 +379,12 @@ export async function cancelEvent(ctx: Ctx, session: SessionContext, id: string,
     if (e.status !== "confirmed") throw e.status === "canceled" || e.status === "ignored" ? stale(e) : fail("not_confirmed", "Seul un rendez-vous confirmé peut être annulé.", 409);
     if (options.expectedVersion !== undefined && options.expectedVersion !== e.version) throw stale(e);
     if (isPast(e, ctx.now)) throw fail("event_past", "Ce rendez-vous est déjà passé.", 409);
+    if (e.seriesId) {
+      const scope = options.scope && SCOPES.includes(options.scope) ? options.scope : "this";
+      await cancelSeries(trx, e, scope, v.userId);
+      await cancelPendingNotices(trx, id, ["reminder_d7", "reminder_d1", "reminder_day_of"]);
+      return;
+    }
     await changeStatus(trx, e, "canceled", v.userId);
     await cancelPendingNotices(trx, id, ["reminder_d7", "reminder_d1", "reminder_day_of"]);
   });
@@ -354,6 +402,8 @@ export interface EventChanges {
   allDay: boolean;
   place?: string | null;
   notes?: string | null;
+  /** Répétition (US-109 RF7) : transforme un RDV provisoire en série, ou change la règle d'une série. */
+  repetition?: RepetitionInput | null;
 }
 
 function validated(v: Viewer, input: EventChanges, validMembers: Set<string>): { title: string; place: string | null; notes: string | null; from: Date; to: Date; endIsDefault: boolean } {
@@ -400,6 +450,7 @@ export async function updateEvent(ctx: Ctx, session: SessionContext, id: string,
   const v = await viewerOf(ctx, session);
   const members = await loadMembers(ctx.db, v.accountId);
   const checked = validated(v, changes, new Set(members.keys()));
+  let resultId = id;
   await ctx.db.transaction().execute(async (trx) => {
     const e = await locked(trx, v, id);
     if (e.status !== "provisional" && e.status !== "confirmed") throw e.status === "canceled" || e.status === "ignored" ? stale(e) : await already(trx, e);
@@ -408,6 +459,27 @@ export async function updateEvent(ctx: Ctx, session: SessionContext, id: string,
     // Un membre retiré n'est plus proposé (US-93 RF6) ; il peut rester sur un rendez-vous où il figure déjà.
     if (!changes.allFamily && changes.memberIds.some((m) => members.get(m)?.removed && !e.memberIds.includes(m))) {
       throw fail("invalid_members", "Un des membres choisis a été retiré de la famille.", 422);
+    }
+    const scope: Scope = e.seriesId ? (e.status === "provisional" ? "all" : options.scope && SCOPES.includes(options.scope) ? options.scope : "this") : "this";
+    const edit: SeriesEdit = {
+      title: checked.title, type: changes.type, allFamily: changes.allFamily, memberIds: changes.allFamily ? [] : [...new Set(changes.memberIds)], from: checked.from, to: checked.to,
+      allDay: changes.allDay, place: checked.place, notes: checked.notes, repetition: changes.repetition,
+    };
+    // Un RDV provisoire devient une série (CA 7.1) ; une série se modifie pour toute la portée choisie (RF8). « Cette séance » suit le chemin d'un RDV ordinaire.
+    if (!e.seriesId && changes.repetition) {
+      if (e.status !== "provisional") throw fail("not_provisional", "Seul un rendez-vous en attente de confirmation peut devenir une série.", 409);
+      resultId = await transformToSeries(trx, e, { ...edit, repetition: changes.repetition }, ctx.now, v.userId, v.timeZone);
+      return;
+    }
+    if (e.seriesId && scope === "all") {
+      resultId = await rewriteSeries(trx, e, edit, ctx.now);
+      await recordModified(trx, resultId, e.status, v.userId, ctx.now);
+      return;
+    }
+    if (e.seriesId && scope === "following") {
+      resultId = await splitSeries(trx, e, edit, ctx.now, v.userId);
+      await recordModified(trx, resultId, e.status, v.userId, ctx.now);
+      return;
     }
     const rescheduled = checked.from.getTime() !== e.startsAt.getTime() || changes.allDay !== e.allDay;
     const next: CalendarEvent = { ...e, startsAt: checked.from, endsAt: checked.to, allFamily: changes.allFamily, memberIds: changes.allFamily ? [] : [...new Set(changes.memberIds)] };
@@ -424,6 +496,8 @@ export async function updateEvent(ctx: Ctx, session: SessionContext, id: string,
         .set({
           title: checked.title ? seal(checked.title) : null, event_type_id: typeId, starts_at: checked.from, ends_at: checked.to, end_is_default: checked.endIsDefault, all_day: changes.allDay,
           location: sealOptional(checked.place), note: sealOptional(checked.notes), whole_family: changes.allFamily, fingerprint: fingerprintOf({ ...next, type: changes.type }),
+          // Une séance modifiée seule reste rattachée à la série avec la mention « Modifiée » (US-109 RF8).
+          ...(e.seriesId ? { is_modified: true } : {}),
         })
         .where("id", "=", id)
         .execute();
@@ -436,6 +510,6 @@ export async function updateEvent(ctx: Ctx, session: SessionContext, id: string,
     if (rescheduled) await cancelPendingNotices(trx, id, ["reminder_d7", "reminder_d1", "reminder_day_of"]);
     await recordModified(trx, id, e.status, v.userId, ctx.now);
   });
-  return getEvent(ctx, session, id);
+  return getEvent(ctx, session, resultId);
 }
 

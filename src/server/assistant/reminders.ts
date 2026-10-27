@@ -266,7 +266,7 @@ interface Message {
 export async function pendingConfirmations(db: Db, accountId: string, now: Date): Promise<number> {
   const row = await db
     .selectFrom("family_events")
-    .select((eb) => eb.fn.countAll<string>().as("n"))
+    .select(sql<string>`count(distinct coalesce(series_id, id))`.as("n"))
     .where("account_id", "=", accountId)
     .where("status", "=", "provisional")
     .where("starts_at", ">", now)
@@ -328,6 +328,7 @@ async function ignoreExpired(ctx: Ctx, family: (accountId: string) => Promise<Fa
     .selectFrom("family_events")
     .select(["id", "account_id", "status", "starts_at", "created_at", "status_changed_at"])
     .where((eb) => eb.or([eb.and([eb("status", "=", "provisional"), eb("starts_at", "<=", ctx.now)]), eb("status", "=", "set_aside")]))
+    .where("series_id", "is", null)
     .$if(Boolean(accountId), (qb) => qb.where("account_id", "=", accountId!))
     .execute();
   for (const row of rows) {
@@ -370,7 +371,8 @@ export async function runReminders(ctx: Ctx, options: { accountId?: string } = {
   const confirmed = await ctx.db
     .selectFrom("family_events as e")
     .innerJoin("event_types as t", "t.id", "e.event_type_id")
-    .select(["e.id", "e.account_id", "t.code", "e.starts_at", "e.all_day", "e.updated_at"])
+    .leftJoin("family_event_series as s", "s.id", "e.series_id")
+    .select(["e.id", "e.account_id", "t.code", "e.starts_at", "e.all_day", "e.updated_at", "s.repeat_unit", "s.repeat_interval"])
     .where("e.status", "=", "confirmed")
     .where("e.starts_at", ">", ctx.now)
     .where("e.starts_at", "<", horizon)
@@ -379,7 +381,9 @@ export async function runReminders(ctx: Ctx, options: { accountId?: string } = {
   for (const row of confirmed) {
     const { timeZone, recipients, settings } = await family(row.account_id);
     const timing = { startsAt: new Date(row.starts_at), allDay: row.all_day, updatedAt: new Date(row.updated_at) };
-    const due = dueKinds(timing, settings.get(typeOfCode(row.code))!, timeZone, ctx.now);
+    // Une série hebdomadaire n'envoie que le rappel J-1 de chaque séance ; toutes les deux semaines ou chaque mois, les délais du type de RDV (US-109 RF9, D46).
+    const onlyD1 = row.repeat_unit !== null && row.repeat_unit !== "month" && row.repeat_interval === 1;
+    const due = dueKinds(timing, settings.get(typeOfCode(row.code))!, timeZone, ctx.now).filter((k) => !onlyD1 || k === "d1");
     const kind = due[due.length - 1];
     if (!kind) continue;
     const event = await notified(ctx.db, row.account_id, row.id);
@@ -393,8 +397,10 @@ export async function runReminders(ctx: Ctx, options: { accountId?: string } = {
   // Relances : rendez-vous provisoires restés sans réponse (US-83).
   const provisional = await ctx.db
     .selectFrom("family_events")
-    .select(["id", "account_id", "starts_at", "created_at", "auto_confirm_at"])
+    .select(["id", "account_id", "starts_at", "created_at", "auto_confirm_at", "series_id"])
     .where("status", "=", "provisional")
+    // Une série provisoire n'est relancée qu'une fois, pour sa première séance (D47).
+    .where(sql<boolean>`(series_id is null or occurrence_date = (select min(x.occurrence_date) from family_events x where x.series_id = family_events.series_id))`)
     .where("starts_at", ">", ctx.now)
     .where("created_at", "<=", new Date(ctx.now.getTime() - NUDGE_HOURS.nudge24 * HOUR))
     .$if(Boolean(options.accountId), (qb) => qb.where("account_id", "=", options.accountId!))
@@ -402,7 +408,7 @@ export async function runReminders(ctx: Ctx, options: { accountId?: string } = {
   for (const row of provisional) {
     const { timeZone, recipients } = await family(row.account_id);
     const startsAt = new Date(row.starts_at);
-    const dues = NUDGE_KINDS.map((k) => ({ k, due: nudgeDueAt(k, new Date(row.created_at), timeZone) }))
+    const dues = NUDGE_KINDS.filter((k) => !row.series_id || k === "nudge24").map((k) => ({ k, due: nudgeDueAt(k, new Date(row.created_at), timeZone) }))
       .filter(({ due }) => due <= ctx.now && due < startsAt)
       .sort((a, b) => a.due.getTime() - b.due.getTime());
     const latest = dues[dues.length - 1];
