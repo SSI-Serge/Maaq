@@ -3,7 +3,7 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-10-27T09:30:40Z",
+  "updated": "2026-10-27T10:43:33Z",
   "deploys": [
     {
       "at": "2026-10-25T08:05:53Z",
@@ -139,6 +139,15 @@
         "f9s6",
         "f9s7"
       ]
+    },
+    {
+      "at": "2026-10-27T10:43:33Z",
+      "env": "preview",
+      "storyIds": [
+        "f17s1"
+      ],
+      "what": "Lot 0 du calendrier intelligent sur https://test.maaq.fr : la base est recréée avec le schéma de référence. Pas la production.",
+      "note": "Comptes remis depuis la sauvegarde ; rendez-vous, enfants et conversation de test perdus ; connexions des appareils à refaire."
     }
   ],
   "features": [
@@ -1937,10 +1946,11 @@
         {
           "id": "f17s1",
           "title": "Retrouver ses données dans une base alignée sur le schéma de conception (lot 0)",
-          "state": "planning",
-          "env": null,
-          "note": "Environ 8 à 10 jours de développeur humain. Les données de famille de test (3 RDV, 2 membres, 1 conversation) sont abandonnées ; sauvegarde de la base avant.",
-          "unsure": "Dépend du découpage en migrations de la session base de données ; les 699 vérifications restent à rejouer sur PostgreSQL 17."
+          "state": "testing",
+          "env": "preview",
+          "note": "Fait et en ligne sur la zone de test : la base suit le schéma de la session base de données (61 tables). Les rendez-vous, enfants et conversations de test sont perdus, comme décidé ; les comptes sont remis.",
+          "unsure": "Pas encore essayé sur le téléphone après la recréation : il faut se reconnecter, recréer le schéma de déverrouillage et réactiver les notifications.",
+          "at": "2026-10-27T10:43:33Z"
         },
         {
           "id": "f17s2",
@@ -1972,12 +1982,21 @@
         {
           "at": "2026-10-27T12:00:00Z",
           "what": "Un doublon rare de notification est accepté si le serveur s'arrête entre l'envoi et son enregistrement."
+        },
+        {
+          "at": "2026-10-27T10:43:33Z",
+          "what": "Les réponses mémorisées par la clé d'idempotence sont chiffrées en base (elles peuvent contenir des données personnelles)."
         }
       ],
       "unsure": [
         "La base de test n'a pas de sauvegarde automatique : une sauvegarde manuelle précède chaque migration."
       ],
       "activity": [
+        {
+          "at": "2026-10-27T10:43:33Z",
+          "kind": "live",
+          "what": "Lot 0 en ligne sur la zone de test : base recréée avec le schéma final, 504 tests verts, sauvegarde faite avant"
+        },
         {
           "at": "2026-10-27T09:30:40Z",
           "kind": "work",
