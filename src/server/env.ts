@@ -48,6 +48,8 @@ const schema = z.object({
   ASSISTANT_PROVIDER: z.enum(["anthropic"]).default("anthropic"),
   ASSISTANT_MODEL: z.string().min(1).default("claude-sonnet-5-5"),
   ASSISTANT_EFFORT: z.enum(["low", "medium", "high"]).default("medium"),
+  /** Modèle léger du résumé du point de la semaine (US-98 RT2) ; sans valeur, celui de l'assistant. */
+  ASSISTANT_DIGEST_MODEL: z.string().min(1).optional(),
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
 });
 

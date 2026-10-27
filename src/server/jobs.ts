@@ -3,6 +3,8 @@ import type { Ctx } from "@/server/auth/service";
 import { runAutoConfirm, runEventNotices, type NoticesResult } from "@/server/assistant/notices";
 import { completeSeries } from "@/server/assistant/series";
 import { completeTaskSeries } from "@/server/assistant/task-series";
+import { runTaskNotices, type TaskNoticesResult } from "@/server/assistant/task-notices";
+import { runDigests, type DigestsResult } from "@/server/assistant/digest";
 import { runReminders, type RemindersResult } from "@/server/assistant/reminders";
 import { cleanupExports } from "@/server/compliance/exports";
 import { runLifecycle, type LifecycleResult } from "@/server/compliance/lifecycle";
@@ -26,6 +28,10 @@ export interface JobsResult {
   reminders: RemindersResult;
   /** Notifications « RDV ajouté » et « RDV à confirmer » réservées et envoyées à l'autre parent (US-113). */
   notices: NoticesResult;
+  /** Rappel quotidien des tâches et rappel d'une heure avant (US-97). */
+  taskNotices: TaskNoticesResult;
+  /** Point de la semaine : résumés préparés et notifications envoyées (US-98). */
+  digests: DigestsResult;
 }
 
 /** Synchronise le carnet toutes les X heures (US-40 RT2) puis nettoie les données expirées (US-40 RT6, US-61 RT2, US-70 RT3). */
@@ -53,10 +59,18 @@ export async function runDueJobs(ctx: Ctx, options: { force?: boolean } = {}): P
     console.error(`Rappels de l'Assistant Famille : ${describeError(error)}`);
     return { sent: 0, failed: 0, ignored: 0 };
   });
-  if (!due) return { logbook: "not_due", purged: null, lifecycle, exports, reminders, notices };
+  const taskNotices = await runTaskNotices(ctx).catch((error) => {
+    console.error(`Rappels de tâches : ${describeError(error)}`);
+    return { daily: 0, dueSoon: 0, abandoned: 0, failed: 0 };
+  });
+  const digests = await runDigests(ctx).catch((error) => {
+    console.error(`Point de la semaine : ${describeError(error)}`);
+    return { prepared: 0, sent: 0, failed: 0 };
+  });
+  if (!due) return { logbook: "not_due", purged: null, lifecycle, exports, reminders, notices, taskNotices, digests };
 
   const logbook = await syncLogbook(ctx);
-  return { logbook, purged: await purgeExpired(ctx), lifecycle, exports, reminders, notices };
+  return { logbook, purged: await purgeExpired(ctx), lifecycle, exports, reminders, notices, taskNotices, digests };
 }
 
 /** Supprime les données arrivées au bout de leur durée de conservation. */
@@ -72,7 +86,7 @@ export async function purgeExpired(ctx: Ctx): Promise<{ logbook: number; errorRe
   let database = 0;
   for (const job of [
     "purge_expired_conversation_messages", "purge_expired_family_events", "purge_expired_attachments", "purge_expired_inbound_emails", "purge_old_daily_counters",
-    "purge_admin_audit_log", "purge_expired_security_events", "purge_expired_family_tasks",
+    "purge_admin_audit_log", "purge_expired_security_events", "purge_expired_family_tasks", "purge_expired_weekly_digests", "purge_old_scheduled_notifications",
   ]) {
     const done = await sql<{ n: string | null }>`select ${sql.ref(job)}() as n`.execute(ctx.db);
     database += Number(done.rows[0]?.n ?? 0);

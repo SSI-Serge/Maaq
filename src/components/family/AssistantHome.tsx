@@ -65,6 +65,9 @@ export function AssistantHome() {
         <Link href="/assistant/taches" className={styles.link}>
           Tâches ›
         </Link>
+        <Link href="/assistant/semaine" className={styles.link}>
+          Point de la semaine ›
+        </Link>
         <Link href="/assistant/membres" className={styles.link}>
           Membres de la famille ›
         </Link>

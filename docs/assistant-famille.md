@@ -239,6 +239,26 @@ Schéma : `0007_lot5_schema.sql`, copie exacte de `lot_5_2_schema.sql` de la ses
   seul l'ajout par le tchat est fait. La carte « Tâche proposée » n'est pas conservée par le serveur (la base n'a pas de tâche proposée sans RDV) : elle disparaît quand la conversation est rechargée. « Toutes » réécrit aussi les occurrences
   déplacées une à une. **Non mesuré avec le vrai modèle** (nouveaux cas de tâches à ajouter au banc d'essai) ; **écrans jamais essayés dans un navigateur ni sur téléphone**.
 
+## Lot 6 du MVP2 : rappels de tâches et point de la semaine (US-97, US-98, US-96 RF4/RF6)
+
+Schéma : `0008_lot6_valeurs_enumerees.sql` (4 types de notification) et `0009_lot6_schema.sql`, copies exactes de `lot_6_1` / `lot_6_2` de la session base de données (SHA-256 `45fd0472…` / `061ca5d1…`).
+La base ne porte aucune fonction de planification pour ces notifications : MAAQ calcule ce qui est dû et réserve chaque envoi dans `scheduled_notifications` avant d'envoyer (une ligne par envoi, jamais de doublon).
+
+- **Rappel quotidien des tâches** (`task-notices.ts`, US-97) : à 8 h dans le fuseau de la famille, une notification par profil avec ses tâches du jour et celles des 7 derniers jours (réglage `overdue_task_reminder_days`), sans le mot « retard ».
+  Comptées : les tâches de son membre ; pour les deux parents, aussi celles sans assigné ou assignées à un enfant. Rien à rappeler, rien d'envoyé. Appareil autorisé : notification ; sinon email quotidien (jamais doublé par email). Un rappel qui n'est pas parti
+  avant midi est abandonné pour la journée. « Rappel quotidien des tâches » se désactive pour soi (Réglages ▸ Mes notifications). Le toucher ouvre `/assistant/taches#aujourdhui`.
+- **Une heure avant** : une tâche avec une heure d'échéance et non faite rappelle « Dans 1 h : … — Mia » à la personne assignée (si elle a un compte), sinon aux deux parents ; notification seulement.
+- **« [Prénom] vous a confié… »** (US-96 RF4, RF6) : à la création, à la réassignation et à la modification, le nouveau membre assigné (compte requis, pas celui qui assigne) est prévenu tout de suite, par notification ou email ; l'ancien ne l'est pas.
+- **Point de la semaine** (`digest.ts`, US-98) : chaque profil choisit son jour et son heure (8, 12, 18, 19, 20, 21 h ; dimanche 19 h par défaut) ou le désactive. Une heure avant le premier envoi, le planificateur prépare le résumé de la famille : un appel du modèle léger
+  (`ASSISTANT_DIGEST_MODEL`, sinon `ASSISTANT_MODEL`), consignes dans `agent/digest-instructions.md`, qui ne reçoit que des références, jours, moments, types, alias et indicateurs de conflit — jamais un titre, un lieu ni un prénom. Le résumé est conservé chiffré
+  avec ses références (`weekly_digests`, 4 semaines) et remplacé à l'affichage selon ce que le lecteur voit. En cas d'échec, le point part quand même, sans résumé. Chaque profil reçoit « Votre semaine est prête : N RDV, M tâches » (ses chiffres, selon sa visibilité) ;
+  une semaine calme est envoyée aussi. Un invité secondaire n'a que le résumé de MAAQ et ses propres RDV et tâches, sans questions.
+- **Écran** `/assistant/semaine` : Synthèse (fait la semaine passée, résumé, chiffres, bandeau des 7 jours, points d'attention : conflits, tâches sans personne, RDV à confirmer) et Détail jour par jour, puis « Encore ouvert de la semaine passée » sans couleur d'alerte. Chaque ligne ouvre son écran.
+  Le point du dernier envoi reste consultable jusqu'au suivant (lien sur l'accueil).
+- **Semaine couverte** : le lundi-dimanche qui suit l'envoi (D47 et schéma `week_start`), y compris pour un point réglé au milieu de la semaine ; la US-98 RF7 et le CA 7.1 disent « les 7 jours qui suivent » (mercredi 12 h → jeudi au mercredi) : écart signalé à la session des user stories.
+- **Pas fait** : questions de rappel du point (US-102, lot 7) et RDV rapprochés de moins de 30 minutes (US-107, lot 8) ; information des parents quand un membre est retiré (US-96 RF8) : aucun type de notification pour cela dans la base ; notification de tâches proposées devenues « à faire » à la confirmation d'un RDV.
+  **Résumé non mesuré avec le vrai modèle** (le PO l'a demandé « après essai sur des semaines fictives », US-98 RT2) ; **écrans jamais essayés dans un navigateur ni sur téléphone**.
+
 ## Réglages
 Voir `.env.example`. Tout est facultatif tant que `ASSISTANT_MODE=off`.
 ```
@@ -246,6 +266,7 @@ ASSISTANT_MODE=live
 ASSISTANT_PROVIDER=anthropic   # seul fournisseur pour l'instant
 ASSISTANT_MODEL=claude-sonnet-5-5
 ASSISTANT_EFFORT=medium
+ASSISTANT_DIGEST_MODEL=         # facultatif : modèle léger du résumé du point de la semaine
 ANTHROPIC_API_KEY=
 ```
 La clé se range dans Secret Manager, jamais dans le dépôt ni dans une conversation. Microsoft Foundry est abandonné (D54, pas de Claude en Europe) : le pilote

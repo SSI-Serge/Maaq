@@ -41,6 +41,8 @@ export type DeliveryStatus = "failed" | "sending" | "sent";
 
 export type DeviceType = "android" | "desktop" | "iphone" | "other";
 
+export type DigestSummaryStatus = "failed" | "generated" | "pending";
+
 export type ErasureStatus = "done" | "failed" | "pending";
 
 export type ErasureSubject = "family_member" | "profile";
@@ -101,7 +103,7 @@ export type MessageSender = "agent" | "profile";
 
 export type NotificationChannel = "none" | "push";
 
-export type NotificationKind = "auto_confirmed" | "event_added" | "event_to_confirm" | "follow_up_24h" | "follow_up_48h" | "reminder_d1" | "reminder_d7" | "reminder_day_of";
+export type NotificationKind = "auto_confirmed" | "event_added" | "event_to_confirm" | "follow_up_24h" | "follow_up_48h" | "reminder_d1" | "reminder_d7" | "reminder_day_of" | "task_assigned" | "task_daily" | "task_due_1h" | "weekly_digest";
 
 export type NotificationStatus = "abandoned" | "cancelled" | "not_applicable" | "scheduled" | "sent";
 
@@ -1178,9 +1180,10 @@ export interface ScheduledNotifications {
   attempts: Generated<number>;
   channel: NotificationChannel | null;
   created_at: Generated<Timestamp>;
+  deadline_at: Timestamp | null;
   due_at: Timestamp;
   email_sent_at: Timestamp | null;
-  event_id: string;
+  event_id: string | null;
   id: Generated<Int8>;
   kind: NotificationKind;
   last_error: string | null;
@@ -1190,6 +1193,8 @@ export interface ScheduledNotifications {
    * scheduled ; sent ; not_applicable (échéance déjà passée à la confirmation) ; abandoned (non parti avant le début du RDV) ; cancelled (RDV annulé ou date changée)
    */
   status: Generated<NotificationStatus>;
+  subject_date: Timestamp | null;
+  task_id: string | null;
   updated_at: Generated<Timestamp>;
 }
 
@@ -1265,8 +1270,12 @@ export interface UserAgentInfoValues {
 export interface UserAssistantSettings {
   account_id: string;
   notify_events_added: Generated<boolean>;
+  task_daily_reminder_enabled: Generated<boolean>;
   updated_at: Generated<Timestamp>;
   user_id: string;
+  weekly_digest_enabled: Generated<boolean>;
+  weekly_digest_time: Generated<string>;
+  weekly_digest_weekday: Generated<number>;
 }
 
 export interface Users {
@@ -1428,6 +1437,18 @@ export interface VProfileAgentMissingItems {
   user_id: string | null;
 }
 
+export interface WeeklyDigests {
+  account_id: string;
+  agent_summary: Buffer | null;
+  created_at: Generated<Timestamp>;
+  events_count: number | null;
+  generated_at: Timestamp | null;
+  id: Generated<string>;
+  summary_status: Generated<DigestSummaryStatus>;
+  tasks_count: number | null;
+  week_start: Timestamp;
+}
+
 export interface DB {
   account_connections: AccountConnections;
   account_contracts: AccountContracts;
@@ -1508,4 +1529,5 @@ export interface DB {
   v_never_activated_purge_candidates: VNeverActivatedPurgeCandidates;
   v_profile_agent_missing_items: VProfileAgentMissingItems;
   verification_codes: VerificationCodes;
+  weekly_digests: WeeklyDigests;
 }

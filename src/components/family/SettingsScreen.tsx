@@ -26,8 +26,13 @@ const KINDS: { kind: ReminderKind; label: string }[] = [
 
 interface PersonalSettings {
   notifyEventsAdded: boolean;
+  taskDaily: boolean;
+  weeklyDigest: { enabled: boolean; weekday: number; hour: number };
   audience: "parent" | "guest";
 }
+
+const WEEKDAY_NAMES = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"];
+const DIGEST_HOURS = [8, 12, 18, 19, 20, 21];
 
 /**
  * Carte « Mes notifications » (US-113 RF14, D58) : l'interrupteur « Être prévenu des RDV ajoutés » est propre à chaque profil, invités secondaires compris.
@@ -36,35 +41,69 @@ interface PersonalSettings {
 function MyNotifications({ pushState }: { pushState: string }) {
   const query = useApiQuery<{ settings: PersonalSettings }>("/api/family/personal-settings");
   const mutation = useApiMutation();
-  const [confirmed, setConfirmed] = useState<boolean | null>(null);
-  const [pending, setPending] = useState(false);
-  const current = confirmed ?? query.data?.settings.notifyEventsAdded ?? null;
-  const guest = query.data?.settings.audience === "guest";
+  const [confirmed, setConfirmed] = useState<PersonalSettings | null>(null);
+  const [pending, setPending] = useState<string | null>(null);
+  const [last, setLast] = useState<{ key: string; patch: Record<string, unknown> } | null>(null);
+  const current = confirmed ?? query.data?.settings ?? null;
+  const guest = current?.audience === "guest";
 
-  async function toggle(next: boolean) {
-    setPending(true);
-    const result = await mutation.run<{ settings: PersonalSettings }>("/api/family/personal-settings", { method: "PATCH", body: { notifyEventsAdded: next } });
-    setPending(false);
-    if (result) setConfirmed(result.settings.notifyEventsAdded);
+  async function save(key: string, patch: Record<string, unknown>) {
+    setPending(key);
+    setLast({ key, patch });
+    const result = await mutation.run<{ settings: PersonalSettings }>("/api/family/personal-settings", { method: "PATCH", body: patch });
+    setPending(null);
+    if (result) setConfirmed(result.settings);
   }
 
   const error = mutation.error;
+  const eventsLabel = guest ? "Être prévenu des RDV ajoutés qui me concernent" : "Être prévenu des RDV ajoutés par l'autre parent";
+  const toggle = (key: string, label: string, value: boolean, patch: (next: boolean) => Record<string, unknown>, hint?: string) => (
+    <div className={styles.settingRow} role="group" aria-label={label}>
+      <div className={styles.settingType}>{label}</div>
+      <div className={styles.switches}>
+        <button type="button" role="switch" aria-checked={value} aria-busy={pending === key} aria-label={label} className={styles.switch} disabled={pending !== null} onClick={() => void save(key, patch(!value))}>
+          {pending === key ? "Enregistrement…" : value ? "Oui" : "Non"}
+        </button>
+      </div>
+      {hint && <span className={styles.hint}>{hint}</span>}
+    </div>
+  );
   return (
     <Section title="Mes notifications">
       {query.loading && current === null && <Loading slow={query.slow} />}
       {query.error && <RetryNotice message={query.error.kind === "server" ? "Vos notifications n'ont pas pu être chargées." : query.error.message} onRetry={query.reload} />}
       {current !== null && (
-        <div className={styles.settingRow} role="group" aria-label="Notification des RDV ajoutés">
-          <div className={styles.settingType}>{guest ? "Être prévenu des RDV ajoutés qui me concernent" : "Être prévenu des RDV ajoutés par l'autre parent"}</div>
-          <div className={styles.switches}>
-            <button type="button" role="switch" aria-checked={current} aria-busy={pending} aria-label={guest ? "Être prévenu des RDV ajoutés qui me concernent" : "Être prévenu des RDV ajoutés par l'autre parent"} className={styles.switch} disabled={pending} onClick={() => void toggle(!current)}>
-              {pending ? "Enregistrement…" : current ? "Oui" : "Non"}
-            </button>
-          </div>
-          <span className={styles.hint}>Une seule notification par RDV, pour vous seul·e. Les relances et rappels ne changent pas.</span>
-        </div>
+        <>
+          {toggle("events", eventsLabel, current.notifyEventsAdded, (next) => ({ notifyEventsAdded: next }), "Une seule notification par RDV, pour vous seul·e. Les relances et rappels ne changent pas.")}
+          {toggle("tasks", "Rappel quotidien des tâches", current.taskDaily, (next) => ({ taskDaily: next }), "À 8 h : vos tâches du jour, et celles des jours passés à faire quand vous pouvez. Rien si vous n'en avez pas.")}
+          {toggle("digest", "Point de la semaine", current.weeklyDigest.enabled, (next) => ({ weeklyDigest: { enabled: next } }), "Un résumé de la semaine qui vient : RDV, tâches, qui fait quoi.")}
+          {current.weeklyDigest.enabled && (
+            <div className={styles.two}>
+              <label className={styles.field}>
+                <span className={styles.label}>Jour du point</span>
+                <select className={styles.select} value={current.weeklyDigest.weekday} disabled={pending !== null} onChange={(e) => void save("weekday", { weeklyDigest: { weekday: Number(e.target.value) } })}>
+                  {WEEKDAY_NAMES.map((name, i) => (
+                    <option key={name} value={i + 1}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className={styles.field}>
+                <span className={styles.label}>Heure</span>
+                <select className={styles.select} value={current.weeklyDigest.hour} disabled={pending !== null} onChange={(e) => void save("hour", { weeklyDigest: { hour: Number(e.target.value) } })}>
+                  {DIGEST_HOURS.map((h) => (
+                    <option key={h} value={h}>
+                      {h} h
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          )}
+        </>
       )}
-      {error && !error.body?.code && <RetryNotice message={error.kind === "server" ? "Le réglage n'a pas pu être enregistré." : error.message} onRetry={() => void toggle(!(current ?? true))} />}
+      {error && !error.body?.code && last && <RetryNotice message={error.kind === "server" ? "Le réglage n'a pas pu être enregistré." : error.message} onRetry={() => void save(last.key, last.patch)} />}
       {error && error.body?.code && <Notice tone="error">{error.message}</Notice>}
       <Link href="/assistant/rappels" className={styles.linkRow}>
         <span>

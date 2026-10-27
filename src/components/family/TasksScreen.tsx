@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useApiQuery } from "@/client/hooks";
 import { AppShell, appStyles as s, Section } from "@/components/app/AppShell";
 import { Loading, Notice, RetryNotice } from "@/components/ui";
@@ -20,6 +20,11 @@ export function TasksScreen() {
   const lists = useApiQuery<{ lists: TaskLists }>(`/api/family/tasks${mine ? "?mine=1" : ""}`);
   const data = lists.data?.lists;
   const open = data ? data.overdue.length + data.today.length + data.upcoming.length : 0;
+
+  // Le toucher du rappel quotidien ouvre l'écran sur la section « Aujourd'hui » (US-97 RF5).
+  useEffect(() => {
+    if (data && window.location.hash === "#aujourdhui") document.getElementById("aujourdhui")?.scrollIntoView({ block: "start" });
+  }, [data]);
 
   return (
     <AppShell title="Tâches" back={{ href: "/assistant", label: "Assistant Famille" }}>
@@ -55,7 +60,9 @@ export function TasksScreen() {
       {data && (
         <>
           <Group title="En retard" tasks={data.overdue} data={data} onChanged={lists.reload} />
-          <Group title="Aujourd'hui" tasks={data.today} data={data} showDate={false} onChanged={lists.reload} />
+          <div id="aujourdhui">
+            <Group title="Aujourd'hui" tasks={data.today} data={data} showDate={false} onChanged={lists.reload} />
+          </div>
           <Group title="À venir" tasks={data.upcoming} data={data} onChanged={lists.reload} />
           {data.done.length > 0 && (
             <details className={styles.removedBox}>

@@ -8,6 +8,7 @@ import { isParent } from "./family";
 import { utcToLocal } from "./local-time";
 import { loadMembers, type MemberChip } from "./member-chips";
 import { familyTimeZone } from "./reminders";
+import { notifyTaskAssigned } from "./task-notices";
 import { addDays, expandOccurrences, ruleLabel, type SeriesRule } from "./series";
 import type { Scope } from "./series-ops";
 import {
@@ -318,6 +319,8 @@ export async function createTask(ctx: Ctx, session: SessionContext, input: NewTa
       return first?.id ?? null;
     });
     if (!id) return { ...emptyView(task), recurring: true };
+    // La personne à qui on confie la tâche est prévenue (US-96 RF4) ; pour une tâche qui revient, à la première occurrence.
+    if (task.assigneeId) await notifyTaskAssigned(ctx, id, v.userId);
     return viewOf(ctx.db, v, id);
   } catch (error) {
     throw translateDbError(error);
@@ -354,6 +357,7 @@ export async function updateTask(ctx: Ctx, session: SessionContext, id: string, 
   const v = await taskViewer(ctx, session);
   const members = await loadMembers(ctx.db, v.accountId);
   let resultId = id;
+  let reassigned = false;
   try {
     await ctx.db.transaction().execute(async (trx) => {
       const row = await lockTask(trx, v, id);
@@ -361,6 +365,7 @@ export async function updateTask(ctx: Ctx, session: SessionContext, id: string, 
       if (row.status !== "todo") throw settled(row);
       if (row.version !== options.expectedVersion) throw staleVersion(row);
       const task = checkFields(v, changes, members, { keepAssignee: row.assigned_member_id });
+      reassigned = task.assigneeId !== null && task.assigneeId !== row.assigned_member_id;
       const series = row.series_id ? await loadTaskSeries(trx, v.accountId, row.series_id, { forUpdate: true }) : undefined;
       const scope: Scope = options.scope ?? "this";
       if (series && !series.event_series_id && scope !== "this") {
@@ -388,6 +393,7 @@ export async function updateTask(ctx: Ctx, session: SessionContext, id: string, 
   } catch (error) {
     throw translateDbError(error);
   }
+  if (reassigned) await notifyTaskAssigned(ctx, resultId, v.userId);
   return viewOf(ctx.db, v, resultId);
 }
 
@@ -395,6 +401,7 @@ export async function updateTask(ctx: Ctx, session: SessionContext, id: string, 
 export async function assignTask(ctx: Ctx, session: SessionContext, id: string, memberId: string | null, options: { expectedVersion?: number } = {}): Promise<TaskView> {
   const v = await taskViewer(ctx, session);
   const members = await loadMembers(ctx.db, v.accountId);
+  let changed = false;
   try {
     await ctx.db.transaction().execute(async (trx) => {
       const row = await lockTask(trx, v, id);
@@ -406,11 +413,14 @@ export async function assignTask(ctx: Ctx, session: SessionContext, id: string, 
         if (!member || member.removed) throw fail("invalid_assignee", "Une tâche ne peut être assignée qu'à un membre actif de la famille.", 422);
         if (!v.parent && memberId !== v.memberId) throw fail("forbidden", "Vous ne pouvez assigner une tâche qu'à vous-même.", 403);
       }
+      changed = memberId !== null && memberId !== row.assigned_member_id;
       await trx.updateTable("family_tasks").set({ assigned_member_id: memberId }).where("id", "=", id).execute();
     });
   } catch (error) {
     throw translateDbError(error);
   }
+  // Le nouveau membre assigné est prévenu, l'ancien non (US-96 RF4, RF6).
+  if (changed) await notifyTaskAssigned(ctx, id, v.userId);
   return viewOf(ctx.db, v, id);
 }
 

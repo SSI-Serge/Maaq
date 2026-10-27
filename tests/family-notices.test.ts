@@ -321,8 +321,8 @@ describe("planificateur", () => {
 describe("réglages personnels (US-113 RF14, D58, RT6)", () => {
   it("sont ouverts à tout profil de la famille : actif par défaut, propre à chacun", async () => {
     const f = await family();
-    expect(await getPersonalSettings(ctx, f.julienSession)).toEqual({ notifyEventsAdded: true, audience: "parent" });
-    expect(await getPersonalSettings(ctx, f.elodieSession)).toEqual({ notifyEventsAdded: true, audience: "guest" });
+    expect(await getPersonalSettings(ctx, f.julienSession)).toEqual({ notifyEventsAdded: true, taskDaily: true, weeklyDigest: { enabled: true, weekday: 7, hour: 19 }, audience: "parent" });
+    expect(await getPersonalSettings(ctx, f.elodieSession)).toMatchObject({ notifyEventsAdded: true, audience: "guest" });
     await setPersonalSettings(ctx, f.elodieSession, { notifyEventsAdded: false });
     expect((await getPersonalSettings(ctx, f.elodieSession)).notifyEventsAdded).toBe(false);
     expect((await getPersonalSettings(ctx, f.julienSession)).notifyEventsAdded).toBe(true);

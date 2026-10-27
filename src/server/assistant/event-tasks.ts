@@ -7,6 +7,7 @@ import { open, openOptional, seal, sealOptional } from "./fields";
 import { localDay } from "./local-time";
 import { loadMembers, type MemberChip } from "./member-chips";
 import { addDays, loadSeries } from "./series";
+import { notifyTaskAssigned } from "./task-notices";
 import { materializeEventTemplates } from "./task-series";
 import { assignableMembers, checkFields, fail, isDay, selectTasks, taskViewer, translateDbError, type TaskViewer } from "./tasks";
 
@@ -195,7 +196,9 @@ async function targetEvent(ctx: Ctx, session: SessionContext, eventId: string): 
 export async function addEventTask(ctx: Ctx, session: SessionContext, eventId: string, input: EventTaskInput, options: { expectedVersion?: number } = {}): Promise<void> {
   const { v, e } = await targetEvent(ctx, session, eventId);
   if (options.expectedVersion !== undefined && options.expectedVersion !== e.version) throw fail("stale_version", "Ce rendez-vous a été modifié entre-temps.", 409, { version: e.version });
-  await insertEventTask(ctx.db, await writeContext(ctx, v), e, input);
+  const id = await insertEventTask(ctx.db, await writeContext(ctx, v), e, input);
+  // Une tâche ajoutée « à faire » à un RDV confirmé et confiée à quelqu'un d'autre le prévient (US-96 RF4) ; une tâche proposée attend la confirmation.
+  if (input.assigneeId && !e.seriesId && e.status === "confirmed") await notifyTaskAssigned(ctx, id, v.userId);
 }
 
 async function findTarget(db: Kysely<DB>, e: CalendarEvent, taskId: string) {

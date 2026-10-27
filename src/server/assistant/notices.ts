@@ -123,28 +123,72 @@ export async function notifyAfterConfirmation(ctx: Ctx, eventId: string): Promis
 // Réglage personnel (US-113 RF14, D58)
 // ---------------------------------------------------------------------------------------------------------------------------
 
+/** Heures proposées pour le point de la semaine (US-98 RF7, décision du PO du 26/10/2026). */
+export const DIGEST_HOURS = [8, 12, 18, 19, 20, 21];
+
 export interface PersonalSettings {
   /** « Être prévenu des RDV ajoutés par l'autre parent » (parent) ou « …qui me concernent » (invité secondaire). Actif par défaut. */
   notifyEventsAdded: boolean;
+  /** « Rappel quotidien des tâches » : une notification à 8 h avec ses tâches du jour (US-97 RF8). Actif par défaut. */
+  taskDaily: boolean;
+  /** « Point de la semaine » : jour ISO (7 = dimanche) et heure (19 h par défaut), chaque profil pour lui-même (US-98 RF7). */
+  weeklyDigest: { enabled: boolean; weekday: number; hour: number };
   audience: "parent" | "guest";
+}
+
+export interface PersonalSettingsInput {
+  notifyEventsAdded?: boolean;
+  taskDaily?: boolean;
+  weeklyDigest?: { enabled?: boolean; weekday?: number; hour?: number };
 }
 
 /** Chaque profil de la famille, invités secondaires compris, règle ses propres notifications. */
 export async function getPersonalSettings(ctx: Ctx, session: SessionContext): Promise<PersonalSettings> {
   const { parent } = requireFamilyProfile(session);
-  const row = await ctx.db.selectFrom("user_assistant_settings").select("notify_events_added").where("user_id", "=", session.user.id).executeTakeFirst();
-  return { notifyEventsAdded: row?.notify_events_added ?? true, audience: parent ? "parent" : "guest" };
+  const row = await ctx.db
+    .selectFrom("user_assistant_settings")
+    .select(["notify_events_added", "task_daily_reminder_enabled", "weekly_digest_enabled", "weekly_digest_weekday", sql<string>`weekly_digest_time::text`.as("weekly_digest_time")])
+    .where("user_id", "=", session.user.id)
+    .executeTakeFirst();
+  return {
+    notifyEventsAdded: row?.notify_events_added ?? true,
+    taskDaily: row?.task_daily_reminder_enabled ?? true,
+    weeklyDigest: { enabled: row?.weekly_digest_enabled ?? true, weekday: row?.weekly_digest_weekday ?? 7, hour: Number((row?.weekly_digest_time ?? "19:00").slice(0, 2)) },
+    audience: parent ? "parent" : "guest",
+  };
 }
 
-export async function setPersonalSettings(ctx: Ctx, session: SessionContext, input: { notifyEventsAdded: boolean }): Promise<PersonalSettings> {
-  const { accountId, parent } = requireFamilyProfile(session);
-  if (typeof input.notifyEventsAdded !== "boolean") throw new Rejection("invalid_setting", "Ce réglage est invalide.", 422);
-  await ctx.db
-    .insertInto("user_assistant_settings")
-    .values({ user_id: session.user.id, account_id: accountId, notify_events_added: input.notifyEventsAdded })
-    .onConflict((oc) => oc.column("user_id").doUpdateSet({ notify_events_added: input.notifyEventsAdded }))
-    .execute();
-  return { notifyEventsAdded: input.notifyEventsAdded, audience: parent ? "parent" : "guest" };
+export async function setPersonalSettings(ctx: Ctx, session: SessionContext, input: PersonalSettingsInput): Promise<PersonalSettings> {
+  const { accountId } = requireFamilyProfile(session);
+  const invalid = () => new Rejection("invalid_setting", "Ce réglage est invalide.", 422);
+  const set: { notify_events_added?: boolean; task_daily_reminder_enabled?: boolean; weekly_digest_enabled?: boolean; weekly_digest_weekday?: number; weekly_digest_time?: string } = {};
+  if (input.notifyEventsAdded !== undefined) {
+    if (typeof input.notifyEventsAdded !== "boolean") throw invalid();
+    set.notify_events_added = input.notifyEventsAdded;
+  }
+  if (input.taskDaily !== undefined) {
+    if (typeof input.taskDaily !== "boolean") throw invalid();
+    set.task_daily_reminder_enabled = input.taskDaily;
+  }
+  const digest = input.weeklyDigest;
+  if (digest) {
+    if (digest.enabled !== undefined) {
+      if (typeof digest.enabled !== "boolean") throw invalid();
+      set.weekly_digest_enabled = digest.enabled;
+    }
+    if (digest.weekday !== undefined) {
+      if (!Number.isInteger(digest.weekday) || digest.weekday < 1 || digest.weekday > 7) throw invalid();
+      set.weekly_digest_weekday = digest.weekday;
+    }
+    if (digest.hour !== undefined) {
+      if (!DIGEST_HOURS.includes(digest.hour)) throw invalid();
+      set.weekly_digest_time = `${String(digest.hour).padStart(2, "0")}:00`;
+    }
+  }
+  if (Object.keys(set).length) {
+    await ctx.db.insertInto("user_assistant_settings").values({ user_id: session.user.id, account_id: accountId, ...set }).onConflict((oc) => oc.column("user_id").doUpdateSet(set)).execute();
+  }
+  return getPersonalSettings(ctx, session);
 }
 
 /**

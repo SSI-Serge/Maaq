@@ -12,7 +12,11 @@ export const GET = handler(async () => {
   return NextResponse.json({ settings: await getPersonalSettings(ctx, session) });
 });
 
-const schema = z.object({ notifyEventsAdded: z.boolean() });
+const schema = z.object({
+  notifyEventsAdded: z.boolean().optional(),
+  taskDaily: z.boolean().optional(),
+  weeklyDigest: z.object({ enabled: z.boolean().optional(), weekday: z.number().int().min(1).max(7).optional(), hour: z.number().int().optional() }).optional(),
+});
 
 /** Enregistré dès qu'on touche l'interrupteur ; ne modifie que les choix du profil connecté. */
 export const PATCH = handler(async (request: Request) => {
