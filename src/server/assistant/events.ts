@@ -3,6 +3,7 @@ import type { Ctx, SessionContext } from "@/server/auth/service";
 import type { DB } from "@/server/db/schema.generated";
 import { Rejection } from "@/server/http";
 import { EVENT_TYPES, MEDICAL_TITLE, STATUS_CODE, TYPE_CODE, eventTypeIds, findConflicts, fingerprintOf, loadCalendarEvent, loadCalendarEvents, type CalendarEvent, type EventSource, type EventStatus, type EventType } from "./calendar";
+import { parsePoint, sealPoint, type PlacePoint } from "./address";
 import { seal, sealOptional } from "./fields";
 import { isParent } from "./family";
 import { loadMembers, type MemberChip } from "./member-chips";
@@ -66,6 +67,8 @@ export interface EventView {
   end: string;
   allDay: boolean;
   place: string | null;
+  /** Les coordonnées du lieu sont connues (adresse choisie dans les suggestions) : condition du suivi de trajet (US-107 RF4). Les coordonnées elles-mêmes ne sortent jamais du serveur. */
+  placeKnown: boolean;
   notes: string | null;
   allFamily: boolean;
   members: MemberChip[];
@@ -152,7 +155,7 @@ function toView(v: Viewer, e: CalendarEvent, members: Map<string, MemberChip>, n
   const chips = e.allFamily ? [...members.values()].filter((m) => !m.removed) : e.memberIds.map((id) => members.get(id)).filter((m): m is MemberChip => Boolean(m));
   return {
     id: e.id, title: e.title, type: e.type, status: e.status, start: utcToLocal(e.startsAt, v.timeZone), end: utcToLocal(e.endsAt, v.timeZone), allDay: e.allDay,
-    place: e.place, notes: e.notes, allFamily: e.allFamily, members: chips, source: e.source, requestedBy: e.createdByUserId ? (names.get(e.createdByUserId) ?? null) : null,
+    place: e.place, placeKnown: e.locationPoint !== null, notes: e.notes, allFamily: e.allFamily, members: chips, source: e.source, requestedBy: e.createdByUserId ? (names.get(e.createdByUserId) ?? null) : null,
     version: e.version, past: isPast(e, now), statusChange: { byFirstName: e.statusChangedByUserId ? (names.get(e.statusChangedByUserId) ?? null) : null, at: e.statusChangedAt.toISOString(), auto: e.autoConfirmed },
     autoConfirm: autoConfirmOf(v, e),
     recurring: Boolean(e.seriesId),
@@ -439,9 +442,25 @@ export interface EventChanges {
   end?: string | null;
   allDay: boolean;
   place?: string | null;
+  /**
+   * Coordonnées de l'adresse choisie dans les suggestions (US-107 RT2). `"keep"` : garder celles du rendez-vous si le texte du lieu n'a pas changé. Sinon (vide, ou texte changé
+   * à la main), elles sont effacées. Jamais pour un rendez-vous médical.
+   */
+  placePoint?: PlacePoint | "keep" | null;
   notes?: string | null;
   /** Répétition (US-109 RF7) : transforme un RDV provisoire en série, ou change la règle d'une série. */
   repetition?: RepetitionInput | null;
+}
+
+/** Coordonnées chiffrées à garder pour le lieu : celles qui viennent d'être choisies, celles du rendez-vous si le texte n'a pas changé, sinon aucune. */
+function resolvePoint(input: EventChanges, current: CalendarEvent, place: string | null): Buffer | null {
+  if (!place || input.type === "medical") return null;
+  const wanted = input.placePoint;
+  if (wanted === "keep") return current.place === place ? current.locationPoint : null;
+  if (!wanted) return null;
+  const point = parsePoint(wanted);
+  if (!point) throw fail("invalid_place", "Les coordonnées de l'adresse sont invalides.", 422);
+  return sealPoint(point);
 }
 
 function validated(v: Viewer, input: EventChanges, validMembers: Set<string>): { title: string; place: string | null; notes: string | null; from: Date; to: Date; endIsDefault: boolean } {
@@ -498,10 +517,11 @@ export async function updateEvent(ctx: Ctx, session: SessionContext, id: string,
     if (!changes.allFamily && changes.memberIds.some((m) => members.get(m)?.removed && !e.memberIds.includes(m))) {
       throw fail("invalid_members", "Un des membres choisis a été retiré de la famille.", 422);
     }
+    const placePoint = resolvePoint(changes, e, checked.place);
     const scope: Scope = e.seriesId ? (e.status === "provisional" ? "all" : options.scope && SCOPES.includes(options.scope) ? options.scope : "this") : "this";
     const edit: SeriesEdit = {
       title: checked.title, type: changes.type, allFamily: changes.allFamily, memberIds: changes.allFamily ? [] : [...new Set(changes.memberIds)], from: checked.from, to: checked.to,
-      allDay: changes.allDay, place: checked.place, notes: checked.notes, repetition: changes.repetition,
+      allDay: changes.allDay, place: checked.place, placePoint, notes: checked.notes, repetition: changes.repetition,
     };
     // Un RDV provisoire devient une série (CA 7.1) ; une série se modifie pour toute la portée choisie (RF8). « Cette séance » suit le chemin d'un RDV ordinaire.
     if (!e.seriesId && changes.repetition) {
@@ -533,7 +553,10 @@ export async function updateEvent(ctx: Ctx, session: SessionContext, id: string,
         .updateTable("family_events")
         .set({
           title: checked.title ? seal(checked.title) : null, event_type_id: typeId, starts_at: checked.from, ends_at: checked.to, end_is_default: checked.endIsDefault, all_day: changes.allDay,
-          location: sealOptional(checked.place), note: sealOptional(checked.notes), whole_family: changes.allFamily, fingerprint: fingerprintOf({ ...next, type: changes.type }),
+          // Le lieu n'est réécrit que s'il change : la base efface les résultats « Sur place » d'un RDV dont l'adresse change (US-112 RF9).
+          ...(checked.place !== e.place ? { location: sealOptional(checked.place) } : {}),
+          ...(placePoint !== e.locationPoint ? { location_point: placePoint } : {}),
+          note: sealOptional(checked.notes), whole_family: changes.allFamily, fingerprint: fingerprintOf({ ...next, type: changes.type }),
           // Une séance modifiée seule reste rattachée à la série avec la mention « Modifiée » (US-109 RF8).
           ...(e.seriesId ? { is_modified: true } : {}),
         })

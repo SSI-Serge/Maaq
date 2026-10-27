@@ -242,6 +242,16 @@ export function EventScreen({ id }: { id: string }) {
             </div>
           )}
 
+          {/* Proposition d'ajouter l'adresse pour suivre le trajet : jamais pour un RDV médical ou administratif ; une simple proposition, qu'on peut ignorer (US-107 RF2) */}
+          {!event.placeKnown && !event.past && event.can.modify && ["school", "work", "family", "personal"].includes(event.type) && (provisional || event.status === "confirmed") && (
+            <Notice tone="info">
+              {event.place ? "Choisissez l'adresse dans les suggestions pour suivre votre trajet avant ce RDV." : "Ajoutez l'adresse pour suivre votre trajet avant ce RDV."}{" "}
+              <button type="button" className={styles.link} onClick={() => setMode("edit")}>
+                {event.place ? "Choisir l'adresse" : "Ajouter l'adresse"}
+              </button>
+            </Notice>
+          )}
+
           {/* RDV rapproché, sans chevauchement : une information, qui n'empêche pas de confirmer (US-107 RF1) */}
           {event.nearby.length > 0 && (provisional || setAside || event.status === "confirmed") && (
             <Notice tone="info">

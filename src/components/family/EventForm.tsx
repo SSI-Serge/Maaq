@@ -5,6 +5,7 @@ import { useApiMutation, useApiQuery } from "@/client/hooks";
 import { Button, Notice, RetryNotice } from "@/components/ui";
 import type { EventType } from "@/server/assistant/calendar";
 import type { ConflictView, EventView, MemberChip, NearbyView } from "@/server/assistant/events";
+import { AddressField } from "./AddressField";
 import { clock, dayOf, EVENT_TYPE_OPTIONS, formTime, shortDate } from "./format";
 import { FALLBACK_COLOR } from "./parts";
 import styles from "./family.module.css";
@@ -77,6 +78,8 @@ export function EventForm({ event, members, onSaved, onCancel, onStale }: Props)
   const [endTime, setEndTime] = useState(event.allDay ? "10:00" : formTime(event.end));
   const [endDate, setEndDate] = useState(dayOf(event.end));
   const [place, setPlace] = useState(event.place ?? "");
+  // Coordonnées de l'adresse choisie dans les suggestions : gardées tant que le texte ne change pas (US-107 RT2).
+  const [placePoint, setPlacePoint] = useState<{ lat: number; lon: number } | "keep" | null>(event.placeKnown ? "keep" : null);
   const [notes, setNotes] = useState(event.notes ?? "");
   const save = useApiMutation();
 
@@ -115,7 +118,7 @@ export function EventForm({ event, members, onSaved, onCancel, onStale }: Props)
         version: event.version, allowConflict, title: title.trim(), type, allFamily, memberIds: allFamily ? [] : memberIds, allDay,
         start: allDay ? date : `${date}T${startTime}`,
         end: allDay ? endDate : multiDay ? `${endDate}T${endTime}` : endTime ? `${date}T${endTime}` : null,
-        place: place.trim() || null, notes: notes.trim() || null,
+        place: place.trim() || null, placePoint: type === "medical" ? null : placePoint, notes: notes.trim() || null,
         ...(confirmedSeries ? { scope } : {}),
         // Pas de nouvelle règle pour « cette séance » seule : elle reste une séance de la série.
         ...(repeating && scopeAll && canRepeat
@@ -261,7 +264,25 @@ export function EventForm({ event, members, onSaved, onCancel, onStale }: Props)
       )}
 
       <Field label="Lieu" error={place.length > MAX_PLACE ? `Le lieu ne peut pas dépasser ${MAX_PLACE} caractères.` : null}>
-        <input className={styles.input} value={place} onChange={(e) => setPlace(e.target.value)} disabled={save.pending} />
+        {type === "medical" ? (
+          // Un rendez-vous médical n'a ni suggestions ni coordonnées : pas de suivi de trajet (D46).
+          <input className={styles.input} value={place} onChange={(e) => setPlace(e.target.value)} disabled={save.pending} />
+        ) : (
+          <AddressField
+            value={place}
+            maxLength={MAX_PLACE}
+            disabled={save.pending}
+            known={placePoint !== null}
+            onTyped={(text) => {
+              setPlace(text);
+              setPlacePoint(event.placeKnown && text.trim() === (event.place ?? "") ? "keep" : null);
+            }}
+            onPicked={(s) => {
+              setPlace(s.label.slice(0, MAX_PLACE));
+              setPlacePoint({ lat: s.lat, lon: s.lon });
+            }}
+          />
+        )}
       </Field>
       <Field label="Note" error={notes.length > MAX_NOTES ? `La note ne peut pas dépasser ${MAX_NOTES} caractères.` : null}>
         <textarea className={styles.textarea} value={notes} onChange={(e) => setNotes(e.target.value)} disabled={save.pending} />

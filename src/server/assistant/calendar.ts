@@ -33,6 +33,8 @@ export interface CalendarEvent {
   endsAt: Date;
   allDay: boolean;
   place: string | null;
+  /** Coordonnées chiffrées du lieu (suggestion d'adresse choisie) ; jamais lues hors du serveur. Vides pour un RDV médical. */
+  locationPoint: Buffer | null;
   notes: string | null;
   status: EventStatus;
   allFamily: boolean;
@@ -86,7 +88,7 @@ function selectEvents(db: Kysely<DB>) {
     .selectFrom("family_events as e")
     .innerJoin("event_types as t", "t.id", "e.event_type_id")
     .select([
-      "e.id", "e.account_id", "e.title", "t.code as type_code", "e.starts_at", "e.ends_at", "e.all_day", "e.location", "e.note", "e.status", "e.whole_family",
+      "e.id", "e.account_id", "e.title", "t.code as type_code", "e.starts_at", "e.ends_at", "e.all_day", "e.location", "e.location_point", "e.note", "e.status", "e.whole_family",
       "e.version", "e.source", "e.requested_by_user_id", "e.status_changed_at", "e.updated_at", "e.auto_confirmed", "e.auto_confirm_at", "e.series_id", sql<string | null>`e.occurrence_date::text`.as("occurrence_date"), "e.is_modified", changedBy,
     ]);
 }
@@ -115,7 +117,7 @@ async function hydrate(db: Kysely<DB>, rows: Row[]): Promise<CalendarEvent[]> {
   };
   return rows.map((r) => ({
     id: r.id, accountId: r.account_id, title: titleOf(r), type: fromCode(TYPE_CODE, r.type_code), startsAt: r.starts_at, endsAt: r.ends_at, allDay: r.all_day,
-    place: openOptional(r.location), notes: openOptional(r.note), status: fromCode(STATUS_CODE, r.status), allFamily: r.whole_family, version: r.version,
+    place: openOptional(r.location), locationPoint: r.location_point, notes: openOptional(r.note), status: fromCode(STATUS_CODE, r.status), allFamily: r.whole_family, version: r.version,
     source: fromCode(SOURCE_CODE, r.source), createdByUserId: r.requested_by_user_id, statusChangedAt: r.status_changed_at,
     statusChangedByUserId: r.changed_by_user_id, updatedAt: r.updated_at, autoConfirmed: r.auto_confirmed, autoConfirmAt: r.auto_confirm_at, seriesId: r.series_id, occurrenceDate: r.occurrence_date, isModified: r.is_modified, memberIds: byEvent.get(r.id) ?? [],
   }));

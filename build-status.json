@@ -3,7 +3,7 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-10-27T17:32:11Z",
+  "updated": "2026-10-27T17:46:09Z",
   "deploys": [
     {
       "at": "2026-10-25T08:05:53Z",
@@ -1964,8 +1964,8 @@
           "title": "US-107 · Être prévenu des temps de trajet entre mes RDV",
           "state": "building",
           "env": null,
-          "note": "Lot 8 commencé : l'alerte « Un autre RDV se termine à 17h30, 15 min avant : pensez au trajet » est faite (écran du RDV). Reste : adresse avec suggestions, consentement à la position, suivi du trajet et notifications.",
-          "unsure": "Bloqué pour la suite : compte et clé TomTom (offre gratuite à reconfirmer) et déclaration du sous-traitant par le DPO. Jamais essayé sur un téléphone ; sur iPhone, l'autorisation de la position peut être redemandée à chaque lancement. La phrase « commence après » de l'alerte est écrite par MAAQ, à relire.",
+          "note": "Lot 8 en cours : l'alerte « RDV rapproché » et le champ « Adresse » avec suggestions de l'État sont faits (coordonnées chiffrées, jamais pour un RDV médical). Reste : consentement à la position, suivi du trajet et notifications.",
+          "unsure": "Le champ Adresse n'a jamais été vu dans un navigateur ni sur un téléphone (le service d'adresses a été essayé en vrai). Bloqué pour la suite : compte et clé TomTom et déclaration du sous-traitant par le DPO. Sur iPhone, l'autorisation de la position peut être redemandée à chaque lancement. La phrase « commence après » de l'alerte est écrite par MAAQ, à relire.",
           "at": "2026-10-27T17:32:11Z"
         },
         {
@@ -2044,6 +2044,10 @@
         {
           "at": "2026-10-27T17:32:11Z",
           "what": "Lot 8 : tout sauf l'appel à TomTom est préparé derrière une interface (faux service pour les tests), pour que l'arrivée de la clé ne change que l'adaptateur."
+        },
+        {
+          "at": "2026-10-27T17:46:09Z",
+          "what": "Les suggestions d'adresses viennent de la Géoplateforme de l'État (data.geopf.fr), qui remplace l'ancienne API Adresse : gratuite, sans clé, adresses françaises."
         }
       ],
       "unsure": [
@@ -2055,6 +2059,11 @@
         "Le mois et l'année de naissance manquants : le choix « Pas maintenant » reste sur l'appareil, pas côté serveur."
       ],
       "activity": [
+        {
+          "at": "2026-10-27T17:46:09Z",
+          "kind": "building",
+          "what": "Lot 8 : champ « Adresse » avec suggestions de l'État et coordonnées chiffrées"
+        },
         {
           "at": "2026-10-27T17:32:11Z",
           "kind": "building",

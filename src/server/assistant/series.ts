@@ -116,7 +116,7 @@ export function ruleLabel(rule: SeriesRule): string {
 // ---------------------------------------------------------------------------------------------------------------------------
 
 type SeriesRow = {
-  id: string; account_id: string; event_type_id: number; title: Buffer | null; location: Buffer | null; note: Buffer | null; start_time: string; duration_minutes: number;
+  id: string; account_id: string; event_type_id: number; title: Buffer | null; location: Buffer | null; location_point: Buffer | null; note: Buffer | null; start_time: string; duration_minutes: number;
   all_day: boolean; whole_family: boolean; series_timezone: string; first_date: string; repeat_unit: "day" | "week" | "month"; repeat_interval: number; weekdays: number[] | null;
   month_mode: "day_of_month" | "nth_weekday" | null; month_day: number | null; month_nth: number | null; month_weekday: number | null; end_kind: "date" | "count" | "never";
   until_date: string | null; occurrence_count: number | null; skip_school_holidays: boolean; status: string; materialized_until: string | null; version: number;
@@ -124,7 +124,7 @@ type SeriesRow = {
 };
 
 const SERIES_COLUMNS = [
-  "id", "account_id", "event_type_id", "title", "location", "note", sql<string>`start_time::text`.as("start_time"), "duration_minutes", "all_day", "whole_family", "series_timezone",
+  "id", "account_id", "event_type_id", "title", "location", "location_point", "note", sql<string>`start_time::text`.as("start_time"), "duration_minutes", "all_day", "whole_family", "series_timezone",
   sql<string>`first_date::text`.as("first_date"), "repeat_unit", "repeat_interval", "weekdays", "month_mode", "month_day", "month_nth", "month_weekday", "end_kind",
   sql<string | null>`until_date::text`.as("until_date"), "occurrence_count", "skip_school_holidays", "status", sql<string | null>`materialized_until::text`.as("materialized_until"), "version",
   "source", "requested_by_user_id", "confirmed_by_user_id", "source_message_id",
@@ -178,6 +178,8 @@ export interface NewSeries {
   /** Vide pour un RDV médical : « RDV médical — prénom » est composé à l'affichage. */
   title: string;
   place: string | null;
+  /** Coordonnées chiffrées du lieu, quand l'adresse vient d'une suggestion (US-107 RT2) ; jamais pour un RDV médical. */
+  placePoint?: Buffer | null;
   notes: string | null;
   /** « HH:MM » dans le fuseau de la série. */
   startTime: string;
@@ -218,7 +220,7 @@ export async function materialize(db: Db, series: SeriesRow, memberIds: string[]
     const batch = dates.slice(i, i + 100).map((day) => {
       const { startsAt, endsAt } = bounds(series, day);
       return {
-        account_id: series.account_id, event_type_id: typeId, title: series.title, location: series.location, note: series.note, starts_at: startsAt, ends_at: endsAt,
+        account_id: series.account_id, event_type_id: typeId, title: series.title, location: series.location, location_point: series.location_point, note: series.note, starts_at: startsAt, ends_at: endsAt,
         end_is_default: false, all_day: series.all_day, whole_family: series.whole_family, status: confirmed ? ("confirmed" as const) : ("provisional" as const),
         source: series.source as "chat_text", requested_by_user_id: series.requested_by_user_id, source_at: now, source_message_id: series.source_message_id === null ? null : Number(series.source_message_id),
         series_id: series.id, occurrence_date: day,
@@ -253,7 +255,7 @@ export async function createSeries(db: Db, input: NewSeries): Promise<{ seriesId
     const row = await db
       .insertInto("family_event_series")
       .values({
-        account_id: input.accountId, event_type_id: typeId, title: medical || !input.title ? null : seal(input.title), location: sealOptional(input.place), note: sealOptional(input.notes),
+        account_id: input.accountId, event_type_id: typeId, title: medical || !input.title ? null : seal(input.title), location: sealOptional(input.place), location_point: input.placePoint ?? null, note: sealOptional(input.notes),
         start_time: input.allDay ? "00:00" : input.startTime, duration_minutes: input.durationMinutes, all_day: input.allDay, whole_family: input.allFamily, series_timezone: input.timeZone,
         first_date: input.firstDate, repeat_unit: rule.unit, repeat_interval: rule.interval, weekdays: rule.weekdays ?? null, month_mode: rule.monthMode ?? null,
         month_day: rule.monthDay ?? null, month_nth: rule.monthNth ?? null, month_weekday: rule.monthWeekday ?? null,

@@ -39,6 +39,7 @@ const schema = z.object({
   end: z.string().max(16).nullable().optional(),
   allDay: z.boolean(),
   place: z.string().max(1000).nullable().optional(),
+  placePoint: z.union([z.literal("keep"), z.object({ lat: z.number().min(-90).max(90), lon: z.number().min(-180).max(180) }), z.null()]).optional(),
   notes: z.string().max(5000).nullable().optional(),
 });
 

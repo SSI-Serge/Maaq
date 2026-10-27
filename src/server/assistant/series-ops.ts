@@ -163,6 +163,8 @@ export interface SeriesEdit {
   to: Date;
   allDay: boolean;
   place: string | null;
+  /** Coordonnées chiffrées du lieu, déjà décidées par l'appelant (conservées, remplacées ou effacées). */
+  placePoint: Buffer | null;
   notes: string | null;
   /** Nouvelle règle (RF7), sinon celle de la série est conservée. */
   repetition?: RepetitionInput | null;
@@ -189,7 +191,7 @@ export async function rewriteSeries(db: Db, e: CalendarEvent, edit: SeriesEdit, 
   await db
     .updateTable("family_event_series")
     .set({
-      event_type_id: typeId, title: medical || !edit.title ? null : seal(edit.title), location: sealOptional(edit.place), note: sealOptional(edit.notes), start_time: edit.allDay ? "00:00" : startTime,
+      event_type_id: typeId, title: medical || !edit.title ? null : seal(edit.title), location: sealOptional(edit.place), location_point: medical ? null : edit.placePoint, note: sealOptional(edit.notes), start_time: edit.allDay ? "00:00" : startTime,
       duration_minutes: duration, all_day: edit.allDay, whole_family: edit.allFamily, repeat_unit: rule.unit, repeat_interval: rule.interval, weekdays: rule.weekdays ?? null,
       month_mode: rule.monthMode ?? null, month_day: rule.monthDay ?? null, month_nth: rule.monthNth ?? null, month_weekday: rule.monthWeekday ?? null,
       end_kind: rule.end.kind, until_date: rule.end.kind === "date" ? rule.end.date : null, occurrence_count: rule.end.kind === "count" ? rule.end.count : null,
@@ -230,7 +232,7 @@ export async function splitSeries(db: Db, e: CalendarEvent, edit: SeriesEdit, no
   const row = await db
     .insertInto("family_event_series")
     .values({
-      account_id: e.accountId, event_type_id: typeId, title: medical || !edit.title ? null : seal(edit.title), location: sealOptional(edit.place), note: sealOptional(edit.notes),
+      account_id: e.accountId, event_type_id: typeId, title: medical || !edit.title ? null : seal(edit.title), location: sealOptional(edit.place), location_point: medical ? null : edit.placePoint, note: sealOptional(edit.notes),
       start_time: edit.allDay ? "00:00" : startTime, duration_minutes: duration, all_day: edit.allDay, whole_family: edit.allFamily, series_timezone: old.series_timezone, first_date: firstDate,
       repeat_unit: rule.unit, repeat_interval: rule.interval, weekdays: rule.weekdays ?? null, month_mode: rule.monthMode ?? null, month_day: rule.monthDay ?? null, month_nth: rule.monthNth ?? null,
       month_weekday: rule.monthWeekday ?? null, end_kind: rule.end.kind, until_date: rule.end.kind === "date" ? rule.end.date : null, occurrence_count: rule.end.kind === "count" ? rule.end.count : null,
@@ -263,7 +265,7 @@ export async function transformToSeries(db: Db, e: CalendarEvent, edit: SeriesEd
     // La première séance a le même créneau que le RDV d'origine : l'empreinte anti-doublon de ce dernier est libérée avant de créer les séances.
     await db.updateTable("family_events").set({ fingerprint: randomBytes(16) }).where("id", "=", e.id).execute();
     const result = await createSeries(db, {
-      accountId: e.accountId, userId, type: edit.type, title: edit.title, place: edit.place, notes: edit.notes, startTime, durationMinutes: duration, allDay: edit.allDay, allFamily: edit.allFamily,
+      accountId: e.accountId, userId, type: edit.type, title: edit.title, place: edit.place, placePoint: edit.type === "medical" ? null : edit.placePoint, notes: edit.notes, startTime, durationMinutes: duration, allDay: edit.allDay, allFamily: edit.allFamily,
       memberIds: edit.memberIds, firstDate, rule: ruleFromRepetition(edit.repetition, firstDate), timeZone, source: reverse[source.source as keyof typeof reverse] ?? "typed",
       sourceMessageId: source.source_message_id === null ? null : Number(source.source_message_id), now,
     });
