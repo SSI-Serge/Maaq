@@ -10,6 +10,7 @@ import type { EventType } from "@/server/assistant/calendar";
 import type { AnticipationView } from "@/server/assistant/anticipation";
 import type { ReminderKind } from "@/server/assistant/reminders";
 import { TYPE_LABEL, TYPE_PLURAL } from "./format";
+import { MyPosition } from "./LocationConsent";
 import styles from "./family.module.css";
 
 interface Setting {
@@ -265,6 +266,8 @@ export function SettingsScreen() {
   return (
     <AppShell title="Réglages" subtitle="Assistant Famille" back={{ href: "/assistant", label: "Assistant Famille" }}>
       <MyNotifications pushState={push} />
+
+      <MyPosition />
 
       <SchoolZone />
       <Anticipation />

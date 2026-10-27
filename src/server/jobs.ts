@@ -74,6 +74,8 @@ export async function runDueJobs(ctx: Ctx, options: { force?: boolean } = {}): P
     console.error(`Anticipation : ${describeError(error)}`);
     return { accounts: 0, created: 0, notified: 0 };
   });
+  // Dernières positions échues : toutes les 5 minutes (US-107 RF12). La lecture ignore déjà les lignes échues ; ceci les efface pour de bon.
+  await sql`select purge_expired_device_positions()`.execute(ctx.db).catch((error) => console.error(`Positions échues : ${describeError(error)}`));
   if (!due) return { logbook: "not_due", purged: null, lifecycle, exports, reminders, notices, taskNotices, digests, anticipation };
 
   const logbook = await syncLogbook(ctx);
@@ -94,6 +96,8 @@ export async function purgeExpired(ctx: Ctx): Promise<{ logbook: number; errorRe
   for (const job of [
     "purge_expired_conversation_messages", "purge_expired_family_events", "purge_expired_attachments", "purge_expired_inbound_emails", "purge_old_daily_counters",
     "purge_admin_audit_log", "purge_expired_security_events", "purge_expired_family_tasks", "purge_expired_weekly_digests", "purge_old_scheduled_notifications", "purge_expired_anticipation",
+    // Journal des consentements à la position au-delà de 5 ans (US-107 RT5, décision du DPO).
+    "purge_location_consent_events",
   ]) {
     const done = await sql<{ n: string | null }>`select ${sql.ref(job)}() as n`.execute(ctx.db);
     database += Number(done.rows[0]?.n ?? 0);

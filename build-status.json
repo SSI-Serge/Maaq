@@ -3,7 +3,7 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-10-27T17:52:09Z",
+  "updated": "2026-10-27T18:01:00Z",
   "deploys": [
     {
       "at": "2026-10-25T08:05:53Z",
@@ -1964,8 +1964,8 @@
           "title": "US-107 · Être prévenu des temps de trajet entre mes RDV",
           "state": "building",
           "env": null,
-          "note": "Lot 8 en cours : l'alerte « RDV rapproché » et le champ « Adresse » avec suggestions de l'État sont faits (coordonnées chiffrées, jamais pour un RDV médical). Reste : consentement à la position, suivi du trajet et notifications.",
-          "unsure": "Le champ Adresse n'a jamais été vu dans un navigateur ni sur un téléphone (le service d'adresses a été essayé en vrai). Bloqué pour la suite : compte et clé TomTom et déclaration du sous-traitant par le DPO. Sur iPhone, l'autorisation de la position peut être redemandée à chaque lancement. La phrase « commence après » de l'alerte est écrite par MAAQ, à relire.",
+          "note": "Lot 8 en cours : l'alerte « RDV rapproché », le champ « Adresse » avec suggestions de l'État et le consentement à la position (autoriser, retirer, journal) sont faits. Reste : suivi du trajet et notifications.",
+          "unsure": "Le champ Adresse et la carte « Position » n'ont jamais été vus dans un navigateur ni sur un téléphone. Bloqué pour la suite : compte et clé TomTom et déclaration du sous-traitant par le DPO. Sur iPhone, l'autorisation de la position peut être redemandée à chaque lancement. La phrase « commence après » de l'alerte est écrite par MAAQ, à relire. Export et suppression des données de position : lot 9 (US-55, US-56).",
           "at": "2026-10-27T17:32:11Z"
         },
         {
@@ -2066,6 +2066,11 @@
         "Le point de la semaine fait appel à un modèle : coût et qualité du résumé à mesurer sur des semaines fictives avant le pilote."
       ],
       "activity": [
+        {
+          "at": "2026-10-27T18:01:00Z",
+          "kind": "building",
+          "what": "Lot 8 : consentement à la position par appareil, retrait, journal et dernière position chiffrée"
+        },
         {
           "at": "2026-10-27T17:46:09Z",
           "kind": "building",
