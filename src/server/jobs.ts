@@ -5,6 +5,7 @@ import { completeSeries } from "@/server/assistant/series";
 import { completeTaskSeries } from "@/server/assistant/task-series";
 import { runTaskNotices, type TaskNoticesResult } from "@/server/assistant/task-notices";
 import { runDigests, type DigestsResult } from "@/server/assistant/digest";
+import { runAnticipation, type AnticipationResult } from "@/server/assistant/anticipation";
 import { runReminders, type RemindersResult } from "@/server/assistant/reminders";
 import { cleanupExports } from "@/server/compliance/exports";
 import { runLifecycle, type LifecycleResult } from "@/server/compliance/lifecycle";
@@ -32,6 +33,8 @@ export interface JobsResult {
   taskNotices: TaskNoticesResult;
   /** Point de la semaine : résumés préparés et notifications envoyées (US-98). */
   digests: DigestsResult;
+  /** Questions d'anticipation posées et notification mensuelle (US-102). */
+  anticipation: AnticipationResult;
 }
 
 /** Synchronise le carnet toutes les X heures (US-40 RT2) puis nettoie les données expirées (US-40 RT6, US-61 RT2, US-70 RT3). */
@@ -67,10 +70,14 @@ export async function runDueJobs(ctx: Ctx, options: { force?: boolean } = {}): P
     console.error(`Point de la semaine : ${describeError(error)}`);
     return { prepared: 0, sent: 0, failed: 0 };
   });
-  if (!due) return { logbook: "not_due", purged: null, lifecycle, exports, reminders, notices, taskNotices, digests };
+  const anticipation = await runAnticipation(ctx).catch((error) => {
+    console.error(`Anticipation : ${describeError(error)}`);
+    return { accounts: 0, created: 0, notified: 0 };
+  });
+  if (!due) return { logbook: "not_due", purged: null, lifecycle, exports, reminders, notices, taskNotices, digests, anticipation };
 
   const logbook = await syncLogbook(ctx);
-  return { logbook, purged: await purgeExpired(ctx), lifecycle, exports, reminders, notices, taskNotices, digests };
+  return { logbook, purged: await purgeExpired(ctx), lifecycle, exports, reminders, notices, taskNotices, digests, anticipation };
 }
 
 /** Supprime les données arrivées au bout de leur durée de conservation. */
@@ -86,7 +93,7 @@ export async function purgeExpired(ctx: Ctx): Promise<{ logbook: number; errorRe
   let database = 0;
   for (const job of [
     "purge_expired_conversation_messages", "purge_expired_family_events", "purge_expired_attachments", "purge_expired_inbound_emails", "purge_old_daily_counters",
-    "purge_admin_audit_log", "purge_expired_security_events", "purge_expired_family_tasks", "purge_expired_weekly_digests", "purge_old_scheduled_notifications",
+    "purge_admin_audit_log", "purge_expired_security_events", "purge_expired_family_tasks", "purge_expired_weekly_digests", "purge_old_scheduled_notifications", "purge_expired_anticipation",
   ]) {
     const done = await sql<{ n: string | null }>`select ${sql.ref(job)}() as n`.execute(ctx.db);
     database += Number(done.rows[0]?.n ?? 0);

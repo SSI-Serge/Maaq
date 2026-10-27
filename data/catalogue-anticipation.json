@@ -1,0 +1,93 @@
+[
+  {
+    "code": "declaration_revenus",
+    "libelle": "Déclaration de revenus",
+    "categorie": "impots",
+    "medical": "non",
+    "par_membre": "non",
+    "periode_debut_mois": 4, "periode_debut_jour": 1, "periode_fin_mois": 5, "periode_fin_jour": 31,
+    "delai_jours": 21, "frequence_annees": 1,
+    "actif": "oui"
+  },
+  {
+    "code": "taxe_fonciere",
+    "libelle": "Taxe foncière",
+    "categorie": "impots",
+    "medical": "non",
+    "par_membre": "non",
+    "periode_debut_mois": 9, "periode_debut_jour": 1, "periode_fin_mois": 10, "periode_fin_jour": 15,
+    "delai_jours": 21, "frequence_annees": 1,
+    "situation": "home_owner=oui",
+    "actif": "oui"
+  },
+  {
+    "code": "entretien_chaudiere",
+    "libelle": "Entretien annuel de la chaudière",
+    "categorie": "logement",
+    "medical": "non",
+    "par_membre": "non",
+    "periode_debut_mois": 9, "periode_debut_jour": 1, "periode_fin_mois": 11, "periode_fin_jour": 30,
+    "delai_jours": 30, "frequence_annees": 1,
+    "situation": "home_owner=oui",
+    "actif": "oui"
+  },
+  {
+    "code": "rentree_inscriptions",
+    "libelle": "Inscriptions et fournitures de la rentrée",
+    "categorie": "ecole",
+    "medical": "non",
+    "par_membre": "non",
+    "periode_debut_mois": 6, "periode_debut_jour": 1, "periode_fin_mois": 9, "periode_fin_jour": 5,
+    "delai_jours": 30, "frequence_annees": 1,
+    "situation": "children_schooled=oui",
+    "actif": "oui"
+  },
+  {
+    "code": "assurance_scolaire",
+    "libelle": "Assurance scolaire",
+    "categorie": "ecole",
+    "medical": "non",
+    "par_membre": "non",
+    "periode_debut_mois": 8, "periode_debut_jour": 15, "periode_fin_mois": 9, "periode_fin_jour": 30,
+    "delai_jours": 14, "frequence_annees": 1,
+    "situation": "children_schooled=oui",
+    "actif": "oui"
+  },
+  {
+    "code": "activites_rentree",
+    "libelle": "Réinscription aux activités de la rentrée",
+    "categorie": "ecole",
+    "medical": "non",
+    "par_membre": "non",
+    "periode_debut_mois": 6, "periode_debut_jour": 1, "periode_fin_mois": 9, "periode_fin_jour": 30,
+    "delai_jours": 30, "frequence_annees": 1,
+    "situation": "children_schooled=oui",
+    "actif": "oui"
+  },
+  {
+    "code": "visite_veterinaire",
+    "libelle": "Visite annuelle chez le vétérinaire",
+    "categorie": "animal",
+    "medical": "non",
+    "par_membre": "non",
+    "periode_debut_mois": 1, "periode_debut_jour": 1, "periode_fin_mois": 3, "periode_fin_jour": 31,
+    "delai_jours": 14, "frequence_annees": 1,
+    "situation": "pet=oui",
+    "actif": "oui"
+  },
+  {
+    "code": "suivi_dentaire_enfant",
+    "libelle": "Suivi dentaire de {membre} cette année",
+    "categorie": "sante",
+    "medical": "oui",
+    "par_membre": "oui",
+    "periode_debut_mois": 1, "periode_debut_jour": 1, "periode_fin_mois": 12, "periode_fin_jour": 31,
+    "delai_jours": 0, "frequence_annees": 1,
+    "role": "enfant", "age_min_mois": 36, "age_max_mois": 215,
+    "source": "",
+    "date_revue": "",
+    "valide_par": "",
+    "actif": "non",
+    "_remarque": "Contenu médical : reste désactivé tant que le référent santé n'a pas validé les âges et indiqué la source officielle, la date de revue et son nom (US-102 RT4, D54). Ne jamais renseigner ces trois colonnes sans cette validation."
+  }
+]

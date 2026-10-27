@@ -3,7 +3,7 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-10-27T13:00:13Z",
+  "updated": "2026-10-27T14:11:42Z",
   "deploys": [
     {
       "at": "2026-10-25T08:05:53Z",
@@ -195,6 +195,17 @@
       ],
       "what": "Lot 5 sur https://test.maaq.fr : tâches. Pas la production.",
       "note": "À essayer : « Rappelle-moi de payer la cantine avant le 5 » puis Ajouter ; « Anniversaire de Mia samedi 15 h » et ajuster la liste « À préparer » avant « Confirmer le RDV et N tâches » ; « + Tâche » chaque mardi."
+    },
+    {
+      "at": "2026-10-27T13:54:39Z",
+      "env": "preview",
+      "storyIds": [
+        "f16s7",
+        "f16s8",
+        "f16s6"
+      ],
+      "what": "Lot 6 sur https://test.maaq.fr : rappels de tâches et point de la semaine. Pas la production.",
+      "note": "À essayer : Réglages ▸ Mes notifications (rappel quotidien, point de la semaine), confier une tâche à l'autre parent, ouvrir Assistant Famille ▸ Point de la semaine."
     }
   ],
   "features": [
@@ -1908,39 +1919,45 @@
           "title": "US-96 · Assigner une tâche préparatoire à un membre de la famille",
           "state": "testing",
           "env": "preview",
-          "note": "Assigner une tâche à un membre actif ou à personne, réassigner d'un appui sur le nom ; couleur du membre ; un invité secondaire n'assigne qu'à lui-même ; un membre retiré laisse ses tâches non assignées.",
+          "note": "Assigner une tâche à un membre actif ou à personne, réassigner d'un appui sur le nom ; couleur du membre ; un invité secondaire n'assigne qu'à lui-même ; un membre retiré laisse ses tâches non assignées. Le membre à qui on confie une tâche est prévenu (« Camille vous a confié… »).",
           "at": "2026-10-27T13:00:13Z",
-          "unsure": "Les notifications « [Prénom] vous a confié… » et l'information des parents au retrait d'un membre ne sont pas faites : la base n'a le type de notification qu'au lot 6."
+          "unsure": "L'information des parents quand un membre est retiré (RF8) n'est pas faite : la base n'a pas de notification pour cela."
         },
         {
           "id": "f16s7",
           "title": "US-97 · Être rappelé des tâches dues ou en retard",
-          "state": "planning",
-          "env": null,
-          "note": "Lot 6."
+          "state": "testing",
+          "env": "preview",
+          "note": "Chaque jour à 8 h, une notification avec mes tâches du jour et celles des 7 derniers jours (sans le mot « retard »), un rappel une heure avant une tâche à heure précise, un email sans appareil autorisé. Se désactive dans Réglages.",
+          "at": "2026-10-27T13:54:39Z",
+          "unsure": "Jamais essayé sur un téléphone : les envois n'ont été vérifiés que par des tests avec des notifications simulées. Les heures (8 h, avant midi) suivent le fuseau de la famille, réglé par le dernier téléphone de l'utilisateur principal."
         },
         {
           "id": "f16s8",
           "title": "US-98 · Consulter le point hebdomadaire du dimanche soir",
-          "state": "planning",
-          "env": null,
-          "note": "Lot 6.",
-          "unsure": "La qualité du modèle léger pour le résumé reste à essayer."
+          "state": "testing",
+          "env": "preview",
+          "note": "Chaque profil reçoit « Votre semaine est prête : N RDV, M tâches » au jour et à l'heure de son choix ; l'écran Point de la semaine a la Synthèse (résumé, chiffres, 7 jours, points d'attention) et le Détail jour par jour. Le résumé est rédigé par l'agent à partir de références sans titre ni prénom.",
+          "unsure": "Le résumé de l'agent n'a jamais été produit avec le vrai modèle (qualité, coût, modèle léger à choisir). Écrans jamais essayés dans un navigateur ni sur un téléphone. Pas encore de questions de rappel (lot 7) ni de RDV rapprochés (lot 8).",
+          "at": "2026-10-27T13:54:39Z"
         },
         {
           "id": "f16s9",
           "title": "US-102 · Découvrir le catalogue d'anticipation mensuel",
-          "state": "planning",
-          "env": null,
-          "note": "Lot 7."
+          "state": "testing",
+          "env": "preview",
+          "note": "Chaque mois, MAAQ pose aux parents des questions sur les échéances à prévoir (impôts, rentrée, entretien…), au plus 5 par semaine. Trois choix : « Oui, c'est fait ou prévu », « Non, à faire » (une tâche est créée) ou « Me le rappeler dans 1, 3 ou 6 mois ». Section « À anticiper » de l'accueil, questions du point de la semaine, réglages (catalogue activé ou non, situation de la famille).",
+          "at": "2026-10-27T14:11:42Z",
+          "unsure": "Jamais essayé sur un téléphone ni dans un navigateur. Le contenu du catalogue (7 échéances non médicales) est une proposition à relire par l'équipe produit. Le suivi dentaire est désactivé : le contenu médical attend la validation du référent santé. Les textes des questions (« Avez-vous prévu : … ? ») et des tâches (« À prévoir : … ») sont à relire."
         },
         {
           "id": "f16s10",
           "title": "US-111 · Charger le catalogue d'anticipation à partir d'un fichier de données",
-          "state": "planning",
-          "env": null,
-          "note": "Lot 7. La console d'administration avec extraction et chargement Excel est reportée (D60).",
-          "unsure": "Le contenu du catalogue (les éléments d'anticipation) reste à fournir."
+          "state": "testing",
+          "env": "preview",
+          "note": "Au MVP2, le catalogue est chargé par l'équipe technique depuis un fichier de données, avec les contrôles de la future console (code unique, âges, source et validation pour le médical), un aperçu avant d'appliquer, et le chargement par code sans jamais supprimer. La console Excel est reportée.",
+          "unsure": "Le fichier du dépôt n'est pas encore chargé sur la zone de test.",
+          "at": "2026-10-27T14:11:42Z"
         },
         {
           "id": "f16s11",
@@ -2001,6 +2018,18 @@
         {
           "at": "2026-10-27T13:00:13Z",
           "what": "L'agent ne voit pas les titres des tâches (règle AT-4) : il peut en ajouter, pas les modifier ni les retirer en écrivant. Les deux se font depuis la carte."
+        },
+        {
+          "at": "2026-10-27T13:54:39Z",
+          "what": "Le point de la semaine couvre le lundi-dimanche qui suit son envoi (décision D47 et schéma), même réglé en milieu de semaine ; le texte de la US-98 dit « les 7 jours qui suivent » : à confirmer avec l'équipe des user stories."
+        },
+        {
+          "at": "2026-10-27T14:11:42Z",
+          "what": "Aucun contenu médical actif sans validation : le suivi dentaire du catalogue d'amorçage est désactivé tant que le référent santé n'a pas indiqué source, date de revue et son nom."
+        },
+        {
+          "at": "2026-10-27T14:11:42Z",
+          "what": "Pas de notification d'anticipation dans le registre de la base : l'avis « N échéances à anticiper ce mois-ci » part directement aux parents qui ont un téléphone autorisé."
         }
       ],
       "unsure": [
@@ -2008,9 +2037,21 @@
         "La recette sur iPhone attend un utilisateur équipé, que le responsable produit doit recruter.",
         "L'offre gratuite de TomTom (2 500 requêtes par jour) est à reconfirmer : la grille a changé le 1er juillet 2026.",
         "Les vacances scolaires de l'année suivante ne sont pas connues d'avance : l'alerte de septembre pour l'administrateur reste à faire.",
-        "Le test d'un cas de rappel J-1 dépendait de l'heure d'exécution (fuseau d'essai) : corrigé, il tourne à toute heure."
+        "Le test d'un cas de rappel J-1 dépendait de l'heure d'exécution (fuseau d'essai) : corrigé, il tourne à toute heure.",
+        "Le point de la semaine fait appel à un modèle : coût et qualité du résumé à mesurer sur des semaines fictives avant le pilote.",
+        "Le mois et l'année de naissance manquants : le choix « Pas maintenant » reste sur l'appareil, pas côté serveur."
       ],
       "activity": [
+        {
+          "at": "2026-10-27T14:11:42Z",
+          "kind": "live",
+          "what": "Lot 7 prêt : questions d'anticipation, catalogue chargé par fichier, réglages et écrans"
+        },
+        {
+          "at": "2026-10-27T13:54:39Z",
+          "kind": "live",
+          "what": "Lot 6 en ligne sur la zone de test : rappel quotidien des tâches, assignation notifiée, point de la semaine"
+        },
         {
           "at": "2026-10-27T13:00:13Z",
           "kind": "live",

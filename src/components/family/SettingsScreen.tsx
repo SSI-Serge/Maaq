@@ -7,6 +7,7 @@ import { usePush } from "@/client/push";
 import { AppShell, Section } from "@/components/app/AppShell";
 import { Loading, Notice, RetryNotice } from "@/components/ui";
 import type { EventType } from "@/server/assistant/calendar";
+import type { AnticipationView } from "@/server/assistant/anticipation";
 import type { ReminderKind } from "@/server/assistant/reminders";
 import { TYPE_LABEL, TYPE_PLURAL } from "./format";
 import styles from "./family.module.css";
@@ -116,6 +117,67 @@ function MyNotifications({ pushState }: { pushState: string }) {
   );
 }
 
+/**
+ * Anticipation (US-102 RF2, RF9) : le catalogue d'échéances se désactive pour la famille, et le court questionnaire « Situation de la famille » (facultatif) précise lesquelles
+ * s'appliquent. Réservé aux parents : un profil sans ce droit ne voit pas la carte.
+ */
+function Anticipation() {
+  const query = useApiQuery<{ anticipation: AnticipationView }>("/api/family/anticipation");
+  const mutation = useApiMutation();
+  const [pending, setPending] = useState<string | null>(null);
+  const [override, setOverride] = useState<Partial<Pick<AnticipationView, "enabled" | "situation">>>({});
+  const data = query.data?.anticipation;
+  if (query.error?.body?.code === "forbidden") return null;
+  const enabled = override.enabled ?? data?.enabled;
+  const situation = override.situation ?? data?.situation ?? [];
+
+  async function save(key: string, body: Record<string, unknown>) {
+    setPending(key);
+    const result = await mutation.run<{ enabled?: boolean; situation?: AnticipationView["situation"] }>("/api/family/anticipation/settings", { method: "PATCH", body });
+    setPending(null);
+    if (result) setOverride((cur) => ({ ...cur, ...(result.enabled !== undefined ? { enabled: result.enabled } : {}), ...(result.situation ? { situation: result.situation } : {}) }));
+  }
+
+  return (
+    <Section title="Anticipation">
+      <p className={styles.hint}>Des questions sur les échéances à prévoir (impôts, rentrée, entretien…), au plus cinq par semaine. Réservé aux parents.</p>
+      {query.loading && !data && <Loading slow={query.slow} />}
+      {query.error && <RetryNotice message={query.error.kind === "server" ? "Les réglages n'ont pas pu être chargés." : query.error.message} onRetry={query.reload} />}
+      {data && enabled !== undefined && (
+        <>
+          <div className={styles.settingRow} role="group" aria-label="Catalogue d'anticipation">
+            <div className={styles.settingType}>Catalogue d&apos;anticipation</div>
+            <div className={styles.switches}>
+              <button type="button" role="switch" aria-checked={enabled} aria-label="Catalogue d'anticipation" className={styles.switch} disabled={pending !== null} onClick={() => void save("enabled", { enabled: !enabled })}>
+                {pending === "enabled" ? "Enregistrement…" : enabled ? "Oui" : "Non"}
+              </button>
+            </div>
+          </div>
+          {enabled && (
+            <>
+              <div className={styles.label}>Situation de la famille (facultatif)</div>
+              {situation.map((q) => (
+                <div key={q.key} className={styles.settingRow} role="group" aria-label={q.label}>
+                  <div className={styles.settingType}>{q.label}</div>
+                  <div className={styles.switches}>
+                    {([[true, "Oui"], [false, "Non"]] as const).map(([value, label]) => (
+                      <button key={label} type="button" className={styles.chipToggle} aria-pressed={q.answer === value} disabled={pending !== null} onClick={() => void save(q.key, { situation: { key: q.key, answer: q.answer === value ? null : value } })}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              <span className={styles.hint}>Sans réponse, seules les échéances sans condition de situation sont proposées.</span>
+            </>
+          )}
+        </>
+      )}
+      {mutation.error && <Notice tone="error">{mutation.error.kind === "server" ? "Le réglage n'a pas pu être enregistré." : mutation.error.message}</Notice>}
+    </Section>
+  );
+}
+
 interface ZoneSetting {
   zone: "A" | "B" | "C" | null;
   canEdit: boolean;
@@ -205,6 +267,7 @@ export function SettingsScreen() {
       <MyNotifications pushState={push} />
 
       <SchoolZone />
+      <Anticipation />
 
       <Section title="Délais de rappel par type de RDV">
         <p className={styles.hint}>Les rappels et les relances sont envoyés par email aux deux parents du foyer. Ces réglages valent pour toute la famille.</p>

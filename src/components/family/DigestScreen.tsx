@@ -8,6 +8,7 @@ import { Loading, RetryNotice } from "@/components/ui";
 import type { DigestDay, DigestView } from "@/server/assistant/digest";
 import { clock, longDate, shortDate } from "./format";
 import { Dots } from "./parts";
+import { QuestionCard } from "./QuestionCards";
 import { TaskRow } from "./TaskRow";
 import styles from "./family.module.css";
 
@@ -88,6 +89,14 @@ export function DigestScreen() {
                   </button>
                 ))}
               </div>
+
+              {d.parent && d.questions.length > 0 && (
+                <Section title="Questions de la semaine">
+                  {d.questions.map((q) => (
+                    <QuestionCard key={q.id} question={q} onAnswered={query.reload} />
+                  ))}
+                </Section>
+              )}
 
               {d.attention.length > 0 && (
                 <Section title="Points d'attention">

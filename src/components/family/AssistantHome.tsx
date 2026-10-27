@@ -7,9 +7,11 @@ import { useApiQuery } from "@/client/hooks";
 import { remindersSeen, usePush } from "@/client/push";
 import { AppShell, Section } from "@/components/app/AppShell";
 import { Loading, RetryNotice } from "@/components/ui";
+import type { AnticipationView } from "@/server/assistant/anticipation";
 import type { EventView } from "@/server/assistant/events";
 import { clock, dayOf, shortDate } from "./format";
 import { Dots } from "./parts";
+import { AnticipationCards } from "./QuestionCards";
 import styles from "./family.module.css";
 
 function Item({ event }: { event: EventView }) {
@@ -36,6 +38,9 @@ function Item({ event }: { event: EventView }) {
 export function AssistantHome() {
   const pending = useApiQuery<{ events: EventView[] }>("/api/family/events/pending");
   const upcoming = useApiQuery<{ events: EventView[] }>("/api/assistant/upcoming");
+  // Réservé aux parents (US-102 RF8) : un profil sans ce droit n'a pas la section.
+  const anticipation = useApiQuery<{ anticipation: AnticipationView }>("/api/family/anticipation");
+  const toAnticipate = anticipation.data?.anticipation;
   const waiting = pending.data?.events ?? [];
   const router = useRouter();
   const { state: push } = usePush();
@@ -87,6 +92,14 @@ export function AssistantHome() {
           <Item key={e.id} event={e} />
         ))}
       </Section>
+
+      {toAnticipate && toAnticipate.enabled && (toAnticipate.questions.length > 0 || toAnticipate.birthCards.length > 0) && (
+        <div id="anticiper">
+          <Section title="À anticiper">
+            <AnticipationCards data={toAnticipate} onChanged={anticipation.reload} />
+          </Section>
+        </div>
+      )}
 
       <Section title="Prochains rendez-vous" action={<Link href="/calendrier" className={styles.link}>Calendrier ›</Link>}>
         {upcoming.loading && !upcoming.data && <Loading slow={upcoming.slow} />}

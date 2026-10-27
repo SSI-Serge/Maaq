@@ -115,6 +115,12 @@ export type ProposalKind = "cancellation" | "modification" | "reschedule";
 
 export type ProposalStatus = "accepted" | "declined" | "expired" | "pending";
 
+export type QuestionAnswer = "done_or_planned" | "remind_later" | "todo";
+
+export type QuestionOrigin = "catalog";
+
+export type QuestionStatus = "dismissed" | "expired" | "pending" | "settled" | "snoozed" | "task_created";
+
 export type ReportCategory = "incorrect_response" | "other" | "wrong_action";
 
 export type RequirementOwner = "account" | "each_profile" | "primary_user";
@@ -413,6 +419,76 @@ export interface AgentValidatedActions {
   sort_order: Generated<number>;
 }
 
+export interface AnticipationAnswers {
+  answer: QuestionAnswer;
+  answered_at: Generated<Timestamp>;
+  answered_by_user_id: string | null;
+  created_task_id: string | null;
+  id: Generated<Int8>;
+  question_id: string;
+  remind_months: number | null;
+}
+
+export interface AnticipationCatalogItems {
+  active: Generated<boolean>;
+  category: string;
+  code: string;
+  created_at: Generated<Timestamp>;
+  /**
+   * Fréquence : 1 = chaque année, 2 = tous les 2 ans… Une échéance réglée (« Oui ») revient la période suivante après ce délai
+   */
+  every_n_years: Generated<number>;
+  id: Generated<number>;
+  /**
+   * Question médicale générique (âge et catalogue seulement, jamais l'historique des RDV, D44). Un contenu médical actif exige une source et une relecture
+   */
+  is_medical: Generated<boolean>;
+  label: string;
+  lead_days: Generated<number>;
+  max_age_months: number | null;
+  min_age_months: number | null;
+  per_member: Generated<boolean>;
+  period_end_day: Generated<number>;
+  period_end_month: number;
+  period_start_day: Generated<number>;
+  period_start_month: number;
+  reviewed_at: Timestamp | null;
+  reviewed_by: string | null;
+  situation_key: string | null;
+  situation_required_value: boolean | null;
+  source_reference: string | null;
+  target_role: MemberRole | null;
+  updated_at: Generated<Timestamp>;
+  version: Generated<number>;
+}
+
+export interface AnticipationQuestions {
+  account_id: string;
+  catalog_item_id: number | null;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  /**
+   * Libellé du catalogue au moment où la question est posée, avec le repère {membre} remplacé à l'affichage : la question garde son ancien libellé sans jamais contenir de prénom. Vide pour une suggestion de l'historique, dont le texte est recomposé à partir du RDV d'origine (D54)
+   */
+  label_template: string | null;
+  member_id: string | null;
+  origin: QuestionOrigin;
+  period_end: Timestamp;
+  period_start: Timestamp;
+  /**
+   * Lundi de la semaine de présentation : au plus 5 questions par semaine et par famille, catalogue et historique confondus (AT-7). Une question sans réponse peut être présentée à nouveau
+   */
+  presented_week: Timestamp | null;
+  remind_at: Timestamp | null;
+  /**
+   * pending ; snoozed (« Me le rappeler », reposée à remind_at) ; settled (« Oui ») ; task_created (« Non » : une tâche existe) ; dismissed (« Ne plus me le proposer ») ; expired (période terminée sans réponse)
+   */
+  status: Generated<QuestionStatus>;
+  status_changed_at: Generated<Timestamp>;
+  times_presented: Generated<number>;
+  updated_at: Generated<Timestamp>;
+}
+
 export interface AssistantRequests {
   conversation_id: string;
   created_at: Generated<Timestamp>;
@@ -449,6 +525,9 @@ export interface ChatErasureRequests {
 
 export interface ChatRequests {
   agent_id: Int8;
+  /**
+   * Jour calendaire dans le fuseau de la famille (accounts.family_timezone) sur lequel la demande a été comptée (hypothèse H35 remplacée, US-70 RF5)
+   */
   counted_date: Timestamp;
   created_at: Generated<Timestamp>;
   request_id: string;
@@ -574,7 +653,7 @@ export interface DailyRequestCounters {
    */
   request_count: Generated<number>;
   /**
-   * Jour calendaire dans le fuseau de l'appareil au moment de la demande (hypothèse H35)
+   * Jour calendaire dans le fuseau de la famille (accounts.family_timezone) au moment de la demande, pour le tchat des agents comme pour l'assistant (hypothèse H35 remplacée, US-70 RF5)
    */
   request_date: Timestamp;
   user_id: string;
@@ -904,10 +983,25 @@ export interface FamilyReminderSettings {
 
 export interface FamilySettings {
   account_id: string;
+  anticipation_enabled: Generated<boolean>;
   created_at: Generated<Timestamp>;
   school_zone: string | null;
   updated_at: Generated<Timestamp>;
   updated_by_user_id: string | null;
+}
+
+export interface FamilySituationAnswers {
+  account_id: string;
+  answer: boolean;
+  answered_at: Generated<Timestamp>;
+  answered_by_user_id: string | null;
+  situation_key: string;
+}
+
+export interface FamilySituationQuestions {
+  label: string;
+  situation_key: string;
+  sort_order: Generated<number>;
 }
 
 export interface FamilyTasks {
@@ -934,6 +1028,10 @@ export interface FamilyTasks {
   id: Generated<string>;
   note: Buffer | null;
   occurrence_date: Timestamp | null;
+  /**
+   * Question d'anticipation qui a créé la tâche (réponse « Non, à faire ») : unique, pas de double création (CC-7)
+   */
+  origin_question_id: string | null;
   series_id: string | null;
   source: Generated<TaskSource>;
   /**
@@ -1396,6 +1494,7 @@ export interface VFamilyTasks {
   is_overdue: boolean | null;
   note: Buffer | null;
   occurrence_date: Timestamp | null;
+  origin_question_id: string | null;
   series_id: string | null;
   source: TaskSource | null;
   status: TaskStatus | null;
@@ -1466,6 +1565,9 @@ export interface DB {
   agent_sample_prompts: AgentSamplePrompts;
   agent_validated_actions: AgentValidatedActions;
   agents: Agents;
+  anticipation_answers: AnticipationAnswers;
+  anticipation_catalog_items: AnticipationCatalogItems;
+  anticipation_questions: AnticipationQuestions;
   assistant_requests: AssistantRequests;
   cc_addresses: CcAddresses;
   chat_erasure_requests: ChatErasureRequests;
@@ -1494,6 +1596,8 @@ export interface DB {
   family_members: FamilyMembers;
   family_reminder_settings: FamilyReminderSettings;
   family_settings: FamilySettings;
+  family_situation_answers: FamilySituationAnswers;
+  family_situation_questions: FamilySituationQuestions;
   family_task_series: FamilyTaskSeries;
   family_tasks: FamilyTasks;
   forwarding_authorized_senders: ForwardingAuthorizedSenders;

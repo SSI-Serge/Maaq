@@ -259,6 +259,23 @@ La base ne porte aucune fonction de planification pour ces notifications : MAAQ 
 - **Pas fait** : questions de rappel du point (US-102, lot 7) et RDV rapprochés de moins de 30 minutes (US-107, lot 8) ; information des parents quand un membre est retiré (US-96 RF8) : aucun type de notification pour cela dans la base ; notification de tâches proposées devenues « à faire » à la confirmation d'un RDV.
   **Résumé non mesuré avec le vrai modèle** (le PO l'a demandé « après essai sur des semaines fictives », US-98 RT2) ; **écrans jamais essayés dans un navigateur ni sur téléphone**.
 
+## Lot 7 du MVP2 : anticipation (US-102, US-111 réduite)
+
+Schéma : `0010_lot7_schema.sql`, copie exacte de `lot_7_2_schema.sql` de la session base de données (SHA-256 `8d2b83a2…`). Pas de fichier de valeurs énumérées pour ce lot. US-108 (suggestions de l'historique) reste reportée : les fichiers `reportee_us108_*` ne sont pas appliqués.
+
+- **Catalogue** (`catalog.ts`, `scripts/load-anticipation-catalog.ts`, `data/catalogue-anticipation.json`) : chargé par l'équipe technique à partir d'un fichier de données (D60) qui a les colonnes et les contrôles de la future console : code unique, libellé de 150
+  caractères, âge minimal ≤ âge maximal, situation connue, et pour un rappel médical actif source, date de revue et « validé par » (US-102 RT4, D54), libellé générique, rappel par membre. Le script montre toujours l'aperçu (créés, modifiés avec les champs changés, désactivés,
+  inchangés) ; `--appliquer` charge par code, en une seule transaction, sans jamais supprimer : un rappel absent du fichier est désactivé et ses questions sans réponse sont retirées, les réponses données restent. La version d'un rappel monte quand son contenu change.
+  Le fichier du dépôt contient 7 rappels non médicaux à relire par l'équipe produit (impôts, taxe foncière, chaudière, rentrée, assurance scolaire, activités, vétérinaire) et le suivi dentaire **désactivé** : aucun contenu médical n'est activé sans la validation du référent santé.
+- **Sélection** (`anticipation.ts`) : pour chaque famille, les échéances dont le délai d'anticipation est ouvert au 1er du mois (ou dont la période commence dans le mois) et dont la période n'est pas finie deviennent des questions, une par échéance, membre et période.
+  Conditions : situation de la famille (sans réponse, seules les échéances sans condition), rôle et âge du membre (le mois et l'année de naissance sont requis ; sinon une carte les demande), fréquence tous les N ans. La base choisit les 5 questions de la semaine (`pick_weekly_questions`) et réveille les rappels échus ;
+  celles restées sans réponse reviennent. Aucun appel au modèle, aucune donnée envoyée à l'agent. Une notification aux parents, « 3 échéances à anticiper ce mois-ci », part quand de nouvelles questions viennent d'être posées.
+- **Réponses** : trois choix, atomiques (`answer_anticipation_question`) : « Oui » règle la période, « Non, à faire » crée une tâche seule « À prévoir : … » due à la fin de la période (jamais dans le passé), « Me le rappeler dans 1, 3 ou 6 mois » sans dépasser la période. Parents seulement ; la réponse d'un parent vaut
+  pour la famille (l'autre reçoit « déjà traitée »). La question garde le libellé du catalogue avec le repère {membre} : jamais de prénom conservé.
+- **Écrans** : section « À anticiper » de l'accueil (parents), « Questions de la semaine » du point de la semaine, cartes « Indiquez le mois et l'année de naissance de Léo… » (« Pas maintenant » gardé sur l'appareil), et Réglages ▸ Anticipation (interrupteur du catalogue, questionnaire « Situation de la famille »).
+- **Pas fait / à savoir** : pas de type de notification mensuelle dans la base : l'avis est envoyé directement aux parents qui ont un appareil, sans registre ni email ; le texte de la tâche et de la question est composé par MAAQ à partir du libellé (« Avez-vous prévu : … ? » / « Pensez-vous à : … ? ») : à relire avec l'équipe produit ;
+  « Pas maintenant » n'est pas conservé côté serveur. **Écrans jamais essayés dans un navigateur ni sur téléphone.**
+
 ## Réglages
 Voir `.env.example`. Tout est facultatif tant que `ASSISTANT_MODE=off`.
 ```

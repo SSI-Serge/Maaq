@@ -8,6 +8,7 @@ import { Rejection } from "@/server/http";
 import { describeError } from "@/server/safe-log";
 import { loadCalendarEvents, type CalendarEvent } from "./calendar";
 import { listEvents, type CalendarListItem } from "./events";
+import { presentedQuestions, type QuestionView } from "./anticipation";
 import { loadPseudoMembers } from "./family";
 import { open, seal } from "./fields";
 import { localDay, localToUtc, utcToLocal } from "./local-time";
@@ -106,8 +107,8 @@ export interface DigestView {
   lastWeek: { doneTasks: number; doneEvents: number; open: TaskView[] };
   calm: boolean;
   parent: boolean;
-  /** Questions de rappel de la semaine (US-102) : réservées aux parents, pas encore en service. */
-  questions: never[];
+  /** Questions de rappel de la semaine (US-102 RF4) : réservées aux parents. */
+  questions: QuestionView[];
   today: string;
 }
 
@@ -185,7 +186,7 @@ export async function getDigest(ctx: Ctx, session: SessionContext, weekParam?: s
     counts: { events: events.length, tasks: tasks.length, alerts: attention.filter((a) => a.kind !== "to_confirm").length, toConfirm: toConfirm.length },
     days, attention,
     lastWeek: { doneTasks: lastTasks.filter((t) => t.status === "done").length, doneEvents: lastEvents.filter((e) => e.status === "confirmed" && e.past).length, open: lastTasks.filter((t) => t.status === "todo") },
-    calm: events.length === 0 && tasks.length === 0, parent: v.parent, questions: [], today: v.today,
+    calm: events.length === 0 && tasks.length === 0, parent: v.parent, questions: v.parent ? await presentedQuestions(ctx.db, v.accountId, v.timeZone, ctx.now) : [], today: v.today,
   };
 }
 
