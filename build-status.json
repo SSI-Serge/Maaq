@@ -3,7 +3,7 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-10-27T12:01:12Z",
+  "updated": "2026-10-27T13:00:13Z",
   "deploys": [
     {
       "at": "2026-10-25T08:05:53Z",
@@ -184,6 +184,17 @@
       ],
       "what": "Lot 4 sur https://test.maaq.fr : RDV récurrents. Pas la production.",
       "note": "À essayer : demander à l'assistant « Foot pour Léo tous les mercredis à 14 h jusqu'en juin », confirmer la série, déplacer une séance."
+    },
+    {
+      "at": "2026-10-27T13:00:13Z",
+      "env": "preview",
+      "storyIds": [
+        "f16s4",
+        "f16s5",
+        "f16s6"
+      ],
+      "what": "Lot 5 sur https://test.maaq.fr : tâches. Pas la production.",
+      "note": "À essayer : « Rappelle-moi de payer la cantine avant le 5 » puis Ajouter ; « Anniversaire de Mia samedi 15 h » et ajuster la liste « À préparer » avant « Confirmer le RDV et N tâches » ; « + Tâche » chaque mardi."
     }
   ],
   "features": [
@@ -1877,24 +1888,29 @@
         {
           "id": "f16s4",
           "title": "US-110 · Créer une tâche seule ou récurrente",
-          "state": "planning",
-          "env": null,
-          "note": "Lot 5."
+          "state": "testing",
+          "env": "preview",
+          "note": "Une tâche seule ou qui revient (chaque jour, semaine, mois), avec échéance et heure. Chaque fois se coche seule ; modifier ou annuler « cette fois », « cette fois et les suivantes » ou « toutes ». Écran Tâches : en retard, aujourd'hui, à venir, faites.",
+          "at": "2026-10-27T13:00:13Z",
+          "unsure": "Jamais essayé dans un navigateur ni sur un téléphone : l'écran Tâches, le formulaire et la case à cocher n'ont été vérifiés que par la compilation et des tests de la partie serveur. L'agent n'a pas été remesuré avec le vrai modèle."
         },
         {
           "id": "f16s5",
           "title": "US-95 · Voir les tâches préparatoires proposées dans la même réponse que le RDV",
-          "state": "planning",
-          "env": null,
-          "note": "Lot 5. Carte du tchat avec la liste « À préparer », confirmation du RDV et des tâches en une opération.",
-          "unsure": "Le délai d'une réponse avec tâches n'est pas mesuré (décision du PO) ; estimation de 8 à 10 s, 10 à 13 s pour une série."
+          "state": "testing",
+          "env": "preview",
+          "note": "L'agent propose les tâches avec le RDV. La carte du tchat et l'écran du RDV ont une liste « À préparer » (retirer, modifier, ajouter), puis « Confirmer le RDV et N tâches » ou « Confirmer sans les tâches ». Les tâches suivent le RDV déplacé ou annulé.",
+          "unsure": "Jamais essayé dans un navigateur ni sur un téléphone. Pas de modification ni de retrait d'une tâche en l'écrivant à l'agent (il ne voit pas les titres des tâches, règle AT-4). Pas de notification d'annulation avec « tâches retirées » : le message s'affiche à l'annulation.",
+          "at": "2026-10-27T13:00:13Z"
         },
         {
           "id": "f16s6",
           "title": "US-96 · Assigner une tâche préparatoire à un membre de la famille",
-          "state": "planning",
-          "env": null,
-          "note": "Lot 5."
+          "state": "testing",
+          "env": "preview",
+          "note": "Assigner une tâche à un membre actif ou à personne, réassigner d'un appui sur le nom ; couleur du membre ; un invité secondaire n'assigne qu'à lui-même ; un membre retiré laisse ses tâches non assignées.",
+          "at": "2026-10-27T13:00:13Z",
+          "unsure": "Les notifications « [Prénom] vous a confié… » et l'information des parents au retrait d'un membre ne sont pas faites : la base n'a le type de notification qu'au lot 6."
         },
         {
           "id": "f16s7",
@@ -1977,15 +1993,29 @@
         {
           "at": "2026-10-27T12:01:12Z",
           "what": "Vacances scolaires : source officielle de l'Éducation nationale, chargée par script à la main. 2025-2026 et 2026-2027 complètes, 2027-2028 sans les vacances d'été, 2028-2029 absente."
+        },
+        {
+          "at": "2026-10-27T13:00:13Z",
+          "what": "Une tâche proposée par l'agent sans RDV (« Rappelle-moi de payer la cantine ») est une carte du tchat qui n'est pas conservée par le serveur : la base n'a pas de tâche proposée sans RDV. Elle disparaît au rechargement de la conversation."
+        },
+        {
+          "at": "2026-10-27T13:00:13Z",
+          "what": "L'agent ne voit pas les titres des tâches (règle AT-4) : il peut en ajouter, pas les modifier ni les retirer en écrivant. Les deux se font depuis la carte."
         }
       ],
       "unsure": [
         "Rien n'est encore construit : tout est en planification ; le lot 0 n'a pas démarré.",
         "La recette sur iPhone attend un utilisateur équipé, que le responsable produit doit recruter.",
         "L'offre gratuite de TomTom (2 500 requêtes par jour) est à reconfirmer : la grille a changé le 1er juillet 2026.",
-        "Les vacances scolaires de l'année suivante ne sont pas connues d'avance : l'alerte de septembre pour l'administrateur reste à faire."
+        "Les vacances scolaires de l'année suivante ne sont pas connues d'avance : l'alerte de septembre pour l'administrateur reste à faire.",
+        "Le test d'un cas de rappel J-1 dépendait de l'heure d'exécution (fuseau d'essai) : corrigé, il tourne à toute heure."
       ],
       "activity": [
+        {
+          "at": "2026-10-27T13:00:13Z",
+          "kind": "live",
+          "what": "Lot 5 en ligne sur la zone de test : tâches seules et récurrentes, tâches préparatoires avec le RDV, assignation"
+        },
         {
           "at": "2026-10-27T12:01:12Z",
           "kind": "live",
