@@ -8,6 +8,7 @@ import { sql, type Kysely } from "kysely";
 import { loadCalendarEvent } from "./calendar";
 import { loadAgentDefinition, runAssistant, type AgentDefinition, type AgentLimits, type AgentSource } from "./agent";
 import { loadPseudoMembers, requireParent } from "./family";
+import { familyTimeZone } from "./reminders";
 import { createModel, type AssistantModel } from "./model";
 import { utcToLocal } from "./local-time";
 
@@ -116,7 +117,8 @@ export async function sendAssistantMessage(
   let userMessageId = (await ctx.db.selectFrom("assistant_requests").select("user_message_id").where("conversation_id", "=", conversation.id).where("request_id", "=", input.requestId).executeTakeFirst())?.user_message_id;
   if (userMessageId === undefined) {
     // Première fois que cette demande arrive : elle compte dans le plafond quotidien du profil (US-70, AF-7). Un renvoi (« Réessayer ») ne recompte pas.
-    const day = localDay(ctx.now, session.device.timezone || "Europe/Paris");
+    // Le jour est celui du fuseau de la famille (AF-2), comme pour les rappels et les heures de nuit.
+    const day = localDay(ctx.now, await familyTimeZone(ctx.db, accountId));
     const accepted = await sql<{ accepted: boolean }>`select register_agent_request(${session.user.id}::uuid, ${day}::date) as accepted`.execute(ctx.db);
     if (!accepted.rows[0]?.accepted) {
       const { daily_request_limit: limit } = await ctx.db.selectFrom("accounts").select("daily_request_limit").where("id", "=", accountId).executeTakeFirstOrThrow();

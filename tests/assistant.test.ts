@@ -583,6 +583,17 @@ describe("message d'un parent à l'assistant", () => {
     expect((await ask(randomUUID(), f.session, tomorrow)).failed).toBe(false);
   });
 
+  it("compte le jour dans le fuseau de la famille, pas celui de l'appareil (AF-2)", async () => {
+    const f = await family();
+    await db.updateTable("accounts").set({ daily_request_limit: 1, family_timezone: "Pacific/Auckland" }).where("id", "=", f.accountId).execute();
+    const model = answering();
+    const ask = (at: string) => sendAssistantMessage({ db, now: new Date(at) }, f.session, { requestId: randomUUID(), text: "Bonjour" }, { model });
+    // 2054-11-02 à 08:00 UTC et 10:00 UTC : le même jour à Paris (appareil), mais le 2 à 21 h puis le 2 à 23 h à Auckland (UTC+13) ; 11:30 UTC = le 3 à 00:30 à Auckland.
+    await ask("2054-11-02T08:00:00Z");
+    expect((await rejectionOf(ask("2054-11-02T10:00:00Z"))).code).toBe("daily_cap_reached");
+    expect((await ask("2054-11-02T11:30:00Z")).failed).toBe(false); // nouveau jour pour la famille, même jour à Paris
+  });
+
   it("compte une demande dont le modèle échoue une seule fois, même renvoyée", async () => {
     const f = await family();
     await db.updateTable("accounts").set({ daily_request_limit: 1 }).where("id", "=", f.accountId).execute();
