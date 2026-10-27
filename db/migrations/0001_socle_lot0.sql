@@ -1,9 +1,8 @@
 -- =====================================================================
 -- Socle de la base MAAQ (lot 0 du MVP2), copié TEL QUEL de la session « base de données » :
---   Base de données/Maaq - BD/migrations/lot_0_2_schema.sql (SHA-256 72a25bfb40c9b4877160e5915ab8ef167d3e2abe8442835fd4ffed7ed5828a7c, le 27/10/2026).
--- Le schéma de référence est maaq_schema.sql ; ce fichier n'est jamais modifié à la main.
--- Les écarts propres à l'application sont dans 0002_application.sql. Les lots suivants (2 à 8)
--- sont copiés de la même façon, dans des fichiers numérotés à la suite.
+--   Base de données/Maaq - BD/migrations/lot_0_2_schema.sql (SHA-256 fd4227fe9393e6280bcaf69b86d5a18154476228c8f8674fc55ec688c8c1e073, le 27/10/2026).
+-- Le schéma de référence est maaq_schema.sql ; ce fichier n'est jamais modifié à la main. Il porte désormais tout ce dont l'application a besoin :
+-- il n'y a plus de migration propre à l'application. Les lots suivants (2 à 8) sont copiés de la même façon, dans des fichiers numérotés à la suite.
 -- =====================================================================
 -- MAAQ — lot 0 : Alignement et nettoyage (socle)
 -- Fichier généré par construire_migrations.py à partir de maaq_schema.sql ; ne pas modifier à la main.
@@ -107,6 +106,8 @@ CREATE TABLE accounts (
   grace_origin        grace_origin,
   grace_started_at    timestamptz,
   purge_scheduled_at  timestamptz,
+  -- Rappel « suppression dans 7 jours » : un seul par délai de grâce (US-58 RF3) ; remis à vide par trigger quand le compte est repris
+  grace_reminder_sent_at timestamptz,
   -- Fin d'abonnement : point de départ des 5 ans de conservation des preuves de consentement
   subscription_ended_at timestamptz,
   created_at          timestamptz NOT NULL DEFAULT now(),
@@ -114,7 +115,9 @@ CREATE TABLE accounts (
   -- Les 3 colonnes de délai de grâce sont toutes renseignées ou toutes vides
   CONSTRAINT ck_accounts_grace_consistent CHECK (
     (status = 'grace_period') = (grace_origin IS NOT NULL AND grace_started_at IS NOT NULL AND purge_scheduled_at IS NOT NULL)
-  )
+  ),
+  -- Le rappel de suppression n'existe que pendant un délai de grâce
+  CONSTRAINT ck_accounts_grace_reminder CHECK (grace_reminder_sent_at IS NULL OR status = 'grace_period')
 );
 -- Profil connectable : administrateur, utilisateur principal ou invité. Un seul modèle pour les
 -- 3 rôles car ils partagent connexion, appareils, sessions, sécurité. Stories : US-3, 4, 10, 18-20, 64.
@@ -307,6 +310,18 @@ CREATE TABLE agents (
   CONSTRAINT ck_agents_blocked_has_message CHECK (
     (status = 'blocked') = (maintenance_message IS NOT NULL AND blocked_at IS NOT NULL AND length(btrim(maintenance_message)) > 0)
   )
+);
+-- Projet Digitorn d'un agent de plateforme « digitorn » (reprise de l'application, décision du PO du 27/10/2026). Table dédiée plutôt que
+-- des colonnes de agents : la clé secrète ne concerne qu'une plateforme, et agents est lue partout (catalogue, tableau de bord, vues) ;
+-- un secret isolé ne sort jamais par un SELECT * ni par une vue. Un agent sans ligne ici (démonstration, simulateur) garde le tchat de MAAQ.
+CREATE TABLE agent_digitorn_projects (
+  agent_id           bigint PRIMARY KEY REFERENCES agents (id) ON DELETE CASCADE,
+  -- NULL pour un agent « visiteur » : seule l'adresse de l'application publiée est connue. Chiffrée par l'application.
+  api_key_encrypted  bytea,
+  app_url            text,
+  updated_at         timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT ck_agent_digitorn_projects_content CHECK (api_key_encrypted IS NOT NULL OR app_url IS NOT NULL),
+  CONSTRAINT ck_agent_digitorn_projects_app_url CHECK (app_url IS NULL OR app_url ~ '^https://[^\s]+$')
 );
 -- Exemples de demandes (fiche + recherche) et suggestions de première demande (état d'accueil du tchat).
 CREATE TABLE agent_sample_prompts (
@@ -769,7 +784,26 @@ CREATE TABLE agent_conversation_messages (
   created_at            timestamptz NOT NULL DEFAULT now(),
   -- 4 jours au plus (US-44), sans nouveau réglage (décision du PO)
   expires_at            timestamptz NOT NULL DEFAULT (now() + interval '4 days'),
-  CONSTRAINT ck_conversation_messages_content CHECK (kind = 'image' OR content IS NOT NULL)
+  CONSTRAINT ck_conversation_messages_content CHECK (kind = 'image' OR content IS NOT NULL),
+  -- Cible des clés composites de assistant_requests : une demande ne relie que des messages de sa propre conversation
+  CONSTRAINT uq_conversation_messages_conversation_id UNIQUE (conversation_id, id)
+);
+-- Une demande envoyée à l'Assistant Famille (reprise de l'application, décision du PO du 27/10/2026) : relie le message du parent à la réponse,
+-- pour qu'un renvoi (« Réessayer », double toucher) rende la réponse déjà donnée au lieu de refaire le travail, et retrouve les RDV créés.
+-- Aucun texte : des identifiants seulement. Rattachée au compte par la conversation (suppression du foyer en cascade) ; disparaît avec les
+-- messages (4 jours, US-44) : pas de purge propre. Pas de colonne account_id : l'application ne l'écrit pas et la conversation la porte déjà.
+CREATE TABLE assistant_requests (
+  conversation_id   uuid NOT NULL REFERENCES agent_conversations (id) ON DELETE CASCADE,
+  request_id        uuid NOT NULL,
+  user_message_id   bigint NOT NULL,
+  reply_message_id  bigint,
+  created_at        timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (conversation_id, request_id),
+  -- Les deux messages appartiennent à la conversation de la demande ; la demande part avec le message du parent, la réponse supprimée la laisse vide
+  CONSTRAINT fk_assistant_requests_user_message FOREIGN KEY (conversation_id, user_message_id)
+    REFERENCES agent_conversation_messages (conversation_id, id) ON DELETE CASCADE,
+  CONSTRAINT fk_assistant_requests_reply_message FOREIGN KEY (conversation_id, reply_message_id)
+    REFERENCES agent_conversation_messages (conversation_id, id) ON DELETE SET NULL (reply_message_id)
 );
 -- Image jointe à un message (photo, capture, partage) : une par message (US-72 RF2).
 CREATE TABLE conversation_attachments (
@@ -1556,6 +1590,13 @@ BEGIN
   NEW.updated_at := now();
   RETURN NEW;
 END $$;
+-- Rappel « suppression dans 7 jours » (US-58 RF3) : un seul par délai de grâce. Quand le compte sort du délai de grâce (reprise), le rappel
+-- est remis à vide, pour qu'un nouveau délai de grâce puisse en recevoir un.
+CREATE FUNCTION account_grace_reminder_reset() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  NEW.grace_reminder_sent_at := NULL;
+  RETURN NEW;
+END $$;
 -- Quota d'invités vérifié côté serveur à l'ajout, même si l'écran affichait une place (US-18 RT1).
 -- Le verrou sur le compte sérialise deux ajouts simultanés. Les invités retirés ou en délai de grâce libèrent
 -- leur place (US-20 RF2 ; décision du 01/10/2026, P13).
@@ -1927,6 +1968,8 @@ CREATE INDEX idx_agent_conversations_account_id ON agent_conversations (account_
 CREATE INDEX idx_agent_conversations_agent_id ON agent_conversations (agent_id);
 CREATE INDEX idx_conversation_messages_conversation ON agent_conversation_messages (conversation_id, created_at);
 CREATE INDEX idx_conversation_messages_expires_at ON agent_conversation_messages (expires_at);
+CREATE INDEX idx_assistant_requests_user_message ON assistant_requests (user_message_id);
+CREATE INDEX idx_assistant_requests_reply_message ON assistant_requests (reply_message_id);
 CREATE INDEX idx_conversation_attachments_expiry ON conversation_attachments (expires_at) WHERE deleted_at IS NULL;
 CREATE INDEX idx_storage_deletion_queue_pending ON storage_deletion_queue (queued_at) WHERE status <> 'done';
 -- Un profil = au plus un membre (US-92 RT1)
@@ -2016,6 +2059,9 @@ CREATE TRIGGER trg_conversation_attachments_enqueue BEFORE DELETE ON conversatio
   FOR EACH ROW EXECUTE FUNCTION enqueue_attachment_file();
 CREATE TRIGGER trg_inbound_emails_enqueue BEFORE DELETE ON inbound_emails
   FOR EACH ROW EXECUTE FUNCTION enqueue_inbound_email_file();
+CREATE TRIGGER trg_accounts_grace_reminder_reset BEFORE UPDATE OF status ON accounts
+  FOR EACH ROW WHEN (NEW.status <> 'grace_period' AND NEW.grace_reminder_sent_at IS NOT NULL)
+  EXECUTE FUNCTION account_grace_reminder_reset();
 CREATE TRIGGER trg_users_guest_quota BEFORE INSERT ON users FOR EACH ROW EXECUTE FUNCTION enforce_guest_quota();
 CREATE TRIGGER trg_profile_agents_rules BEFORE INSERT OR UPDATE ON profile_agents
   FOR EACH ROW EXECUTE FUNCTION enforce_profile_agent_rules();
@@ -2042,10 +2088,20 @@ END $$;
 -- ---------------------------------------------------------------------
 -- Données de référence
 -- ---------------------------------------------------------------------
+-- Texte de consentement au challenge d'un contrat, version 1.0 (US-36 RF2, RT1) : le nom du partenaire n'est pas encore connu
+INSERT INTO legal_document_versions (document_type, version_label, content, published_at) VALUES
+  ('contract_challenge_consent', '1.0', 'L''entreprise [nom du partenaire], partenaire de MAAQ, pourra utiliser les informations de votre contrat pour le challenger.', now());
 INSERT INTO agent_categories (code, label, sort_order, is_core_only, shown_on_dashboard) VALUES
   ('pro', 'Pro', 1, false, true),
   ('perso', 'Perso', 2, false, true),
   ('contracts', 'Agents des Contrats', 3, true, false);
+-- Assistant Famille : agent appelé par API directe (plateforme « anthropic »). Les conversations du tchat de MAAQ (agent_conversations) et les RDV
+-- créés par l'assistant s'y rattachent, donc la ligne est une donnée de référence du socle. Elle n'apparaît dans le catalogue d'aucun profil tant
+-- qu'elle n'est pas ajoutée à un profil (US-106).
+INSERT INTO agents (platform, platform_agent_ref, name, category_id, short_description, full_description, status) VALUES
+  ('anthropic', 'assistant-famille', 'Assistant Famille — RDV & tâches', (SELECT id FROM agent_categories WHERE code = 'perso'),
+   'Rendez-vous et tâches de la famille, par écrit ou à la voix.',
+   'Assistant du calendrier familial : crée des rendez-vous provisoires à confirmer, propose des créneaux et rappelle les échéances.', 'available');
 INSERT INTO connector_types (code, label, requires_oauth) VALUES
   ('google_drive', 'Google Drive', true),
   ('google_calendar', 'Google Agenda', true),
@@ -2092,6 +2148,7 @@ COMMENT ON COLUMN accounts.daily_request_limit IS $$Nombre maximum de demandes a
 COMMENT ON COLUMN accounts.family_timezone IS $$Fuseau IANA de la famille (appareil de l'utilisateur principal à sa dernière connexion), utilisé pour les heures des RDV, rappels et relances$$;
 COMMENT ON COLUMN accounts.grace_origin IS $$in_app_request = bouton Désabonnement (annulable immédiatement) ; billing_unsubscribe = outil de facturation (reprise = nouvel abonnement hors app) — US-59 RF2/RF3$$;
 COMMENT ON COLUMN accounts.purge_scheduled_at IS $$Date de suppression définitive (début du délai de grâce + 30 jours). Lue par le traitement quotidien (US-56 RT2)$$;
+COMMENT ON COLUMN accounts.grace_reminder_sent_at IS $$Date d'envoi du rappel « suppression dans 7 jours » : un seul rappel par délai de grâce (US-58 RF3). Remis à vide par trigger quand le compte est repris ; ne peut être renseignée que pendant un délai de grâce$$;
 COMMENT ON COLUMN accounts.subscription_ended_at IS $$Date de fin d'abonnement ; sert à calculer la fin de conservation du journal des consentements (5 ans, US-36 RT1)$$;
 COMMENT ON TABLE users IS $$Profil connectable : administrateur, utilisateur principal ou invité (3 rôles, un seul modèle). [US-3, 4, 10, 11, 18, 19, 20, 64]$$;
 COMMENT ON COLUMN users.account_id IS $$Compte d'appartenance ; NULL pour les administrateurs (hors compte client)$$;
@@ -2134,6 +2191,8 @@ COMMENT ON COLUMN agents.platform_agent_ref IS $$Identifiant de l'agent chez sa 
 COMMENT ON COLUMN agents.status IS $$available = utilisable ; blocked = maintenance, MAAQ refuse toute nouvelle demande vers cet agent (US-42 RT1)$$;
 COMMENT ON COLUMN agents.cc_addresses_max_count IS $$Nombre maximum d'adresses en copie par profil que cet agent accepte, fixé par l'administrateur à la publication ; 0 = l'agent n'a pas de section « Adresses en copie » (US-16 RF1, RF4)$$;
 COMMENT ON COLUMN agents.maintenance_message IS $$Message affiché dans la bannière de blocage, 200 caractères max, obligatoire au blocage$$;
+COMMENT ON TABLE agent_digitorn_projects IS $$Clé secrète (sk_…) du projet Digitorn de l'agent, chiffrée avec la clé de l'application (jamais affichée ni journalisée), et domaine personnalisé facultatif de l'application publiée. Aucune donnée personnelle. [US-45, 106]$$;
+COMMENT ON COLUMN agent_digitorn_projects.api_key_encrypted IS $$Clé secrète du projet, chiffrée par l'application ; jamais en clair en base, jamais renvoyée au navigateur$$;
 COMMENT ON TABLE agent_sample_prompts IS $$Exemples de demandes (fiche agent, recherche) et suggestions de première demande (tchat vide). [US-24, 25, 41, 45]$$;
 COMMENT ON COLUMN agent_sample_prompts.kind IS $$example = exemple affiché sur la fiche et indexé par la recherche ; first_suggestion = bouton de l'état d'accueil du tchat (3 par agent)$$;
 COMMENT ON TABLE agent_validated_actions IS $$Types d'actions soumises à validation, déclarés à la mise à disposition de l'agent. [US-24 RF1, 39 RF6, 45]$$;
@@ -2196,6 +2255,7 @@ COMMENT ON TABLE agent_conversations IS $$Conversation d'un profil avec un agent
 COMMENT ON TABLE agent_conversation_messages IS $$Messages d'une conversation conservée par MAAQ. Supprimés à la déconnexion, au retrait de l'agent et au bout de 4 jours. [US-38, 43, 44, 71, 72]$$;
 COMMENT ON COLUMN agent_conversation_messages.content IS $$Contenu chiffré avec les vrais prénoms (texte, ou transcription d'une dictée : l'enregistrement audio n'est jamais conservé, US-71 RT2)$$;
 COMMENT ON COLUMN agent_conversation_messages.delivery_state IS $$État d'envoi du message : sending, sent, failed, waiting_for_connection (US-38 RF2, RF14)$$;
+COMMENT ON TABLE assistant_requests IS $$Demandes faites à l'Assistant Famille : message du parent, réponse de l'assistant ; sert à rendre la même réponse à un renvoi et à retrouver les RDV créés par la demande. Aucun texte. Disparaît avec les messages (4 jours). [US-38, 44, 71, 95]$$;
 COMMENT ON TABLE conversation_attachments IS $$Image jointe à un message du tchat de l'Assistant Famille (le fichier est dans un stockage chiffré de l'UE). [US-72, 73]$$;
 COMMENT ON COLUMN conversation_attachments.storage_key IS $$Chemin de l'objet dans le stockage chiffré ; NULL après suppression. Les suppressions passent par storage_deletion_queue$$;
 COMMENT ON TABLE storage_deletion_queue IS $$Fichiers (images, mails bruts) à supprimer du stockage, avec réessais. Évite les fichiers orphelins après une suppression en cascade. [US-56, 58, 72, 87, 93]$$;
@@ -2249,6 +2309,7 @@ COMMENT ON FUNCTION purge_expired_request_records() IS $$Supprime les clés d'id
 COMMENT ON FUNCTION family_member_age_months(smallint, smallint, date) IS $$Âge d'un membre en mois civils (différence des mois, sans jour) à une date ; NULL si le mois ou l'année de naissance manque. Sert aux conditions d'âge du catalogue (US-102) et aux tranches d'âge transmises au modèle. [US-92, US-102, D54]$$;
 COMMENT ON FUNCTION purge_admin_audit_log() IS $$Supprime les entrées du journal d'administration de plus de 5 ans (réglable). À planifier chaque jour. [US-45, US-64]$$;
 COMMENT ON FUNCTION backfill_family_members() IS $$Crée la fiche « membre » des profils qui n'en ont pas (invités existants) ; une fiche archivée pour un invité retiré. Idempotent. [US-92 RF1, US-20, US-113 RT6]$$;
+COMMENT ON FUNCTION account_grace_reminder_reset() IS $$Remet à vide le rappel de suppression d'un compte qui sort du délai de grâce (reprise), pour qu'un nouveau délai puisse en recevoir un. [US-58 RF3]$$;
 COMMENT ON VIEW v_profile_agent_missing_items IS $$Éléments manquants (connecteur ou information) et responsable (profil ou utilisateur principal) par agent du dashboard. [US-29 RT1]$$;
 COMMENT ON VIEW v_dashboard_agents IS $$Agents actifs d'un profil avec statut Prêt / À configurer / Bloqué. [US-22, 29, 31, 42]$$;
 COMMENT ON VIEW v_info_prefill_suggestions IS $$Valeurs déjà saisies pour un autre agent (même clé commune et même type) proposées pré-remplies pour un champ encore vide. [US-10 RF12]$$;

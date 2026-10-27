@@ -23,7 +23,7 @@ async function demoAccountId(): Promise<string> {
 describe("base de données", () => {
   it("applique le schéma de la conception et ne rejoue pas une migration déjà passée", async () => {
     const { rows } = await pool.query("SELECT name FROM schema_migrations");
-    expect(rows.map((r) => r.name)).toEqual(expect.arrayContaining(["0001_socle_lot0.sql", "0002_application.sql"]));
+    expect(rows.map((r) => r.name)).toEqual(expect.arrayContaining(["0001_socle_lot0.sql"]));
     expect(await migrate(pool)).toEqual([]);
   });
 

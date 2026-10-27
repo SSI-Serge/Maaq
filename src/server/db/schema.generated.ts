@@ -175,7 +175,7 @@ export interface Accounts {
    */
   grace_origin: GraceOrigin | null;
   /**
-   * Date d'envoi du rappel « suppression dans 7 jours » : un seul rappel par délai de grâce (US-58 RF3). Remis à vide quand le compte est repris
+   * Date d'envoi du rappel « suppression dans 7 jours » : un seul rappel par délai de grâce (US-58 RF3). Remis à vide par trigger quand le compte est repris ; ne peut être renseignée que pendant un délai de grâce
    */
   grace_reminder_sent_at: Timestamp | null;
   grace_started_at: Timestamp | null;
@@ -307,6 +307,9 @@ export interface AgentConversations {
 
 export interface AgentDigitornProjects {
   agent_id: Int8;
+  /**
+   * Clé secrète du projet, chiffrée par l'application ; jamais en clair en base, jamais renvoyée au navigateur
+   */
   api_key_encrypted: Buffer | null;
   app_url: string | null;
   updated_at: Generated<Timestamp>;

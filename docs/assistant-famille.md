@@ -139,9 +139,9 @@ Tests : `tests/speech.test.ts` (assemblage du texte), `tests/assistant.test.ts` 
 ## Lot 0 du MVP2 : la base suit le schéma de référence (27/10/2026)
 
 La base de MAAQ n'est plus écrite à la main : `db/migrations/0001_socle_lot0.sql` est la copie **telle quelle** du lot 0 de la session « base de données »
-(`Base de données/Maaq - BD/migrations/lot_0_2_schema.sql`, SHA-256 `72a25bfb40c9…`, 61 tables). Les lots suivants (2 à 8) se copient de la même façon,
+(`Base de données/Maaq - BD/migrations/lot_0_2_schema.sql`, SHA-256 `fd4227fe9393…`, 65 tables). Les lots suivants (2 à 8) se copient de la même façon,
 dans des fichiers numérotés à la suite, dans l'ordre de `ordre_d_application.txt` (un fichier `_1_valeurs_enumerees` toujours avant son `_2_schema`).
-Les migrations « reportées » (US-108, US-111) ne sont pas appliquées au MVP2. `idempotency_keys` et `chat_requests` font partie du schéma ; la réponse mémorisée d'une clé d'idempotence est **chiffrée** (elle peut contenir des données personnelles) et `purge_expired_request_records()` la purge après 24 h. `0002_application.sql` garde ce que le schéma de référence ne connaît pas :
+Les migrations « reportées » (US-108, US-111) ne sont pas appliquées au MVP2. `idempotency_keys` et `chat_requests` font partie du schéma ; la réponse mémorisée d'une clé d'idempotence est **chiffrée** (elle peut contenir des données personnelles) et `purge_expired_request_records()` la purge après 24 h. Il n'y a plus de migration propre à l'application : tout ce qu'elle utilise est dans le schéma de référence, dont :
 `accounts.grace_reminder_sent_at`, `agent_digitorn_projects` (clé et adresse du projet Digitorn de chaque agent), le texte de
 consentement du challenge de contrat, la ligne de l'agent « Assistant Famille » (plateforme `anthropic`) et `assistant_requests` (renvoi d'une demande).
 
