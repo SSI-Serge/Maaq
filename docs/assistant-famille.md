@@ -293,9 +293,17 @@ utilise l'API Anthropic directe ; Claude sur Vertex AI en région européenne se
 ```
 npx tsc --noEmit
 npx vitest run tests/assistant.test.ts     # 46 tests, sans clé
-npx tsx scripts/assistant-bench.ts --env agent/.env --runs 2     # vrai modèle, environ 1 à 3 $ par passage
+npx tsx scripts/assistant-bench.ts --env agent/.env --runs 2     # vrai modèle, environ 1 à 3 $ par passage pour le jeu de base
+npx tsx scripts/assistant-bench.ts --env agent/.env --jeu series # seulement les 24 cas de séries et de tâches (--jeu base : les 36 premiers)
 ```
 `agent/.env` n'est jamais suivi par Git (`agent/.gitignore`). Le banc de bout en bout écrit son rapport dans `agent/resultats/`.
+
+**Cas de séries et de tâches** (`agent/tests/cas_series_taches.json`, numérotés 37 à 60, jamais encore passés avec le vrai modèle) : séries (hebdomadaire avec date de fin, sans fin → « Jusqu'à quand ? », réponse à cette question,
+deux jours par semaine avec nombre de séances, premier mardi du mois, un samedi sur deux, « sauf vacances » sans zone réglée, série médicale minimisée, demande trop vague, conflit de la première séance) ; tâches d'un rendez-vous
+(anniversaire, anniversaire proche sans échéance déjà passée, rendez-vous médical aux trois titres génériques, rendez-vous courant sans tâche, ajout à un rendez-vous existant, retrait d'une tâche encore proposée, tâche déjà
+enregistrée intouchable) ; tâches seules (simple, avec heure et personne, qui revient avec ou sans fin, quotidienne, date passée, mail piégé). Le banc contrôle ce que l'agent demande (répétition, fin, jours), ce qui est
+enregistré (nombre et titres des tâches, prénoms absents, titres médicaux génériques) et les cartes de tâche. Un cas peut rejouer d'abord un échange avec le vrai modèle (`precedent`) : les cas 39 et 52 dépendent donc aussi
+de la réponse de l'étape préalable. Les cas ont été essayés à vide (fausse clé, aucun appel facturé) pour vérifier le décor et les contrôles.
 
 ## Pour déployer plus tard (rien de fait)
 1. Appliquer la migration `0007` sur Supabase, puis relancer `deploy/supabase-securiser.sql` (nouvelles tables).

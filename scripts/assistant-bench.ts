@@ -1,9 +1,11 @@
 // Banc d'essai de bout en bout de l'Assistant Famille : le VRAI modèle, la VRAIE boucle et les VRAIS outils de MAAQ, sur une base de test
-// jetable (PostgreSQL embarqué). Rejoue les 36 cas de agent/tests/cas_de_test.json et compare au résultat attendu, comme le banc Python
-// (agent/banc_essai/lancer_tests.py), mais sur le code qui tournera en production. Aucune donnée réelle.
+// jetable (PostgreSQL embarqué). Rejoue les 36 cas de agent/tests/cas_de_test.json et les cas de séries et de tâches de
+// agent/tests/cas_series_taches.json, et compare au résultat attendu, comme le banc Python (agent/banc_essai/lancer_tests.py, qui ne lit que le
+// premier fichier), mais sur le code qui tournera en production. Aucune donnée réelle.
 //
 //   npx tsx scripts/assistant-bench.ts --env agent/.env              # clé ANTHROPIC_API_KEY lue dans ce fichier (jamais affichée)
 //   npx tsx scripts/assistant-bench.ts --cas 01 29 30 --runs 2
+//   npx tsx scripts/assistant-bench.ts --jeu series                  # seulement les cas de séries et de tâches (--jeu base : les 36 premiers)
 import { randomBytes, randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -59,7 +61,20 @@ interface Case {
     creations?: number; creations_min?: number; evenements?: { date: string; heure?: string; fin?: string; journee_entiere?: boolean; type?: string; membres_inclus?: string[] }[];
     outils_requis?: string[]; outils_interdits?: string[]; modification?: { id: string; date: string; heure: string }; annulation?: string;
     question?: boolean; texte_contient?: string[]; medical_sans_detail?: boolean; doublon_attendu?: boolean;
+    /** Répétition demandée par l'agent dans son dernier appel de création ; `fin` accepte plusieurs choix séparés par « | ». */
+    serie?: { frequence?: string; jours?: string[]; fin?: string; fin_date?: string; fin_nombre?: number; sauf_vacances?: boolean };
+    sans_serie?: boolean;
+    /** Tâches rattachées au premier rendez-vous créé (ou à ses modèles pour une série). */
+    taches_rdv?: { min?: number; max?: number; sans_prenom?: boolean; generiques_medical?: boolean; echeances_non_passees?: boolean };
+    /** Une tâche enregistrée sur un rendez-vous du calendrier de départ. */
+    ajout_tache?: { evenement: string; titre_contient: string };
+    /** Cartes de tâche seule proposées dans le tchat (rien n'est enregistré). */
+    brouillons?: { nombre: number; due?: string; heure?: string; membre?: string; titre_contient?: string; repetition?: { frequence?: string; jours?: string[]; fin?: string; fin_date?: string; fin_nombre?: number } };
   };
+  /** Échange rejoué d'abord avec le vrai modèle ; le message testé reçoit cet échange en historique. */
+  precedent?: { message: string; source: "saisie" | "dictee" | "capture" | "mail"; question?: boolean };
+  /** Tâches déjà enregistrées (« à faire ») sur un rendez-vous du calendrier de départ. */
+  taches_initiales?: { evenement: string; titre: string; jours_avant: number }[];
 }
 const data = JSON.parse(readFileSync(path.join(process.cwd(), "agent", "tests", "cas_de_test.json"), "utf8")) as {
   contexte: { maintenant: string; fuseau: string; utilisateur: string };
@@ -67,6 +82,10 @@ const data = JSON.parse(readFileSync(path.join(process.cwd(), "agent", "tests", 
   calendrier_initial: { id: string; titre: string; type: string; debut: string; fin: string; membres: string[]; lieu?: string; journee_entiere?: boolean; statut: string }[];
   cas: Case[];
 };
+const extra = JSON.parse(readFileSync(path.join(process.cwd(), "agent", "tests", "cas_series_taches.json"), "utf8")) as { cas: Case[] };
+const jeu = option("jeu") ?? "tout";
+const baseCases = data.cas;
+data.cas = jeu === "base" ? baseCases : jeu === "series" ? extra.cas : [...baseCases, ...extra.cas];
 const SOURCE: Record<Case["source"], "typed" | "dictation" | "capture" | "mail"> = { saisie: "typed", dictee: "dictation", capture: "capture", mail: "mail" };
 const TYPE: Record<string, string> = { ecole: "school", medical: "medical", pro: "work", familial: "family", perso: "personal", admin: "admin" };
 const TZ = data.contexte.fuseau;
@@ -76,6 +95,30 @@ const seedUuid = (id: string) => `0000000${id.slice(-1)}-0000-4000-8000-00000000
 const normalize = (s: string) => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().trim();
 const TUTOIEMENT = /\b(tu|toi|ton|ta|tes|te|tien|tienne)\b|\bt'/;
 const SECONDS_LIMIT = 10;
+
+// --- contrôles des séries et des tâches ---------------------------------------------------------------------------------------------
+type Repetition = { frequence?: string; jours?: string[]; fin?: { type?: string; date?: string; nombre?: number }; sauf_vacances_scolaires?: boolean };
+type WantedRepetition = NonNullable<Case["attendu"]["serie"]>;
+const GENERIC_MEDICAL_TASKS = ["Préparer la carte Vitale", "Préparer le carnet de santé", "Préparer les documents à apporter"].map(normalize);
+const DAYS_BEFORE: Record<string, number> = { le_jour_meme: 0, la_veille: 1, "2_jours_avant": 2, "3_jours_avant": 3, "1_semaine_avant": 7 };
+const minusDays = (day: string, n: number) => {
+  const d = new Date(`${day}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - n);
+  return d.toISOString().slice(0, 10);
+};
+
+/** Compare la répétition décrite par l'agent à ce qui est attendu. Sans `jours`, l'outil prend le jour de la première occurrence : c'est accepté. */
+function checkRepetition(label: string, rep: Repetition | undefined, want: WantedRepetition): string[] {
+  if (!rep) return [`${label} : aucune répétition décrite par l'agent`];
+  const out: string[] = [];
+  if (want.frequence !== undefined && rep.frequence !== want.frequence) out.push(`${label} : fréquence « ${rep.frequence} » au lieu de « ${want.frequence} »`);
+  if (want.jours && rep.jours?.length && rep.jours.map(normalize).sort().join() !== want.jours.map(normalize).sort().join()) out.push(`${label} : jours « ${rep.jours.join(", ")} » au lieu de « ${want.jours.join(", ")} »`);
+  if (want.fin !== undefined && !want.fin.split("|").includes(rep.fin?.type ?? "")) out.push(`${label} : fin « ${rep.fin?.type} » au lieu de « ${want.fin} »`);
+  if (want.fin_date !== undefined && rep.fin?.date !== want.fin_date) out.push(`${label} : date de fin « ${rep.fin?.date} » au lieu de « ${want.fin_date} »`);
+  if (want.fin_nombre !== undefined && rep.fin?.nombre !== want.fin_nombre) out.push(`${label} : ${rep.fin?.nombre} fois au lieu de ${want.fin_nombre}`);
+  if (want.sauf_vacances !== undefined && Boolean(rep.sauf_vacances_scolaires) !== want.sauf_vacances) out.push(`${label} : sauf vacances scolaires ${Boolean(rep.sauf_vacances_scolaires)} au lieu de ${want.sauf_vacances}`);
+  return out;
+}
 
 // --- base jetable ------------------------------------------------------------------------------------------------------------------
 const port = 6000 + Math.floor(Math.random() * 500);
@@ -114,9 +157,13 @@ async function seedFamily() {
   return { accountId: account.id, userId: ids.get(data.contexte.utilisateur)! };
 }
 
-async function seedCalendar(accountId: string) {
+async function seedCalendar(accountId: string, userId: string, tasks: Case["taches_initiales"] = []) {
   await db.deleteFrom("family_event_change_proposals").where("account_id", "=", accountId).execute();
+  // Les séries et les tâches du cas précédent partent avec leurs rendez-vous (tâches, modèles, rendez-vous, séries : dans cet ordre).
+  await db.deleteFrom("family_tasks").where("account_id", "=", accountId).execute();
+  await db.deleteFrom("family_task_series").where("account_id", "=", accountId).execute();
   await db.deleteFrom("family_events").where("account_id", "=", accountId).execute();
+  await db.deleteFrom("family_event_series").where("account_id", "=", accountId).execute();
   const members = await db.selectFrom("family_members").select(["id", "first_name"]).where("account_id", "=", accountId).execute();
   const types = new Map((await db.selectFrom("event_types").select(["id", "code"]).execute()).map((t) => [t.code, t.id]));
   const { localToUtc } = await import("../src/server/assistant/local-time");
@@ -129,6 +176,19 @@ async function seedCalendar(accountId: string) {
       })
       .execute();
     await db.insertInto("family_event_members").values(e.membres.map((m) => ({ event_id: seedUuid(e.id), member_id: members.find((x) => x.first_name === m)!.id, account_id: accountId }))).execute();
+  }
+  // Tâches déjà enregistrées (« à faire »), comme après la confirmation d'un rendez-vous.
+  for (const t of tasks) {
+    const event = data.calendrier_initial.find((e) => e.id === t.evenement)!;
+    const due = new Date(`${event.debut.slice(0, 10)}T00:00:00Z`);
+    due.setUTCDate(due.getUTCDate() - t.jours_avant);
+    await db
+      .insertInto("family_tasks")
+      .values({
+        account_id: accountId, event_id: seedUuid(t.evenement), title: seal(t.titre), status: "todo", due_date: due.toISOString().slice(0, 10), days_before_event: t.jours_avant,
+        created_by_user_id: userId, source: "user",
+      })
+      .execute();
   }
 }
 
@@ -181,6 +241,68 @@ async function evaluate(c: Case, result: AgentRunResult, accountId: string): Pro
       if (!r.title.startsWith("RDV médical — ") || r.place || r.notes) failures.push(`rendez-vous médical non minimisé : ${r.title}`);
     }
   }
+  // --- séries et tâches ---
+  const calls = (name: string) => result.trace.filter((t) => t.name === name).map((t) => t.input as Record<string, unknown>);
+  const repetitionCalls = calls("creer_evenement_provisoire").filter((i) => i.repetition);
+  if (a.sans_serie && repetitionCalls.length) failures.push("une série a été créée alors qu'une question était attendue");
+  if (a.serie) failures.push(...checkRepetition("série", repetitionCalls[repetitionCalls.length - 1]?.repetition as Repetition | undefined, a.serie));
+
+  if (a.taches_rdv) {
+    const w = a.taches_rdv;
+    const first = result.createdEventIds[0];
+    const event = first ? await loadCalendarEvent(db, accountId, first) : null;
+    let titles: string[] = [];
+    if (event?.seriesId) {
+      titles = (await db.selectFrom("family_task_series").select("title").where("event_series_id", "=", event.seriesId).where("ended_at", "is", null).execute()).map((r) => open(r.title));
+    } else if (event) {
+      titles = (await db.selectFrom("family_tasks").select("title").where("event_id", "=", event.id).where("series_id", "is", null).where("status", "in", ["proposed", "todo", "done"]).execute()).map((r) => open(r.title));
+    }
+    if (w.min !== undefined && titles.length < w.min) failures.push(`${titles.length} tâche(s) de préparation, au moins ${w.min} attendue(s)`);
+    if (w.max !== undefined && titles.length > w.max) failures.push(`${titles.length} tâche(s) de préparation, au plus ${w.max} attendue(s) : ${titles.join(" ; ")}`);
+    if (w.sans_prenom) {
+      for (const title of titles) {
+        const hit = [...firstNames.values()].find((n) => n && new RegExp(`\\b${normalize(n)}\\b`).test(normalize(title)));
+        if (hit) failures.push(`prénom dans le titre d'une tâche : « ${title} »`);
+      }
+    }
+    if (w.generiques_medical) {
+      for (const title of titles) if (!GENERIC_MEDICAL_TASKS.some((g) => normalize(title).startsWith(g))) failures.push(`titre de tâche médicale non générique : « ${title} »`);
+    }
+    if (w.echeances_non_passees) {
+      const today = utcToLocal(NOW, TZ).slice(0, 10);
+      const eventDay = rows[0]?.start.slice(0, 10);
+      for (const input of calls("creer_evenement_provisoire")) {
+        for (const t of (input.taches as { titre?: string; echeance?: string }[] | undefined) ?? []) {
+          const days = DAYS_BEFORE[t.echeance ?? ""];
+          if (eventDay && days !== undefined && minusDays(eventDay, days) < today) failures.push(`échéance déjà passée proposée : « ${t.titre} » ${t.echeance}`);
+        }
+      }
+    }
+  }
+
+  if (a.ajout_tache) {
+    const w = a.ajout_tache;
+    const titles = (await db.selectFrom("family_tasks").select("title").where("event_id", "=", seedUuid(w.evenement)).execute()).map((r) => open(r.title));
+    if (!titles.some((t) => normalize(t).includes(normalize(w.titre_contient)))) failures.push(`tâche « ${w.titre_contient} » non enregistrée sur ${w.evenement}`);
+  }
+
+  if (a.brouillons) {
+    const w = a.brouillons;
+    const drafts = result.taskDrafts;
+    if (drafts.length !== w.nombre) failures.push(`${drafts.length} carte(s) de tâche au lieu de ${w.nombre}`);
+    const d = drafts[0];
+    if (d && w.nombre > 0) {
+      if (w.due !== undefined && d.due !== w.due) failures.push(`échéance ${d.due} au lieu de ${w.due}`);
+      if (w.heure !== undefined && d.dueTime?.slice(0, 5) !== w.heure) failures.push(`heure ${d.dueTime ?? "(aucune)"} au lieu de ${w.heure}`);
+      if (w.titre_contient !== undefined && !normalize(d.title).includes(normalize(w.titre_contient))) failures.push(`le titre « ${d.title} » devrait contenir « ${w.titre_contient} »`);
+      if (w.membre !== undefined && normalize(firstNames.get(d.assigneeId ?? "") ?? "") !== normalize(w.membre)) failures.push(`tâche assignée à « ${firstNames.get(d.assigneeId ?? "") ?? "(personne)"} » au lieu de « ${w.membre} »`);
+      if (w.repetition) {
+        const last = calls("proposer_tache").at(-1);
+        failures.push(...checkRepetition("tâche", last?.repetition as Repetition | undefined, w.repetition));
+      }
+    }
+  }
+
   if (result.leaks.length) failures.push(`données personnelles envoyées au modèle : ${result.leaks.join(", ")}`);
   if (result.unknownAliases.length) failures.push(`alias inventé : ${result.unknownAliases.join(", ")}`);
   const tut = TUTOIEMENT.exec(text.replace(/’/g, "'"));
@@ -207,14 +329,22 @@ try {
   console.log(`Modèle ${process.env.MODELE ?? "claude-sonnet-5-5"} via ${provider} — ${cases.length} cas × ${runs} passage(s) — code de production de MAAQ\n`);
   for (let run = 1; run <= runs; run++) {
     for (const c of cases) {
-      await seedCalendar(accountId);
+      await seedCalendar(accountId, userId, c.taches_initiales);
       await db.deleteFrom("family_event_change_proposals").where("account_id", "=", accountId).execute();
+      const base = { db, model, definition, accountId, userId, members, authorMemberId: author, timeZone: TZ, now: NOW };
+      const before: string[] = [];
+      let history: { role: "user" | "assistant"; text: string; source?: "typed" | "dictation" | "capture" | "mail" }[] | undefined;
       console.info = () => {}; // les traces d'exploitation ne sont pas affichées ici
-      const result = await runAssistant({
-        db, model, definition, accountId, userId, members, authorMemberId: author, timeZone: TZ, now: NOW, requestId: randomUUID(), source: SOURCE[c.source], text: c.message,
-      });
+      if (c.precedent) {
+        // Échange préalable avec le vrai modèle : le message testé le reçoit en historique, comme dans le tchat.
+        const first = await runAssistant({ ...base, requestId: randomUUID(), source: SOURCE[c.precedent.source], text: c.precedent.message });
+        history = [{ role: "user", text: c.precedent.message, source: SOURCE[c.precedent.source] }, { role: "assistant", text: first.reply }];
+        if (first.status !== "ok") before.push(`échange préalable : état ${first.status}`);
+        if (c.precedent.question && (first.createdEventIds.length || !first.reply.includes("?"))) before.push("échange préalable : une question était attendue, sans création");
+      }
+      const result = await runAssistant({ ...base, requestId: randomUUID(), source: SOURCE[c.source], text: c.message, history });
       console.info = quiet;
-      const failures = await evaluate(c, result, accountId);
+      const failures = [...before, ...(await evaluate(c, result, accountId))];
       const seconds = result.durationMs / 1000;
       outcomes.push({ id: c.id, titre: c.titre, run, failures, seconds, result, duplicate: Boolean(c.attendu.doublon_attendu), message: c.message });
       console.log(`${failures.length ? "✘" : "✔"} ${c.id} #${run} [${seconds.toFixed(1)} s] ${result.trace.map((t) => t.name).join(",")}${failures.length ? ` — ${failures.join(" ; ")}` : ""}`);
