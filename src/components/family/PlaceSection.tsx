@@ -30,7 +30,9 @@ export function PlaceBlocks({ blocks, checkedOn }: { blocks: PlaceBlock[]; check
           {block.note && <div className={styles.hint}>{block.note}</div>}
         </div>
       ))}
-      <div className={styles.hint}>Informations trouvées sur internet le {shortDate(checkedOn)} : vérifiez-les avant de partir. MAAQ ne réserve rien.</div>
+      <div className={styles.hint}>
+        Informations trouvées sur internet{/^\d{4}-\d{2}-\d{2}$/.test(checkedOn) ? ` le ${shortDate(checkedOn)}` : ""} : vérifiez-les avant de partir. MAAQ ne réserve rien.
+      </div>
     </div>
   );
 }

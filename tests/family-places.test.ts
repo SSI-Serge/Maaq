@@ -131,6 +131,8 @@ describe("recherche « Sur place » (US-112)", () => {
     expect(done.result_payload!.toString("utf8")).not.toContain("Parking");
     const view = (await placeSearchView(at(), f.session, event, new FakePlaceProvider()))!;
     expect(view).toMatchObject({ available: true, searches: 1, max: 3, latest: { status: "done" } });
+    // La date de vérification est un jour « AAAA-MM-JJ » : l'écran la met en forme (une date JavaScript convertie en texte le faisait planter, 27/10).
+    expect(view.results!.checkedOn).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     const byCategory = Object.fromEntries(view.results!.blocks.map((b) => [b.category, b.items.map((i) => i.name)]));
     expect(byCategory.parking).toEqual(["Parking d'essai des Remparts", "Parking d'essai du Marché"]); // celui de la gare est trop loin
     expect(byCategory.snack).toHaveLength(2);
@@ -168,6 +170,7 @@ describe("recherche « Sur place » (US-112)", () => {
     const view = (await placeSearchView(at(), f.session, event, fake))!;
     expect(view.latest?.status).toBe("no_result");
     expect(view.results?.blocks).toEqual([]);
+    expect(view.results?.checkedOn).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
   it("CA 11.1 : service muet, la recherche échoue (service_unavailable), ne compte pas dans les 3 par RDV, et « Réessayer » est possible", async () => {

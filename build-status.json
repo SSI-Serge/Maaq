@@ -3,7 +3,7 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-10-27T19:34:25Z",
+  "updated": "2026-10-28T10:36:23Z",
   "deploys": [
     {
       "at": "2026-10-27T18:29:38Z",
@@ -2077,6 +2077,10 @@
         {
           "at": "2026-10-27T19:12:26Z",
           "what": "La recherche demandée à l'assistant compte dans le plafond quotidien en plus du message du tchat ; l'assistant ne voit jamais le lieu du RDV qu'il cherche."
+        },
+        {
+          "at": "2026-10-28T10:36:23Z",
+          "what": "Les sections facultatives de l'écran d'un RDV (suivi du trajet, « Sur place ») ne peuvent plus faire tomber la page : si leur affichage échoue, seule la section disparaît."
         }
       ],
       "unsure": [
@@ -2086,9 +2090,15 @@
         "Le test d'un cas de rappel J-1 dépendait de l'heure d'exécution (fuseau d'essai) : corrigé, il tourne à toute heure.",
         "Le point de la semaine fait appel à un modèle : coût et qualité du résumé à mesurer sur des semaines fictives avant le pilote.",
         "Le suivi du trajet ne repose pour l'instant que sur un faux service : aucune durée réelle n'a été obtenue de TomTom.",
-        "La clé Anthropic a atteint sa limite d'usage jusqu'au 01/11/2026 : l'assistant de la zone de test est aussi arrêté. Deux cas de base du banc d'essai (22 et 23) échouent et restent à diagnostiquer."
+        "La clé Anthropic a atteint sa limite d'usage jusqu'au 01/11/2026 : l'assistant de la zone de test est aussi arrêté. Deux cas de base du banc d'essai (22 et 23) échouent et restent à diagnostiquer.",
+        "La dictée corrigée (relance automatique, mots répétés) n'a pas été vérifiée sur un vrai Android : à refaire par le PO."
       ],
       "activity": [
+        {
+          "at": "2026-10-28T10:36:23Z",
+          "kind": "back",
+          "what": "Deux anomalies du PO corrigées : plantage de la page d'un RDV après une recherche « Sur place », et dictée vocale qui répétait les mots sur Android"
+        },
         {
           "at": "2026-10-27T19:34:25Z",
           "kind": "back",

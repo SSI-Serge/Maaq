@@ -121,7 +121,7 @@ export async function placeSearchView(ctx: Ctx, session: SessionContext, eventId
   const e = await visibleEvent(ctx, session, eventId);
   if (!provider) return null;
   const max = await integerSetting(ctx.db, "max_place_searches_per_event", 3);
-  const rows = await ctx.db.selectFrom("event_place_searches").select(["id", "status", "failure_reason", "checked_on", "result_payload", "seq"]).where("event_id", "=", e.id).orderBy("seq", "desc").execute();
+  const rows = await ctx.db.selectFrom("event_place_searches").select(["id", "status", "failure_reason", sql<string | null>`checked_on::text`.as("checked_on"), "result_payload", "seq"]).where("event_id", "=", e.id).orderBy("seq", "desc").execute();
   const latest = rows[0] ?? null;
   const done = rows.find((r) => r.status === "done" && r.result_payload);
   const results = done ? { checkedOn: String(done.checked_on), place: e.place ?? "", blocks: blocksOf(JSON.parse(open(done.result_payload!)) as PlacePayload) } : null;
@@ -262,7 +262,7 @@ export interface PlaceSearchDetail {
 }
 
 async function searchDetail(db: Db, accountId: string, searchId: string): Promise<PlaceSearchDetail | null> {
-  const s = await db.selectFrom("event_place_searches").select(["id", "event_id", "status", "failure_reason", "checked_on", "result_payload"]).where("id", "=", searchId).where("account_id", "=", accountId).executeTakeFirst();
+  const s = await db.selectFrom("event_place_searches").select(["id", "event_id", "status", "failure_reason", sql<string | null>`checked_on::text`.as("checked_on"), "result_payload"]).where("id", "=", searchId).where("account_id", "=", accountId).executeTakeFirst();
   if (!s) return null;
   const e = await loadCalendarEvent(db, accountId, s.event_id);
   return {

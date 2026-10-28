@@ -9,6 +9,7 @@ import { AppShell, appStyles } from "@/components/app/AppShell";
 import { Button, Loading, Notice, RetryNotice } from "@/components/ui";
 import type { AssistantMessageView, TaskDraftView } from "@/server/assistant/service";
 import type { TaskLists } from "@/server/assistant/tasks";
+import { OptionalSection } from "./OptionalSection";
 import { PlaceResultsCard, PlaceSuggestionCard } from "./PlaceCards";
 import { EventProposalCard, TaskDraftCard } from "./ProposalCards";
 import styles from "./family.module.css";
@@ -140,8 +141,11 @@ export function AssistantChat() {
         {thread.map((entry) => (
           <div key={entry.key} className={`${styles.bubble} ${entry.role === "user" ? styles.bubbleUser : styles.bubbleAgent}`}>
             {entry.text}
-            {entry.place?.kind === "place_suggestion" && <PlaceSuggestionCard place={entry.place} onAnswered={history.reload} />}
-            {entry.place?.kind === "place_results" && <PlaceResultsCard place={entry.place} onRetried={history.reload} />}
+            {entry.place && (
+              <OptionalSection label="Sur place">
+                {entry.place.kind === "place_suggestion" ? <PlaceSuggestionCard place={entry.place} onAnswered={history.reload} /> : <PlaceResultsCard place={entry.place} onRetried={history.reload} />}
+              </OptionalSection>
+            )}
             {entry.events.map((e) =>
               e.status === "provisional" ? (
                 <EventProposalCard key={e.id} eventId={e.id} />

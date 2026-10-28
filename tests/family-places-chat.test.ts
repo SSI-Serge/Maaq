@@ -124,6 +124,7 @@ describe("suggestion automatique dans le tchat (US-112 RF3)", () => {
     await runPlaceSearch(at(), searchId!, fake());
     const done = (await placeMessages(f)).find((m) => m.place?.kind === "place_results")!.place!;
     expect(done.search?.status).toBe("done");
+    expect(done.search?.checkedOn).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     expect(done.search?.blocks.map((b) => b.items.length)).toEqual([2, 2, 2]);
     expect((await placeMessages(f)).find((m) => m.place?.kind === "place_suggestion")?.place?.suggestion).toBe("accepted");
   });
