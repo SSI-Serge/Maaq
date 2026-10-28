@@ -3,7 +3,7 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-10-28T10:36:23Z",
+  "updated": "2026-10-28T21:23:27Z",
   "deploys": [
     {
       "at": "2026-10-27T18:29:38Z",
@@ -1909,7 +1909,7 @@
           "title": "US-110 · Créer une tâche seule ou récurrente",
           "state": "testing",
           "env": "preview",
-          "note": "Une tâche seule ou qui revient (chaque jour, semaine, mois), avec échéance et heure. Chaque fois se coche seule ; modifier ou annuler « cette fois », « cette fois et les suivantes » ou « toutes ». Écran Tâches : en retard, aujourd'hui, à venir, faites.",
+          "note": "Une tâche seule ou qui revient (chaque jour, semaine, mois), avec échéance et heure. Chaque fois se coche seule ; modifier ou annuler « cette fois », « cette fois et les suivantes » ou « toutes ». Écran Tâches : en retard, aujourd'hui, à venir, faites. Section « Plus tard » ajoutée le 28/10 : une tâche seule à plus de 14 jours (par exemple « À prévoir : entretien de la chaudière ») n'était affichée nulle part.",
           "at": "2026-10-27T13:00:13Z",
           "unsure": "Jamais essayé dans un navigateur ni sur un téléphone : l'écran Tâches, le formulaire et la case à cocher n'ont été vérifiés que par la compilation et des tests de la partie serveur. Assistant mesuré avec le vrai modèle le 27/10 : 24 cas de séries et de tâches réussis aux deux passages (48 sur 48)."
         },
@@ -2081,6 +2081,10 @@
         {
           "at": "2026-10-28T10:36:23Z",
           "what": "Les sections facultatives de l'écran d'un RDV (suivi du trajet, « Sur place ») ne peuvent plus faire tomber la page : si leur affichage échoue, seule la section disparaît."
+        },
+        {
+          "at": "2026-10-28T21:23:27Z",
+          "what": "L'écran Tâches a une section « Plus tard » pour les tâches seules à plus de 14 jours : une tâche créée ne doit jamais être introuvable."
         }
       ],
       "unsure": [
@@ -2091,9 +2095,15 @@
         "Le point de la semaine fait appel à un modèle : coût et qualité du résumé à mesurer sur des semaines fictives avant le pilote.",
         "Le suivi du trajet ne repose pour l'instant que sur un faux service : aucune durée réelle n'a été obtenue de TomTom.",
         "La clé Anthropic a atteint sa limite d'usage jusqu'au 01/11/2026 : l'assistant de la zone de test est aussi arrêté. Deux cas de base du banc d'essai (22 et 23) échouent et restent à diagnostiquer.",
-        "La dictée corrigée (relance automatique, mots répétés) n'a pas été vérifiée sur un vrai Android : à refaire par le PO."
+        "La dictée corrigée (relance automatique, mots répétés) n'a pas été vérifiée sur un vrai Android : à refaire par le PO.",
+        "Les emails de l'Assistant Famille (J-1 toujours en email, relances, repli des rappels de tâches) attendent la règle de sobriété que le PO doit choisir ; aucun changement fait en attendant."
       ],
       "activity": [
+        {
+          "at": "2026-10-28T21:23:27Z",
+          "kind": "back",
+          "what": "Anomalies du PO : tâche d'anticipation introuvable (section « Plus tard » ajoutée) ; notifications « RDV ajouté » sans défaut de code (téléphone de l'invitée sans abonnement)"
+        },
         {
           "at": "2026-10-28T10:36:23Z",
           "kind": "back",

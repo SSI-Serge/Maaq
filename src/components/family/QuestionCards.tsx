@@ -56,6 +56,7 @@ export function QuestionCard({ question, onAnswered }: { question: QuestionView;
               </Button>
             </div>
           </div>
+          <div className={styles.hint}>« Non, à faire » ajoute une tâche à votre liste ; « Oui » clôt la question sans tâche.</div>
           {mutation.error && code === "already_handled" && (
             <Notice tone="info">
               Cette question a déjà reçu une réponse de l&apos;autre parent.{" "}

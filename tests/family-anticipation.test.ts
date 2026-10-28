@@ -8,6 +8,7 @@ import { applyCatalog, previewCatalog, validateCatalog, type CatalogFileRow } fr
 import { getDigest } from "@/server/assistant/digest";
 import { addChild, removeMember, updateMember } from "@/server/assistant/family";
 import { open } from "@/server/assistant/fields";
+import { listTasks } from "@/server/assistant/tasks";
 import type { Ctx, SessionContext } from "@/server/auth/service";
 import type { DB } from "@/server/db/schema.generated";
 import { Rejection } from "@/server/http";
@@ -326,6 +327,10 @@ describe("réponses à trois choix (US-102 RF6, RF8, CC-7)", () => {
     expect(open(tasks[0].title as unknown as Buffer)).toBe("À prévoir : contrôle technique de la voiture");
     expect(tasks[0]).toMatchObject({ status: "todo", source: "anticipation", due: "2054-04-30" });
     expect((await questions(f.accountId)).find((q) => q.code === "controle_technique")?.status).toBe("task_created");
+    // La tâche est à plus de 14 jours : sans « Plus tard », elle serait introuvable dans l'écran Tâches (anomalie du 28/10, entretien de la chaudière).
+    const lists = await listTasks(april(), f.sophie);
+    expect(lists.upcoming).toEqual([]);
+    expect(lists.later.map((t) => [t.title, t.due])).toEqual([["À prévoir : contrôle technique de la voiture", "2054-04-30"]]);
     const late = await failure(answerQuestion(april(), f.sophie, target, { answer: "done_or_planned" }));
     expect(late).toMatchObject({ code: "already_handled", status: 409 });
   });

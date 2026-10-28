@@ -76,7 +76,7 @@ function MyNotifications({ pushState }: { pushState: string }) {
       {query.error && <RetryNotice message={query.error.kind === "server" ? "Vos notifications n'ont pas pu être chargées." : query.error.message} onRetry={query.reload} />}
       {current !== null && (
         <>
-          {toggle("events", eventsLabel, current.notifyEventsAdded, (next) => ({ notifyEventsAdded: next }), "Une seule notification par RDV, pour vous seul·e. Les relances et rappels ne changent pas.")}
+          {toggle("events", eventsLabel, current.notifyEventsAdded, (next) => ({ notifyEventsAdded: next }), `Une seule notification par RDV, pour vous seul·e. Les relances et rappels ne changent pas.${pushState === "enabled" ? "" : " Ce téléphone n'est pas autorisé à recevoir les notifications : vous ne recevrez rien tant que vous ne les avez pas activées (lien ci-dessous)."}`)}
           {toggle("tasks", "Rappel quotidien des tâches", current.taskDaily, (next) => ({ taskDaily: next }), "À 8 h : vos tâches du jour, et celles des jours passés à faire quand vous pouvez. Rien si vous n'en avez pas.")}
           {toggle("digest", "Point de la semaine", current.weeklyDigest.enabled, (next) => ({ weeklyDigest: { enabled: next } }), "Un résumé de la semaine qui vient : RDV, tâches, qui fait quoi.")}
           {current.weeklyDigest.enabled && (

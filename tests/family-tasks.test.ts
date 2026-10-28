@@ -96,6 +96,8 @@ describe("tâche seule (US-110)", () => {
     expect(lists.overdue.map((t) => t.title)).toEqual(["Renvoyer le dossier", "Rappeler l'école"]);
     expect(lists.today.map((t) => t.title)).toEqual(["Acheter du pain"]);
     expect(lists.upcoming.map((t) => t.title)).toEqual(["Payer la cantine"]);
+    // Une tâche seule au-delà des 14 jours ne disparaît pas : elle est dans « Plus tard » (anomalie du 28/10, « À prévoir : entretien de la chaudière » introuvable).
+    expect(lists.later.map((t) => [t.title, t.due])).toEqual([["Réserver les vacances", "2054-12-30"]]);
     expect(lists.overdue.every((t) => t.overdue && t.status === "todo")).toBe(true);
     expect(lists.today[0].dueTime).toBe("18:00");
     expect(lists.todayDate).toBe("2054-11-02");
@@ -195,6 +197,7 @@ describe("tâche récurrente (US-110 RF3 à RF5, RF11, RT2)", () => {
     const lists = await listTasks(at(later), f.sophie);
     expect(lists.today.map((t) => t.due)).toEqual([]); // mardi 10 : l'occurrence est à 20 h, pas encore en retard
     expect(lists.upcoming.map((t) => t.due)).toEqual(["2054-11-10", "2054-11-17"]);
+    expect(lists.later).toEqual([]); // les occurrences plus lointaines d'une tâche qui revient ne remplissent pas « Plus tard »
     expect(lists.done).toHaveLength(1);
   });
 

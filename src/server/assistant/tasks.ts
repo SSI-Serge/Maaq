@@ -61,6 +61,8 @@ export interface TaskLists {
   overdue: TaskView[];
   today: TaskView[];
   upcoming: TaskView[];
+  /** Tâches seules à faire au-delà des 14 jours de « À venir » (par exemple « À prévoir : entretien de la chaudière », échéance en fin de période) : sans cette section, elles seraient introuvables. */
+  later: TaskView[];
   done: TaskView[];
   /** Membres à qui une tâche peut être assignée par ce profil (US-96 RF2, RF3). */
   assignable: MemberChip[];
@@ -210,8 +212,8 @@ export function assignableMembers(v: TaskViewer, members: Map<string, MemberChip
 }
 
 /**
- * L'écran « Tâches » (US-110 RF6 à RF8) : à faire en retard, aujourd'hui, à venir sur 14 jours, et faites sur 30 jours. « Mes tâches » ne garde que celles assignées au
- * membre de ce profil.
+ * L'écran « Tâches » (US-110 RF6 à RF8) : à faire en retard, aujourd'hui, à venir sur 14 jours, plus tard (tâches seules au-delà), et faites sur 30 jours. « Mes tâches » ne garde
+ * que celles assignées au membre de ce profil. Les occurrences d'une tâche qui revient n'entrent dans « Plus tard » que lorsqu'elles arrivent dans les 14 jours.
  */
 export async function listTasks(ctx: Ctx, session: SessionContext, options: { mine?: boolean } = {}): Promise<TaskLists> {
   const v = await taskViewer(ctx, session);
@@ -224,6 +226,16 @@ export async function listTasks(ctx: Ctx, session: SessionContext, options: { mi
     .where("t.status", "=", "todo")
     .where("t.due_date", "<=", sql<Date>`${horizon}::date`)
     .$if(Boolean(mine), (qb) => qb.where("t.assigned_member_id", "=", mine!))
+    .execute();
+  const beyond = await selectTasks(ctx.db)
+    .where("t.account_id", "=", v.accountId)
+    .where(visibleTo(v.userId))
+    .where("t.status", "=", "todo")
+    .where("t.series_id", "is", null)
+    .where("t.due_date", ">", sql<Date>`${horizon}::date`)
+    .$if(Boolean(mine), (qb) => qb.where("t.assigned_member_id", "=", mine!))
+    .orderBy("t.due_date")
+    .limit(100)
     .execute();
   const finished = await selectTasks(ctx.db)
     .where("t.account_id", "=", v.accountId)
@@ -239,6 +251,7 @@ export async function listTasks(ctx: Ctx, session: SessionContext, options: { mi
     overdue: views.filter((t) => t.overdue),
     today: views.filter((t) => !t.overdue && t.due <= v.today),
     upcoming: views.filter((t) => !t.overdue && t.due > v.today),
+    later: (await toTaskViews(ctx.db, v, beyond, members)).sort(byDue),
     done: await toTaskViews(ctx.db, v, finished, members),
     assignable: assignableMembers(v, members),
     viewer: { parent: v.parent, memberId: v.memberId },

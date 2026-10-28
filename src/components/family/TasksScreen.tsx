@@ -12,14 +12,14 @@ import { TaskRow } from "./TaskRow";
 import styles from "./family.module.css";
 
 /**
- * Écran « Tâches » (US-110 RF6 à RF10) : à faire en retard, aujourd'hui, à venir sur 14 jours, et « Faites » sur 30 jours, repliée. Les parents choisissent « Mes tâches » ou
+ * Écran « Tâches » (US-110 RF6 à RF10) : à faire en retard, aujourd'hui, à venir sur 14 jours, « Plus tard » (tâches seules au-delà), et « Faites » sur 30 jours, repliée. Les parents choisissent « Mes tâches » ou
  * « Toutes ». Le serveur ne rend que les tâches que ce profil a le droit de voir (AT-2).
  */
 export function TasksScreen() {
   const [mine, setMine] = useState(false);
   const lists = useApiQuery<{ lists: TaskLists }>(`/api/family/tasks${mine ? "?mine=1" : ""}`);
   const data = lists.data?.lists;
-  const open = data ? data.overdue.length + data.today.length + data.upcoming.length : 0;
+  const open = data ? data.overdue.length + data.today.length + data.upcoming.length + data.later.length : 0;
 
   // Le toucher du rappel quotidien ouvre l'écran sur la section « Aujourd'hui » (US-97 RF5).
   useEffect(() => {
@@ -64,6 +64,7 @@ export function TasksScreen() {
             <Group title="Aujourd'hui" tasks={data.today} data={data} showDate={false} onChanged={lists.reload} />
           </div>
           <Group title="À venir" tasks={data.upcoming} data={data} onChanged={lists.reload} />
+          <Group title="Plus tard" tasks={data.later} data={data} onChanged={lists.reload} />
           {data.done.length > 0 && (
             <details className={styles.removedBox}>
               <summary>Faites ({data.done.length})</summary>
