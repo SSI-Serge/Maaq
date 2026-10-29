@@ -8,7 +8,7 @@ import { shortDate } from "./format";
 import styles from "./family.module.css";
 
 /**
- * Carte d'une question d'anticipation à trois choix (US-102 RF4, RF6, AT-6) : « Oui, c'est fait ou prévu », « Non, à faire » (une tâche est créée) et « Me le rappeler dans… »
+ * Carte d'une question d'anticipation à trois choix (US-102 RF4, RF6, AT-6) : « Oui, c'est fait ou prévu », « Non, l'ajouter à mes tâches » (une tâche est créée) et « Me le rappeler dans… »
  * (1, 3 ou 6 mois). Pendant l'enregistrement, les trois boutons sont désactivés (RF10) ; en cas d'erreur, la question reste posée avec « Réessayer » (RF11). La réponse d'un parent
  * vaut pour la famille : si l'autre parent a déjà répondu, la carte le dit et disparaît au rechargement.
  */
@@ -43,7 +43,7 @@ export function QuestionCard({ question, onAnswered }: { question: QuestionView;
               Oui, c&apos;est fait ou prévu
             </Button>
             <Button variant="secondary" onClick={() => void answer({ answer: "todo" })} loading={mutation.pending && last?.answer === "todo"} disabled={busy}>
-              Non, à faire
+              Non, l&apos;ajouter à mes tâches
             </Button>
             <div className={styles.actionsRow}>
               <select className={styles.select} value={months} onChange={(e) => setMonths(e.target.value)} aria-label="Me le rappeler dans" disabled={busy}>
@@ -56,7 +56,7 @@ export function QuestionCard({ question, onAnswered }: { question: QuestionView;
               </Button>
             </div>
           </div>
-          <div className={styles.hint}>« Non, à faire » ajoute une tâche à votre liste ; « Oui » clôt la question sans tâche.</div>
+          <div className={styles.hint}>« Non » ajoute une tâche à votre liste ; « Oui » clôt la question sans tâche.</div>
           {mutation.error && code === "already_handled" && (
             <Notice tone="info">
               Cette question a déjà reçu une réponse de l&apos;autre parent.{" "}

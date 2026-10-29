@@ -381,7 +381,7 @@ describe("rappels, relances et planificateur (US-109 RF9, RT1, D47, D51)", () =>
     expect(tags().filter((t) => t.startsWith("d7-") && t.endsWith(weekly.eventIds[0]))).toEqual([]); // jamais de J-7 pour la série hebdomadaire
     await runReminders(at("2054-11-11T08:00:00Z"), { accountId: f.accountId }); // J-1 du 11 (18 h locales la veille, selon le fuseau d'essai) : dû, et le RDV n'a pas commencé
     expect(tags()).toContain(`d1-${weekly.eventIds[0]}`);
-    expect((await messagesTo(f.julien.email)).filter((m) => m.subject?.includes("Foot"))).toHaveLength(1); // le J-1 est doublé par un email
+    expect((await messagesTo(f.julien.email)).filter((m) => m.subject?.includes("Foot"))).toHaveLength(0); // le J-1 part par notification, sans doublon par email (D63)
   });
 
   it("D47 : une série provisoire n'est relancée qu'une fois, pour sa première séance", async () => {

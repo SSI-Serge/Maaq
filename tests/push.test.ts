@@ -236,15 +236,16 @@ describe("rappels par notification, avec repli par email (US-81 RF6, RF11, AF-3)
     expect(payloadOf(0).body).toBe("Aujourd'hui 14h00 — RDV médical — Léo");
   });
 
-  it("double le rappel J-1 par un email, pas les autres (CA 6.2)", async () => {
+  it("le rappel J-1 suit la règle commune : notification seule, email à défaut (CA 6.2, D63)", async () => {
     const f = await family();
     await saveSubscription(ctxAt("2054-11-02T09:00"), f.camilleSession, fcm());
     await seed(f, { start: "2054-11-10T17:00" });
     await run(f, "2054-11-09T18:00");
     expect(send).toHaveBeenCalledTimes(1);
-    expect(await messagesTo(f.camille.email)).toHaveLength(1);
+    expect(await messagesTo(f.camille.email)).toHaveLength(0); // pas de doublon par email
+    expect(await messagesTo(f.julien.email)).toHaveLength(1); // Julien n'a aucun appareil autorisé : email
     const [row] = await db.selectFrom("scheduled_notifications").select(["push_sent_at", "email_sent_at"]).where("recipient_user_id", "=", f.camille.id).execute();
-    expect([row.push_sent_at !== null, row.email_sent_at !== null]).toEqual([true, true]); // notification et email
+    expect([row.push_sent_at !== null, row.email_sent_at !== null]).toEqual([true, false]); // notification seule
   });
 
   it("passe par l'email quand la notification n'est pas partie (CA 11.1)", async () => {
@@ -257,26 +258,6 @@ describe("rappels par notification, avec repli par email (US-81 RF6, RF11, AF-3)
     quiet.mockRestore();
     expect(await messagesTo(f.camille.email)).toHaveLength(1);
     expect((await pushStatus(ctxAt("2054-11-10T07:30"), f.camilleSession)).subscribed).toBe(false); // l'appareil injoignable est désinscrit
-  });
-
-  it("ne renvoie pas la notification quand seul l'email de J-1 échoue", async () => {
-    const f = await family();
-    await saveSubscription(ctxAt("2054-11-02T09:00"), f.camilleSession, fcm());
-    await seed(f, { start: "2054-11-10T17:00" });
-    const { messenger } = await import("@/server/adapters/messaging");
-    const quiet = vi.spyOn(console, "error").mockImplementation(() => {});
-    const mail = vi.spyOn(messenger(), "sendEmail").mockRejectedValueOnce(new Error("SMTP indisponible"));
-    try {
-      await run(f, "2054-11-09T18:00");
-    } finally {
-      mail.mockRestore();
-      quiet.mockRestore();
-    }
-    expect(send).toHaveBeenCalledTimes(1);
-    await run(f, "2054-11-09T18:05");
-    expect(send).toHaveBeenCalledTimes(1); // pas de doublon de notification
-    const [row] = await db.selectFrom("scheduled_notifications").select(["status", "push_sent_at", "email_sent_at"]).where("recipient_user_id", "=", f.camille.id).execute();
-    expect([row.status, row.push_sent_at !== null, row.email_sent_at !== null]).toEqual(["sent", true, false]);
   });
 
   it("relance aussi par notification, et ouvre l'écran de confirmation (US-83 RF7, CA 3.1)", async () => {

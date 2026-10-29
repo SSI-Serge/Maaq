@@ -13,7 +13,7 @@ import { addDays, isoWeekday } from "./series";
 import { notifyTaskAssigned } from "./task-notices";
 
 /**
- * Anticipation (US-102) : le catalogue d'échéances types devient, famille par famille, des questions à trois choix (AT-6) : « Oui, c'est fait ou prévu », « Non, à faire » (une tâche
+ * Anticipation (US-102) : le catalogue d'échéances types devient, famille par famille, des questions à trois choix (AT-6) : « Oui, c'est fait ou prévu », « Non, l'ajouter à mes tâches » (une tâche
  * est créée) ou « Me le rappeler dans… ». La sélection suit des règles fixes, sans appel au modèle ni donnée envoyée à l'agent (RT2, D31). La base garde les règles qui comptent : la réponse
  * est atomique (`answer_anticipation_question`), au plus 5 questions par semaine (`pick_weekly_questions`, AT-7), rien quand le catalogue est désactivé. Réservé aux parents (D26).
  */
@@ -285,12 +285,12 @@ export interface AnswerInput {
   answer: "done_or_planned" | "todo" | "remind_later";
   /** 1, 3 ou 6 mois (« Me le rappeler dans… »), sans dépasser la fin de la période. */
   remindMonths?: number;
-  /** « Non, à faire » : la personne à qui confier la tâche créée (US-96), facultative. */
+  /** « Non, l'ajouter à mes tâches » : la personne à qui confier la tâche créée (US-96), facultative. */
   assigneeId?: string | null;
 }
 
 /**
- * Enregistre la réponse d'un parent (la base fait tout en une transaction : réponse, état de la question, tâche créée, sans double création). « Non, à faire » crée une tâche seule,
+ * Enregistre la réponse d'un parent (la base fait tout en une transaction : réponse, état de la question, tâche créée, sans double création). « Non, l'ajouter à mes tâches » crée une tâche seule,
  * due à la fin de la période (jamais dans le passé). La réponse d'un parent vaut pour la famille : l'autre parent reçoit « déjà traitée ».
  */
 export async function answerQuestion(ctx: Ctx, session: SessionContext, id: string, input: AnswerInput): Promise<{ taskId: string | null }> {

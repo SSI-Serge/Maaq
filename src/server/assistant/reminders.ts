@@ -276,8 +276,8 @@ export async function pendingConfirmations(db: Db, accountId: string, now: Date)
 
 /**
  * Envoie à chaque destinataire : par notification sur ses appareils autorisés, par email à défaut ou si la notification n'est pas partie (US-81 RF6,
- * RF11). Le rappel J-1 est toujours doublé par un email (AF-3). Après un envoi réussi par notification, un email en échec ne fait pas rejouer la
- * notification : la réservation est conservée.
+ * RF11), J-1 compris (D63 : plus de doublon systématique par email). Si l'enregistrement échoue après une notification partie, la notification n'est
+ * pas rejouée : la réservation est conservée.
  */
 async function deliver(ctx: Ctx, accountId: string, eventId: string, kind: ReminderKind | NudgeKind, dueAt: Date, recipients: Recipient[], build: (to: Recipient) => Message, totals: RemindersResult): Promise<void> {
   const badge = pushConfigured() ? await pendingConfirmations(ctx.db, accountId, ctx.now) : 0;
@@ -287,14 +287,14 @@ async function deliver(ctx: Ctx, accountId: string, eventId: string, kind: Remin
     let pushed = 0;
     try {
       pushed = (await sendPush(ctx, to.id, { ...message.push, tag: `${kind}-${eventId}`, badge })).delivered;
-      const email = pushed === 0 || kind === "d1";
+      const email = pushed === 0;
       if (email) await messenger().sendEmail(message.email);
       await markSent(ctx, eventId, kind, dueAt, to.id, { push: pushed > 0, email });
       totals.sent += 1;
     } catch (error) {
       console.error(`Rappel non envoyé : ${describeError(error)}`);
       if (pushed > 0) {
-        // La notification est partie : on garde l'envoi pour ne pas la rejouer ; seul l'email de J-1 manque.
+        // La notification est partie : on garde l'envoi pour ne pas la rejouer.
         await markSent(ctx, eventId, kind, dueAt, to.id, { push: true, email: false });
         totals.sent += 1;
         continue;

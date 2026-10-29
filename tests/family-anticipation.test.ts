@@ -316,7 +316,7 @@ describe("réponses à trois choix (US-102 RF6, RF8, CC-7)", () => {
     expect((await getAnticipation(april(), f.sophie)).questions.map((q) => q.text)).not.toContain("Avez-vous prévu : déclaration de revenus ?");
   });
 
-  it("« Non, à faire » crée une tâche seule due à la fin de la période, assignable, une seule fois (CA 6.2, CC-7)", async () => {
+  it("« Non, l'ajouter à mes tâches » crée une tâche seule due à la fin de la période, assignable, une seule fois (CA 6.2, CC-7)", async () => {
     const { f, id } = await ready();
     const target = id("contrôle technique");
     const sophieMember = (await db.selectFrom("family_members").select("id").where("user_id", "=", f.userIds.sophie).executeTakeFirstOrThrow()).id;

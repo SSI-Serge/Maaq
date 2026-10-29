@@ -3,7 +3,7 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-10-28T21:23:27Z",
+  "updated": "2026-10-29T12:20:07Z",
   "deploys": [
     {
       "at": "2026-10-27T18:29:38Z",
@@ -2085,6 +2085,10 @@
         {
           "at": "2026-10-28T21:23:27Z",
           "what": "L'écran Tâches a une section « Plus tard » pour les tâches seules à plus de 14 jours : une tâche créée ne doit jamais être introuvable."
+        },
+        {
+          "at": "2026-10-29T12:20:07Z",
+          "what": "Sobriété des emails : le rappel J-1 suit la règle commune (notification, email à défaut). Bouton d'anticipation renommé « Non, l'ajouter à mes tâches »."
         }
       ],
       "unsure": [
@@ -2095,10 +2099,14 @@
         "Le point de la semaine fait appel à un modèle : coût et qualité du résumé à mesurer sur des semaines fictives avant le pilote.",
         "Le suivi du trajet ne repose pour l'instant que sur un faux service : aucune durée réelle n'a été obtenue de TomTom.",
         "La clé Anthropic a atteint sa limite d'usage jusqu'au 01/11/2026 : l'assistant de la zone de test est aussi arrêté. Deux cas de base du banc d'essai (22 et 23) échouent et restent à diagnostiquer.",
-        "La dictée corrigée (relance automatique, mots répétés) n'a pas été vérifiée sur un vrai Android : à refaire par le PO.",
-        "Les emails de l'Assistant Famille (J-1 toujours en email, relances, repli des rappels de tâches) attendent la règle de sobriété que le PO doit choisir ; aucun changement fait en attendant."
+        "La dictée corrigée (relance automatique, mots répétés) n'a pas été vérifiée sur un vrai Android : à refaire par le PO."
       ],
       "activity": [
+        {
+          "at": "2026-10-29T12:20:07Z",
+          "kind": "back",
+          "what": "Décisions du PO : rappel J-1 sans doublon email ; bouton « Non, l'ajouter à mes tâches »"
+        },
         {
           "at": "2026-10-28T21:23:27Z",
           "kind": "back",
