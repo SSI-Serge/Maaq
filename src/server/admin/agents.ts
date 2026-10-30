@@ -87,12 +87,15 @@ export async function listAgents(ctx: Ctx, search = ""): Promise<AgentRow[]> {
   }));
 }
 
-/** Clé secrète d'un projet Digitorn : une clé publique (pk_…) ou mal formée est refusée avant tout appel. */
+/**
+ * Clé secrète d'un projet Digitorn : une clé publique (pk_…) ou mal formée est refusée avant tout appel. Le préfixe `sk_` n'est plus exigé (Digitorn a
+ * changé le format de ses clés) : seul Digitorn sait si la clé est celle d'un projet, `GET /me` le confirme à la recherche.
+ */
 function cleanKey(raw: string | null | undefined): string | undefined {
   const key = raw?.trim();
   if (!key) return undefined;
-  if (key.startsWith("pk_")) throw new Rejection("invalid_key", "Cette clé est publique (pk_…). Il faut la clé secrète du projet (sk_…).", 422);
-  if (!/^sk_[A-Za-z0-9_\-]{8,200}$/.test(key)) throw new Rejection("invalid_key", "La clé secrète d'un projet Digitorn commence par sk_.", 422);
+  if (key.startsWith("pk_")) throw new Rejection("invalid_key", "Cette clé est publique (pk_…). Il faut la clé secrète du projet.", 422);
+  if (!/^[A-Za-z0-9_.~+/=\-]{8,500}$/.test(key)) throw new Rejection("invalid_key", "Cette clé n'a pas le format d'une clé Digitorn : copiez-la en entier, sans espace.", 422);
   return key;
 }
 

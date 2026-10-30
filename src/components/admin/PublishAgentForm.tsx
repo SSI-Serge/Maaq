@@ -191,7 +191,7 @@ export function PublishAgentForm({ onCancel, onPublished }: { onCancel: () => vo
             </div>
             <div>
               <label className={s.label} htmlFor="agent-key">
-                Clé secrète du projet Digitorn (sk_…)
+                Clé secrète du projet Digitorn
               </label>
               <input
                 id="agent-key"

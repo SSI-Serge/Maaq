@@ -108,7 +108,7 @@ describe("US-45 — mettre un agent à disposition", () => {
 
   it("une clé publique ou mal formée est refusée avant tout appel à Digitorn", async () => {
     expect((await rejectionOf(lookupAgent(now(), { name: "Admin_RDV", apiKey: "pk_abcdefghij" }))).code).toBe("invalid_key");
-    expect((await rejectionOf(lookupAgent(now(), { name: "Admin_RDV", apiKey: "cle-quelconque" }))).code).toBe("invalid_key");
+    expect((await rejectionOf(lookupAgent(now(), { name: "Admin_RDV", apiKey: "cle avec espaces" }))).code).toBe("invalid_key");
     expect((await rejectionOf(publishAgent(now(), adminId, agentInput({ digitornRef: "perso_courses", digitornApiKey: "pk_abcdefghij" })))).code).toBe("invalid_key");
   });
 

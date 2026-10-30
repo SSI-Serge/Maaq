@@ -7,7 +7,7 @@ Il existe **deux niveaux**, selon ce que l'administrateur renseigne à la public
 
 | | Adresse seule | Adresse + clé secrète du projet |
 |---|---|---|
-| Ce qu'il faut | l'adresse de l'application publiée (`https://….digitorn.app`) | idem, plus la clé secrète `sk_…` du projet, et `DIGITORN_MODE=live` |
+| Ce qu'il faut | l'adresse de l'application publiée (`https://….digitorn.app`) | idem, plus la clé secrète du projet, et `DIGITORN_MODE=live` |
 | Pour Digitorn, l'utilisateur est | un **visiteur anonyme** (ses conversations restent dans le navigateur de l'appareil) | **reconnu** : son identifiant MAAQ, son prénom, son rang |
 | Rang du demandeur, membres du compte | envoyés par la page, **non vérifiés** par Digitorn | posés par le serveur MAAQ (`claims`), **vérifiés** |
 | Effacement des conversations à la déconnexion | impossible : l'historique reste dans le navigateur | fait par MAAQ chez Digitorn |
@@ -27,7 +27,7 @@ Digitorn propose une liste de sites autorisés (**Project → Access**) : si le 
 
 ## Brancher un agent avec sa clé (utilisateur reconnu)
 
-1. Dans Digitorn : **Project → Access** ▸ copier la clé **secrète** (`sk_…`, jamais la clé publique `pk_…`).
+1. Dans Digitorn : **Project → Access** ▸ copier la clé **secrète** (jamais la clé publique `pk_…` ; le préfixe `sk_` n'est plus exigé depuis le changement de format de Digitorn).
 2. Dans la console MAAQ, saisir le nom de l'agent **et** la clé, puis **Rechercher l'agent** : MAAQ interroge Digitorn,
    vérifie que la clé est bien celle du projet de cet agent, et préremplit la fiche.
 3. Publier. La clé est conservée **chiffrée** dans la base ; elle n'est jamais réaffichée ni journalisée.
