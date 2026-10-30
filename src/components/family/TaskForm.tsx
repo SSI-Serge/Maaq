@@ -72,7 +72,8 @@ interface Props {
   task?: TaskView;
   initial?: TaskFormInitial;
   assignable: MemberChip[];
-  onSaved: (task: TaskView) => void;
+  /** Le second argument porte la proposition de l'aide Devoirs quand le titre de la tâche créée parle de devoirs (US-119 RF1). */
+  onSaved: (task: TaskView, extras?: { homeworkOffer: { weekStart: string } | null }) => void;
   onCancel: () => void;
   /** La tâche a été annulée (« Annuler la tâche »). */
   onRemoved?: (cancelled: number) => void;
@@ -108,9 +109,10 @@ export function TaskForm({ task, initial, assignable, onSaved, onCancel, onRemov
   async function submit() {
     if (invalid) return;
     const fields = { title: title.trim(), note: note.trim() || null, due, dueTime: dueTime || null, assigneeId };
+    type Saved = { task: TaskView; homeworkOffer?: { weekStart: string } | null };
     const result = task
-      ? await save.run<{ task: TaskView }>(`/api/family/tasks/${task.id}`, { method: "PATCH", body: { version: task.version, ...(recurringEdit ? { scope } : {}), ...fields } })
-      : await save.run<{ task: TaskView }>("/api/family/tasks", {
+      ? await save.run<Saved>(`/api/family/tasks/${task.id}`, { method: "PATCH", body: { version: task.version, ...(recurringEdit ? { scope } : {}), ...fields } })
+      : await save.run<Saved>("/api/family/tasks", {
           method: "POST",
           body: {
             ...fields,
@@ -125,7 +127,7 @@ export function TaskForm({ task, initial, assignable, onSaved, onCancel, onRemov
               : {}),
           },
         });
-    if (result) onSaved(result.task);
+    if (result) onSaved(result.task, { homeworkOffer: result.homeworkOffer ?? null });
   }
 
   async function cancelTask() {

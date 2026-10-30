@@ -4,7 +4,19 @@
     {
       "name": "maaq",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "port": 3000
+    },
+    {
+      "name": "maaq-next",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "next",
+        "dev"
+      ],
       "port": 3000
     }
   ]

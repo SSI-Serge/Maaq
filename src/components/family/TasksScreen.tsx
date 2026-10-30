@@ -7,6 +7,7 @@ import { useApiQuery } from "@/client/hooks";
 import { AppShell, appStyles as s, Section } from "@/components/app/AppShell";
 import { Loading, Notice, RetryNotice } from "@/components/ui";
 import type { TaskLists, TaskView } from "@/server/assistant/tasks";
+import { HomeworkOfferCard } from "./HomeworkOffer";
 import { TaskForm } from "./TaskForm";
 import { TaskRow } from "./TaskRow";
 import styles from "./family.module.css";
@@ -98,11 +99,16 @@ function Group({ title, tasks, data, showDate = true, onChanged }: { title: stri
 export function NewTaskScreen() {
   const router = useRouter();
   const lists = useApiQuery<{ lists: TaskLists }>("/api/family/tasks");
+  // La tâche est enregistrée dans tous les cas ; si son titre parle de devoirs, une carte propose l'aide Devoirs sous le formulaire (US-119 RF1).
+  const [offer, setOffer] = useState<{ weekStart: string } | null>(null);
   return (
     <AppShell title="Nouvelle tâche" back={{ href: "/assistant/taches", label: "Tâches" }}>
       {lists.error && <RetryNotice message={lists.error.message} onRetry={lists.reload} />}
       {lists.loading && !lists.data && <Loading slow={lists.slow} />}
-      {lists.data && <TaskForm assignable={lists.data.lists.assignable} onSaved={() => router.push("/assistant/taches")} onCancel={() => router.push("/assistant/taches")} />}
+      {lists.data && !offer && (
+        <TaskForm assignable={lists.data.lists.assignable} onSaved={(_task, extras) => (extras?.homeworkOffer ? setOffer(extras.homeworkOffer) : router.push("/assistant/taches"))} onCancel={() => router.push("/assistant/taches")} />
+      )}
+      {offer && <HomeworkOfferCard weekStart={offer.weekStart} onLater={() => router.push("/assistant/taches")} />}
     </AppShell>
   );
 }

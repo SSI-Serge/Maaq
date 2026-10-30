@@ -80,7 +80,7 @@ export function TaskRow({ task, assignable, showDate = true, onChanged }: Props)
       />
       <div className={styles.taskBody}>
         <Link href={`/assistant/taches/${task.id}`} className={styles.taskTitle}>
-          {task.assignee && task.assignee.role === "child" ? `${task.assignee.firstName} — ${task.title.charAt(0).toLowerCase()}${task.title.slice(1)}` : task.title}
+          {task.assignee && task.assignee.role === "child" && !task.homeworkWeekId ? `${task.assignee.firstName} — ${task.title.charAt(0).toLowerCase()}${task.title.slice(1)}` : task.title}
         </Link>
         <div className={styles.taskMeta}>
           {task.overdue && !checked && <span className={styles.taskLate}>En retard</span>}
@@ -96,6 +96,7 @@ export function TaskRow({ task, assignable, showDate = true, onChanged }: Props)
           {task.dueTime && <span>{dueTimeLabel(task.dueTime)}</span>}
           {task.recurring && <span title={task.rule ?? "À chaque séance"}>↻ {task.rule ?? "À chaque séance"}</span>}
           {task.event && <Link href={`/calendrier/rdv/${task.event.id}`}>{task.event.title} ›</Link>}
+          {task.homeworkWeekId && <Link href={`/assistant/devoirs/${task.homeworkWeekId}`}>Semaine de devoirs ›</Link>}
           {checked && task.status === "done" && task.doneBy && <span>Faite par {task.doneBy}</span>}
           {justDone && (
             <>

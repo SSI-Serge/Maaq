@@ -233,7 +233,7 @@ export async function activityOptions(db: Db, accountId: string, memberId: strin
     };
   });
   options.sort((a, b) => Number(a.state !== "free") - Number(b.state !== "free") || a.distance - b.distance || a.title.localeCompare(b.title, "fr"));
-  return options.slice(0, limit).map(({ distance: _distance, ...o }) => o);
+  return options.slice(0, limit).map((o) => ({ activityId: o.activityId, title: o.title, ageLabel: o.ageLabel, needsAdult: o.needsAdult, description: o.description, state: o.state, card: o.card }));
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------
@@ -613,3 +613,16 @@ function translateItem(error: unknown): unknown {
 }
 
 export { ACTIVITY_CATEGORIES };
+
+export interface HomeworkOptions extends ChildOptions {
+  activities: { category: HomeworkActivityCategory; label: string; options: ActivityOption[] }[];
+}
+
+/** Tout ce que l'aide propose pour un enfant dans une semaine : maths puis les six catégories d'activités (RF2). */
+export async function homeworkOptionsFor(ctx: Ctx, session: SessionContext, memberId: string, weekStart: string | null): Promise<HomeworkOptions> {
+  const v = await viewerOf(ctx, session);
+  const maths = await childOptions(ctx.db, v.accountId, memberId, weekStart);
+  const activities = [];
+  for (const c of ACTIVITY_CATEGORIES) activities.push({ category: c.key, label: c.label, options: await activityOptions(ctx.db, v.accountId, memberId, c.key) });
+  return { ...maths, activities };
+}
