@@ -15,6 +15,14 @@ export type AgentStatus = "available" | "blocked";
 
 export type AnonymizationStatus = "done" | "none" | "pending";
 
+export type ArrayType<T> = ArrayTypeImpl<T> extends (infer U)[]
+  ? U[]
+  : ArrayTypeImpl<T>;
+
+export type ArrayTypeImpl<T> = T extends ColumnType<infer S, infer I, infer U>
+  ? ColumnType<S[], I[], U[]>
+  : T[];
+
 export type AuditAction = "account_created" | "account_updated" | "activation_link_resent" | "agent_blocked" | "agent_published" | "agent_reactivated" | "contract_archived" | "contract_created" | "contract_field_changed" | "contract_updated" | "device_revoked_by_admin";
 
 export type ChangeScope = "all" | "following" | "this";
@@ -51,7 +59,7 @@ export type EventAction = "cancelled" | "completed_by_email" | "confirmed" | "cr
 
 export type EventChangeReason = "cancellation_mail" | "completed_by_email" | "event_started" | "no_response" | "report_mail" | "user_request";
 
-export type EventSource = "android_share" | "calendar_sync" | "chat_text" | "forwarded_email" | "photo" | "voice" | "whatsapp";
+export type EventSource = "android_share" | "calendar_sync" | "chat_text" | "forwarded_email" | "outing" | "photo" | "voice" | "whatsapp";
 
 export type EventStatus = "cancelled" | "confirmed" | "dismissed" | "provisional" | "set_aside";
 
@@ -66,6 +74,10 @@ export type Generated<T> = T extends ColumnType<infer S, infer I, infer U>
 export type GraceOrigin = "billing_unsubscribe" | "in_app_request";
 
 export type GuestRank = "core" | "secondary";
+
+export type HomeworkActivityCategory = "art" | "games_projects" | "imagination" | "nature" | "philosophy" | "stem";
+
+export type HomeworkLevel = "ce1" | "ce2" | "cm1" | "cm2" | "cp";
 
 export type InboundStatus = "failed" | "irrelevant" | "known_event" | "no_date_found" | "no_matching_event" | "processed" | "received" | "rejected_unauthorized" | "verification_mail";
 
@@ -105,11 +117,25 @@ export type MessageSender = "agent" | "profile";
 
 export type NotificationChannel = "none" | "push";
 
-export type NotificationKind = "auto_confirmed" | "event_added" | "event_to_confirm" | "follow_up_24h" | "follow_up_48h" | "place_search_ready" | "reminder_d1" | "reminder_d7" | "reminder_day_of" | "task_assigned" | "task_daily" | "task_due_1h" | "travel_first" | "travel_second" | "weekly_digest";
+export type NotificationKind = "auto_confirmed" | "event_added" | "event_to_confirm" | "follow_up_24h" | "follow_up_48h" | "outing_proposal" | "place_search_ready" | "reminder_d1" | "reminder_d7" | "reminder_day_of" | "task_assigned" | "task_daily" | "task_due_1h" | "travel_first" | "travel_second" | "weekly_digest";
 
 export type NotificationStatus = "abandoned" | "cancelled" | "not_applicable" | "scheduled" | "sent";
 
 export type Numeric = ColumnType<string, number | string, number | string>;
+
+export type OutingCategory = "couple" | "kids" | "self" | "teens";
+
+export type OutingDayPref = "friday" | "monday" | "saturday" | "sunday" | "thursday" | "tuesday" | "wednesday" | "weekday_evenings" | "weekend";
+
+export type OutingFrequency = "monthly" | "twice_monthly" | "weekly";
+
+export type OutingIdeaSection = "in_budget" | "novelty";
+
+export type OutingIdeaStatus = "added" | "dismissed" | "proposed";
+
+export type OutingMood = "both" | "calm" | "playful";
+
+export type OutingProposalStatus = "added" | "dismissed" | "ready";
 
 export type PlaceSearchOrigin = "button" | "chat" | "suggestion";
 
@@ -151,7 +177,7 @@ export type SyncStatus = "failed" | "running" | "succeeded";
 
 export type TaskCancelReason = "event_cancelled" | "expired" | "series_ended" | "user";
 
-export type TaskSource = "agent" | "anticipation" | "user";
+export type TaskSource = "agent" | "anticipation" | "homework" | "user";
 
 export type TaskStatus = "cancelled" | "done" | "proposed" | "todo";
 
@@ -541,9 +567,6 @@ export interface ChatErasureRequests {
 
 export interface ChatRequests {
   agent_id: Int8;
-  /**
-   * Jour calendaire dans le fuseau de la famille (accounts.family_timezone) sur lequel la demande a été comptée (hypothèse H35 remplacée, US-70 RF5)
-   */
   counted_date: Timestamp;
   created_at: Generated<Timestamp>;
   request_id: string;
@@ -669,7 +692,7 @@ export interface DailyRequestCounters {
    */
   request_count: Generated<number>;
   /**
-   * Jour calendaire dans le fuseau de la famille (accounts.family_timezone) au moment de la demande, pour le tchat des agents comme pour l'assistant (hypothèse H35 remplacée, US-70 RF5)
+   * Jour calendaire dans le fuseau de l'appareil au moment de la demande (hypothèse H35)
    */
   request_date: Timestamp;
   user_id: string;
@@ -1094,6 +1117,18 @@ export interface FamilySettings {
   account_id: string;
   anticipation_enabled: Generated<boolean>;
   created_at: Generated<Timestamp>;
+  /**
+   * Date de la dernière désactivation de l'aide, posée automatiquement quand elle passe de vraie à fausse et remise à vide à la réactivation. Les exercices validés sont gardés jusqu'à homework_validation_grace_days (30) après cette date : une réactivation pendant ce délai les retrouve (D65)
+   */
+  homework_help_disabled_at: Timestamp | null;
+  /**
+   * Aide Devoirs activée pour toute la famille (faux par défaut). Ne s'active que si la famille compte au moins un membre enfant ; désactiver arrête l'aide sans effacer les plannings ni les progrès. [US-118 RF1, RF2, RF5, D64]
+   */
+  homework_help_enabled: Generated<boolean>;
+  /**
+   * Date de la première activation, posée automatiquement : vide = la présentation en trois lignes n'a jamais été montrée (US-118 RF3)
+   */
+  homework_help_first_enabled_at: Timestamp | null;
   school_zone: string | null;
   updated_at: Generated<Timestamp>;
   updated_by_user_id: string | null;
@@ -1134,6 +1169,10 @@ export interface FamilyTasks {
   due_date: Timestamp;
   due_time: string | null;
   event_id: string | null;
+  /**
+   * Semaine de devoirs à l'origine de la tâche « Devoirs — [prénom] (N éléments) » (source « homework ») : une tâche par enfant et par jour de travail ; supprimée avec la semaine. [US-119 RF4]
+   */
+  homework_week_id: string | null;
   id: Generated<string>;
   note: Buffer | null;
   occurrence_date: Timestamp | null;
@@ -1227,6 +1266,79 @@ export interface ForwardingMailboxes {
   last_mail_received_at: Timestamp | null;
   revoked_at: Timestamp | null;
   revoked_by_user_id: string | null;
+}
+
+export interface HomeworkActivities {
+  age: number;
+  card_ref: string | null;
+  category: HomeworkActivityCategory;
+  id: Generated<Int8>;
+  needs_adult: Generated<boolean>;
+  title: string;
+}
+
+export interface HomeworkChildren {
+  account_id: string;
+  created_at: Generated<Timestamp>;
+  /**
+   * Âge des devoirs (6 à 12 ans) : donne le niveau de maths (6 CP … 10 CM2, 11 et 12 CM2) et l'âge des activités à un an près. Sans lien avec family_members.birth_year et birth_month, qu'il ne modifie pas
+   */
+  homework_age: number;
+  member_id: string;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface HomeworkExercises {
+  answer: string | null;
+  id: Generated<Int8>;
+  level: HomeworkLevel;
+  number: number;
+  textbook_key: string;
+  theme: string;
+}
+
+export interface HomeworkExerciseValidations {
+  exercise_id: Int8;
+  member_id: string;
+  validated_at: Generated<Timestamp>;
+}
+
+export interface HomeworkTextbooks {
+  is_foreign: Generated<boolean>;
+  label: string;
+  sort_order: Generated<number>;
+  textbook_key: string;
+}
+
+export interface HomeworkWeekForeignBooks {
+  account_id: string;
+  member_id: string;
+  proposed_at: Generated<Timestamp>;
+  textbook_key: string;
+  week_id: string;
+}
+
+export interface HomeworkWeekItems {
+  account_id: string;
+  activity_id: Int8 | null;
+  checked_at: Timestamp | null;
+  created_at: Generated<Timestamp>;
+  custom_title: Buffer | null;
+  day: Timestamp;
+  exercise_id: Int8 | null;
+  id: Generated<Int8>;
+  member_id: string;
+  week_id: string;
+}
+
+export interface HomeworkWeeks {
+  account_id: string;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  prepared_by_user_id: string | null;
+  updated_at: Generated<Timestamp>;
+  week_start: Timestamp;
+  work_days: number[];
 }
 
 export interface IdempotencyKeys {
@@ -1337,6 +1449,101 @@ export interface LogbookSyncRuns {
   id: Generated<Int8>;
   started_at: Generated<Timestamp>;
   status: Generated<SyncStatus>;
+}
+
+export interface OutingCriteria {
+  account_id: string;
+  budget_eur: number | null;
+  created_at: Generated<Timestamp>;
+  /**
+   * Ville ou secteur (« Lyon », « Paris et Île-de-France »), 80 caractères au plus, jamais une adresse : refusé si la saisie ressemble à une adresse (looks_like_address). Aucune adresse de domicile n'est stockée (D47)
+   */
+  departure_place: string | null;
+  /**
+   * « Recevoir des idées de sorties » : faux par défaut ; vrai exige budget, nombre de personnes, lieu de départ et au moins un thème. Désactiver arrête les propositions sans rien supprimer (SG-2)
+   */
+  enabled: Generated<boolean>;
+  frequency: Generated<OutingFrequency>;
+  mood: Generated<OutingMood>;
+  people_count: number | null;
+  /**
+   * Jours préférés : week-end (samedi, dimanche), soirs de semaine, ou un jour précis. Au moins un ; « week-end » par défaut. Le jour visé est choisi par l'application (US-115 RF1)
+   */
+  preferred_days: Generated<ArrayType<OutingDayPref>>;
+  updated_at: Generated<Timestamp>;
+  user_id: string;
+}
+
+export interface OutingCriteriaThemes {
+  category: OutingCategory;
+  theme_key: string;
+  user_id: string;
+}
+
+export interface OutingOfferMemory {
+  account_id: string;
+  /**
+   * Empreinte SHA-256 de l'offre (nom et lieu normalisés), calculée par l'application avec un secret : jamais un texte lisible
+   */
+  offer_hash: Buffer;
+  proposed_at: Generated<Timestamp>;
+  user_id: string;
+}
+
+export interface OutingProposalIdeas {
+  category: OutingCategory | null;
+  created_at: Generated<Timestamp>;
+  description: Buffer;
+  details: Buffer | null;
+  id: Generated<Int8>;
+  idea_position: number;
+  name: Buffer;
+  offer_url: Buffer;
+  opened_year: number | null;
+  place: Buffer;
+  price_basis: Buffer | null;
+  price_checked_on: Timestamp;
+  price_eur: Numeric;
+  /**
+   * Prix non affiché par la source, estimé avec son calcul (price_basis) : l'application affiche « estimé », ou « ≈ » pour une nouveauté
+   */
+  price_is_estimated: Generated<boolean>;
+  proposal_id: string;
+  section: OutingIdeaSection;
+  /**
+   * proposed ; dismissed = « Pas cette fois » (retire cette seule idée ; la dernière idée retirée retire la proposition) ; added = « Ajoutée au calendrier » (la proposition passe à « ajoutée ») . Aucun lien vers le RDV créé
+   */
+  status: Generated<OutingIdeaStatus>;
+  status_changed_at: Generated<Timestamp>;
+  theme_key: string | null;
+  user_id: string;
+}
+
+export interface OutingProposals {
+  account_id: string;
+  budget_eur: number;
+  created_at: Generated<Timestamp>;
+  departure_place: string;
+  id: Generated<string>;
+  people_count: number;
+  /**
+   * ready = visible sur l'accueil du profil ; dismissed = retirée par le profil (revenir en arrière possible tant qu'une idée reste) ; added = une idée a été ajoutée au calendrier. Transitions : ready ↔ dismissed, ready → added
+   */
+  status: Generated<OutingProposalStatus>;
+  status_changed_at: Generated<Timestamp>;
+  /**
+   * Jour visé, choisi par l'application (prochain jour préféré au moins 4 jours plus tard et sans RDV sur toute la journée). Une seule proposition par profil et par jour visé : un second passage du planificateur ne crée pas de doublon
+   */
+  target_date: Timestamp;
+  updated_at: Generated<Timestamp>;
+  user_id: string;
+}
+
+export interface OutingThemes {
+  category: OutingCategory;
+  label: string;
+  sort_order: Generated<number>;
+  theme_key: string;
 }
 
 export interface PlatformSettingChanges {
@@ -1610,6 +1817,7 @@ export interface VFamilyTasks {
   due_date: Timestamp | null;
   due_time: string | null;
   event_id: string | null;
+  homework_week_id: string | null;
   id: string | null;
   is_overdue: boolean | null;
   note: Buffer | null;
@@ -1729,6 +1937,14 @@ export interface DB {
   forwarding_authorized_senders: ForwardingAuthorizedSenders;
   forwarding_consent_events: ForwardingConsentEvents;
   forwarding_mailboxes: ForwardingMailboxes;
+  homework_activities: HomeworkActivities;
+  homework_children: HomeworkChildren;
+  homework_exercise_validations: HomeworkExerciseValidations;
+  homework_exercises: HomeworkExercises;
+  homework_textbooks: HomeworkTextbooks;
+  homework_week_foreign_books: HomeworkWeekForeignBooks;
+  homework_week_items: HomeworkWeekItems;
+  homework_weeks: HomeworkWeeks;
   idempotency_keys: IdempotencyKeys;
   inbound_email_daily_counters: InboundEmailDailyCounters;
   inbound_emails: InboundEmails;
@@ -1737,6 +1953,12 @@ export interface DB {
   logbook_entries: LogbookEntries;
   logbook_entry_participants: LogbookEntryParticipants;
   logbook_sync_runs: LogbookSyncRuns;
+  outing_criteria: OutingCriteria;
+  outing_criteria_themes: OutingCriteriaThemes;
+  outing_offer_memory: OutingOfferMemory;
+  outing_proposal_ideas: OutingProposalIdeas;
+  outing_proposals: OutingProposals;
+  outing_themes: OutingThemes;
   platform_setting_changes: PlatformSettingChanges;
   platform_settings: PlatformSettings;
   profile_agents: ProfileAgents;
