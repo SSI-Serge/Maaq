@@ -24,7 +24,8 @@ export interface ModelRequest {
 export interface ModelResponse {
   content: ContentBlock[];
   stopReason: string;
-  usage: { inputTokens: number; outputTokens: number; cacheRead: number; cacheWrite: number };
+  /** `webSearches` : recherches web faites par le fournisseur pendant l'appel (facturées en plus des jetons), quand l'outil de recherche est fourni. */
+  usage: { inputTokens: number; outputTokens: number; cacheRead: number; cacheWrite: number; webSearches?: number };
   /** Identifiant de requête du fournisseur, à journaliser pour le support. */
   requestId: string | null;
 }
@@ -104,7 +105,7 @@ export function createModel(config: ModelConfig): AssistantModel {
           if (!res.ok) throw new ModelError(`requête refusée par le modèle (HTTP ${res.status}) : ${raw.slice(0, 300)}`, res.status, false, requestId);
           const json = JSON.parse(raw) as {
             content: ContentBlock[]; stop_reason: string;
-            usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number };
+            usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number; server_tool_use?: { web_search_requests?: number } };
           };
           return {
             content: json.content,
@@ -114,6 +115,7 @@ export function createModel(config: ModelConfig): AssistantModel {
               outputTokens: json.usage?.output_tokens ?? 0,
               cacheRead: json.usage?.cache_read_input_tokens ?? 0,
               cacheWrite: json.usage?.cache_creation_input_tokens ?? 0,
+              webSearches: json.usage?.server_tool_use?.web_search_requests ?? 0,
             },
             requestId,
           };

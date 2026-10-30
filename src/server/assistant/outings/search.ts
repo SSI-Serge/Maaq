@@ -37,6 +37,13 @@ export interface SearchResult {
   ideas: IdeaDraft[];
   costUsd: number | null;
   searches: number;
+  /** Jetons et durée cumulés des appels, pour mesurer le coût réel d'une proposition. */
+  tokens: { input: number; output: number; cacheRead: number; cacheWrite: number };
+  calls: number;
+  durationMs: number;
+  /** Texte brut de la dernière réponse, pour contrôler la qualité (essais seulement ; jamais journalisé). */
+  rawText: string;
+  urls: string[];
 }
 
 const MOOD_LABEL: Record<OutingMood, string> = { calm: "calme", playful: "ludique", both: "calme ou ludique" };
@@ -181,15 +188,23 @@ export async function findIdeas(model: AssistantModel, request: SearchRequest, e
   let costUsd: number | null = 0;
   let searches = 0;
   let text = "";
+  const tokens = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
+  const startedAt = Date.now();
+  let calls = 0;
   for (let turn = 0; turn <= MAX_CONTINUATIONS; turn++) {
     const answer = await model.send({ system: instructions(), tools: [{ type: "web_search_20250305", name: "web_search", max_uses: MAX_SEARCHES }], messages });
     for (const url of resultUrls(answer.content)) urls.add(url);
-    searches += answer.content.filter((b) => b.type === "server_tool_use").length;
+    searches += Math.max(answer.usage.webSearches ?? 0, answer.content.filter((b) => b.type === "server_tool_use").length);
+    calls += 1;
+    tokens.input += answer.usage.inputTokens;
+    tokens.output += answer.usage.outputTokens;
+    tokens.cacheRead += answer.usage.cacheRead;
+    tokens.cacheWrite += answer.usage.cacheWrite;
     const cost = estimateCostUsd(model.id, answer.usage);
     costUsd = costUsd === null || cost === null ? null : costUsd + cost;
     text = textOf(answer.content) || text;
     if (answer.stopReason !== "pause_turn") break;
     messages.push({ role: "assistant", content: answer.content });
   }
-  return { ideas: validateIdeas(text, request, urls, excluded), costUsd, searches };
+  return { ideas: validateIdeas(text, request, urls, excluded), costUsd, searches, tokens, calls, durationMs: Date.now() - startedAt, rawText: text, urls: [...urls] };
 }
