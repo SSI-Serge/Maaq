@@ -1,0 +1,3192 @@
+{
+"maths": {
+"singapore": {
+"cp": [
+{
+"n": 1,
+"theme": "Dénombrement & Comparaison (< 20)",
+"enonce": "Écris en chiffres : Sept = ___ ; Douze = ___ ; Quinze = ___ ; Dix-huit = ___.",
+"corrige": "7 ; 12 ; 15 ; 18."
+},
+{
+"n": 2,
+"theme": "Dénombrement & Comparaison (< 20)",
+"enonce": "Complète avec <, > ou = : 14 ___ 17 ; 19 ___ 12 ; 8 + 5 ___ 13 ; 15 ___ 10 + 6.",
+"corrige": "14 < 17 ; 19 > 12 ; 8 + 5 = 13 ; 15 < 16."
+},
+{
+"n": 3,
+"theme": "Dénombrement & Comparaison (< 20)",
+"enonce": "Décompose en Dizaines (D) et Unités (U) : 16 = ___ D et ___ U ; 13 = ___ D et ___ U.",
+"corrige": "16 = 1D 6U ; 13 = 1D 3U."
+},
+{
+"n": 4,
+"theme": "Dénombrement & Comparaison (< 20)",
+"enonce": "Liaisons de nombres (Number Bonds) : Quel nombre manque-t-il pour faire 10 ? (7 + ___ = 10) ; (4 + ___ = 10).",
+"corrige": "7 + 3 = 10 ; 4 + 6 = 10."
+},
+{
+"n": 5,
+"theme": "Dénombrement & Comparaison (< 20)",
+"enonce": "Suite numérique : Complète la chenille des nombres : 9, 11, 13, ___, 17, ___.",
+"corrige": "9, 11, 13, 15, 17, 19 (pas de 2)."
+},
+{
+"n": 6,
+"theme": "Additions & Soustractions jusqu'à 20",
+"enonce": "Calcule : 8 + 5 = ___ ; 9 + 7 = ___ ; 14 - 6 = ___ ; 18 - 9 = ___.",
+"corrige": "8+5=13 ; 9+7=16 ; 14-6=8 ; 18-9=9."
+},
+{
+"n": 7,
+"theme": "Additions & Soustractions jusqu'à 20",
+"enonce": "Équations à trous : 12 + ___ = 19 ; 15 - ___ = 8 ; ___ + 6 = 14.",
+"corrige": "12+7=19 ; 15-7=8 ; 8+6=14."
+},
+{
+"n": 8,
+"theme": "Additions & Soustractions jusqu'à 20",
+"enonce": "Calcul réfléchi : Pour faire 8 + 6, fais d'abord 8 + 2 = 10, puis ajoute 4. Quel est le résultat ?",
+"corrige": "8 + 2 = 10, 10 + 4 = 14."
+},
+{
+"n": 9,
+"theme": "Additions & Soustractions jusqu'à 20",
+"enonce": "Problème : Léa a 9 billes. Son frère lui en donne 6. Combien de billes a Léa en tout ?",
+"corrige": "9 + 6 = 15 billes."
+},
+{
+"n": 10,
+"theme": "Additions & Soustractions jusqu'à 20",
+"enonce": "Problème : Hugo a 15 images. Il en donne 7 à son ami. Combien lui en reste-t-il ?",
+"corrige": "15 - 7 = 8 images."
+},
+{
+"n": 11,
+"theme": "Nombres jusqu'à 100 & Calcul réfléchi",
+"enonce": "Écris le nombre représenté par 3 dizaines et 7 unités : ___.",
+"corrige": "37."
+},
+{
+"n": 12,
+"theme": "Nombres jusqu'à 100 & Calcul réfléchi",
+"enonce": "Calcule : 30 + 40 = ___ ; 70 - 20 = ___ ; 45 + 3 = ___ ; 58 - 5 = ___.",
+"corrige": "30+40=70 ; 70-20=50 ; 45+3=48 ; 58-5=53."
+},
+{
+"n": 13,
+"theme": "Nombres jusqu'à 100 & Calcul réfléchi",
+"enonce": "Addition à 2 chiffres : 24 + 15 = ___ (Additionne les unités puis les dizaines).",
+"corrige": "24 + 15 = (4+5) + (20+10) = 39."
+},
+{
+"n": 14,
+"theme": "Nombres jusqu'à 100 & Calcul réfléchi",
+"enonce": "Soustraction à 2 chiffres : 47 - 23 = ___.",
+"corrige": "47 - 23 = 24."
+},
+{
+"n": 15,
+"theme": "Nombres jusqu'à 100 & Calcul réfléchi",
+"enonce": "Problème de comparaison : Thomas a 28 cartes. Sarah en a 35. Combien Sarah a-t-elle de cartes de plus que Thomas ?",
+"corrige": "35 - 28 = 7 cartes de plus."
+},
+{
+"n": 16,
+"theme": "Mesures, Temps & Monnaie",
+"enonce": "Quelle heure indique une horloge dont la petite aiguille pointe sur 4 et la grande sur 12 ? ___ h.",
+"corrige": "4 heures (4h00)."
+},
+{
+"n": 17,
+"theme": "Mesures, Temps & Monnaie",
+"enonce": "Quelle heure indique une horloge dont la petite aiguille pointe entre 7 et 8 et la grande sur 6 ? ___ h 30.",
+"corrige": "7 heures et demie (7h30)."
+},
+{
+"n": 18,
+"theme": "Mesures, Temps & Monnaie",
+"enonce": "Monnaie : Combien font 2 pièces de 2€ + 3 pièces de 1€ + 1 billet de 5€ ? ___ €.",
+"corrige": "(2x2) + 3 + 5 = 4 + 3 + 5 = 12 €."
+},
+{
+"n": 19,
+"theme": "Mesures, Temps & Monnaie",
+"enonce": "Rendu de monnaie : Julie achète un livre à 7€. Elle donne un billet de 10€. Combien lui rend-on ?",
+"corrige": "10 - 7 = 3 € rendus."
+},
+{
+"n": 20,
+"theme": "Mesures, Temps & Monnaie",
+"enonce": "Mesure de longueur : Un crayon mesure 12 cm. Une gomme mesure 4 cm. Quelle est la différence de longueur ?",
+"corrige": "12 - 4 = 8 cm de différence."
+},
+{
+"n": 21,
+"theme": "Géométrie & Initiation à la Multiplication",
+"enonce": "Nomme les formes ayant 3 côtés et 3 sommets : ___.",
+"corrige": "Le triangle."
+},
+{
+"n": 22,
+"theme": "Géométrie & Initiation à la Multiplication",
+"enonce": "Groupements : Il y a 4 sacs de 3 pommes chacun. Combien y a-t-il de pommes en tout ? (3 + 3 + 3 + 3 = ___).",
+"corrige": "4 x 3 = 12 pommes."
+},
+{
+"n": 23,
+"theme": "Géométrie & Initiation à la Multiplication",
+"enonce": "Partage : Partage 12 bonbons également entre 3 enfants. Combien de bonbons aura chaque enfant ?",
+"corrige": "12 : 3 = 4 bonbons par enfant."
+},
+{
+"n": 24,
+"theme": "Géométrie & Initiation à la Multiplication",
+"enonce": "Lecture de tableau : Dans un diagramme, 1 symbole s représente 2 pommes. S'il y a 4 symboles, combien y a-t-il de pommes ?",
+"corrige": "4 x 2 = 8 pommes."
+},
+{
+"n": 25,
+"theme": "Géométrie & Initiation à la Multiplication",
+"enonce": "Problème bilan : Marc a 15€. Il achète un cahier à 4€ et un stylo à 3€. Combien d'argent lui reste-t-il ?",
+"corrige": "Dépense = 4 + 3 = 7€. Reste = 15 - 7 = 8 €."
+}
+],
+"ce1": [
+{
+"n": 26,
+"theme": "Nombres jusqu'à 1 000 & Valeur de position",
+"enonce": "Décompose le nombre 478 : ___ Centaines, ___ Dizaines et ___ Unités.",
+"corrige": "4 Centaines, 7 Dizaines, 8 Unités."
+},
+{
+"n": 27,
+"theme": "Nombres jusqu'à 1 000 & Valeur de position",
+"enonce": "Écris en chiffres : Six cent quatre-vingt-quinze = ___.",
+"corrige": "695."
+},
+{
+"n": 28,
+"theme": "Nombres jusqu'à 1 000 & Valeur de position",
+"enonce": "Remplis avec < ou > : 589 ___ 598 ; 702 ___ 699.",
+"corrige": "589 < 598 ; 702 > 699."
+},
+{
+"n": 29,
+"theme": "Nombres jusqu'à 1 000 & Valeur de position",
+"enonce": "Suite numérique (+10 et +100) : 340, 350, 360, ___ ; 250, 350, 450, ___.",
+"corrige": "370 ; 550."
+},
+{
+"n": 30,
+"theme": "Nombres jusqu'à 1 000 & Valeur de position",
+"enonce": "Quel est le plus grand nombre que l'on peut former avec les chiffres 3, 8 et 1 ? ___.",
+"corrige": "831."
+},
+{
+"n": 31,
+"theme": "Addition & Soustraction posées jusqu'à 1 000",
+"enonce": "Pose et calcule : 345 + 238 = ___.",
+"corrige": "345 + 238 = 583."
+},
+{
+"n": 32,
+"theme": "Addition & Soustraction posées jusqu'à 1 000",
+"enonce": "Pose et calcule avec retenue : 567 + 285 = ___.",
+"corrige": "567 + 285 = 852."
+},
+{
+"n": 33,
+"theme": "Addition & Soustraction posées jusqu'à 1 000",
+"enonce": "Pose et calcule la soustraction avec échange : 652 - 237 = ___.",
+"corrige": "652 - 237 = 415."
+},
+{
+"n": 34,
+"theme": "Addition & Soustraction posées jusqu'à 1 000",
+"enonce": "Problème modèle Partie-Tout : Dans une école, il y a 245 garçons et 278 filles. Combien y a-t-il d'élèves au total ?",
+"corrige": "245 + 278 = 523 élèves."
+},
+{
+"n": 35,
+"theme": "Addition & Soustraction posées jusqu'à 1 000",
+"enonce": "Problème de comparaison : Un verger compte 420 pommiers et 185 poiriers. Combien y a-t-il de pommiers de plus que de poiriers ?",
+"corrige": "420 - 185 = 235 pommiers de plus."
+},
+{
+"n": 36,
+"theme": "Multiplication & Division (Tables de 2, 3, 4, 5, 10)",
+"enonce": "Calcule : 4 x 5 = ___ ; 3 x 8 = ___ ; 7 x 10 = ___ ; 4 x 9 = ___.",
+"corrige": "4x5=20 ; 3x8=24 ; 7x10=70 ; 4x9=36."
+},
+{
+"n": 37,
+"theme": "Multiplication & Division (Tables de 2, 3, 4, 5, 10)",
+"enonce": "Complète les divisions : 20 : 5 = ___ ; 18 : 3 = ___ ; 32 : 4 = ___.",
+"corrige": "20:5=4 ; 18:3=6 ; 32:4=8."
+},
+{
+"n": 38,
+"theme": "Multiplication & Division (Tables de 2, 3, 4, 5, 10)",
+"enonce": "Écris la multiplication correspondant à l'addition : 6 + 6 + 6 + 6 + 6 = ___ x ___ = ___.",
+"corrige": "5 x 6 = 30."
+},
+{
+"n": 39,
+"theme": "Multiplication & Division (Tables de 2, 3, 4, 5, 10)",
+"enonce": "Problème de multiplication : Une boîte contient 6 œufs. Combien y a-t-il d'œufs dans 8 boîtes ?",
+"corrige": "6 x 8 = 48 œufs."
+},
+{
+"n": 40,
+"theme": "Multiplication & Division (Tables de 2, 3, 4, 5, 10)",
+"enonce": "Problème de partage : Le maître veut distribuer 28 cahiers également à 4 élèves. Combien chaque élève reçoit-il de cahiers ?",
+"corrige": "28 : 4 = 7 cahiers."
+},
+{
+"n": 41,
+"theme": "Fractions visuelles, Mesures & Monnaie",
+"enonce": "Quelle fraction de la figure est coloriée s'il y a 1 part choisie sur 4 parts égales ? ___.",
+"corrige": "1/4 (un quart)."
+},
+{
+"n": 42,
+"theme": "Fractions visuelles, Mesures & Monnaie",
+"enonce": "Compare les fractions : 1/2 ___ 1/4 (Utilise < ou >).",
+"corrige": "1/2 > 1/4."
+},
+{
+"n": 43,
+"theme": "Fractions visuelles, Mesures & Monnaie",
+"enonce": "Heure et durée : Un film commence à 14h00 et dure 1h30. À quelle heure se termine-t-il ? ___ h ___.",
+"corrige": "14h00 + 1h30 = 15h30."
+},
+{
+"n": 44,
+"theme": "Fractions visuelles, Mesures & Monnaie",
+"enonce": "Monnaie : Antoine a 15€ 50c. Son père lui donne 4€ 80c. Combien a-t-il maintenant ?",
+"corrige": "15,50 + 4,80 = 20,30 € (20€ 30c)."
+},
+{
+"n": 45,
+"theme": "Fractions visuelles, Mesures & Monnaie",
+"enonce": "Contenance : Une bouteille contient 2 Litres d'eau. Combien de verres de 25 cL peut-on remplir ?",
+"corrige": "2 L = 200 cL. 200 : 25 = 8 verres."
+},
+{
+"n": 46,
+"theme": "Géométrie, Diagrammes & Problèmes Bilans",
+"enonce": "Combien de faces, de sommets et d'arêtes possède un cube ? ___ faces, ___ sommets, ___ arêtes.",
+"corrige": "6 faces, 8 sommets, 12 arêtes."
+},
+{
+"n": 47,
+"theme": "Géométrie, Diagrammes & Problèmes Bilans",
+"enonce": "Diagramme en images : Si 1 symbole s = 5 étoiles, combien d'étoiles représentent 6 symboles s ?",
+"corrige": "6 x 5 = 30 étoiles."
+},
+{
+"n": 48,
+"theme": "Géométrie, Diagrammes & Problèmes Bilans",
+"enonce": "Modèle en barres de comparaison : Paul a 120 images. Émilie en a 45 de moins que Paul. Combien en ont-ils à eux deux ?",
+"corrige": "Émilie = 120 - 45 = 75. Total = 120 + 75 = 195 images."
+},
+{
+"n": 49,
+"theme": "Géométrie, Diagrammes & Problèmes Bilans",
+"enonce": "Mesure de masse : Un sac de farine pèse 2 kg. On utilise 750 g pour un gâteau. Combien de grammes de farine reste-t-il ?",
+"corrige": "2 kg = 2 000 g. 2 000 - 750 = 1 250 g."
+},
+{
+"n": 50,
+"theme": "Géométrie, Diagrammes & Problèmes Bilans",
+"enonce": "Problème bilan 2 étapes : Un pâtissier fabrique 150 tartelettes le matin. Il en vend 85 l'après-midi puis en fabrique 40 autres. Combien en a-t-il à la fin de la journée ?",
+"corrige": "150 - 85 = 65. 65 + 40 = 105 tartelettes."
+}
+],
+"ce2": [
+{
+"n": 51,
+"theme": "Nombres jusqu'à 10 000 & Numération",
+"enonce": "Dans le nombre 8 472, quel est le chiffre des dizaines ? ___ Quel est le nombre de centaines ? ___.",
+"corrige": "Chiffre des dizaines = 7 ; Nombre de centaines = 84."
+},
+{
+"n": 52,
+"theme": "Nombres jusqu'à 10 000 & Numération",
+"enonce": "Écris en lettres le nombre 6 059 : ___.",
+"corrige": "Six mille cinquante-neuf."
+},
+{
+"n": 53,
+"theme": "Nombres jusqu'à 10 000 & Numération",
+"enonce": "Arrondis 4 382 à la centaine la plus proche : ___ ; au millier le plus proche : ___.",
+"corrige": "Centaine = 4 400 ; Millier = 4 000."
+},
+{
+"n": 54,
+"theme": "Nombres jusqu'à 10 000 & Numération",
+"enonce": "Intercale un nombre : 7 800 < ______ < 7 850.",
+"corrige": "Exemple : 7 825."
+},
+{
+"n": 55,
+"theme": "Nombres jusqu'à 10 000 & Numération",
+"enonce": "Décompose : 9 000 + 400 + 7 = ___.",
+"corrige": "9 407."
+},
+{
+"n": 56,
+"theme": "Operations posées (Add/Soust) < 10 000",
+"enonce": "Pose et calcule : 4 582 + 3 749 = ___.",
+"corrige": "4 582 + 3 749 = 8 331."
+},
+{
+"n": 57,
+"theme": "Operations posées (Add/Soust) < 10 000",
+"enonce": "Pose et calcule : 8 000 - 3 426 = ___.",
+"corrige": "8 000 - 3 426 = 4 574."
+},
+{
+"n": 58,
+"theme": "Operations posées (Add/Soust) < 10 000",
+"enonce": "Calcul d'écart : Quel est l'écart entre 6 150 et 2 890 ?",
+"corrige": "6 150 - 2 890 = 3 260."
+},
+{
+"n": 59,
+"theme": "Operations posées (Add/Soust) < 10 000",
+"enonce": "Problème : Une bibliothèque contient 4 250 livres. 1 890 sont des romans, le reste des bandes dessinées. Combien y a-t-il de BD ?",
+"corrige": "4 250 - 1 890 = 2 360 BD."
+},
+{
+"n": 60,
+"theme": "Operations posées (Add/Soust) < 10 000",
+"enonce": "Problème multi-étapes : Une usine produit 2 400 bouteilles le lundi et 3 150 le mardi. On en expédie 4 200. Combien en reste-t-il ?",
+"corrige": "Total = 2 400 + 3 150 = 5 550. Reste = 5 550 - 4 200 = 1 350 bouteilles."
+},
+{
+"n": 61,
+"theme": "Multiplication & Division avec reste (Tables 6 à 9)",
+"enonce": "Calcule : 7 x 8 = ___ ; 9 x 6 = ___ ; 8 x 4 = ___ ; 9 x 9 = ___.",
+"corrige": "7x8=56 ; 9x6=54 ; 8x4=32 ; 9x9=81."
+},
+{
+"n": 62,
+"theme": "Multiplication & Division avec reste (Tables 6 à 9)",
+"enonce": "Pose et calcule la multiplication à 3 chiffres : 246 x 4 = ___.",
+"corrige": "246 x 4 = 984."
+},
+{
+"n": 63,
+"theme": "Multiplication & Division avec reste (Tables 6 à 9)",
+"enonce": "Pose et calcule la division avec reste : 87 : 5 = ___ reste ___.",
+"corrige": "87 : 5 = 17 reste 2."
+},
+{
+"n": 64,
+"theme": "Multiplication & Division avec reste (Tables 6 à 9)",
+"enonce": "Problème de reste : On veut ranger 45 œufs dans des boîtes de 6. Combien de boîtes seront complètes et combien d'œufs restera-t-il ?",
+"corrige": "45 : 6 = 7 boîtes complètes, reste 3 œufs."
+},
+{
+"n": 65,
+"theme": "Multiplication & Division avec reste (Tables 6 à 9)",
+"enonce": "Problème : 4 cartons contiennent chacun 135 livres. On distribue ces livres équitablement à 5 écoles. Combien chaque école reçoit-elle ?",
+"corrige": "Total = 4 x 135 = 540. Par école = 540 : 5 = 108 livres."
+},
+{
+"n": 66,
+"theme": "Fractions équivalentes, Périmètre & Aire",
+"enonce": "Trouve le nombre manquant pour faire une fraction équivalente : 2/3 = ___ / 9.",
+"corrige": "2/3 = 6/9."
+},
+{
+"n": 67,
+"theme": "Fractions équivalentes, Périmètre & Aire",
+"enonce": "Calcule : 3/8 + 2/8 = ___ ; 7/10 - 4/10 = ___.",
+"corrige": "3/8 + 2/8 = 5/8 ; 7/10 - 4/10 = 3/10."
+},
+{
+"n": 68,
+"theme": "Fractions équivalentes, Périmètre & Aire",
+"enonce": "Périmètre : Calcule le périmètre d'un rectangle de longueur 12 cm et de largeur 7 cm. P = ___ cm.",
+"corrige": "P = 2 x (12 + 7) = 2 x 19 = 38 cm."
+},
+{
+"n": 69,
+"theme": "Fractions équivalentes, Périmètre & Aire",
+"enonce": "Aire : Calcule l'aire d'un carré de côté 6 cm. A = ___ cm².",
+"corrige": "A = 6 x 6 = 36 cm²."
+},
+{
+"n": 70,
+"theme": "Fractions équivalentes, Périmètre & Aire",
+"enonce": "Conversion : Convertis 3 kg 45 g en grammes = ___ g ; 4 L 50 cL en cL = ___ cL.",
+"corrige": "3 kg 45 g = 3 045 g ; 4 L 50 cL = 450 cL."
+},
+{
+"n": 71,
+"theme": "Géométrie, Graphiques & Problèmes Bilans",
+"enonce": "Nomme un angle plus petit qu'un angle droit (___) et un angle plus grand (___).",
+"corrige": "Angle aigu (< 90°) ; Angle obtus (> 90°)."
+},
+{
+"n": 72,
+"theme": "Géométrie, Graphiques & Problèmes Bilans",
+"enonce": "Observe le graphique ci-dessous : Quelle fourniture a été vendue à 60 exemplaires ?",
+"corrige": "Les Cahiers (60 exemplaires)."
+},
+{
+"n": 73,
+"theme": "Géométrie, Graphiques & Problèmes Bilans",
+"enonce": "Problème de modélisation par barres : Pierre a 3 fois plus de billes que Paul. Ensemble, ils ont 120 billes. Combien de billes a Pierre ?",
+"corrige": "4 parts = 120 -> 1 part = 30. Pierre (3 parts) = 3 x 30 = 90 billes."
+},
+{
+"n": 74,
+"theme": "Géométrie, Graphiques & Problèmes Bilans",
+"enonce": "Problème de durée : Une compétition de natation commence à 9h45 et se termine à 11h20. Quelle est la durée exacte de l'épreuve ?",
+"corrige": "De 9h45 à 10h00 = 15 min. De 10h00 à 11h20 = 1h20. Total = 1h35 min."
+},
+{
+"n": 75,
+"theme": "Géométrie, Graphiques & Problèmes Bilans",
+"enonce": "Problème bilan complet : Un commerçant achète 6 caisses de 25 kg de pommes à 2€ le kg. Il revend le tout 450€. Quel est son bénéfice ?",
+"corrige": "Achat = 6 x 25 x 2€ = 300€. Vente = 450€. Bénéfice = 450 - 300 = 150 €."
+}
+],
+"cm1": [
+{
+"n": 76,
+"theme": "Grands Nombres (100 000), Facteurs & Multiples",
+"enonce": "Écris en chiffres : Quatre-vingt-douze mille quatre cent huit = ___.",
+"corrige": "92 408."
+},
+{
+"n": 77,
+"theme": "Grands Nombres (100 000), Facteurs & Multiples",
+"enonce": "Donne tous les facteurs (diviseurs) du nombre 24 : ___.",
+"corrige": "Facteurs de 24 : 1, 2, 3, 4, 6, 8, 12, 24."
+},
+{
+"n": 78,
+"theme": "Grands Nombres (100 000), Facteurs & Multiples",
+"enonce": "Quel est le plus petit multiple commun (PPMC) de 4 et 6 ? ___.",
+"corrige": "PPMC(4, 6) = 12."
+},
+{
+"n": 79,
+"theme": "Grands Nombres (100 000), Facteurs & Multiples",
+"enonce": "Indique si 157 est divisible par 2, par 3 ou par 5 : ___.",
+"corrige": "Aucun (157 est impair, somme = 13 non div par 3, ne finit pas par 0 ou 5. 157 est premier)."
+},
+{
+"n": 80,
+"theme": "Grands Nombres (100 000), Facteurs & Multiples",
+"enonce": "Encadre 48 725 entre deux milliers consécutifs : ___ < 48 725 < ___.",
+"corrige": "48 000 < 48 725 < 49 000."
+},
+{
+"n": 81,
+"theme": "Multiplication à 2 chiffres & Division posée",
+"enonce": "Pose et calcule : 438 x 26 = ___.",
+"corrige": "438 x 26 = 11 388."
+},
+{
+"n": 82,
+"theme": "Multiplication à 2 chiffres & Division posée",
+"enonce": "Pose et calcule la division : 3 584 : 7 = ___.",
+"corrige": "3 584 : 7 = 512."
+},
+{
+"n": 83,
+"theme": "Multiplication à 2 chiffres & Division posée",
+"enonce": "Calcul avec parenthèses : 15 + 5 x (12 - 4) = ___.",
+"corrige": "15 + 5 x 8 = 15 + 40 = 55."
+},
+{
+"n": 84,
+"theme": "Multiplication à 2 chiffres & Division posée",
+"enonce": "Problème : Un camion transporte 45 cartons de 28 kg chacun. Quel est le poids total du chargement ?",
+"corrige": "45 x 28 = 1 260 kg."
+},
+{
+"n": 85,
+"theme": "Multiplication à 2 chiffres & Division posée",
+"enonce": "Problème : On veut distribuer 1 250 sacs de semences à 8 agriculteurs. Combien de sacs reçoit chaque agriculteur et combien en reste-t-il ?",
+"corrige": "1 250 : 8 = 156 sacs par agriculteur, reste 2 sacs."
+},
+{
+"n": 86,
+"theme": "Fractions avancées & Nombres mixtes",
+"enonce": "Transforme la fraction impropre 11/4 en nombre mixte : ___.",
+"corrige": "11/4 = 2 + 3/4."
+},
+{
+"n": 87,
+"theme": "Fractions avancées & Nombres mixtes",
+"enonce": "Transforme le nombre mixte 3 + 2/5 en fraction impropre : ___.",
+"corrige": "3 + 2/5 = 17/5."
+},
+{
+"n": 88,
+"theme": "Fractions avancées & Nombres mixtes",
+"enonce": "Calcule : 2/3 + 1/6 = ___ (Mets au même dénominateur).",
+"corrige": "4/6 + 1/6 = 5/6."
+},
+{
+"n": 89,
+"theme": "Fractions avancées & Nombres mixtes",
+"enonce": "Calcule les 3/5 de 150 € : ___ €.",
+"corrige": "(150 : 5) x 3 = 30 x 3 = 90 €."
+},
+{
+"n": 90,
+"theme": "Fractions avancées & Nombres mixtes",
+"enonce": "Problème : Paul dépense 1/4 de son argent le matin et 1/2 l'après-midi. Quelle fraction de son argent lui reste-t-il ?",
+"corrige": "Dépense = 1/4 + 2/4 = 3/4. Reste = 1/4."
+},
+{
+"n": 91,
+"theme": "Nombres Décimaux & Opérations",
+"enonce": "Écris sous forme décimale : 3 + 4/10 + 7/100 = ___.",
+"corrige": "3,47."
+},
+{
+"n": 92,
+"theme": "Nombres Décimaux & Opérations",
+"enonce": "Compare : 4,08 ___ 4,8 ; 12,35 ___ 12,305.",
+"corrige": "4,08 < 4,8 ; 12,35 > 12,305."
+},
+{
+"n": 93,
+"theme": "Nombres Décimaux & Opérations",
+"enonce": "Pose et calcule : 45,8 + 12,74 = ___ ; 89,5 - 34,28 = ___.",
+"corrige": "45,8 + 12,74 = 58,54 ; 89,5 - 34,28 = 55,22."
+},
+{
+"n": 94,
+"theme": "Nombres Décimaux & Opérations",
+"enonce": "Arrondis 14,86 au dixième le plus proche : ___.",
+"corrige": "14,9."
+},
+{
+"n": 95,
+"theme": "Nombres Décimaux & Opérations",
+"enonce": "Problème : Un rouleau de tissu mesure 15 m. On en coupe trois morceaux de 2,45 m, 3,8 m et 4,15 m. Combien de mètres reste-t-il ?",
+"corrige": "Coupé = 2,45 + 3,8 + 4,15 = 10,4 m. Reste = 15 - 10,4 = 4,6 m."
+},
+{
+"n": 96,
+"theme": "Géométrie, Aire de figures composées & Synthèse",
+"enonce": "Combien de degrés mesure un angle plat ? ___ °. Un angle droit ? ___ °.",
+"corrige": "Angle plat = 180° ; Angle droit = 90°."
+},
+{
+"n": 97,
+"theme": "Géométrie, Aire de figures composées & Synthèse",
+"enonce": "Propriété : Si un triangle a 2 côtés égaux, c'est un triangle ___. S'il a 3 côtés égaux, c'est un triangle ___.",
+"corrige": "Isocèle ; Équilatéral."
+},
+{
+"n": 98,
+"theme": "Géométrie, Aire de figures composées & Synthèse",
+"enonce": "Aire composée : Une pièce a la forme d'un L formé d'un rectangle de 8m x 5m et d'un carré de 3m de côté. Quelle est son aire totale ?",
+"corrige": "Aire = (8 x 5) + (3 x 3) = 40 + 9 = 49 m²."
+},
+{
+"n": 99,
+"theme": "Géométrie, Aire de figures composées & Synthèse",
+"enonce": "Symétrie : Combien d'axes de symétrie possède un carré ? ___ Un rectangle non carré ? ___.",
+"corrige": "Carré = 4 axes ; Rectangle = 2 axes."
+},
+{
+"n": 100,
+"theme": "Géométrie, Aire de figures composées & Synthèse",
+"enonce": "Problème bilan CM1 : Un terrain rectangulaire de 40 m de long et 25 m de large est entouré d'un grillage qui coûte 12€ le mètre. Quel est le coût total du grillage ?",
+"corrige": "P = 2 x (40 + 25) = 130 m. Coût = 130 x 12€ = 1 560 €."
+}
+],
+"cm2": [
+{
+"n": 101,
+"theme": "Grands Nombres (Millions) & Priorités Opératoires",
+"enonce": "Écris en chiffres : Deux millions quarante-cinq mille huit cents = ___.",
+"corrige": "2 045 800."
+},
+{
+"n": 102,
+"theme": "Grands Nombres (Millions) & Priorités Opératoires",
+"enonce": "Calcule en respectant les priorités : 50 - [4 x (6 + 3)] = ___.",
+"corrige": "50 - [4 x 9] = 50 - 36 = 14."
+},
+{
+"n": 103,
+"theme": "Grands Nombres (Millions) & Priorités Opératoires",
+"enonce": "Arrondis 3 482 910 au centième de mille le plus proche : ___.",
+"corrige": "3 500 000."
+},
+{
+"n": 104,
+"theme": "Grands Nombres (Millions) & Priorités Opératoires",
+"enonce": "Évalue : 12 x 100 : 4 + 15 = ___.",
+"corrige": "1200 : 4 + 15 = 300 + 15 = 315."
+},
+{
+"n": 105,
+"theme": "Grands Nombres (Millions) & Priorités Opératoires",
+"enonce": "Écris en écriture scientifique / décomposée : 4 050 000 = 4 x 1 000 000 + 5 x ___.",
+"corrige": "4 x 1 000 000 + 5 x 10 000."
+},
+{
+"n": 106,
+"theme": "Multiplication/Division de Fractions & Problèmes complexes",
+"enonce": "Calcule et simplifie : 3/4 x 8/9 = ___.",
+"corrige": "(3 x 8) / (4 x 9) = 24 / 36 = 2/3."
+},
+{
+"n": 107,
+"theme": "Multiplication/Division de Fractions & Problèmes complexes",
+"enonce": "Divise une fraction par un entier : (4/5) : 2 = ___.",
+"corrige": "4/5 : 2 = 2/5."
+},
+{
+"n": 108,
+"theme": "Multiplication/Division de Fractions & Problèmes complexes",
+"enonce": "Problème de fraction d'un reste : Marc a 240€. Il dépense 1/3 pour un blouson, puis 1/4 du RESTE pour un livre. Combien lui reste-t-il ?",
+"corrige": "Blouson = 240/3 = 80€. Reste 1 = 160€. Livre = 160/4 = 40€. Reste final = 160 - 40 = 120 €."
+},
+{
+"n": 109,
+"theme": "Multiplication/Division de Fractions & Problèmes complexes",
+"enonce": "Calcule : 2 + 1/3 - 3/4 = ___.",
+"corrige": "2 + 1/3 - 3/4 = 24/12 + 4/12 - 9/12 = 19/12 = 1 + 7/12."
+},
+{
+"n": 110,
+"theme": "Multiplication/Division de Fractions & Problèmes complexes",
+"enonce": "Problème : Dans un collège de 600 élèves, les 3/5 pratiquent un sport. Parmi ces sportifs, 1/3 fait du football. Combien font du football ?",
+"corrige": "Sportifs = 600 x 3/5 = 360. Foot = 360 x 1/3 = 120 élèves."
+},
+{
+"n": 111,
+"theme": "Décimaux avancés, Pourcentages & Conversions",
+"enonce": "Calcule : 4,5 x 0,08 = ___ ; 15,6 : 0,3 = ___.",
+"corrige": "4,5 x 0,08 = 0,36 ; 15,6 : 0,3 = 52."
+},
+{
+"n": 112,
+"theme": "Décimaux avancés, Pourcentages & Conversions",
+"enonce": "Convertis 3/5 en pourcentage = ___ % ; 0,45 en fraction simplifiée = ___.",
+"corrige": "3/5 = 60% ; 0,45 = 45/100 = 9/20."
+},
+{
+"n": 113,
+"theme": "Décimaux avancés, Pourcentages & Conversions",
+"enonce": "Calcul de pourcentage : Calcule 15% de 240 € = ___ €.",
+"corrige": "240 x 0,15 = 36 €."
+},
+{
+"n": 114,
+"theme": "Décimaux avancés, Pourcentages & Conversions",
+"enonce": "Augmentation / Réduction : Un article coûtant 80€ bénéficie d'une remise de 20%. Quel est son nouveau prix ?",
+"corrige": "Remise = 80 x 0,20 = 16€. Prix = 80 - 16 = 64 €."
+},
+{
+"n": 115,
+"theme": "Décimaux avancés, Pourcentages & Conversions",
+"enonce": "Problème : Un placement de 1 500€ rapporte 3% d'intérêts par an. Quel sera le montant total après un an ?",
+"corrige": "Intérêt = 1 500 x 0,03 = 45€. Total = 1 545 €."
+},
+{
+"n": 116,
+"theme": "Ratios, Proportionnalité & Échelle",
+"enonce": "Simplifie le ratio 15 : 25 : 35 = ___ : ___ : ___.",
+"corrige": "Diviser par 5 -> 3 : 5 : 7."
+},
+{
+"n": 117,
+"theme": "Ratios, Proportionnalité & Échelle",
+"enonce": "Partage proportionnel : On partage 180 bonbons entre deux enfants selon le ratio 4 : 5. Combien reçoit chaque enfant ?",
+"corrige": "Total parts = 4 + 5 = 9. Part = 180 / 9 = 20. Enfant 1 = 80, Enfant 2 = 100 bonbons."
+},
+{
+"n": 118,
+"theme": "Ratios, Proportionnalité & Échelle",
+"enonce": "Ratio inverse : Si le ratio garçons/filles est de 3 : 2 et qu'il y a 18 garçons, combien y a-t-il de filles ?",
+"corrige": "3 parts = 18 -> 1 part = 6. Filles (2 parts) = 2 x 6 = 12 filles."
+},
+{
+"n": 119,
+"theme": "Ratios, Proportionnalité & Échelle",
+"enonce": "Vitesse moyenne : Une voiture parcourt 210 km en 2h30. Quelle est sa vitesse moyenne en km/h ?",
+"corrige": "2h30 = 2,5h. Vitesse = 210 / 2,5 = 84 km/h."
+},
+{
+"n": 120,
+"theme": "Ratios, Proportionnalité & Échelle",
+"enonce": "Échelle : Sur une carte à l'échelle 1 : 50 000, deux villes sont distantes de 4 cm. Quelle est la distance réelle en km ?",
+"corrige": "Distance = 4 cm x 50 000 = 200 000 cm = 2 000 m = 2 km."
+},
+{
+"n": 121,
+"theme": "Aire du Triangle, Volume & Grand Problème Bilan",
+"enonce": "Aire du triangle : Calcule l'aire d'un triangle de base 14 cm et de hauteur 9 cm (Aire = Base x Hauteur / 2) = ___ cm².",
+"corrige": "Aire = (14 x 9) / 2 = 126 / 2 = 63 cm²."
+},
+{
+"n": 122,
+"theme": "Aire du Triangle, Volume & Grand Problème Bilan",
+"enonce": "Volume du pavé droit : Calcule le volume d'un réservoir rectangulaire de L = 50 cm, l = 30 cm, h = 20 cm. Volume = ___ cm³ = ___ Litres.",
+"corrige": "Volume = 50 x 30 x 20 = 30 000 cm³ = 30 Litres."
+},
+{
+"n": 123,
+"theme": "Aire du Triangle, Volume & Grand Problème Bilan",
+"enonce": "Angles dans un triangle : Dans un triangle ABC isocèle en A, l'angle A mesure 40°. Combien mesurent les angles B et C ?",
+"corrige": "Somme = 180°. B + C = 180 - 40 = 140°. Isocèle -> B = C = 70°."
+},
+{
+"n": 124,
+"theme": "Aire du Triangle, Volume & Grand Problème Bilan",
+"enonce": "Réservoir d'eau : Un aquarium de 60 cm x 40 cm x 30 cm est rempli aux 2/3 d'eau. Quel est le volume d'eau en Litres ?",
+"corrige": "Volume total = 60 x 40 x 30 = 72 000 cm³ = 72 L. Eau = 72 x 2/3 = 48 Litres."
+},
+{
+"n": 125,
+"theme": "Aire du Triangle, Volume & Grand Problème Bilan",
+"enonce": "Grand problème bilan CM2 : Un commerçant achète 120 VTT à 150€ l'unité. Il paye 5% de frais de transport. Il les revend avec une marge de 30% sur le coût total. Quel est son bénéfice total ?",
+"corrige": "Achat = 120 x 150 = 18 000€. Transport = 5% x 18 000 = 900€. Coût total = 18 900€. Marge (30%) = 18 900 x 0,30 = 5 670 € de bénéfice total."
+}
+]
+},
+"france": {
+"cp": [
+{
+"n": 1,
+"theme": "Dénombrement de collections",
+"enonce": "Compter des billes : 3 paquets de 10 et 4 billes seules. Combien y a-t-il de billes en tout ?",
+"corrige": "On regroupe par dizaines. 3 paquets de 10 font 30. 30 + 4 = 34 billes au total."
+},
+{
+"n": 2,
+"theme": "Dizaines et Unités",
+"enonce": "Dans le nombre 47, quel est le chiffre des dizaines et celui des unités ?",
+"corrige": "Dans un nombre à deux chiffres, le premier est la dizaine, le second l'unité. 4 est le chiffre des dizaines, 7 est le chiffre des unités."
+},
+{
+"n": 3,
+"theme": "Comparaison de nombres",
+"enonce": "Compare 25 et 31 avec les symboles < ou >.",
+"corrige": "On regarde d'abord le chiffre des dizaines. 2 < 3. 25 < 31 car 2 dizaines est plus petit que 3 dizaines."
+},
+{
+"n": 4,
+"theme": "Rangement de nombres",
+"enonce": "Range dans l'ordre croissant : 19, 42, 8, 35.",
+"corrige": "Ordre croissant = du plus petit au plus grand. 8 < 19 < 35 < 42."
+},
+{
+"n": 5,
+"theme": "Décomposition additive",
+"enonce": "Décompose le nombre 56 sous la forme : ... + ...",
+"corrige": "Un nombre se décompose en dizaines entières plus unités. 56 = 50 + 6."
+},
+{
+"n": 6,
+"theme": "Les doubles jusqu'à 10",
+"enonce": "Quel est le double de 7 ?",
+"corrige": "Le double d'un nombre c'est ce nombre additionné à lui-même. 7 + 7 = 14. Le double de 7 est 14."
+},
+{
+"n": 7,
+"theme": "Les compléments à 10",
+"enonce": "Calcule le complément : 6 + ... = 10.",
+"corrige": "Pour trouver le complément à 10 de 6, on fait 10 - 6. 6 + 4 = 10. Le complément est 4."
+},
+{
+"n": 8,
+"theme": "Addition sans retenue",
+"enonce": "Calcule : 23 + 5.",
+"corrige": "On ajoute les unités aux unités (3 + 5 = 8) sans changer les dizaines. 23 + 5 = 28."
+},
+{
+"n": 9,
+"theme": "Passage de la dizaine",
+"enonce": "Calcule : 8 + 5 en passant par 10.",
+"corrige": "On complète d'abord 8 à 10 (il faut 2), puis on ajoute le reste (3). 8 + 2 = 10, puis 10 + 3 = 13."
+},
+{
+"n": 10,
+"theme": "Soustraction simple",
+"enonce": "Calcule : 15 - 4.",
+"corrige": "On retire 4 unités aux 5 unités du nombre 15. 15 - 4 = 11."
+},
+{
+"n": 11,
+"theme": "Addition posée sans retenue",
+"enonce": "Pose et calcule en colonne : 32 + 15.",
+"corrige": "Aligner correctement les unités sous les unités et les dizaines sous les dizaines. 2+5=7 et 3+1=4. Résultat : 47."
+},
+{
+"n": 12,
+"theme": "Addition posée avec retenue",
+"enonce": "Pose et calcule en colonne : 28 + 14.",
+"corrige": "8 + 4 = 12 (on pose 2 et on retient 1 dizaine). 2 + 1 + 1 (retenue) = 4. 28 + 14 = 42."
+},
+{
+"n": 13,
+"theme": "Calcul de dizaines entières",
+"enonce": "Calcule : 30 + 20.",
+"corrige": "3 dizaines + 2 dizaines = 5 dizaines. 30 + 20 = 50."
+},
+{
+"n": 14,
+"theme": "Recherche du terme manquant",
+"enonce": "Trouve le nombre manquant : 14 + ... = 19.",
+"corrige": "On cherche ce qu'il faut ajouter à 14 pour atteindre 19 (19 - 14). 14 + 5 = 19."
+},
+{
+"n": 15,
+"theme": "Problème d'addition simple",
+"enonce": "Léo a 12 images. Sa sœur lui en donne 5. Combien a-t-il d'images maintenant ?",
+"corrige": "C'est une addition d'ajout : quantité initiale + quantité ajoutée. 12 + 5 = 17 images."
+},
+{
+"n": 16,
+"theme": "Repérage spatial",
+"enonce": "Où se trouve l'objet A par rapport à B si A est au-dessus ?",
+"corrige": "Employer les termes de vocabulaire : sur, sous, au-dessus, au-dessous. A est situé au-dessus de B."
+},
+{
+"n": 17,
+"theme": "Repérage sur quadrillage",
+"enonce": "Donne les coordonnées de la case située en colonne B et ligne 3.",
+"corrige": "Le nom de la case associe la lettre de colonne et le chiffre de ligne. La case se nomme (B, 3)."
+},
+{
+"n": 18,
+"theme": "Figures planes fondamentales",
+"enonce": "Combien de côtés et de sommets possède un triangle ?",
+"corrige": "Un triangle a 3 côtés et 3 sommets. Le triangle possède 3 côtés et 3 sommets."
+},
+{
+"n": 19,
+"theme": "Reproduction de carré",
+"enonce": "Comment tracer un carré de 4 carreaux de côté sur quadrillage ?",
+"corrige": "Compter 4 carreaux horizontalement, puis 4 verticalement avec des angles droits. On trace 4 côtés égaux de 4 carreaux."
+},
+{
+"n": 20,
+"theme": "Tracé à la règle",
+"enonce": "Comment relier correctement deux points A et B ?",
+"corrige": "Bien maintenir la règle avec la main non scriptrice et faire glisser le crayon. On trace un trait droit reliant A et B sans bouger la règle."
+},
+{
+"n": 21,
+"theme": "Mesure de longueurs (cm)",
+"enonce": "Quelle est la longueur d'un crayon mesuré du 0 au 8 de la règle ?",
+"corrige": "Placer l'origine du crayon exactement sur la graduation 0. Le crayon mesure 8 cm."
+},
+{
+"n": 22,
+"theme": "Comparaison de longueurs",
+"enonce": "La bande A fait 12 cm et la bande B fait 9 cm. Quelle est la plus longue ?",
+"corrige": "On compare directement les valeurs numériques. La bande A est plus longue (12 cm > 9 cm)."
+},
+{
+"n": 23,
+"theme": "Calcul de monnaie en euros Monnaie",
+"enonce": "Combien font 1 billet de 10 € et 2 pièces de 2 € ?",
+"corrige": "On additionne la valeur des pièces au billet. 10 + 2 + 2 = 14 €."
+},
+{
+"n": 24,
+"theme": "Rendu de monnaie Problème monnaie",
+"enonce": "J'achète un livre à 7 €. Je donne un billet de 10 €. Combien me rend-on ?",
+"corrige": "On calcule la différence entre la somme donnée et le prix. 10 - 7 = 3 € rendus."
+},
+{
+"n": 25,
+"theme": "Lecture des heures entières",
+"enonce": "Où sont placées les aiguilles pour indiquer 9 heures pile ?",
+"corrige": "La grande aiguille pointe sur le 12, la petite pointe sur le nombre de l'heure. Petite aiguille sur le 9, grande aiguille sur le 12."
+}
+],
+"ce1": [
+{
+"n": 26,
+"theme": "Les nombres jusqu'à 1 000",
+"enonce": "Écris en chiffres : trois cent soixante-quinze.",
+"corrige": "3 centaines, 7 dizaines et 5 unités. 375."
+},
+{
+"n": 27,
+"theme": "Valeur de position",
+"enonce": "Quel est le chiffre des dizaines dans 842 ?",
+"corrige": "Le premier chiffre à droite est l'unité, le deuxième la dizaine, le troisième la centaine. Le chiffre des dizaines est 4."
+},
+{
+"n": 28,
+"theme": "Comparaison à 3 chiffres",
+"enonce": "Compare 458 et 482.",
+"corrige": "Centaines égales (4=4). On compare les dizaines (5 < 8). 458 < 482."
+},
+{
+"n": 29,
+"theme": "Rangement de 3 chiffres",
+"enonce": "Range dans l'ordre croissant : 509, 390, 590, 412.",
+"corrige": "Comparer d'abord les centaines, puis les dizaines. 390 < 412 < 509 < 590."
+},
+{
+"n": 30,
+"theme": "Décomposition canonique",
+"enonce": "Décompose 649 sous la forme c + d + u.",
+"corrige": "6 centaines = 600, 4 dizaines = 40, 9 unités = 9. 649 = 600 + 40 + 9."
+},
+{
+"n": 31,
+"theme": "Encadrement à la dizaine",
+"enonce": "Encadre 347 entre la dizaine précédente et suivante.",
+"corrige": "Trouver le multiple de 10 juste en dessous et juste au-dessus. 340 < 347 < 350."
+},
+{
+"n": 32,
+"theme": "Complément à 100",
+"enonce": "Calcule le complément : 65 + ... = 100.",
+"corrige": "Ajouter 5 pour atteindre 70, puis 30 pour atteindre 100. 65 + 35 = 100."
+},
+{
+"n": 33,
+"theme": "Addition posée avec retenues",
+"enonce": "Pose et calcule : 247 + 185.",
+"corrige": "7+5=12 (pose 2 retiens 1). 4+8+1=13 (pose 3 retiens 1). 2+1+1=4. 247 + 185 = 432."
+},
+{
+"n": 34,
+"theme": "Soustraction avec emprunt",
+"enonce": "Pose et calcule : 83 - 47.",
+"corrige": "3 - 7 impossible : on casse 1 dizaine (13 - 7 = 6). 7 - 4 = 3. 83 - 47 = 36."
+},
+{
+"n": 35,
+"theme": "Sens de la multiplication",
+"enonce": "Écris 5 + 5 + 5 + 5 sous forme d'une multiplication.",
+"corrige": "C'est une addition répétée de 4 groupes de 5. 4 × 5 = 20."
+},
+{
+"n": 36,
+"theme": "Tables de 2 et 5",
+"enonce": "Calcule : 7 × 2 et 6 × 5.",
+"corrige": "Mémorisation fluide des tables de 2 et 5. 7 × 2 = 14 et 6 × 5 = 30."
+},
+{
+"n": 37,
+"theme": "Multiplication par 10",
+"enonce": "Calcule : 38 × 10.",
+"corrige": "Pour multiplier un entier par 10, on ajoute un 0 à droite. 38 × 10 = 380."
+},
+{
+"n": 38,
+"theme": "Doubles et Moitiés",
+"enonce": "Quel est le double de 45 et la moitié de 60 ?",
+"corrige": "Double = ×2 (40+40 + 5+5). Moitié = ÷2. Double de 45 = 90 ; Moitié de 60 = 30."
+},
+{
+"n": 39,
+"theme": "Partage équitable (Division)",
+"enonce": "Partage 15 jetons équitablement entre 3 enfants.",
+"corrige": "On cherche dans la table de 3 : 3 × ... = 15. Chaque enfant reçoit 5 jetons (15 ÷ 3 = 5)."
+},
+{
+"n": 40,
+"theme": "Problème à 2 étapes",
+"enonce": "Marc a 50 €. Il achète 2 BD à 8 € chacune. Combien lui reste-t-il ?",
+"corrige": "1) Calculer le coût total (2 × 8 = 16 €). 2) Soustraire du budget (50 - 16). Il lui reste 34 €."
+},
+{
+"n": 41,
+"theme": "Codage sur quadrillage",
+"enonce": "Déplacement de (A,1) de 2 cases vers la droite et 3 vers le haut.",
+"corrige": "Avancer de 2 colonnes (A->B->C) et monter de 3 lignes (1->2->3->4). Case d'arrivée : (C, 4)."
+},
+{
+"n": 42,
+"theme": "Propriétés du carré",
+"enonce": "Combien de côtés égaux et d'angles droits possède un carré ?",
+"corrige": "Un carré est un polygone à 4 côtés égaux et 4 angles droits. 4 côtés égaux et 4 angles droits."
+},
+{
+"n": 43,
+"theme": "Distinction Carré / Rectangle",
+"enonce": "Quelle est la différence principale entre les côtés du carré et du rectangle ?",
+"corrige": "Le carré a 4 côtés égaux ; le rectangle a ses côtés opposés égaux 2 à 2. Le rectangle a des côtés opposés égaux 2 à 2."
+},
+{
+"n": 44,
+"theme": "Axe de symétrie",
+"enonce": "Qu'est-ce qu'un axe de symétrie d'une figure ?",
+"corrige": "C'est une ligne de pliage qui superpose exactement les deux moitiés. C'est la ligne où les deux parties se superposent parfaitement."
+},
+{
+"n": 45,
+"theme": "Reconnaissance des solides",
+"enonce": "Combien de faces possède un cube ?",
+"corrige": "Un cube est composé de 6 faces carrées identiques. Un cube a 6 faces."
+},
+{
+"n": 46,
+"theme": "Conversions cm et mm",
+"enonce": "Convertis 7 cm 4 mm en millimètres.",
+"corrige": "1 cm = 10 mm, donc 7 cm = 70 mm. 70 mm + 4 mm = 74 mm."
+},
+{
+"n": 47,
+"theme": "Unités de masse (g et kg)",
+"enonce": "Choisis l'unité adaptée : le poids d'un chat (4 ...) et d'un bonbon (5 ...).",
+"corrige": "Le gramme pour les objets légers, le kilogramme pour les objets lourds. Chat = 4 kg ; Bonbon = 5 g."
+},
+{
+"n": 48,
+"theme": "Sommes en billets et pièces Monnaie",
+"enonce": "Calcule le total : 1 billet de 50 €, 2 billets de 10 € et 3 pièces de 1 €.",
+"corrige": "50 + 20 + 3. 73 €."
+},
+{
+"n": 49,
+"theme": "Rendu de monnaie sur 20 € Problème monnaie",
+"enonce": "Un jouet coûte 13 €. Je donne 20 €. Combien me rend-on ?",
+"corrige": "20 - 13 = 7. 7 € rendus."
+},
+{
+"n": 50,
+"theme": "Heures et demi-heures",
+"enonce": "Où sont les aiguilles à 4 heures et demie (4h30) ?",
+"corrige": "Petite aiguille entre le 4 et le 5, grande aiguille sur le 6. Petite aiguille entre 4 et 5, grande sur le 6."
+}
+],
+"ce2": [
+{
+"n": 51,
+"theme": "Grands nombres jusqu'à 10 000",
+"enonce": "Écris en chiffres : huit mille quatre cent vingt-six.",
+"corrige": "8 milliers, 4 centaines, 2 dizaines, 6 unités. 8 426."
+},
+{
+"n": 52,
+"theme": "Chiffre vs Nombre de...",
+"enonce": "Dans 5 382, quel est le chiffre des centaines et le NOMBRE de dizaines ?",
+"corrige": "Chiffre = rang précis (3). Nombre = quantité totale de dizaines (538). Chiffre des centaines = 3 ; Nombre de dizaines = 538."
+},
+{
+"n": 53,
+"theme": "Comparaison à 4 chiffres",
+"enonce": "Compare 7 240 et 7 420.",
+"corrige": "Milliers égaux (7=7). Comparer les centaines (2 < 4). 7 240 < 7 420."
+},
+{
+"n": 54,
+"theme": "Encadrement au millier près",
+"enonce": "Encadre 6 350 entre deux milliers consécutifs.",
+"corrige": "Chercher le multiple de 1 000 en dessous et au-dessus. 6 000 < 6 350 < 7 000."
+},
+{
+"n": 55,
+"theme": "Repérage sur ligne graduée",
+"enonce": "Sur une ligne graduée de 100 en 100, quel nombre se situe 3 graduations après 2 500 ?",
+"corrige": "Chaque graduation vaut +100. 3 graduations = +300. 2 500 + 300 = 2 800."
+},
+{
+"n": 56,
+"theme": "Introduction aux fractions",
+"enonce": "Que représente 1/4 d'une pizza ?",
+"corrige": "Le dénominateur (4) indique le nombre de parts égales. Le numérateur (1) est la part prise. C'est 1 part sur une pizza coupée en 4 parts égales."
+},
+{
+"n": 57,
+"theme": "Complément à 1 000",
+"enonce": "Calcule le complément : 420 + ... = 1 000.",
+"corrige": "420 + 80 = 500, puis 500 + 500 = 1 000. 420 + 580 = 1 000."
+},
+{
+"n": 58,
+"theme": "Toutes les tables (2 à 10)",
+"enonce": "Calcule : 7 × 8 et 9 × 6.",
+"corrige": "Mémorisation des tables de multiplication jusqu'à 10. 7 × 8 = 56 et 9 × 6 = 54."
+},
+{
+"n": 59,
+"theme": "Addition de grands nombres",
+"enonce": "Pose et calcule : 3 458 + 2 764.",
+"corrige": "Aligner les rangs et appliquer les retenues. 3 458 + 2 764 = 6 222."
+},
+{
+"n": 60,
+"theme": "Soustraction posée complexe",
+"enonce": "Pose et calcule : 5 000 - 1 432.",
+"corrige": "Cassage successif des zéros des centaines et dizaines. 5 000 - 1 432 = 3 568."
+},
+{
+"n": 61,
+"theme": "Multiplication à 1 chiffre",
+"enonce": "Pose et calcule : 436 × 7.",
+"corrige": "6×7=42 (pose 2 retiens 4) ; 3×7+4=25 (pose 5 retiens 2) ; 4×7+2=30. 436 × 7 = 3 052."
+},
+{
+"n": 62,
+"theme": "Multiplication à 2 chiffres",
+"enonce": "Pose et calcule : 145 × 23.",
+"corrige": "Ligne 1 : 145 × 3 = 435. Ligne 2 : 145 × 20 = 2 900. Total = 435 + 2900. 145 × 23 = 3 335."
+},
+{
+"n": 63,
+"theme": "Division euclidienne posée",
+"enonce": "Effectue la division de 47 par 5 (quotient et reste).",
+"corrige": "47 = (5 × 9) + 2. Quotient = 9, Reste = 2."
+},
+{
+"n": 64,
+"theme": "Multiplier par 10, 100, 1000",
+"enonce": "Calcule : 54 × 100.",
+"corrige": "Ajouter deux zéros à droite du nombre entier. 54 × 100 = 5 400."
+},
+{
+"n": 65,
+"theme": "Problème complexe à étapes",
+"enonce": "Un verger a 8 rangées de 15 pommiers. Chaque arbre produit 4 kg de pommes. Quel est le poids total ?",
+"corrige": "1) Nombre d'arbres = 8 × 15 = 120. 2) Poids total = 120 × 4 = 480 kg. La récolte totale est de 480 kg."
+},
+{
+"n": 66,
+"theme": "Repérage de l'angle droit",
+"enonce": "Quel instrument utilise-t-on pour vérifier un angle droit ?",
+"corrige": "L'équerre est l'outil géométrique de contrôle d'angle droit. On utilise une équerre."
+},
+{
+"n": 67,
+"theme": "Tracé de rectangle guidé",
+"enonce": "Tracer un rectangle de 6 cm sur 4 cm à la règle et l'équerre.",
+"corrige": "Tracer une longueur de 6 cm, élever deux perpendiculaires de 4 cm à l'équerre, fermer. Vérifier la présence de 4 angles droits."
+},
+{
+"n": 68,
+"theme": "Cercle et Compas",
+"enonce": "Si le rayon d'un cercle fait 5 cm, quelle est la longueur de son diamètre ?",
+"corrige": "Le diamètre est le double du rayon (D = 2 × R). Diamètre = 2 × 5 = 10 cm."
+},
+{
+"n": 69,
+"theme": "Symétrie sur quadrillage",
+"enonce": "Comment construire le symétrique d'un point distant de 3 carreaux de l'axe ?",
+"corrige": "Compter 3 carreaux de l'autre côté de l'axe perpendiculairement. Le point est situé à 3 carreaux de l'autre côté de l'axe."
+},
+{
+"n": 70,
+"theme": "Solides : Arêtes et Sommets",
+"enonce": "Combien d'arêtes et de sommets possède une pyramide à base carrée ?",
+"corrige": "Base = 4 arêtes + 4 arêtes latérales = 8 arêtes. 4 sommets de base + 1 sommet principal = 5. 8 arêtes et 5 sommets."
+},
+{
+"n": 71,
+"theme": "Conversions de longueurs",
+"enonce": "Convertis : 3 km 40 m en mètres.",
+"corrige": "1 km = 1 000 m, donc 3 km = 3 000 m. 3 000 + 40 = 3 040 m."
+},
+{
+"n": 72,
+"theme": "Calcul du périmètre du carré",
+"enonce": "Quel est le périmètre d'un carré de 7 cm de côté ?",
+"corrige": "Le périmètre est la somme des côtés : P = 4 × côté. P = 4 × 7 = 28 cm."
+},
+{
+"n": 73,
+"theme": "Périmètre du rectangle",
+"enonce": "Calcule le périmètre d'un rectangle de L = 8 cm et l = 5 cm.",
+"corrige": "P = 2 × (L + l). P = 2 × (8 + 5) = 2 × 13 = 26 cm."
+},
+{
+"n": 74,
+"theme": "Calcul de durées",
+"enonce": "Un film commence à 14h15 et dure 1h30. À quelle heure finit-il ?",
+"corrige": "Ajouter les heures aux heures (14+1=15h) et les minutes (15+30=45m). Le film se termine à 15h45."
+},
+{
+"n": 75,
+"theme": "Exploitation de tableau",
+"enonce": "Dans un tableau des effectifs : CP=22, CE1=24, CE2=20. Quel est le total des élèves ?",
+"corrige": "Somme des valeurs de la ligne/colonne. 22 + 24 + 20 = 66 élèves."
+}
+],
+"cm1": [
+{
+"n": 76,
+"theme": "Nombres jusqu'au million",
+"enonce": "Écris en chiffres : quatre cent vingt-cinq mille six cent dix.",
+"corrige": "Classe des milliers (425) et classe des unités (610). 425 610."
+},
+{
+"n": 77,
+"theme": "Rangement de grands nombres",
+"enonce": "Range dans l'ordre croissant : 540 100, 504 900, 540 099.",
+"corrige": "Comparer chiffre par chiffre de gauche à droite. 504 900 < 540 099 < 540 100."
+},
+{
+"n": 78,
+"theme": "Fractions simples",
+"enonce": "Représente la fraction 3/4 et indique ce que signifie le numérateur 3.",
+"corrige": "Le numérateur 3 indique que l'on prend 3 parts d'un tout divisé en 4. 3 parts sélectionnées sur 4 parts égales."
+},
+{
+"n": 79,
+"theme": "Fractions décimales",
+"enonce": "Décompose 247/100 sous la forme d'un entier et d'une fraction < 1.",
+"corrige": "247/100 = 200/100 + 47/100. 2 + 47/100."
+},
+{
+"n": 80,
+"theme": "Passage au nombre décimal",
+"enonce": "Écris la fraction décimale 1 508 / 100 sous forme de nombre à virgule.",
+"corrige": "Diviser par 100 déplace la virgule de 2 rangs vers la gauche. 15,08."
+},
+{
+"n": 81,
+"theme": "Comparaison de décimaux",
+"enonce": "Compare 4,7 et 4,68.",
+"corrige": "Parties entières égales (4=4). Dixièmes : 7 > 6. 4,7 > 4,68 (car 4,70 > 4,68)."
+},
+{
+"n": 82,
+"theme": "Encadrement au dixième",
+"enonce": "Encadre 8,34 entre deux dixièmes consécutifs.",
+"corrige": "Repérer le nombre à un chiffre après la virgule juste en dessous et au-dessus. 8,3 < 8,34 < 8,4."
+},
+{
+"n": 83,
+"theme": "Addition de grands entiers",
+"enonce": "Pose et calcule : 148 520 + 87 640.",
+"corrige": "Aligner méticuleusement les unités de même rang. 148 520 + 87 640 = 236 160."
+},
+{
+"n": 84,
+"theme": "Multiplication posée (3x2 chiffres)",
+"enonce": "Pose et calcule : 428 × 35.",
+"corrige": "Ligne 1 : 428 × 5 = 2 140. Ligne 2 : 428 × 30 = 12 840. Somme = 14 980. 428 × 35 = 14 980."
+},
+{
+"n": 85,
+"theme": "Division posée à 1 chiffre",
+"enonce": "Effectue la division de 845 par 6 (quotient et reste).",
+"corrige": "8÷6=1 reste 2 ; 24÷6=4 reste 0 ; 5÷6=0 reste 5. Quotient = 140, Reste = 5."
+},
+{
+"n": 86,
+"theme": "Critères de divisibilité Arithmétique",
+"enonce": "Parmi 124, 345 et 670, lesquels sont divisibles par 5 ?",
+"corrige": "Un nombre est divisible par 5 si son chiffre des unités est 0 ou 5. 345 et 670 sont divisibles par 5."
+},
+{
+"n": 87,
+"theme": "Addition de décimaux",
+"enonce": "Pose et calcule : 43,8 + 15,45.",
+"corrige": "Aligner impérativement les virgules verticalement (43,80 + 15,45). 43,8 + 15,45 = 59,25."
+},
+{
+"n": 88,
+"theme": "Soustraction de décimaux",
+"enonce": "Pose et calcule : 82 - 14,35.",
+"corrige": "Écrire 82 sous la forme 82,00 avant de poser la soustraction. 82,00 - 14,35 = 67,65."
+},
+{
+"n": 89,
+"theme": "Calcul mental décimal",
+"enonce": "Calcule : 4,5 × 10 et 72,4 ÷ 100.",
+"corrige": "×10 déplace la virgule d'un rang à droite ; ÷100 de deux rangs à gauche. 4,5 × 10 = 45 ; 72,4 ÷ 100 = 0,724."
+},
+{
+"n": 90,
+"theme": "Problème d'achats complexes",
+"enonce": "J'achète 3 cahiers à 2,40 € l'un et un stylo à 1,80 €. Je donne 10 €. Combien me rend-on ?",
+"corrige": "1) Coût cahiers = 7,20 €. 2) Total = 7,20 + 1,80 = 9,00 €. 3) Rendu = 10 - 9. Il me reste 1,00 €."
+},
+{
+"n": 91,
+"theme": "Droites perpendiculaires",
+"enonce": "Comment vérifier à l'équerre que deux droites d1 et d2 sont perpendiculaires ?",
+"corrige": "Placer un côté de l'angle droit de l'équerre sur d1 et vérifier le long de d2. Si les droites épousent l'angle droit de l'équerre, elles sont perpendiculaires."
+},
+{
+"n": 92,
+"theme": "Droites parallèles",
+"enonce": "Si deux droites sont perpendiculaires à une même troisième, que peut-on dire d'elles ?",
+"corrige": "Propriété fondamentale de géométrie plane. Elles sont parallèles entre elles."
+},
+{
+"n": 93,
+"theme": "Classification des angles",
+"enonce": "Classer les angles : 45°, 90°, 120°.",
+"corrige": "Aigu (<90°), Droit (=90°), Obtus (>90°). 45° est aigu, 90° est droit, 120° est obtus."
+},
+{
+"n": 94,
+"theme": "Nature des triangles",
+"enonce": "Comment s'appelle un triangle qui a 2 côtés égaux ? Et 3 côtés égaux ?",
+"corrige": "Isocèle = 2 côtés égaux ; Équilatéral = 3 côtés égaux. 2 côtés égaux = Isocèle ; 3 côtés égaux = Équilatéral."
+},
+{
+"n": 95,
+"theme": "Quadrilâtères particuliers",
+"enonce": "Quelles sont les caractéristiques des diagonales du losange ?",
+"corrige": "Les diagonales du losange se coupent en leur milieu et sont perpendiculaires. Elles sont perpendiculaires et se coupent en leur milieu."
+},
+{
+"n": 96,
+"theme": "Périmètre vs Aire",
+"enonce": "Quelle est la différence entre le périmètre et l'aire d'une figure ?",
+"corrige": "Périmètre = longueur du contour (en m). Aire = surface intérieure (en m²). Périmètre = contour (m) ; Aire = surface (m²)."
+},
+{
+"n": 97,
+"theme": "Calcul d'aire du rectangle",
+"enonce": "Calcule l'aire d'un terrain rectangulaire de L = 15 m et l = 8 m.",
+"corrige": "Aire = Longueur × largeur. Aire = 15 × 8 = 120 m²."
+},
+{
+"n": 98,
+"theme": "Conversions de masse (kg et g)",
+"enonce": "Convertis 4,5 kg en grammes.",
+"corrige": "1 kg = 1 000 g, donc 4,5 × 1 000. 4,5 kg = 4 500 g."
+},
+{
+"n": 99,
+"theme": "Calculs de durées complexes",
+"enonce": "Un train part à 8h45 et arrive à 11h20. Quelle est la durée du trajet ?",
+"corrige": "8h45 -> 9h00 (15 min) ; 9h00 -> 11h00 (2h) ; 11h00 -> 11h20 (20 min). Total = 2h + 35 min. La durée est de 2 heures et 35 minutes."
+},
+{
+"n": 100,
+"theme": "Proportionnalité (Passage à l'unité)",
+"enonce": "3 kg de pommes coûtent 6 €. Combien coûtent 5 kg ?",
+"corrige": "1) Prix pour 1 kg = 6 ÷ 3 = 2 €. 2) Prix pour 5 kg = 5 × 2 = 10 €. 5 kg de pommes coûtent 10 €."
+}
+],
+"cm2": [
+{
+"n": 101,
+"theme": "Les Milliards",
+"enonce": "Écris en chiffres : deux milliards trois cent millions.",
+"corrige": "Classe des milliards (2), millions (300), milliers (000), unités (000). 2 300 000 000."
+},
+{
+"n": 102,
+"theme": "Addition de fractions",
+"enonce": "Calcule : 3/8 + 7/8 et exprime le résultat sous forme mixte.",
+"corrige": "3/8 + 7/8 = 10/8 = 8/8 + 2/8. 1 + 2/8 (ou 1 + 1/4)."
+},
+{
+"n": 103,
+"theme": "Comparaison de décimaux aux millièmes",
+"enonce": "Compare 4,17 et 4,099.",
+"corrige": "Parties entières égales (4=4). Dixièmes : 1 > 0. 4,17 > 4,099."
+},
+{
+"n": 104,
+"theme": "Repérage fin sur droite graduée",
+"enonce": "Quel nombre se trouve exactement au milieu entre 3,4 et 3,5 ?",
+"corrige": "3,4 = 3,40 et 3,5 = 3,50. Le milieu entre 40 et 50 est 45. 3,45."
+},
+{
+"n": 105,
+"theme": "Décomposition de décimaux",
+"enonce": "Décompose 12,345 sous la forme : 12 + .../10 + .../100 + .../1000.",
+"corrige": "Chaque chiffre après la virgule correspond à son rang décimal. 12 + 3/10 + 4/100 + 5/1 000."
+},
+{
+"n": 106,
+"theme": "Arrondis de décimaux",
+"enonce": "Arrondis 14,76 au dixième le plus proche.",
+"corrige": "Le chiffre des centièmes (6) est ≥ 5, on arrondit au dixième supérieur. 14,8."
+},
+{
+"n": 107,
+"theme": "Fraction d'une quantité",
+"enonce": "Calcule les 3/5 de 400 €.",
+"corrige": "On divise par le dénominateur puis multiplie par le numérateur : (400 ÷ 5) × 3. 80 × 3 = 240 €."
+},
+{
+"n": 108,
+"theme": "Opérations combinées sur décimaux",
+"enonce": "Pose et calcule : 124,5 + 38,76 - 45,2.",
+"corrige": "Effectuer dans l'ordre de gauche à droite : 163,26 - 45,20. 118,06."
+},
+{
+"n": 109,
+"theme": "Multiplication de deux décimaux",
+"enonce": "Pose et calcule : 14,2 × 3,5.",
+"corrige": "Effectuer 142 × 35 = 4 970. Placer la virgule avec 1+1 = 2 chiffres après la virgule. 49,70 (ou 49,7)."
+},
+{
+"n": 110,
+"theme": "Division à quotient décimal",
+"enonce": "Effectue la division de 75 par 4 jusqu'à obtenir un reste nul.",
+"corrige": "75 ÷ 4 = 18 reste 3 ; poser la virgule au quotient : 30 ÷ 4 = 7 reste 2 ; 20 ÷ 4 = 5. Quotient exact = 18,75."
+},
+{
+"n": 111,
+"theme": "Calcul mental décimal avancé",
+"enonce": "Calcule : 36 × 0,1 et 42 ÷ 0,1.",
+"corrige": "Multiplier par 0,1 revient à diviser par 10. Diviser par 0,1 revient à multiplier par 10. 36 × 0,1 = 3,6 ; 42 ÷ 0,1 = 420."
+},
+{
+"n": 112,
+"theme": "Priorités opératoires",
+"enonce": "Calcule : 5 + 3 × (12 - 4).",
+"corrige": "Priorité aux parenthèses (12-4=8), puis à la multiplication (3×8=24), puis addition. 5 + 24 = 29."
+},
+{
+"n": 113,
+"theme": "Divisibilité par 3 et 9 Arithmétique",
+"enonce": "Le nombre 4 518 est-il divisible par 9 ? Justifie.",
+"corrige": "Un nombre est divisible par 9 si la somme de ses chiffres est un multiple de 9. Somme : 4+5+1+8 = 18 (multiple de 9). Oui, il est divisible par 9."
+},
+{
+"n": 114,
+"theme": "Division euclidienne complexe",
+"enonce": "Effectue la division de 1 250 par 12 (quotient et reste).",
+"corrige": "1250 = (12 × 104) + 2. Quotient = 104, Reste = 2."
+},
+{
+"n": 115,
+"theme": "Problème de facture complète",
+"enonce": "Achat de 4 chaises à 45,50 € l'une et une table à 120 €. Remise de 15 €. Quel est le coût net ?",
+"corrige": "1) Chaises = 4 × 45,50 = 182 €. 2) Total = 182 + 120 = 302 €. 3) Net = 302 - 15. Le montant final à payer est de 287,00 €."
+},
+{
+"n": 116,
+"theme": "Mesure des angles (Rapporteur)",
+"enonce": "Quelle est la mesure de l'angle droit, plat et plein ?",
+"corrige": "Angle droit = 90°, plat = 180°, plein = 360°. Droit = 90°, Plat = 180°, Plein = 360°."
+},
+{
+"n": 117,
+"theme": "Circonférence du cercle",
+"enonce": "Calcule le périmètre d'un cercle de diamètre d = 10 cm (π ≈ 3,14).",
+"corrige": "Formule : C = π × d. C = 3,14 × 10 = 31,4 cm."
+},
+{
+"n": 118,
+"theme": "Construction de triangle",
+"enonce": "Comment construire un triangle ABC avec AB = 6 cm, AC = 5 cm et BC = 4 cm ?",
+"corrige": "Tracer AB = 6 cm. Tracer un arc de cercle de centre A et rayon 5 cm, puis centre B et rayon 4 cm. Le point d'intersection des arcs donne le sommet C."
+},
+{
+"n": 119,
+"theme": "Propriétés de la symétrie",
+"enonce": "La symétrie axiale modifie-t-elle l'aire d'une figure ?",
+"corrige": "Non, la symétrie axiale conserve les longueurs, les angles et les aires (isométrie). Non, l'aire et les dimensions restent rigoureusement identiques."
+},
+{
+"n": 120,
+"theme": "Patron du pavé droit",
+"enonce": "De combien de rectangles est constitué le patron d'un pavé droit ?",
+"corrige": "Le pavé droit comporte 6 faces rectangulaires opposées 2 à 2 identiques. Le patron comporte 6 rectangles."
+},
+{
+"n": 121,
+"theme": "Périmètre et Aire complexes",
+"enonce": "Un jardin carré a un périmètre de 36 m. Quelle est son aire ?",
+"corrige": "1) Côté = 36 ÷ 4 = 9 m. 2) Aire = 9 × 9 = 81 m². Son aire est de 81 m²."
+},
+{
+"n": 122,
+"theme": "Aire du triangle",
+"enonce": "Calcule l'aire d'un triangle de base b = 10 cm et de hauteur h = 6 cm.",
+"corrige": "Formule : Aire = (Base × Hauteur) / 2. Aire = (10 × 6) / 2 = 60 / 2 = 30 cm²."
+},
+{
+"n": 123,
+"theme": "Volume du pavé droit",
+"enonce": "Calcule le volume d'un pavé droit de L = 5 m, l = 4 m, h = 3 m.",
+"corrige": "Formule : Volume = Longueur × largeur × hauteur. Volume = 5 × 4 × 3 = 60 m³."
+},
+{
+"n": 124,
+"theme": "Calcul de pourcentages",
+"enonce": "Un vêtement à 80 € bénéficie d'une réduction de 25%. Quel est le montant de la remise ?",
+"corrige": "25% correspond au quart (1/4). Remise = 80 ÷ 4 = 20 €. Le montant de la remise est de 20 € (Prix final = 60 €)."
+},
+{
+"n": 125,
+"theme": "Vitesse et Échelle",
+"enonce": "Une carte est à l'échelle 1/100 000. Deux villes sont distantes de 5 cm sur la carte. Quelle est la distance réelle en km ?",
+"corrige": "1 cm sur carte = 100 000 cm réels = 1 km. 5 cm = 5 × 1 km = 5 km. La distance réelle est de 5 km."
+}
+]
+},
+"china": {
+"cp": [
+{
+"n": 1,
+"theme": "Valeur de position (Dizaines et Unités)",
+"enonce": "Xiao Ming a 5 paquets de 10 billes et 4 billes isolées. 1) Complète : ( ) dizaines et ( ) unités. 2) Quel est le nombre total de billes ?",
+"corrige": "1) 5 dizaines et 4 unités. 2) 5 dizaines = 50, plus 4 unités = 54 billes (50 + 4 = 54)."
+},
+{
+"n": 2,
+"theme": "Décomposition et complément à 10",
+"enonce": "Une boîte à 10 cases contient 7 jetons. 1) Combien manquent pour fabriquer 10 (7 + ? = 10) ? 2) Écris la soustraction associée (10 - 7 = ?).",
+"corrige": "1) 7 + 3 = 10. Il manque 3 jetons. 2) 10 - 7 = 3."
+},
+{
+"n": 3,
+"theme": "Automatisation du calcul mental dans 10",
+"enonce": "Effectue le plus vite possible : a) 4 + 5 = ... b) 9 - 3 = ... c) 2 + 7 = ... d) 8 - 5 = ...",
+"corrige": "a) 9 b) 6 c) 9 d) 3."
+},
+{
+"n": 4,
+"theme": "Formes géométriques fondamentales",
+"enonce": "Un dessin de train comporte 1 grand rectangle pour le wagon, 2 carrés pour les fenêtres et 3 cercles pour les roues. 1) Combien de figures à 4 côtés au total ? 2) Quelle forme fait rouler le train ?",
+"corrige": "1) 1 rectangle + 2 carrés = 3 figures à 4 côtés. 2) Ce sont les cercles."
+},
+{
+"n": 5,
+"theme": "Comparaison quantitative (« beaucoup plus », « un peu moins »)",
+"enonce": "Dans la réserve, il y a 97 pommes, 20 poires et 16 bananes. Compare les pommes aux poires, puis les bananes aux poires.",
+"corrige": "1) 97 est très supérieur à 20 : il y a beaucoup plus de pommes que de poires. 2) 16 est proche de 20 : il y a un peu moins de bananes que de poires."
+},
+{
+"n": 6,
+"theme": "Addition avec passage de la dizaine (« Make a Ten »)",
+"enonce": "Calcule 8 + 5 en décomposant 5. 1) Combien ajouter à 8 pour atteindre 10 ? 2) Décompose 5. 3) Résultat final.",
+"corrige": "1) Il faut 2 pour aller de 8 à 10. 2) 5 = 2 + 3. 3) 8 + 5 = (8 + 2) + 3 = 10 + 3 = 13."
+},
+{
+"n": 7,
+"theme": "Famille d'opérations et réversibilité",
+"enonce": "Li Wei a 7 fleurs rouges et 6 jaunes (13 en tout). Écris les 4 égalités de cette famille.",
+"corrige": "7 + 6 = 13 ; 6 + 7 = 13 ; 13 - 7 = 6 ; 13 - 6 = 7."
+},
+{
+"n": 8,
+"theme": "Équation à trou et notion d'équilibre",
+"enonce": "Trouve le nombre caché : 9 + ? = 15. Explique ton calcul.",
+"corrige": "Utiliser la soustraction inverse : ? = 15 - 9 = 6. Vérification : 9 + 6 = 15."
+},
+{
+"n": 9,
+"theme": "Problème de retrait et auto-vérification",
+"enonce": "18 livres en rayon. Les élèves en empruntent 7. 1) Combien restent ? 2) Quelle addition permet de vérifier ?",
+"corrige": "1) 18 - 7 = 11 livres restants. 2) Addition de contrôle : 11 + 7 = 18."
+},
+{
+"n": 10,
+"theme": "Système monétaire chinois (Yuan et Jiao)",
+"enonce": "1 Yuan = 10 Jiao. Un cahier coûte 5 Yuan et 8 Jiao. 1) Exprime le prix en Jiao. 2) Si tu donnes 6 Yuan (60 Jiao), combien rend-on ?",
+"corrige": "1) 5 Yuan 8 Jiao = 50 + 8 = 58 Jiao. 2) Rendu de monnaie : 60 - 58 = 2 Jiao."
+},
+{
+"n": 11,
+"theme": "Égalisation de collections (Problème des perles)",
+"enonce": "Xiaojun a 8 perles, Fangfang en a 12. Propose 3 méthodes pour qu'ils aient le même nombre.",
+"corrige": "Méthode 1 : Donner 4 perles à Xiaojun (8 + 4 = 12). Méthode 2 : Enlever 4 à Fangfang (12 - 4 = 8). Méthode 3 (Transfert) : Donner 2 perles de Fangfang à Xiaojun (12 - 2 = 10 et 8 + 2 = 10)."
+},
+{
+"n": 12,
+"theme": "Modélisation par diagramme en bandes (Tape Diagram)",
+"enonce": "Xiao Ming a 15 images. Hua en a 4 de plus que lui. Calcule le nombre d'images de Hua.",
+"corrige": "Bande de Hua = Bande de Xiao Ming (15) + extension (4). Calcul : 15 + 4 = 19 images."
+},
+{
+"n": 13,
+"theme": "Recherche de la petite quantité",
+"enonce": "Xiao Ying a 11 fleurs. Xiao Ping en a 3 de moins qu'elle. Combien en a Xiao Ping ?",
+"corrige": "Petite quantité = Grande quantité - Différence = 11 - 3 = 8 fleurs."
+},
+{
+"n": 14,
+"theme": "Lecture d'heure et durée d'activité",
+"enonce": "Entrée dans le parc à 9h30, sortie à 11h30. Combien d'heures sont-ils restés ?",
+"corrige": "De 9h30 à 10h30 = 1h. De 10h30 à 11h30 = 1h. Total : 1 + 1 = 2 heures."
+},
+{
+"n": 15,
+"theme": "Recherche de motifs et suites numériques",
+"enonce": "Suite : 3, 7, 11, 15, ... 1) Quelle est la règle ? 2) Trouve les deux nombres suivants.",
+"corrige": "1) La règle est d'ajouter 4 à chaque étape (+4). 2) 15 + 4 = 19, puis 19 + 4 = 23."
+},
+{
+"n": 16,
+"theme": "Groupement par 10 et numération jusqu'à 100",
+"enonce": "Une fleuriste a 57 roses. Elle fait des bouquets de 10 roses. Combien de bouquets et de roses restantes ?",
+"corrige": "57 = 5 dizaines et 7 unités. Elle fabrique 5 bouquets complets et il reste 7 roses."
+},
+{
+"n": 17,
+"theme": "Addition en ligne sans retenue (jusqu'à 100)",
+"enonce": "Vente de 43 cerfs-volants le matin et 25 l'après-midi. Calcule 43 + 25 en séparant dizaines et unités.",
+"corrige": "Dizaines : 40 + 20 = 60. Unités : 3 + 5 = 8. Somme : 60 + 8 = 68 cerfs-volants."
+},
+{
+"n": 18,
+"theme": "Soustraction avec retenue dans 100",
+"enonce": "Calcule 47 - 29 de deux façons différentes.",
+"corrige": "Méthode 1 : 47 - 20 = 27 -> 27 - 9 = 18. Méthode 2 (astucieuse) : 47 - 30 + 1 = 17 + 1 = 18."
+},
+{
+"n": 19,
+"theme": "Achats combinés et budget",
+"enonce": "Xiao Ming a 10 Yuan. Il achète un stylo à 3 Yuan et un cahier à 4 Yuan 5 Jiao. 1) Coût total ? 2) Monnaie rendue ?",
+"corrige": "1) Coût total : 3 Yuan + 4 Yuan 5 Jiao = 7 Yuan 5 Jiao. 2) Reste : 10 Yuan - 7 Yuan 5 Jiao = 2 Yuan 5 Jiao."
+},
+{
+"n": 20,
+"theme": "Problème d'autobus à 2 étapes (Classique chinois)",
+"enonce": "Un bus contient 34 passagers. 15 descendent et 18 montent. Combien de passagers au départ ?",
+"corrige": "Méthode 1 : 34 - 15 = 19, puis 19 + 18 = 37 passagers. Méthode 2 : Mouvement net = 18 - 15 = +3 passagers -> 34 + 3 = 37."
+},
+{
+"n": 21,
+"theme": "Résolution par deux méthodes différentes",
+"enonce": "Livre de 95 pages. Jour 1 : 30 pages. Jour 2 : 40 pages. Combien de pages restent non lues ?",
+"corrige": "Méthode 1 (Soustractions successives) : 95 - 30 = 65 -> 65 - 40 = 25 pages. Méthode 2 (Total lu) : 30 + 40 = 70 -> 95 - 70 = 25 pages."
+},
+{
+"n": 22,
+"theme": "Partage et reste (Initiation informelle à la division)",
+"enonce": "Ranger 30 œufs dans des boîtes de 8. 1) Combien de boîtes remplies ? 2) Combien d'œufs restent ?",
+"corrige": "3 boîtes = 3 x 8 = 24. 4 boîtes = 32 (dépasse 30). 1) 3 boîtes complètes. 2) Reste : 30 - 24 = 6 œufs (30 = 3 x 8 + 6)."
+},
+{
+"n": 23,
+"theme": "Inconnue masquée dans un diagramme en bandes",
+"enonce": "Bande totale = 50 cm. Premier morceau = 32 cm. 1) Longueur du 2e morceau ? 2) Équation de contrôle.",
+"corrige": "1) 50 - 32 = 18 cm. 2) Contrôle : 32 + 18 = 50 cm."
+},
+{
+"n": 24,
+"theme": "Équations symboliques imagées (Pré-algèbre)",
+"enonce": "Trouve la valeur : 1) Triangle + Triangle + Triangle = 15. 2) Triangle + Carré = 12.",
+"corrige": "1) 3 Triangles = 15 -> Triangle = 15 / 3 = 5. 2) 5 + Carré = 12 -> Carré = 12 - 5 = 7."
+},
+{
+"n": 25,
+"theme": "Grand défi de synthèse (Évaluation de fin de CP)",
+"enonce": "12 filles et 8 garçons fabriquent chacun 2 fleurs. Ils regroupent tout puis offrent 25 fleurs. Combien de fleurs restent ?",
+"corrige": "1) Total enfants = 12 + 8 = 20. 2) Total fleurs = 20 x 2 = 40 fleurs. 3) Fleurs restantes = 40 - 25 = 15 fleurs."
+}
+],
+"ce1": [
+{
+"n": 1,
+"theme": "Du groupement égal à la multiplication",
+"enonce": "4 tables avec 5 pinceaux chacune. 1) Écris l'addition répétée. 2) Écris la multiplication correspondante.",
+"corrige": "1) 5 + 5 + 5 + 5 = 20 pinceaux. 2) 4 x 5 = 20 pinceaux (4 groupes de 5)."
+},
+{
+"n": 2,
+"theme": "Mémorisation fluide des tables (2, 3, 5, 10)",
+"enonce": "Calcule mentalement : a) 3 x 4 = ... b) 5 x 7 = ... c) 2 x 9 = ... d) 10 x 6 = ...",
+"corrige": "a) 12 b) 35 c) 18 d) 60."
+},
+{
+"n": 3,
+"theme": "Commutativité et disposition en réseau",
+"enonce": "Verger de 6 rangées de 4 pommiers. 1) Calcul par rangées. 2) Calcul par colonnes.",
+"corrige": "1) 6 x 4 = 24 pommiers. 2) 4 x 6 = 24 pommiers. Donc 6 x 4 = 4 x 6 = 24."
+},
+{
+"n": 4,
+"theme": "Complément à la centaine supérieure",
+"enonce": "Complète pour atteindre 100 : a) 63 + ? = 100 b) 100 - 28 = ? c) 45 + ? = 100",
+"corrige": "a) 37 b) 72 c) 55."
+},
+{
+"n": 5,
+"theme": "Problème multiplicatif direct",
+"enonce": "Un sachet de gâteaux coûte 8 Yuan. Mme Zhang en achète 4. Combien paie-t-elle ?",
+"corrige": "4 x 8 = 32 Yuan."
+},
+{
+"n": 6,
+"theme": "Sens de la division (Partage vs Groupement)",
+"enonce": "18 bananes. 1) Partagées entre 3 singes. 2) Rangées en paquets de 6.",
+"corrige": "1) Division-partage : 18 / 3 = 6 bananes par singe. 2) Division-groupement : 18 / 6 = 3 paquets."
+},
+{
+"n": 7,
+"theme": "Famille d'opérations multiplicatives",
+"enonce": "À partir des nombres (7, 5, 35), écris 2 multiplications et 2 divisions.",
+"corrige": "7 x 5 = 35 ; 5 x 7 = 35 ; 35 / 7 = 5 ; 35 / 5 = 7."
+},
+{
+"n": 8,
+"theme": "Équation symbolique multiplicative (Pré-algèbre)",
+"enonce": "Trouve l'inconnue : a) ? x 6 = 42 b) 36 / ? = 4 c) 8 x ? = 72",
+"corrige": "a) ? = 42 / 6 = 7 b) ? = 36 / 4 = 9 c) ? = 72 / 8 = 9."
+},
+{
+"n": 9,
+"theme": "Division avec reste (Initiation au dividende)",
+"enonce": "Répartir 23 cahiers entre 5 élèves. 1) Combien par élève ? 2) Combien restent ?",
+"corrige": "1) 4 cahiers par élève (5 x 4 = 20). 2) Reste : 23 - 20 = 3 cahiers. Vérification : 23 = (5 x 4) + 3."
+},
+{
+"n": 10,
+"theme": "Partage avec conversion d'unités",
+"enonce": "Un ruban de 2 mètres est coupé en morceaux égaux de 40 cm. Combien de morceaux ?",
+"corrige": "1) Conversion : 2 m = 200 cm. 2) Partage : 200 / 40 = 5 morceaux."
+},
+{
+"n": 11,
+"theme": "Diagramme en bandes — Comparaison « Fois plus »",
+"enonce": "Li Wei a 6 timbres. Son grand-père en a 4 fois plus que lui. Calcule les timbres du grand-père.",
+"corrige": "Bande de Li Wei = 1 unité (6). Bande du grand-père = 4 blocs de 6. Calcul : 6 x 4 = 24 timbres."
+},
+{
+"n": 12,
+"theme": "Comparaison multiplicative vs additive",
+"enonce": "45 livres de maths et 9 de sciences. 1) Combien de fois plus de maths ? 2) Combien de maths de PLUS ?",
+"corrige": "1) Rapport multiplicatif : 45 / 9 = 5 fois plus. 2) Différence additive : 45 - 9 = 36 livres de plus."
+},
+{
+"n": 13,
+"theme": "Diagramme en bandes — Total combiné",
+"enonce": "Xiao Chen a 8 billets. Sa sœur en a 3 fois plus que lui. Combien de billets ont-ils ENSEMBLE ?",
+"corrige": "Méthode 1 : Sœur = 8 x 3 = 24 -> Total = 8 + 24 = 32. Méthode astucieuse chinoise : 1 unité + 3 unités = 4 unités au total -> 8 x 4 = 32 billets."
+},
+{
+"n": 14,
+"theme": "Ajustement (« x fois plus que le double »)",
+"enonce": "12 baguettes le matin. L'après-midi : 5 baguettes de plus que LE DOUBLE du matin. Combien l'après-midi ?",
+"corrige": "Calcul : (12 x 2) + 5 = 24 + 5 = 29 baguettes."
+},
+{
+"n": 15,
+"theme": "Égalisation par transfert multiplicatif",
+"enonce": "Groupe A = 32 élèves, Groupe B = 16. Combien transférer de A vers B pour égaliser ?",
+"corrige": "1) Différence initiale : 32 - 16 = 16 élèves. 2) Transfert requis : 16 / 2 = 8 élèves (32 - 8 = 24 et 16 + 8 = 24)."
+},
+{
+"n": 16,
+"theme": "Addition posée à 3 chiffres avec retenues",
+"enonce": "Pose et effectue : 348 + 275.",
+"corrige": "348 + 275 = 623. (Unités : 8+5=13 -> 3 retiens 1 ; Dizaines : 4+7+1=12 -> 2 retiens 1 ; Centaines : 3+2+1=6)."
+},
+{
+"n": 17,
+"theme": "Soustraction posée avec emprunt à zéro",
+"enonce": "Pose et effectue : 503 - 247.",
+"corrige": "503 - 247 = 256. (Emprunt à travers le zéro : 5 centaines deviennent 4 centaines, 9 dizaines et 13 unités)."
+},
+{
+"n": 18,
+"theme": "Périmètre et lien avec la division",
+"enonce": "Rectangle de 8 cm sur 4 cm. Un carré a le même périmètre. Calcule le côté du carré.",
+"corrige": "1) Périmètre du rectangle : (8 + 4) x 2 = 24 cm. 2) Côté du carré : 24 / 4 = 6 cm."
+},
+{
+"n": 19,
+"theme": "Priorité opératoire et rôle des parenthèses",
+"enonce": "Calcule : a) 45 + 5 x 6 et b) (45 + 5) x 6.",
+"corrige": "a) Priorité à la multiplication : 45 + 30 = 75. b) Priorité aux parenthèses : 50 x 6 = 300."
+},
+{
+"n": 20,
+"theme": "Traitement de données et tableau à double entrée",
+"enonce": "Ventes (kg) : Pommes (Matin 24, A-M 36), Poires (Matin 18, A-M 22). 1) Total matin ? 2) Fruit le plus vendu ?",
+"corrige": "1) Ventes du matin : 24 + 18 = 42 kg. 2) Totaux : Pommes = 60 kg, Poires = 40 kg. Le fruit le plus vendu est la pomme."
+},
+{
+"n": 21,
+"theme": "Problème à 3 étapes (Achat combiné)",
+"enonce": "Xiao Ming a 100 Yuan. Achète 3 livres à 12 Yuan et un jeu à 25 Yuan. Monnaie rendue ?",
+"corrige": "1) Livres : 3 x 12 = 36 Yuan. 2) Dépense totale : 36 + 25 = 61 Yuan. 3) Monnaie : 100 - 61 = 39 Yuan. Expression : 100 - (3 x 12 + 25) = 39."
+},
+{
+"n": 22,
+"theme": "Calcul intelligent (Distributivité intuitive)",
+"enonce": "Calcule astucieusement : a) 7 x 9 + 3 x 9 = ... b) 18 x 5 - 8 x 5 = ...",
+"corrige": "a) Factorisation : (7 + 3) x 9 = 10 x 9 = 90. b) Factorisation : (18 - 8) x 5 = 10 x 5 = 50."
+},
+{
+"n": 23,
+"theme": "Problème d'intervalle (Poteaux et arbres)",
+"enonce": "Allée de 40 mètres. Arbres tous les 5 mètres aux deux extrémités incluses. Combien d'arbres ?",
+"corrige": "1) Intervalles : 40 / 5 = 8. 2) Nombre d'arbres = Intervalles + 1 = 8 + 1 = 9 arbres."
+},
+{
+"n": 24,
+"theme": "Système d'équations imagées (Pré-algèbre)",
+"enonce": "1) 3 Pommes = 24 Yuan. 2) 1 Pomme + 2 Bananes = 18 Yuan. 3) 1 Banane + 1 Fraise = 9 Yuan.",
+"corrige": "1) Pomme = 24 / 3 = 8 Yuan. 2) 8 + 2 Bananes = 18 -> 2 Bananes = 10 -> Banane = 5 Yuan. 3) 5 + Fraise = 9 -> Fraise = 4 Yuan."
+},
+{
+"n": 25,
+"theme": "Grand défi d'évaluation globale du CE1",
+"enonce": "Bus avec 48 passagers. Arrêt 1 : 1/3 descend, 10 montent. Arrêt 2 : 1/2 descend, 6 montent. Reste ?",
+"corrige": "1er arrêt : 48 / 3 = 16 descendent -> 48 - 16 = 32 -> +10 = 42 passagers. 2e arrêt : 42 / 2 = 21 descendent -> 42 - 21 = 21 -> +6 = 27 passagers."
+}
+],
+"ce2": [
+{
+"n": 1,
+"theme": "Multiplication posée à 1 chiffre (sans retenue)",
+"enonce": "3 cartons de 123 livres. 1) Pose et effectue 123 x 3. 2) Explique chaque chiffre du résultat.",
+"corrige": "1) 123 x 3 = 369 livres. 2) 3 x 3 u = 9 ; 3 x 2 d = 60 ; 3 x 1 c = 300. Somme = 369."
+},
+{
+"n": 2,
+"theme": "Multiplication posée avec retenues multiples",
+"enonce": "4 caisses de pommes de 246 kg chacune. Calcule la masse totale en posant l'opération.",
+"corrige": "246 x 4 = 984 kg. (4 x 6 = 24 pose 4 retiens 2 ; 4 x 4 + 2 = 18 pose 8 retiens 1 ; 4 x 2 + 1 = 9)."
+},
+{
+"n": 3,
+"theme": "Introduction aux fractions simples (Part de l'unité)",
+"enonce": "Pizza coupée en 8 parts. Xiao Ming en mange 3 parts, sa sœur 2 parts. 1) Fractions mangées ? 2) Fraction restante ?",
+"corrige": "1) Xiao Ming : 3/8 ; Sa sœur : 2/8. 2) Total mangé = 5/8. Reste = 8/8 - 5/8 = 3/8 de la pizza."
+},
+{
+"n": 4,
+"theme": "Comparaison de fractions de même dénominateur",
+"enonce": "Compare avec <, > ou = : a) 2/5 ... 4/5 b) 7/10 ... 3/10 c) 5/5 ... 1",
+"corrige": "a) 2/5 < 4/5 b) 7/10 > 3/10 c) 5/5 = 1."
+},
+{
+"n": 5,
+"theme": "Décomposition des grands nombres (jusqu'à 10 000)",
+"enonce": "Bibliothèque avec 7 405 livres. 1) Écris en lettres. 2) Décompose selon les positions.",
+"corrige": "1) Sept mille quatre cent cinq. 2) 7 405 = 7 milliers + 4 centaines + 0 dizaine + 5 unités."
+},
+{
+"n": 6,
+"theme": "Division posée à 1 chiffre sans reste",
+"enonce": "848 kg de riz répartis dans 4 sacs. Pose 848 / 4.",
+"corrige": "848 / 4 = 212 kg par sac. (8/4=2, 4/4=1, 8/4=2). Vérification : 212 x 4 = 848."
+},
+{
+"n": 7,
+"theme": "Division posée à 1 chiffre avec reste intermédiaire",
+"enonce": "435 billes dans des boîtes de 3. Combien de boîtes complètes ?",
+"corrige": "435 / 3 = 145 boîtes. (4/3=1 reste 1 ; 13/3=4 reste 1 ; 15/3=5 reste 0)."
+},
+{
+"n": 8,
+"theme": "Découverte de la notion d'aire (Pavage)",
+"enonce": "Table couverte par 6 rangées de 8 carrés de 1 cm² chacun. 1) Aire totale ? 2) Différence aire/périmètre ?",
+"corrige": "1) Aire = 6 x 8 = 48 cm². 2) Le périmètre mesure le contour (cm), l'aire mesure la surface occupée (cm²)."
+},
+{
+"n": 9,
+"theme": "Formule de l'aire du rectangle et du carré",
+"enonce": "Terrain de basket de 28 m de long et 15 m de large. Calcule son périmètre et son aire.",
+"corrige": "1) Périmètre = (28 + 15) x 2 = 43 x 2 = 86 m. 2) Aire = 28 x 15 = 420 m²."
+},
+{
+"n": 10,
+"theme": "Conversion des unités de surface (cm², dm², m²)",
+"enonce": "Convertis : a) 3 m² = ... dm² b) 500 cm² = ... dm² c) 4 dm² 20 cm² = ... cm²",
+"corrige": "a) 300 dm² (1 m² = 100 dm²) b) 5 dm² (100 cm² = 1 dm²) c) 420 cm²."
+},
+{
+"n": 11,
+"theme": "Diagramme en bandes — Problème d'ajustement complexifié",
+"enonce": "Li Wei a 45 cartes. Sa sœur a 3 fois plus de cartes que lui, MOINS 12 cartes. Calcule ses cartes.",
+"corrige": "Calcul : (45 x 3) - 12 = 135 - 12 = 123 cartes."
+},
+{
+"n": 12,
+"theme": "Fraction d'un ensemble d'objets",
+"enonce": "Panier de 24 pommes. Xiao Ping prend les 3/8 des pommes. Combien de pommes prend-il ?",
+"corrige": "1) 1/8 de 24 = 24 / 8 = 3 pommes. 2) 3/8 = 3 x 3 = 9 pommes."
+},
+{
+"n": 13,
+"theme": "Problème d'horaires et franchissement de midi",
+"enonce": "Train quitte Shanghai à 10h45 et arrive à 13h15. Quelle est la durée du voyage ?",
+"corrige": "10h45 à 11h = 15 min. 11h à 13h = 2h. 13h à 13h15 = 15 min. Total = 2h + 15 min + 15 min = 2 heures 30 minutes."
+},
+{
+"n": 14,
+"theme": "Multiplication par des multiples de 10 et 100",
+"enonce": "40 cartons de 30 stylos. Calcule le nombre total de stylos.",
+"corrige": "40 x 30 = (4 x 3) x 100 = 12 x 100 = 1 200 stylos."
+},
+{
+"n": 15,
+"theme": "Problème de pesée et de tare (Inconnue cachée)",
+"enonce": "Seau plein d'eau = 19 kg. Rempli à moitié = 11 kg. 1) Poids de la moitié de l'eau ? 2) Poids du seau vide ?",
+"corrige": "1) Moitié de l'eau = 19 - 11 = 8 kg. 2) Eau totale = 8 x 2 = 16 kg -> Seau vide = 19 - 16 = 3 kg."
+},
+{
+"n": 16,
+"theme": "Multiplication posée à 2 chiffres (24 x 13)",
+"enonce": "Pose et effectue 24 x 13 en expliquant les produits partiels.",
+"corrige": "24 x 13 = 312. (Produit partiel 1 : 24 x 3 = 72 ; Produit partiel 2 : 24 x 10 = 240 ; Somme : 72 + 240 = 312)."
+},
+{
+"n": 17,
+"theme": "Aire d'une figure composée (Soustraction de surfaces)",
+"enonce": "Pièce de 8 m sur 6 m avec un tapis carré de 3 m de côté au centre. Aire sol NON couverte ?",
+"corrige": "1) Aire pièce = 8 x 6 = 48 m². 2) Aire tapis = 3 x 3 = 9 m². 3) Non couverte = 48 - 9 = 39 m²."
+},
+{
+"n": 18,
+"theme": "Division d'organisation avec arrondissement au supérieur",
+"enonce": "250 élèves en excursion. Bus de 45 places. Combien de bus faut-il au minimum ?",
+"corrige": "250 / 45 = 5 bus (reste 25 élèves). Il faut commander 6 bus pour transporter tout le monde."
+},
+{
+"n": 19,
+"theme": "Passage aux nombres décimaux simples",
+"enonce": "Exprime sous forme décimale : a) 3/10 b) 1 + 5/10 c) 25/10.",
+"corrige": "a) 0,3 b) 1,5 c) 2,5."
+},
+{
+"n": 20,
+"theme": "Résolution de problèmes à rebours (Méthode inverse)",
+"enonce": "Xiao Ming multiplie un nombre par 4, ajoute 12, divise par 2 et obtient 26. Quel nombre initial ?",
+"corrige": "Remonter à l'envers : 1) 26 x 2 = 52 ; 2) 52 - 12 = 40 ; 3) 40 / 4 = 10."
+},
+{
+"n": 21,
+"theme": "Calcul intelligent (Associativité et recombinaison)",
+"enonce": "Calcule astucieusement : a) 25 x 17 x 4 b) 125 x 8 x 9.",
+"corrige": "a) (25 x 4) x 17 = 100 x 17 = 1 700. b) (125 x 8) x 9 = 1 000 x 9 = 9 000."
+},
+{
+"n": 22,
+"theme": "Optimisation d'achats et tarif groupe",
+"enonce": "Entrée : 15 Yuan/pers. Groupe (10 pers) = 120 Yuan. Coût minimal pour 23 personnes ?",
+"corrige": "Option 2 groupes (20 pers) + 3 individuel = (2 x 120) + (3 x 15) = 240 + 45 = 285 Yuan."
+},
+{
+"n": 23,
+"theme": "Périmètre et découpage géométrique",
+"enonce": "Rectangle de 12 cm sur 8 cm coupé en 2 rectangles identiques. Compare le périmètre selon le sens de la coupe.",
+"corrige": "Périmètre initial = 40 cm. Coupe largeur (deux 6x8) -> Périmètre total = 2 x (6+8) x 2 = 56 cm (+16 cm). Coupe longueur (deux 12x4) -> Périmètre total = 64 cm (+24 cm)."
+},
+{
+"n": 24,
+"theme": "Système d'équations à deux inconnues liées",
+"enonce": "2 pommes + 1 poire = 16 Yuan. 2 pommes + 3 poires = 24 Yuan. Prix de chaque fruit ?",
+"corrige": "1) Différence : 2 poires de plus coûtent 24 - 16 = 8 Yuan -> Poire = 4 Yuan. 2) 2 pommes + 4 = 16 -> 2 pommes = 12 -> Pomme = 6 Yuan."
+},
+{
+"n": 25,
+"theme": "Grand défi d'évaluation globale du CE2",
+"enonce": "Entrepôt de 4 tonnes de blé (4000 kg). Matin : 3 camions de 850 kg. Après-midi : reste mis en sacs de 25 kg. Nombre de sacs ?",
+"corrige": "1) Blé emporté : 3 x 850 = 2 550 kg. 2) Reste : 4 000 - 2 550 = 1 450 kg. 3) Sacs : 1 450 / 25 = 58 sacs."
+}
+],
+"cm1": [
+{
+"n": 1,
+"theme": "Grande numération (jusqu'à 100 000 000)",
+"enonce": "Population de 8 450 900 habitants. 1) Écris en lettres. 2) Valeur du chiffre 4 ?",
+"corrige": "1) Huit millions quatre cent cinquante mille neuf cents. 2) Le 4 occupe la position des centaines de milliers (400 000)."
+},
+{
+"n": 2,
+"theme": "Passage de la fraction décimale au nombre décimal",
+"enonce": "Exprime sous forme décimale : a) 7/10 b) 35/100 c) 4 + 8/100.",
+"corrige": "a) 0,7 b) 0,35 c) 4,08 (attention au zéro des dixièmes)."
+},
+{
+"n": 3,
+"theme": "Addition et soustraction de nombres décimaux",
+"enonce": "Compas à 12,85 Yuan et règle à 4,50 Yuan. Payer avec 20 Yuan. 1) Coût total ? 2) Monnaie ?",
+"corrige": "1) Coût total : 12,85 + 4,50 = 17,35 Yuan. 2) Monnaie rendue : 20 - 17,35 = 2,65 Yuan."
+},
+{
+"n": 4,
+"theme": "Propriétés des opérations (Commutativité & Associativité)",
+"enonce": "Calcule de manière simplifiée : 387 + 149 + 113.",
+"corrige": "Regroupement stratégique : (387 + 113) + 149 = 500 + 149 = 649."
+},
+{
+"n": 5,
+"theme": "Arrondi et estimation des grands nombres",
+"enonce": "Arrondis 748 620 : a) À la dizaine de mille la plus proche b) À la centaine de mille la plus proche.",
+"corrige": "a) 750 000 (chiffre des milliers = 8 >= 5). b) 700 000 (chiffre dizaines de mille = 4 < 5)."
+},
+{
+"n": 6,
+"theme": "Multiplication posée à 3 chiffres par 2 chiffres",
+"enonce": "Usine fabrique 214 pièces par heure. Combien en 35 heures ?",
+"corrige": "214 x 35 = 7 490 pièces. (Produits partiels : 214 x 5 = 1 070 et 214 x 30 = 6 420. Somme = 7 490)."
+},
+{
+"n": 7,
+"theme": "Division posée avec diviseur à 2 chiffres (sans reste)",
+"enonce": "960 kg de mandarines réparties dans 32 caisses identiques. Masse d'une caisse ?",
+"corrige": "960 / 32 = 30 kg par caisse. (96 / 32 = 3, puis 0 / 32 = 0)."
+},
+{
+"n": 8,
+"theme": "Division posée avec diviseur à 2 chiffres (avec reste)",
+"enonce": "580 livres dans des cartons de 24 livres. 1) Cartons complets ? 2) Livres restants ?",
+"corrige": "580 / 24 = 24 cartons complets (24 x 24 = 576) et il reste 4 livres (580 - 576 = 4)."
+},
+{
+"n": 9,
+"theme": "Propriété d'invariance du quotient",
+"enonce": "Sachant que 360 / 12 = 30, déduis sans poser : 3 600 / 120.",
+"corrige": "Multiplier dividende et diviseur par le même nombre (10) ne change pas le quotient : 3 600 / 120 = 30."
+},
+{
+"n": 10,
+"theme": "Expressions combinées et priorités (Crochets)",
+"enonce": "Calcule : 180 / [(12 + 3) x 2].",
+"corrige": "1) Parenthèses : 12 + 3 = 15. 2) Crochets : 15 x 2 = 30. 3) Division : 180 / 30 = 6."
+},
+{
+"n": 11,
+"theme": "Droites parallèles et perpendiculaires",
+"enonce": "La droite (D1) est perpendiculaire à (D2). La droite (D3) est aussi perpendiculaire à (D2). Que dire de (D1) et (D3) ?",
+"corrige": "Deux droites perpendiculaires à une même troisième sont parallèles entre elles : (D1) // (D3)."
+},
+{
+"n": 12,
+"theme": "Mesure et classification des angles",
+"enonce": "Un angle mesure 135°. 1) Quel est son type ? 2) Combien manque-t-il pour un angle plat (180°) ?",
+"corrige": "1) Angle obtus (entre 90° et 180°). 2) 180° - 135° = 45° (angle aigu complémentaire)."
+},
+{
+"n": 13,
+"theme": "Propriétés du parallélogramme",
+"enonce": "Parallélogramme avec deux côtés consécutifs de 8 cm et 5 cm. 1) Longueur des autres côtés ? 2) Périmètre ?",
+"corrige": "1) Les côtés opposés sont égaux : 8 cm et 5 cm. 2) Périmètre = (8 + 5) x 2 = 26 cm."
+},
+{
+"n": 14,
+"theme": "Aire du parallélogramme (Hauteur et base)",
+"enonce": "Parallélogramme de base 12 cm et de hauteur correspondante 6 cm. Calcule son aire.",
+"corrige": "Formule : Aire = Base x Hauteur = 12 x 6 = 72 cm²."
+},
+{
+"n": 15,
+"theme": "Hauteur et aire du triangle",
+"enonce": "Triangle de base 10 cm et de hauteur 7 cm. Calcule son aire.",
+"corrige": "Formule : Aire = (Base x Hauteur) / 2 = (10 x 7) / 2 = 35 cm²."
+},
+{
+"n": 16,
+"theme": "Diagramme en bandes — Somme et différence",
+"enonce": "Somme de 2 nombres = 150. Différence = 30. Trouve les deux nombres.",
+"corrige": "2 x Petit nombre = Somme - Différence = 150 - 30 = 120 -> Petit nombre = 60. Grand nombre = 60 + 30 = 90."
+},
+{
+"n": 17,
+"theme": "Diagramme en bandes — Somme et multiple",
+"enonce": "Le père a 4 fois l'âge de son fils. À eux deux, ils ont 50 ans. Âge de chacun ?",
+"corrige": "Total d'unités = 1 + 4 = 5 parts. 1 part (fils) = 50 / 5 = 10 ans. Père = 10 x 4 = 40 ans."
+},
+{
+"n": 18,
+"theme": "Proportionnalité et règle de trois",
+"enonce": "6 cahiers coûtent 18 Yuan. Combien coûtent 15 cahiers ?",
+"corrige": "Prix unitaire = 18 / 6 = 3 Yuan par cahier. Prix 15 cahiers = 15 x 3 = 45 Yuan."
+},
+{
+"n": 19,
+"theme": "Vitesse moyenne, distance et durée (v = d / t)",
+"enonce": "Train CRH parcourt 600 km en 2 heures et 30 minutes (2,5 h). Quelle est sa vitesse moyenne ?",
+"corrige": "Vitesse = Distance / Temps = 600 / 2,5 = 240 km/h."
+},
+{
+"n": 20,
+"theme": "Moyenne arithmétique simple",
+"enonce": "Notes en maths : 88, 92, 95 et 85. Calcule la note moyenne.",
+"corrige": "Somme = 88 + 92 + 95 + 85 = 360. Moyenne = 360 / 4 = 90 sur 100."
+},
+{
+"n": 21,
+"theme": "Calcul intelligent par distributivité avancée",
+"enonce": "Calcule astucieusement : 99 x 47 + 47.",
+"corrige": "Factorisation : 99 x 47 + 1 x 47 = (99 + 1) x 47 = 100 x 47 = 4 700."
+},
+{
+"n": 22,
+"theme": "Optimisation de trajet et vitesse relative (Rencontre)",
+"enonce": "Distance A-B = 350 km. Voiture de A à 70 km/h, camion de B à 30 km/h en sens inverse. Temps avant croisement ?",
+"corrige": "Vitesse de rapprochement = 70 + 30 = 100 km/h. Temps = 350 / 100 = 3,5 heures (3h 30 min)."
+},
+{
+"n": 23,
+"theme": "Principe des tiroirs de Dirichlet (Pigeonhole Principle)",
+"enonce": "13 billes réparties dans 4 boîtes. Montre qu'au moins une boîte a au moins 4 billes.",
+"corrige": "13 / 4 = 3 reste 1. Si chaque boîte avait au plus 3 billes, le total serait 12. Donc au moins une boîte contient 3 + 1 = 4 billes."
+},
+{
+"n": 24,
+"theme": "Conversion d'aires et problème de pavage géométrique",
+"enonce": "Cour de 12 m sur 8 m. Dalles carrées de 40 cm de côté. Nombre de dalles nécessaires ?",
+"corrige": "1) Aire cour en cm² : 1 200 x 800 = 960 000 cm². 2) Aire dalle : 40 x 40 = 1 600 cm². 3) Dalles : 960 000 / 1 600 = 600 dalles."
+},
+{
+"n": 25,
+"theme": "Grand défi d'évaluation globale du CM1",
+"enonce": "Achat de 150 kg de pommes à 6 Yuan/kg. Vend 2/3 à 9 Yuan/kg, reste avec réduction à 5 Yuan/kg. Bénéfice net ?",
+"corrige": "1) Achat = 150 x 6 = 900 Yuan. 2) Vente 1 = 100 kg x 9 = 900 Yuan. Vente 2 = 50 kg x 5 = 250 Yuan. Vente totale = 1 150 Yuan. 3) Bénéfice = 1 150 - 900 = 250 Yuan."
+}
+],
+"cm2": [
+{
+"n": 1,
+"theme": "Addition et soustraction de fractions à dénominateurs différents",
+"enonce": "Calcule 3/4 + 2/5 et 5/6 - 1/4 en réduisant au même dénominateur.",
+"corrige": "1) 3/4 + 2/5 = 15/20 + 8/20 = 23/20 = 1 + 3/20. 2) 5/6 - 1/4 = 10/12 - 3/12 = 7/12."
+},
+{
+"n": 2,
+"theme": "Multiplication de fractions et simplification préalable",
+"enonce": "Calcule (5/8) x (4/15) en simplifiant avant le produit.",
+"corrige": "(5 x 4) / (8 x 15) = (1 x 1) / (2 x 3) = 1/6."
+},
+{
+"n": 3,
+"theme": "Division de fractions (Multiplication par l'inverse)",
+"enonce": "Calcule (7/10) / (14/15).",
+"corrige": "(7/10) x (15/14) = (7 x 15) / (10 x 14) = (1 x 3) / (2 x 2) = 3/4."
+},
+{
+"n": 4,
+"theme": "Conversion entre fractions, décimaux et pourcentages",
+"enonce": "Complète : a) 3/5 = ... = ...% b) 0,85 = ...% = ... c) 75% = ... = ...",
+"corrige": "a) 3/5 = 0,60 = 60% b) 0,85 = 85% = 17/20 c) 75% = 0,75 = 3/4."
+},
+{
+"n": 5,
+"theme": "Calcul de pourcentage direct et réduction",
+"enonce": "Vélo à 450 Yuan. Réduction de 20%. Montant de la réduction et prix final ?",
+"corrige": "1) Réduction : 450 x 0,20 = 90 Yuan. 2) Prix final : 450 - 90 = 360 Yuan (ou 450 x 0,80 = 360)."
+},
+{
+"n": 6,
+"theme": "Notion de ratio et partage proportionnel",
+"enonce": "Partager 1 200 Yuan entre Li Wei et Xiao Ming selon le ratio 3 : 5.",
+"corrige": "Parts totales = 3 + 5 = 8. Valeur d'une part = 1 200 / 8 = 150 Yuan. Li Wei (3 parts) = 450 Yuan. Xiao Ming (5 parts) = 750 Yuan."
+},
+{
+"n": 7,
+"theme": "Échelle sur une carte géographique",
+"enonce": "Carte à l'échelle 1 : 500 000. Distance mesurée = 6 cm. Distance réelle en km ?",
+"corrige": "Distance réelle en cm = 6 x 500 000 = 3 000 000 cm. Conversion : 3 000 000 cm = 30 000 m = 30 km."
+},
+{
+"n": 8,
+"theme": "Variation en pourcentage (Augmentations successives)",
+"enonce": "Prix augmente de 10% puis baisse de 10%. Compare le prix final au prix initial de 100 Yuan.",
+"corrige": "1) Après +10% : 100 x 1,10 = 110 Yuan. 2) Après -10% : 110 x 0,90 = 99 Yuan (baisse globale de 1%)."
+},
+{
+"n": 9,
+"theme": "Problème de mélange et concentration",
+"enonce": "Mélanger 200 g d'eau sucrée à 15% et 300 g à 10%. Concentration du mélange ?",
+"corrige": "Sucre total = (200 x 0,15) + (300 x 0,10) = 30 + 30 = 60 g. Masse totale = 500 g. Concentration = 60 / 500 = 12%."
+},
+{
+"n": 10,
+"theme": "Proportionnalité inverse (Durée et effectif)",
+"enonce": "6 ouvriers accomplissent un travail en 12 jours. Temps nécessaire pour 9 ouvriers ?",
+"corrige": "Travail total en homme-jours = 6 x 12 = 72. Temps pour 9 ouvriers = 72 / 9 = 8 jours."
+},
+{
+"n": 11,
+"theme": "Volume du pavé droit et du cube",
+"enonce": "Volume d'un pavé (12 cm x 8 cm x 5 cm) et d'un cube de 6 cm d'arête.",
+"corrige": "1) Volume pavé = 12 x 8 x 5 = 480 cm³. 2) Volume cube = 6 x 6 x 6 = 216 cm³."
+},
+{
+"n": 12,
+"theme": "Aire totale du pavé droit (sans couvercle)",
+"enonce": "Aquarium de 50 cm de long, 30 cm de large et 40 cm de haut. Surface de verre nécessaire ?",
+"corrige": "Base = 50 x 30 = 1 500 cm². 4 faces latérales = 2x(50x40) + 2x(30x40) = 4 000 + 2 400 = 6 400 cm². Total = 1 500 + 6 400 = 7 900 cm²."
+},
+{
+"n": 13,
+"theme": "Conversion d'unités de volume et de capacité",
+"enonce": "Convertis : a) 2,5 m³ = ... dm³ = ... L b) 850 cm³ = ... dm³ = ... L.",
+"corrige": "a) 2,5 m³ = 2 500 dm³ = 2 500 L b) 850 cm³ = 0,85 dm³ = 0,85 L."
+},
+{
+"n": 14,
+"theme": "Hauteur d'eau et déplacement de volume (Principe d'Archimède)",
+"enonce": "Récipient de base 20 cm x 15 cm. Une pierre immergée fait monter l'eau de 3 cm. Volume de la pierre ?",
+"corrige": "Volume de la pierre = Volume déplacé = (20 x 15) x 3 = 300 x 3 = 900 cm³."
+},
+{
+"n": 15,
+"theme": "Aire du disque et périmètre du cercle (pi ≈ 3,14)",
+"enonce": "Parc circulaire de rayon 10 m. Calcule son périmètre (circonférence) et son aire.",
+"corrige": "1) Circonférence = 2 x pi x r = 2 x 3,14 x 10 = 62,8 m. 2) Aire = pi x r² = 3,14 x 10² = 314 m²."
+},
+{
+"n": 16,
+"theme": "Résolution d'équations à une inconnue avec fractions",
+"enonce": "Résous : (3/4)x - 5 = 10.",
+"corrige": "(3/4)x = 15 -> x = 15 / (3/4) = 15 x (4/3) = 20."
+},
+{
+"n": 17,
+"theme": "Problème de travail partagé (Rendements)",
+"enonce": "Robinet A remplit en 6h, Robinet B en 3h. Temps nécessaire si les deux coulent ensemble ?",
+"corrige": "Rendement A = 1/6 par heure. Rendement B = 1/3 = 2/6 par heure. Rendement combiné = 3/6 = 1/2 par heure. Temps = 1 / (1/2) = 2 heures."
+},
+{
+"n": 18,
+"theme": "Problème de rattrapage (Vitesse relative)",
+"enonce": "Piéton part à 4 km/h. Cycliste part 2h plus tard à 12 km/h. Temps de rattrapage ?",
+"corrige": "Avance du piéton = 4 x 2 = 8 km. Vitesse de rattrapage = 12 - 4 = 8 km/h. Temps = 8 / 8 = 1 heure."
+},
+{
+"n": 19,
+"theme": "Problème de poules et de lapins (Fausse position)",
+"enonce": "Ferme avec poules et lapins. 35 têtes et 94 pattes. Nombre de poules et lapins ?",
+"corrige": "Hypothèse : Si 35 poules -> 35 x 2 = 70 pattes. Pattes manquantes = 94 - 70 = 24 pattes. Chaque lapin ajoute 2 pattes (4-2=2). Lapins = 24 / 2 = 12 lapins. Poules = 35 - 12 = 23 poules."
+},
+{
+"n": 20,
+"theme": "Diagramme en bandes — Inconnues liées avec fraction",
+"enonce": "Xiao Ming lit 2/5 d'un livre le jour 1, puis 30 pages le jour 2. Il lui reste la moitié (1/2). Nombre de pages total ?",
+"corrige": "Jour 1 = 4/10. Reste final = 5/10. Jour 2 = 1 - (4/10 + 5/10) = 1/10 du livre. 1/10 = 30 pages -> Total = 30 x 10 = 300 pages."
+},
+{
+"n": 21,
+"theme": "Moyenne pondérée et analyse de données",
+"enonce": "40 élèves : 15 ont 90/100, 20 ont 80/100 et 5 ont 70/100. Calcule la moyenne générale.",
+"corrige": "Points totaux = (15x90) + (20x80) + (5x70) = 1 350 + 1 600 + 350 = 3 300. Moyenne = 3 300 / 40 = 82,5 sur 100."
+},
+{
+"n": 22,
+"theme": "Diagramme circulaire et effectif total",
+"enonce": "Basketball = 35% des élèves (84 élèves). Quel est l'effectif total de l'école ?",
+"corrige": "Effectif total = 84 / 0,35 = 240 élèves."
+},
+{
+"n": 23,
+"theme": "Application avancée des Tiroirs de Dirichlet",
+"enonce": "Choisir 51 nombres parmi les entiers de 1 à 100. Montre que 2 nombres ont une différence de 50.",
+"corrige": "Former 50 paires d'écart 50 : {1,51}, {2,52}, ..., {50,100}. En choisissant 51 nombres dans 50 paires, une paire est forcément complète. Leur différence est 50."
+},
+{
+"n": 24,
+"theme": "Découpe de cube et multiplication de surface",
+"enonce": "Cube de 20 cm d'arête découpé en petits cubes de 5 cm. 1) Combien de petits cubes ? 2) Comparaison des surfaces ?",
+"corrige": "1) Petit cubes = (20/5)³ = 4³ = 64 petits cubes. 2) Surface grand cube = 6 x 20² = 2 400 cm². Surface 64 petits cubes = 64 x (6 x 5²) = 9 600 cm² (Surface quadruplée x4)."
+},
+{
+"n": 25,
+"theme": "Grand Défi d'Évaluation Globale de Fin d'Élémentaire (CM2)",
+"enonce": "Citerne remplie aux 3/8 contient 450 L. Une pompe ajoute 15 L/min pendant 45 min. On retire 20% du total. Volume final ?",
+"corrige": "1) Capacité totale = 450 / (3/8) = 1 200 Litres. 2) Pompe ajoute = 15 x 45 = 675 L -> Total = 450 + 675 = 1 125 L. 3) Retrait 20% = 1 125 x 0,20 = 225 L -> Volume final = 1 125 - 225 = 900 Litres (75% de la capacité)."
+}
+]
+}
+},
+"activites": [
+{
+"id": "nature-1",
+"cat": "nature",
+"titre": "Le panier de collecte",
+"ageMin": 6,
+"ageMax": 6,
+"adulte": false,
+"description": "Lors d'une balade ou au jardin, l'enfant récolte librement des éléments naturels tombés au sol (feuilles, cailloux, plumes, cônes). De retour, il les trie seul selon leurs textures, couleurs ou formes.",
+"materiel": "un panier une boîte à œufs une loupe",
+"etapes": [
+"Ramasse ce qui est tombé par terre : feuilles, cailloux, plumes.",
+"À la maison, vide ton panier sur la table.",
+"Trie par couleur, par forme ou par toucher."
+]
+},
+{
+"id": "nature-2",
+"cat": "nature",
+"titre": "Les semis rapides",
+"ageMin": 6,
+"ageMax": 7,
+"adulte": false,
+"description": "Remplir un récipient recyclé de terreau et y planter des graines à germination rapide (lentilles, haricots, maïs). L'enfant gère seul l'arrosage quotidien et suit l'évolution des pousses.",
+"materiel": "pots de yaourt terreau · lentilles ou haricots petit arrosoir",
+"etapes": [
+"Remplis ton pot de terreau.",
+"Enfonce 3 graines du bout du doigt.",
+"Arrose un peu chaque jour et regarde-les pousser."
+]
+},
+{
+"id": "nature-3",
+"cat": "nature",
+"titre": "Le journal de la nature",
+"ageMin": 7,
+"ageMax": 7,
+"adulte": false,
+"description": "Consigner dans un cahier dédié les changements de son environnement proche (premiers bourgeons, météo, insectes). L'enfant illustre ses notes par des croquis et des collages.",
+"materiel": "un cahier crayons de couleur colle · ruban adhésif",
+"etapes": [
+"Regarde dehors : météo, bourgeons, insectes.",
+"Écris la date et dessine ce que tu vois.",
+"Colle une feuille ou une fleur trouvée."
+]
+},
+{
+"id": "nature-4",
+"cat": "nature",
+"titre": "Le dessin des ombres",
+"ageMin": 7,
+"ageMax": 8,
+"adulte": false,
+"description": "Disposer des feuilles et branches sur une feuille blanche exposée au soleil. L'enfant retrace au crayon les contours précis des ombres projetées et observe leur déplacement au fil des heures.",
+"materiel": "feuille blanche une branche ou une plante · 2 crayons de couleur",
+"etapes": [
+"Pose la feuille au soleil, la plante juste à côté.",
+"Trace le contour de l'ombre.",
+"Reviens 1 heure plus tard avec une autre couleur : l'ombre a bougé !"
+]
+},
+{
+"id": "nature-5",
+"cat": "nature",
+"titre": "Le micro-composteur",
+"ageMin": 8,
+"ageMax": 8,
+"adulte": false,
+"description": "Rassembler des épluchures et feuilles mortes dans un bac perforé. L'enfant entretient l'humidité, mélange la matière et observe la décomposition biologique progressive.",
+"materiel": "bac percé de trous épluchures · feuilles mortes vaporisateur",
+"etapes": [
+"Mets une couche de feuilles, puis tes épluchures.",
+"Mélange chaque semaine et mouille si c'est sec.",
+"Observe : petit à petit, ça devient de la terre !"
+]
+},
+{
+"id": "nature-6",
+"cat": "nature",
+"titre": "La promenade jour / nuit",
+"ageMin": 8,
+"ageMax": 9,
+"adulte": true,
+"description": "Explorer un même coin de nature de jour puis à la nuit tombée (avec lampe de poche) pour comparer les sensations visuelles, les sons d'animaux et les odeurs environnementales.",
+"materiel": "lampe de poche un carnet un crayon",
+"etapes": [
+"Le jour, note ce que tu vois, entends et sens.",
+"Reviens au même endroit à la nuit tombée, avec un adulte.",
+"Compare tes deux listes : qu'est-ce qui a changé ?"
+]
+},
+{
+"id": "nature-7",
+"cat": "nature",
+"titre": "Le chasseur de sons",
+"ageMin": 9,
+"ageMax": 9,
+"adulte": false,
+"description": "S'isoler 10 minutes en extérieur avec un enregistreur ou carnet. L'enfant capture ou répertorie la diversité des bruits (vent, chant d'oiseau, ruisseau, craquement de bois).",
+"materiel": "enregistreur ou téléphone un carnet · un minuteur",
+"etapes": [
+"Assieds-toi dehors 10 minutes, sans bouger.",
+"Note ou enregistre chaque son que tu entends.",
+"Classe-les : animaux, eau, vent, humains."
+]
+},
+{
+"id": "nature-8",
+"cat": "nature",
+"titre": "Le reportage photo",
+"ageMin": 9,
+"ageMax": 10,
+"adulte": false,
+"description": "",
+"materiel": "appareil photo ou tablette un thème · un cahier pour l'album",
+"etapes": [
+"Choisis un thème : écorces, symétries, couleurs…",
+"Prends 10 photos qui y correspondent.",
+"Garde les meilleures et fais ton mini- album."
+]
+},
+{
+"id": "nature-9",
+"cat": "nature",
+"titre": "Mesurer un arbre avec son ombre",
+"ageMin": 10,
+"ageMax": 11,
+"adulte": false,
+"description": "",
+"materiel": "un bâton d'1 mètre mètre ruban · un carnet",
+"etapes": [
+"Plante le bâton au soleil, bien droit.",
+"Attends que son ombre mesure 1 mètre, elle aussi.",
+"Vite, mesure l'ombre de l'arbre : c'est sa hauteur !"
+]
+},
+{
+"id": "nature-10",
+"cat": "nature",
+"titre": "Le détective des arbres",
+"ageMin": 11,
+"ageMax": 12,
+"adulte": false,
+"description": "",
+"materiel": "guide des arbres illustré une loupe · fiches cartonnées",
+"etapes": [
+"Observe une feuille : forme, bord, nervures.",
+"Suis les questions du guide jusqu'au nom de l'arbre.",
+"Fais ta fiche : nom, dessin, lieu, date."
+]
+},
+{
+"id": "philo-1",
+"cat": "philo",
+"titre": "Le miroir des émotions",
+"ageMin": 6,
+"ageMax": 6,
+"adulte": false,
+"description": "À partir de cartes illustrant des visages d'émotions, l'enfant associe chaque expression à un souvenir personnel et dessine la réaction appropriée face à un ami triste.",
+"materiel": "cartes visages une feuille · crayons de couleur",
+"etapes": [
+"Tire une carte et dis le nom de l'émotion.",
+"Raconte un moment où tu l'as ressentie.",
+"Dessine ce que tu ferais pour un ami triste."
+]
+},
+{
+"id": "philo-2",
+"cat": "philo",
+"titre": "La boîte à « Pourquoi ? »",
+"ageMin": 6,
+"ageMax": 7,
+"adulte": false,
+"description": "L'enfant dépose dans une boîte décorée toutes ses interrogations existentielles ou curieuses ('Pourquoi on meurt ?', 'C'est quoi la justice ?') pour préparer les échanges familiaux.",
+"materiel": "boîte à chaussures petits papiers · feutres gommettes",
+"etapes": [
+"Décore ta boîte et fais une fente dans le couvercle.",
+"Écris ou dessine tes questions sur des papiers.",
+"Ouvre la boîte en famille et discutez-en."
+]
+},
+{
+"id": "philo-3",
+"cat": "philo",
+"titre": "L'arbre des choix",
+"ageMin": 7,
+"ageMax": 7,
+"adulte": false,
+"description": "Dessiner un arbre dont le tronc est une décision (ex: 'dire la vérité') et les branches sont les conséquences possibles pour soi et pour les autres. Évalue l'impact de ses actes.",
+"materiel": "une grande feuille crayons vert et rouge",
+"etapes": [
+"Dessine un tronc et écris une décision dessus.",
+"Sur chaque branche, écris une conséquence possible.",
+"Vert si ça fait du bien, rouge si ça fait du tort."
+]
+},
+{
+"id": "philo-4",
+"cat": "philo",
+"titre": "Le trieur d'affirmations",
+"ageMin": 7,
+"ageMax": 8,
+"adulte": false,
+"description": "Classer une série de cartes contenant des affirmations variées ('Les chats voient dans le noir', 'Toutes les sorcières sont méchantes') pour distinguer fait, opinion et préjugé.",
+"materiel": "cartes d'affirmations · 3 étiquettes : Vrai, Faux, À vérifier",
+"etapes": [
+"Pose les 3 étiquettes sur la table.",
+"Lis chaque carte et range-la dans une colonne.",
+"Pour « À vérifier », cherche comment le savoir."
+]
+},
+{
+"id": "philo-5",
+"cat": "philo",
+"titre": "Les cartes Explorateurs Philo",
+"ageMin": 8,
+"ageMax": 8,
+"adulte": false,
+"description": "Explorer une notion centrale (La Liberté, Le Respect, Le Bonheur) à travers un parcours de cartes comprenant une illustration, une devinette et un paradoxe à méditer seul.",
+"materiel": "cartes : image, devinette, paradoxe · un carnet",
+"etapes": [
+"Choisis une idée : liberté, respect ou bonheur.",
+"Regarde l'image, puis réponds à la devinette.",
+"Réfléchis au paradoxe et écris ta réponse."
+]
+},
+{
+"id": "philo-6",
+"cat": "philo",
+"titre": "Le débat mouvant",
+"ageMin": 8,
+"ageMax": 9,
+"adulte": true,
+"description": "Face à une question complexe ('Faut-il toujours obéir ?'), les participants se placent physiquement d'un côté ou de l'autre de la pièce et peuvent changer de camp après chaque argument.",
+"materiel": "ruban adhésif au sol · 2 panneaux OUI / NON une question",
+"etapes": [
+"Trace une ligne au sol : OUI d'un côté, NON de l'autre.",
+"Écoute la question et place-toi.",
+"Après chaque argument, tu as le droit de changer de côté !"
+]
+},
+{
+"id": "philo-7",
+"cat": "philo",
+"titre": "La gazette des deux avis",
+"ageMin": 9,
+"ageMax": 10,
+"adulte": false,
+"description": "",
+"materiel": "une feuille A3 un stylo une règle",
+"etapes": [
+"Choisis un sujet (ex. : les écrans le week- end).",
+"Écris une colonne « Pour » et une colonne « Contre ».",
+"Termine par ton avis à toi."
+]
+},
+{
+"id": "philo-8",
+"cat": "philo",
+"titre": "Les dilemmes moraux",
+"ageMin": 10,
+"ageMax": 11,
+"adulte": false,
+"description": "",
+"materiel": "un scénario (tramway, anneau de Gygès) · journal de réflexion",
+"etapes": [
+"Lis le scénario deux fois.",
+"Écris ce que tu ferais, et pourquoi.",
+"Imagine ce qu'une autre personne répondrait."
+]
+},
+{
+"id": "philo-9",
+"cat": "philo",
+"titre": "Le décodeur d'images",
+"ageMin": 11,
+"ageMax": 11,
+"adulte": false,
+"description": "Analyser une affiche publicitaire ou une photo de presse : identifier l'intention de l'auteur, le cadrage, les émotions visées et ce qui est caché au premier regard.",
+"materiel": "une publicité ou photo de presse une loupe · tes 3 questions",
+"etapes": [
+"Qui a fait cette image, et pour quoi ?",
+"Que montre le cadrage ? Que cache-t-il ?",
+"Quelle émotion veut-on te faire ressentir ?"
+]
+},
+{
+"id": "philo-10",
+"cat": "philo",
+"titre": "Le mini café philo",
+"ageMin": 11,
+"ageMax": 12,
+"adulte": false,
+"description": "",
+"materiel": "un bâton de parole minuteur 20 min · l'ordre du jour",
+"etapes": [
+"Choisissez un thème et préparez 3 questions.",
+"Seul celui qui tient le bâton parle.",
+"À 20 minutes, résume ce qui a été dit."
+]
+},
+{
+"id": "stim-1",
+"cat": "stim",
+"titre": "Les tours équilibristes",
+"ageMin": 6,
+"ageMax": 6,
+"adulte": false,
+"description": "Utiliser des blocs de bois géométriques simples pour ériger des structures stables en respectant des contraintes (ex: utiliser seulement 3 points d'appui au sol).",
+"materiel": "blocs en bois cubes, cylindres, planchettes",
+"etapes": [
+"Construis une tour qui touche le sol en 3 points seulement.",
+"Ajoute un bloc à la fois.",
+"Elle tombe ? Cherche pourquoi et recommence."
+]
+},
+{
+"id": "stim-2",
+"cat": "stim",
+"titre": "Le labyrinthe à billes",
+"ageMin": 6,
+"ageMax": 7,
+"adulte": false,
+"description": "Concevoir un parcours pour bille à l'intérieur d'une boîte à chaussures à l'aide de pailles, bâtonnets et tubes de carton collés.",
+"materiel": "boîte à chaussures pailles bâtonnets · colle une bille",
+"etapes": [
+"Dessine ton chemin au fond de la boîte.",
+"Colle pailles et bâtonnets pour faire les murs.",
+"Penche la boîte pour guider la bille jusqu'au drapeau."
+]
+},
+{
+"id": "stim-3",
+"cat": "stim",
+"titre": "Le pont en bâtonnets",
+"ageMin": 7,
+"ageMax": 7,
+"adulte": false,
+"description": "Fabriquer un pont d'une portée de 20 cm en bâtonnets de glace. L'enfant teste progressivement la résistance du pont en y déposant de petits objets gradués.",
+"materiel": "bâtonnets de glace colle · 2 piles de livres pièces, gommes",
+"etapes": [
+"Écarte les deux piles de livres de 20 cm.",
+"Colle les bâtonnets pour faire un pont de l'une à l'autre.",
+"Pose des objets un par un : combien tient- il ?"
+]
+},
+{
+"id": "stim-4",
+"cat": "stim",
+"titre": "Engrenages et poulies",
+"ageMin": 7,
+"ageMax": 8,
+"adulte": false,
+"description": "Manipuler des kits de construction ou bouchons crantés pour comprendre la transmission du mouvement, le sens de rotation et l'effet de levier.",
+"materiel": "kit d'engrenages ou bouchons crantés · carton attaches parisiennes",
+"etapes": [
+"Fixe 2 roues sur le carton, qu'elles se touchent.",
+"Tourne la première : dans quel sens va l'autre ?",
+"Ajoute une 3ᵉ roue et observe."
+]
+},
+{
+"id": "stim-5",
+"cat": "stim",
+"titre": "Le volcan qui mousse",
+"ageMin": 8,
+"ageMax": 8,
+"adulte": false,
+"description": "Modeler un cône en pâte à modeler autour d'un flacon, y verser du bicarbonate de soude et du vinaigre coloré pour observer la libération de dioxyde de carbone.",
+"materiel": "petit flacon pâte à modeler bicarbonate · vinaigre + colorant un plateau",
+"etapes": [
+"Modèle un cône autour du flacon, sur le plateau.",
+"Mets 2 cuillères de bicarbonate dans le flacon.",
+"Verse le vinaigre coloré et recule : ça mousse !"
+]
+},
+{
+"id": "stim-6",
+"cat": "stim",
+"titre": "Le démontage d'un réveil",
+"ageMin": 8,
+"ageMax": 9,
+"adulte": true,
+"description": "Muni de tournevis adaptés, démonter une vieille horloge ou un réveil mécanique pour en observer les rouages, circuits et composants internes en toute sécurité.",
+"materiel": "vieux réveil sans pile tournevis adaptés · boîte pour les vis",
+"etapes": [
+"Vérifie avec l'adulte : débranché, sans pile.",
+"Dévisse et range chaque vis dans la boîte.",
+"Observe les rouages et dessine-les."
+]
+},
+{
+"id": "stim-7",
+"cat": "stim",
+"titre": "Le petit commerçant",
+"ageMin": 9,
+"ageMax": 10,
+"adulte": false,
+"description": "",
+"materiel": "objets à vendre étiquettes · monnaie factice cahier de caisse",
+"etapes": [
+"Mets un prix sur chaque objet.",
+"Vends, fais des remises, rends la monnaie exacte.",
+"Note chaque vente et calcule ta recette."
+]
+},
+{
+"id": "stim-8",
+"cat": "stim",
+"titre": "La réaction en chaîne",
+"ageMin": 10,
+"ageMax": 10,
+"adulte": false,
+"description": "Aligner dominos, billes, rampes et livres pour créer un parcours de cascades d'actions physiques déclenchant un événement final amusant (ex: faire sonner une clochette).",
+"materiel": "dominos billes livres règles · une clochette",
+"etapes": [
+"Dessine ton parcours : chaque objet pousse le suivant.",
+"Installe-le petit à petit, teste chaque étape.",
+"Pousse le premier domino… et ding !"
+]
+},
+{
+"id": "stim-9",
+"cat": "stim",
+"titre": "Le robot en papier",
+"ageMin": 10,
+"ageMax": 11,
+"adulte": false,
+"description": "",
+"materiel": "papier quadrillé un crayon · un « robot » humain",
+"etapes": [
+"Écris un code : avancer, tourner, répéter.",
+"Donne-le à ton robot, ou suis-le sur le quadrillage.",
+"Le dessin est faux ? Trouve le bug et corrige !"
+]
+},
+{
+"id": "stim-10",
+"cat": "stim",
+"titre": "La station météo",
+"ageMin": 11,
+"ageMax": 12,
+"adulte": false,
+"description": "",
+"materiel": "bouteille coupée + règle paille et carton · bocal + ballon carnet",
+"etapes": [
+"Fabrique pluviomètre, girouette et baromètre.",
+"Relève-les chaque jour à la même heure.",
+"Trace la courbe de ta semaine."
+]
+},
+{
+"id": "art-1",
+"cat": "art",
+"titre": "Le modelage en cire",
+"ageMin": 6,
+"ageMax": 6,
+"adulte": false,
+"description": "Chauffer la cire naturelle dans le creux des mains avant de la façonner. Favorise la conscience corporelle, la force des doigts et la patience créative.",
+"materiel": "cire d'abeille ou pâte à sel une planche",
+"etapes": [
+"Réchauffe la cire dans tes mains quelques minutes.",
+"Pétris, roule, pince.",
+"Façonne un animal ou un objet."
+]
+},
+{
+"id": "art-2",
+"cat": "art",
+"titre": "L'aquarelle mouillée",
+"ageMin": 6,
+"ageMax": 7,
+"adulte": false,
+"description": "Humidifier la feuille avant d'appliquer les couleurs primaires au pinceau doux pour observer la fusion des nuances et la naissance spontanée des formes.",
+"materiel": "papier épais une éponge · aquarelle bleu, jaune, rouge gros pinceau",
+"etapes": [
+"Mouille toute la feuille avec l'éponge.",
+"Pose une couleur, puis une autre juste à côté.",
+"Regarde-les se mélanger toutes seules."
+]
+},
+{
+"id": "art-3",
+"cat": "art",
+"titre": "Le tissage sur carton",
+"ageMin": 7,
+"ageMax": 7,
+"adulte": false,
+"description": "Entrecroiser des fils de laine colorés sur un support en carton cranté. Développe la régularité du geste, la coordination œil-main et l'organisation visuelle.",
+"materiel": "carton à encoches laine de couleurs · aiguille en plastique",
+"etapes": [
+"Enroule la laine d'une encoche à l'autre.",
+"Passe dessus, dessous, dessus, dessous…",
+"Change de couleur quand tu veux."
+]
+},
+{
+"id": "art-4",
+"cat": "art",
+"titre": "Le dessin à la loupe",
+"ageMin": 7,
+"ageMax": 8,
+"adulte": false,
+"description": "Observer l'intérieur d'une fleur, une plume ou un coquillage à la loupe et reproduire fidèlement l'agrandissement en respectant proportions et détails.",
+"materiel": "une loupe fleur, plume ou coquillage · crayon et gomme",
+"etapes": [
+"Regarde ton objet à la loupe.",
+"Dessine-le en grand, avec tous les détails.",
+"Compare : as-tu oublié quelque chose ?"
+]
+},
+{
+"id": "art-5",
+"cat": "art",
+"titre": "Le théâtre d'ombres",
+"ageMin": 8,
+"ageMax": 8,
+"adulte": false,
+"description": "Découper des silhouettes dans du carton noir, les fixer sur des pics en bois et jouer une scène derrière un drap blanc éclairé par une lampe de bureau.",
+"materiel": "carton noir ciseaux pics en bois · drap blanc une lampe",
+"etapes": [
+"Découpe tes personnages dans le carton noir.",
+"Scotche chaque silhouette sur un pic.",
+"Joue derrière le drap éclairé par la lampe."
+]
+},
+{
+"id": "art-6",
+"cat": "art",
+"titre": "La sculpture récup'",
+"ageMin": 8,
+"ageMax": 9,
+"adulte": false,
+"description": "Assembler bouchons, emballages métalliques, fils de fer et cartons pour créer un personnage, une créature fantastique ou une structure architecturale.",
+"materiel": "bouchons boîtes et rouleaux fil de fer · colle",
+"etapes": [
+"Étale ton matériel et imagine une créature.",
+"Assemble avec la colle et le fil de fer.",
+"Ajoute les détails : yeux, antennes…"
+]
+},
+{
+"id": "art-7",
+"cat": "art",
+"titre": "Le tricot avec les doigts",
+"ageMin": 9,
+"ageMax": 10,
+"adulte": false,
+"description": "",
+"materiel": "grosse laine un crochet (au choix)",
+"etapes": [
+"Fais une boucle autour de ton index.",
+"Enroule la laine sur tes doigts, passe les boucles par-dessus.",
+"Continue jusqu'à la bonne longueur : bracelet ou marque-page !"
+]
+},
+{
+"id": "art-8",
+"cat": "art",
+"titre": "La fresque au pastel",
+"ageMin": 10,
+"ageMax": 10,
+"adulte": false,
+"description": "Expérimenter les fondus de couleurs au pastel sec sur grand format, en utilisant les doigts ou des estompes en papier pour créer des ambiances lumineuses.",
+"materiel": "grande feuille pastels secs · estompe ou mouchoir",
+"etapes": [
+"Trace les grandes zones de couleur.",
+"Estompe avec le doigt pour mélanger.",
+"Ajoute des touches claires pour la lumière."
+]
+},
+{
+"id": "art-9",
+"cat": "art",
+"titre": "La reliure du carnet",
+"ageMin": 10,
+"ageMax": 11,
+"adulte": false,
+"description": "",
+"materiel": "5 feuilles A4 carton pour la couverture · poinçon aiguille et fil de lin",
+"etapes": [
+"Plie les feuilles en deux, glisse-les dans la couverture.",
+"Perce 3 trous dans le pli.",
+"Couds : milieu, haut, bas, milieu. Fais un nœud."
+]
+},
+{
+"id": "art-10",
+"cat": "art",
+"titre": "Mon exposition",
+"ageMin": 11,
+"ageMax": 12,
+"adulte": false,
+"description": "",
+"materiel": "tes plus belles œuvres · petites étiquettes (cartels) pâte à fixe",
+"etapes": [
+"Choisis 5 à 10 de tes plus belles créations.",
+"Écris un cartel : titre, technique, intention.",
+"Accroche-les et fais visiter ton expo."
+]
+},
+{
+"id": "imagination-1",
+"cat": "imagination",
+"titre": "Le petit théâtre",
+"ageMin": 6,
+"ageMax": 6,
+"adulte": false,
+"description": "Choisir des accessoires dans une malle à déguisements et inventer une histoire jouée devant un public ou pour soi-même dans un espace dédié.",
+"materiel": "malle à déguisements figurines · un tissu pour la scène",
+"etapes": [
+"Choisis un costume ou des figurines.",
+"Invente : qui ? où ? quel problème ?",
+"Joue ton histoire, pour toi ou pour un public."
+]
+},
+{
+"id": "imagination-2",
+"cat": "imagination",
+"titre": "La fabrique à histoires",
+"ageMin": 6,
+"ageMax": 7,
+"adulte": false,
+"description": "Tirer au sort deux mots sans rapport évident (ex: 'Chien' et 'Armoire') et inventer un récit oral ou dessiné expliquant leur rencontre extraordinaire.",
+"materiel": "petits papiers avec des mots 2 bocaux · feuille et crayons",
+"etapes": [
+"Tire un mot dans chaque bocal.",
+"Imagine comment ces deux-là se rencontrent.",
+"Raconte ou dessine ton histoire."
+]
+},
+{
+"id": "imagination-3",
+"cat": "imagination",
+"titre": "Le conte à écouter",
+"ageMin": 7,
+"ageMax": 7,
+"adulte": false,
+"description": "S'allonger au calme et écouter une histoire audio captivante. L'enfant dessine ensuite la scène principale telle qu'il l'a imaginée dans sa tête.",
+"materiel": "un conte audio un coussin · feuille et crayons",
+"etapes": [
+"Allonge-toi, ferme les yeux et écoute.",
+"Imagine les lieux et les personnages.",
+"Dessine la scène que tu as vue dans ta tête."
+]
+},
+{
+"id": "imagination-4",
+"cat": "imagination",
+"titre": "La BD en 4 cases",
+"ageMin": 7,
+"ageMax": 8,
+"adulte": false,
+"description": "Mettre en scène une plaisanterie ou une petite aventure en traçant 4 vignettes structurées : situation initiale, élément perturbateur, action, dénouement.",
+"materiel": "feuille pliée en 4 un crayon feutres",
+"etapes": [
+"Case 1 : le début. Case 2 : un problème arrive.",
+"Case 3 : ton héros agit.",
+"Case 4 : la fin de l'histoire."
+]
+},
+{
+"id": "imagination-5",
+"cat": "imagination",
+"titre": "Le jeu de rôle héroïque",
+"ageMin": 8,
+"ageMax": 9,
+"adulte": true,
+"description": "Créer un personnage avec 3 caractéristiques (Force, Agilité, Esprit) et vivre une aventure interactive guidée par un conteur à l'aide de dés.",
+"materiel": "fiche personnage 2 dés un crayon · un conteur",
+"etapes": [
+"Répartis 10 points entre Force, Agilité et Esprit.",
+"Le conteur décrit, tu dis ce que tu fais.",
+"Lance les dés pour savoir si tu réussis."
+]
+},
+{
+"id": "imagination-6",
+"cat": "imagination",
+"titre": "Le roman-photo",
+"ageMin": 9,
+"ageMax": 9,
+"adulte": false,
+"description": "Composer une suite de scènes avec ses figurines ou membres de la famille, prendre les photos, les imprimer et ajouter les bulles de dialogue manuellement.",
+"materiel": "figurines ou famille appareil photo · imprimante feutres",
+"etapes": [
+"Écris ton histoire en 6 scènes.",
+"Photographie chaque scène et imprime.",
+"Colle les photos et dessine les bulles."
+]
+},
+{
+"id": "imagination-7",
+"cat": "imagination",
+"titre": "Mon podcast",
+"ageMin": 9,
+"ageMax": 10,
+"adulte": false,
+"description": "",
+"materiel": "dictaphone ou téléphone ton texte · objets pour les bruitages",
+"etapes": [
+"Écris 2 minutes de texte sur ta passion.",
+"Entraîne-toi à lire en articulant bien.",
+"Enregistre-toi et ajoute tes bruitages maison."
+]
+},
+{
+"id": "imagination-8",
+"cat": "imagination",
+"titre": "Le film en stop-motion",
+"ageMin": 10,
+"ageMax": 11,
+"adulte": false,
+"description": "",
+"materiel": "tablette + appli stop-motion · pâte à modeler ou Lego un support fixe",
+"etapes": [
+"Fixe la tablette pour qu'elle ne bouge pas.",
+"Bouge un tout petit peu ton personnage, prends une photo.",
+"Recommence 50 fois, puis lance ton film !"
+]
+},
+{
+"id": "imagination-9",
+"cat": "imagination",
+"titre": "Le livre dont tu es le héros",
+"ageMin": 11,
+"ageMax": 11,
+"adulte": false,
+"description": "Rédiger un récit à choix multiples comprenant des paragraphes numérotés et des renvois ('Si vous choisissez d'ouvrir la porte, allez au paragraphe 12').",
+"materiel": "un cahier un crayon le plan des chemins",
+"etapes": [
+"Dessine le plan des chemins avant d'écrire.",
+"Numérote chaque paragraphe.",
+"Finis par des choix : « Si tu ouvres la porte, va au 12. »"
+]
+},
+{
+"id": "imagination-10",
+"cat": "imagination",
+"titre": "Le mini-documentaire",
+"ageMin": 11,
+"ageMax": 12,
+"adulte": false,
+"description": "",
+"materiel": "téléphone ou caméra tes 5 questions · appli de montage",
+"etapes": [
+"Choisis un sujet près de chez toi, écris 5 questions.",
+"Filme l'interview et des images du lieu.",
+"Monte un film de 3 minutes."
+]
+},
+{
+"id": "projets-1",
+"cat": "projets",
+"titre": "La cabane d'intérieur",
+"ageMin": 6,
+"ageMax": 6,
+"adulte": false,
+"description": "Aménager un espace refuge sous une table ou entre deux chaises avec des draps et pinces à linge. L'enfant y gère son propre univers intime.",
+"materiel": "draps ou voilages coussins · pinces à linge 2 chaises",
+"etapes": [
+"Pose un drap entre deux chaises ou sur une table.",
+"Fixe-le avec des pinces à linge.",
+"Installe coussins, livres et lampe : c'est chez toi !"
+]
+},
+{
+"id": "projets-2",
+"cat": "projets",
+"titre": "Le coin calme",
+"ageMin": 6,
+"ageMax": 7,
+"adulte": false,
+"description": "Se retirer spontanément dans un espace douillet équipé de bouteilles de retour au calme, de livres douces et d'éléments sensoriels pour apaiser ses tensions.",
+"materiel": "un gros coussin bouteille à paillettes · des livres un doudou",
+"etapes": [
+"Quand ça bouillonne dedans, va dans ton coin.",
+"Secoue la bouteille, regarde les paillettes tomber.",
+"Respire lentement jusqu'à ce qu'elles touchent le fond."
+]
+},
+{
+"id": "projets-3",
+"cat": "projets",
+"titre": "La boîte anti-ennui",
+"ageMin": 7,
+"ageMax": 7,
+"adulte": false,
+"description": "Rédiger à l'avance 20 papiers contenant des défis ou idées d'activités simples. En cas d'ennui, l'enfant pige une carte et s'engage à la réaliser.",
+"materiel": "une boîte ou un bocal 20 petits papiers · un crayon",
+"etapes": [
+"Écris 20 idées d'activités sur des papiers.",
+"Plie-les et mets-les dans la boîte.",
+"Tu t'ennuies ? Tire un papier… et fais-le !"
+]
+},
+{
+"id": "projets-4",
+"cat": "projets",
+"titre": "Le parcours d'obstacles",
+"ageMin": 7,
+"ageMax": 8,
+"adulte": false,
+"description": "Concevoir un circuit sécurisé dans le jardin ou le salon (ramper sous une chaise, sauter par-dessus un coussin), puis tenter de battre son propre record de temps.",
+"materiel": "chaises coussins plots ou bouteilles · chronomètre",
+"etapes": [
+"Installe ton parcours : ramper, sauter, slalomer.",
+"Fais un tour d'essai, lentement.",
+"Chronomètre-toi et bats ton record !"
+]
+},
+{
+"id": "projets-5",
+"cat": "projets",
+"titre": "Mon jeu de société",
+"ageMin": 8,
+"ageMax": 9,
+"adulte": false,
+"description": "Dessiner un plateau de jeu, fabriquer les pions, écrire les cartes d'épreuves et rédiger la règle du jeu complète avant de la faire tester à des proches.",
+"materiel": "carton feutres bouchons pour les pions · un dé",
+"etapes": [
+"Dessine le plateau et ses cases.",
+"Fabrique les pions et les cartes d'épreuves.",
+"Écris la règle, puis fais tester ta famille."
+]
+},
+{
+"id": "projets-6",
+"cat": "projets",
+"titre": "Le marché d'échanges",
+"ageMin": 9,
+"ageMax": 9,
+"adulte": true,
+"description": "Organiser entre enfants un temps où chacun propose un objet à troquer ou une compétence à enseigner aux autres (ex: apprendre à faire un nœud marin).",
+"materiel": "objets à troquer étiquettes · un savoir à enseigner",
+"etapes": [
+"Chacun apporte un objet ou un savoir à partager.",
+"Installe ton stand avec une étiquette.",
+"Échange ou enseigne, sans argent !"
+]
+},
+{
+"id": "projets-7",
+"cat": "projets",
+"titre": "Le musée de ma chambre",
+"ageMin": 9,
+"ageMax": 10,
+"adulte": false,
+"description": "",
+"materiel": "tes collections étiquettes boîtes · panneaux en carton",
+"etapes": [
+"Range ta collection par familles.",
+"Étiquette chaque objet : nom, origine, date.",
+"Fais visiter ta famille, comme un vrai guide."
+]
+},
+{
+"id": "projets-8",
+"cat": "projets",
+"titre": "Le budget de l'été",
+"ageMin": 10,
+"ageMax": 11,
+"adulte": false,
+"description": "",
+"materiel": "un tableau sur papier une calculatrice · les vrais tarifs",
+"etapes": [
+"Tu as 50 € pour une journée idéale.",
+"Cherche les vrais prix : transport, repas, visite.",
+"Additionne : te reste-t-il de l'argent ?"
+]
+},
+{
+"id": "projets-9",
+"cat": "projets",
+"titre": "Mon chef-d'œuvre du mois",
+"ageMin": 11,
+"ageMax": 11,
+"adulte": false,
+"description": "Choisir un grand sujet de passion (ex: fabriquer une maquette de bateau, écrire une nouvelle), tenir un carnet de bord hebdomadaire et présenter le résultat final.",
+"materiel": "un carnet de bord le matériel de ton projet",
+"etapes": [
+"Choisis un grand projet pour 1 mois.",
+"Chaque semaine, note ce qui est fait et ce qui reste.",
+"À la fin, présente ton chef-d'œuvre."
+]
+},
+{
+"id": "projets-10",
+"cat": "projets",
+"titre": "J'organise la fête",
+"ageMin": 11,
+"ageMax": 12,
+"adulte": false,
+"description": "",
+"materiel": "papier pour les invitations liste de courses · décorations jeux",
+"etapes": [
+"Choisis la date, le menu et les jeux.",
+"Écris les invitations et la liste de courses.",
+"Décore, accueille et anime la fête !"
+]
+}
+]
+}

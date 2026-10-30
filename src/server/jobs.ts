@@ -112,6 +112,8 @@ export async function purgeExpired(ctx: Ctx): Promise<{ logbook: number; errorRe
     "purge_admin_audit_log", "purge_expired_security_events", "purge_expired_family_tasks", "purge_expired_weekly_digests", "purge_old_scheduled_notifications", "purge_expired_anticipation",
     // Journal des consentements à la position au-delà de 5 ans (US-107 RT5, décision du DPO).
     "purge_location_consent_events", "purge_travel_data", "purge_place_searches",
+    // Lot 10 : propositions de sorties (30 jours après le jour visé) et offres mémorisées (90 jours) ; semaines de devoirs (12 mois) et exercices validés (D65).
+    "purge_expired_outing_data", "purge_expired_homework_data",
   ]) {
     const done = await sql<{ n: string | null }>`select ${sql.ref(job)}() as n`.execute(ctx.db);
     database += Number(done.rows[0]?.n ?? 0);

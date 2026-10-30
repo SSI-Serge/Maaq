@@ -10,6 +10,7 @@ import type { EventType } from "@/server/assistant/calendar";
 import type { AnticipationView } from "@/server/assistant/anticipation";
 import type { ReminderKind } from "@/server/assistant/reminders";
 import { TYPE_LABEL, TYPE_PLURAL } from "./format";
+import { HomeworkSettings } from "./HomeworkSettings";
 import { MyPosition } from "./LocationConsent";
 import styles from "./family.module.css";
 
@@ -270,6 +271,7 @@ export function SettingsScreen() {
       <MyPosition />
 
       <SchoolZone />
+      <HomeworkSettings />
       <Anticipation />
 
       <Section title="Délais de rappel par type de RDV">
