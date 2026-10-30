@@ -362,3 +362,4 @@ tant que le pilote reste petit. Le rapport du banc d'essai donne maintenant la p
 3. L'image Docker embarque désormais `agent/instructions.md` et `agent/outils/` (lus par le backend au démarrage).
 4. Une requête de l'assistant peut durer jusqu'à une minute (plusieurs appels du modèle) : vérifier le délai maximal du service Cloud Run.
 5. Informer les familles pilotes que leurs conversations avec l'assistant sont traitées par Anthropic (API directe), et recueillir leur accord écrit : clause du pilote (lot 9).
+6. **Rôle de base limité (condition d'ouverture du pilote, décision du PO du 30/10/2026)** : l'application se connecte aujourd'hui avec un seul rôle. Pour que la sécurité par ligne des 5 tables privées des Sorties (lot 10) agisse, il faut un rôle limité et `SET LOCAL app.user_id` à chaque transaction (assistant `asProfile`). Le lot 10 repose sur le code, sans cette protection de la base.

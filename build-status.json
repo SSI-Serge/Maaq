@@ -3,7 +3,7 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-10-29T12:20:07Z",
+  "updated": "2026-10-30T17:40:17Z",
   "deploys": [
     {
       "at": "2026-10-27T18:29:38Z",
@@ -2089,6 +2089,10 @@
         {
           "at": "2026-10-29T12:20:07Z",
           "what": "Sobriété des emails : le rappel J-1 suit la règle commune (notification, email à défaut). Bouton d'anticipation renommé « Non, l'ajouter à mes tâches »."
+        },
+        {
+          "at": "2026-10-30T17:40:17Z",
+          "what": "Lot 10 (Sorties et Devoirs) : protection des données privées des Sorties par le code (asProfile, fonctions *_visible_to, tests « l'autre parent ne voit rien »). Le brouillon des choix Devoirs reste dans le navigateur, sans table."
         }
       ],
       "unsure": [
@@ -2102,6 +2106,11 @@
         "La dictée corrigée (relance automatique, mots répétés) n'a pas été vérifiée sur un vrai Android : à refaire par le PO."
       ],
       "activity": [
+        {
+          "at": "2026-10-30T17:40:17Z",
+          "kind": "plan",
+          "what": "Lot 10 confié par le PO : en attente des empreintes finales du schéma avant de commencer"
+        },
         {
           "at": "2026-10-29T12:20:07Z",
           "kind": "back",
@@ -2420,6 +2429,11 @@
       "name": "Suggestions tirées de l'historique non médical (US-108)",
       "tag": "Proposed, not built",
       "note": "Reportée hors du MVP2 (D60). La spécification est écrite ; rien n'est perdu."
+    },
+    {
+      "name": "Lot 9 : rôle de base limité avec app.user_id effectif (condition d'ouverture du pilote)",
+      "tag": "Proposed, not built",
+      "note": "Décidé par le PO le 30/10 : la sécurité par ligne des 5 tables privées des Sorties n'agit qu'avec un rôle limité et SET LOCAL app.user_id. Le lot 10 s'appuie sur le code ; ce passage reste à faire avant le pilote."
     }
   ]
 }
