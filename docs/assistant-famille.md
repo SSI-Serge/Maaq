@@ -320,7 +320,9 @@ Le schéma porte les règles : demande de recherche « Sur place » avec plafond
 
 Le service de trajets sera derrière une interface (un faux service sert aux tests), de sorte que tout sauf l'appel à TomTom soit prêt avant d'avoir la clé.
 
-## Lot 10 du MVP2 : sous-agents Sorties et Devoirs (US-114 à US-121) — construit en local, livré éteint
+## Lot 10 du MVP2 : sous-agents Sorties et Devoirs (US-114 à US-121) — en ligne sur la zone de test, Sorties fermées
+
+**Zone de test (30/10/2026, révision `maaq-test-00034-mrg`)** : base sauvegardée et vérifiée avant migration (94 tables, 421 lignes), migrations 0013 et 0014 appliquées (14 au total), `deploy/supabase-securiser.sql` rejoué (toutes les tables avec la sécurité par ligne), catalogue Devoirs chargé. `OUTINGS_MODE` n'est pas réglé : **les Sorties sont fermées** (aucune recherche, même si un parent saisit ses critères). L'aide Devoirs est désactivée par défaut pour chaque foyer. Pour ouvrir les Sorties à l'essai : `gcloud run services update maaq-test --region europe-west1 --project maaq-test --update-env-vars OUTINGS_MODE=live` (l'outil de recherche web doit être activé pour l'organisation Anthropic).
 
 Schéma : `0013_lot10_valeurs_enumerees.sql` et `0014_lot10_schema.sql`, copies exactes de `lot_10_1_valeurs_enumerees.sql` / `lot_10_2_schema.sql` de la session base de données (SHA-256 `f5194935…` / `c7a4abef…`, version D65). Types régénérés. Les deux sous-agents sont des comportements de l'Assistant Famille, sans tuile du catalogue (SG-1). Tests : 855 au total, dont `family-homework-settings` (9), `family-homework-weeks` (24), `family-homework-photos` (10) et `family-outings` (44).
 

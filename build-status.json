@@ -3,8 +3,23 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-10-30T18:48:12Z",
+  "updated": "2026-10-30T18:54:10Z",
   "deploys": [
+    {
+      "at": "2026-10-30T18:54:10Z",
+      "env": "preview",
+      "what": "Lot 10 sur la zone de test : aide Devoirs (réglage, semaine, tâches, photos) ; Sorties (critères, propositions, RDV depuis une idée) fermées par OUTINGS_MODE=off",
+      "storyIds": [
+        "f16s113",
+        "f16s114",
+        "f16s115",
+        "f16s116",
+        "f16s117",
+        "f16s118",
+        "f16s119",
+        "f16s120"
+      ]
+    },
     {
       "at": "2026-10-27T18:29:38Z",
       "env": "preview",
@@ -1996,72 +2011,72 @@
           "id": "f16s113",
           "title": "US-118 — Activer l'aide Devoirs pour la famille et indiquer l'âge des devoirs de chaque enfant",
           "state": "testing",
-          "env": null,
-          "note": "Construit en local : interrupteur commun au foyer, présentation à la première activation, âge des devoirs, effacement des progrès.",
-          "at": "2026-10-30T18:48:12Z",
+          "env": "preview",
+          "note": "Sur la zone de test : interrupteur commun au foyer, présentation à la première activation, âge des devoirs, effacement des progrès.",
+          "at": "2026-10-30T18:54:10Z",
           "unsure": "Écrans jamais vus sur un téléphone."
         },
         {
           "id": "f16s114",
           "title": "US-119 — Préparer la semaine de devoirs de mes enfants avec l'aide Devoirs",
           "state": "testing",
-          "env": null,
-          "note": "Construit en local : carte sur la tâche « devoir », parcours en 4 étapes, semaine par enfant et par jour, tâches, impression, photos analysées puis oubliées.",
-          "at": "2026-10-30T18:48:12Z",
+          "env": "preview",
+          "note": "Sur la zone de test : carte sur la tâche « devoir », parcours en 4 étapes, semaine par enfant et par jour, tâches, impression, photos analysées puis oubliées.",
+          "at": "2026-10-30T18:54:10Z",
           "unsure": "Parcours en écran à boutons et non dans le tchat ; photo jamais essayée avec le vrai modèle ; critère de passage de niveau à valider."
         },
         {
           "id": "f16s115",
           "title": "US-114 — Définir mes critères de proposition de sorties",
           "state": "testing",
-          "env": null,
-          "note": "Construit en local : critères privés dans les réglages, désactivés par défaut.",
-          "at": "2026-10-30T18:48:12Z",
+          "env": "preview",
+          "note": "Sur la zone de test : critères privés dans les réglages, désactivés par défaut.",
+          "at": "2026-10-30T18:54:10Z",
           "unsure": "Écran jamais vu sur un téléphone."
         },
         {
           "id": "f16s116",
           "title": "US-115 — Recevoir une proposition de sortie suggérée automatiquement",
           "state": "testing",
-          "env": null,
-          "note": "Construit en local, fermé (OUTINGS_MODE=off) : recherche web du sous-agent, règles vérifiées par le code, planificateur, notification générique.",
-          "at": "2026-10-30T18:48:12Z",
+          "env": "preview",
+          "note": "Sur la zone de test, fermé (OUTINGS_MODE=off) : recherche web du sous-agent, règles vérifiées par le code, planificateur, notification générique.",
+          "at": "2026-10-30T18:54:10Z",
           "unsure": "La recherche web réelle n'a jamais été essayée ; coût inconnu ; avis du DPO attendu."
         },
         {
           "id": "f16s117",
           "title": "US-116 — Écarter une proposition de sortie sans y donner suite",
           "state": "testing",
-          "env": null,
-          "note": "Construit en local : « Annuler » avec retour en arrière de 10 secondes, « Pas cette fois ».",
-          "at": "2026-10-30T18:48:12Z",
+          "env": "preview",
+          "note": "Sur la zone de test : « Annuler » avec retour en arrière de 10 secondes, « Pas cette fois ».",
+          "at": "2026-10-30T18:54:10Z",
           "unsure": ""
         },
         {
           "id": "f16s118",
           "title": "US-117 — Ne pas voir les propositions de sortie faites à l'autre parent",
           "state": "testing",
-          "env": null,
-          "note": "Construit en local : protection par le code et tests ; sécurité par ligne de la base testée avec un rôle limité.",
-          "at": "2026-10-30T18:48:12Z",
+          "env": "preview",
+          "note": "Sur la zone de test : protection par le code et tests ; sécurité par ligne de la base testée avec un rôle limité.",
+          "at": "2026-10-30T18:54:10Z",
           "unsure": "Le rôle limité de l'application est une condition d'ouverture du pilote ; l'export reste à faire (lot 9)."
         },
         {
           "id": "f16s119",
           "title": "US-120 — Créer le RDV effectif à partir d'une proposition de sortie",
           "state": "testing",
-          "env": null,
-          "note": "Construit en local : formulaire prérempli sans date, RDV confirmé, conflit signalé, l'autre parent non notifié.",
-          "at": "2026-10-30T18:48:12Z",
+          "env": "preview",
+          "note": "Sur la zone de test : formulaire prérempli sans date, RDV confirmé, conflit signalé, l'autre parent non notifié.",
+          "at": "2026-10-30T18:54:10Z",
           "unsure": ""
         },
         {
           "id": "f16s120",
           "title": "US-121 — Être prévenu qu'un RDV de sortie sera visible par l'autre parent",
           "state": "testing",
-          "env": null,
-          "note": "Construit en local : avertissement au-dessus du bouton, titre discret, « Plus tard ».",
-          "at": "2026-10-30T18:48:12Z",
+          "env": "preview",
+          "note": "Sur la zone de test : avertissement au-dessus du bouton, titre discret, « Plus tard ».",
+          "at": "2026-10-30T18:54:10Z",
           "unsure": ""
         }
       ],
@@ -2183,6 +2198,11 @@
         "Lot 10 : recherche web des Sorties, analyse d'une vraie photo, écrans sur téléphone et impression jamais essayés ; avis du DPO attendu (recherche web, données de mineurs)."
       ],
       "activity": [
+        {
+          "at": "2026-10-30T18:54:10Z",
+          "kind": "live",
+          "what": "Lot 10 en ligne sur la zone de test (révision 00034), migrations 0013 et 0014 appliquées après sauvegarde vérifiée ; Sorties fermées"
+        },
         {
           "at": "2026-10-30T18:48:12Z",
           "kind": "back",
