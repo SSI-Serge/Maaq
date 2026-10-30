@@ -9,7 +9,7 @@ import { localDay } from "../local-time";
 import type { AssistantModel, ImageBlock } from "../model";
 import { familyTimeZone } from "../reminders";
 import { taskViewer } from "../tasks";
-import { exerciseStatement, LEVEL_LABEL } from "./catalog";
+import { LEVEL_LABEL } from "./catalog";
 import { photoDone } from "./photo-text";
 import { homeworkEnabled } from "./settings";
 
@@ -47,6 +47,7 @@ interface Candidate {
   textbook: string;
   theme: string;
   answer: string | null;
+  statement: string | null;
 }
 
 /** Les exercices que le modèle peut valider : ceux du niveau de l'enfant prévus dans une semaine (la sienne si elle est donnée), pas encore validés. */
@@ -55,16 +56,16 @@ async function candidates(ctx: Ctx, accountId: string, memberId: string, level: 
     .selectFrom("homework_week_items as i")
     .innerJoin("homework_exercises as e", "e.id", "i.exercise_id")
     .leftJoin("homework_exercise_validations as v", (join) => join.onRef("v.exercise_id", "=", "e.id").on("v.member_id", "=", memberId))
-    .select(["e.id", "e.number", "e.textbook_key", "e.theme", "e.answer"])
+    .select(["e.id", "e.number", "e.textbook_key", "e.theme", "e.answer", "e.statement"])
     .where("i.account_id", "=", accountId)
     .where("i.member_id", "=", memberId)
     .where("e.level", "=", level as "cp")
     .where("v.member_id", "is", null)
     .$if(Boolean(weekId), (qb) => qb.where("i.week_id", "=", weekId!))
-    .groupBy(["e.id", "e.number", "e.textbook_key", "e.theme", "e.answer"])
+    .groupBy(["e.id", "e.number", "e.textbook_key", "e.theme", "e.answer", "e.statement"])
     .orderBy("e.number")
     .execute();
-  return rows.map((r) => ({ id: String(r.id), number: r.number, textbook: r.textbook_key, theme: r.theme, answer: r.answer }));
+  return rows.map((r) => ({ id: String(r.id), number: r.number, textbook: r.textbook_key, theme: r.theme, answer: r.answer, statement: r.statement }));
 }
 
 function parseAnswer(text: string): { comment: string; states: Map<number, PhotoState> } {
@@ -126,7 +127,7 @@ export async function analyzeHomeworkPhoto(
     ctx.db.updateTable("daily_request_counters").set({ request_count: sql`greatest(request_count - 1, 0)` }).where("user_id", "=", session.user.id).where("request_date", "=", sql<Date>`${day}::date`).execute();
 
   const image: ImageBlock = { type: "image", source: { type: "base64", media_type: input.mediaType, data: input.data.toString("base64") } };
-  const exercises = list.map((c) => ({ numero: c.number, theme: c.theme, enonce: exerciseStatement(c.textbook, level as "cp", c.number), corrige: c.answer ?? "" }));
+  const exercises = list.map((c) => ({ numero: c.number, theme: c.theme, enonce: c.statement ?? "", corrige: c.answer ?? "" }));
   let answer: Awaited<ReturnType<AssistantModel["send"]>>;
   try {
     answer = await model.send({

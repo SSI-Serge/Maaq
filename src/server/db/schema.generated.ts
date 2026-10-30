@@ -1273,7 +1273,15 @@ export interface HomeworkActivities {
   card_ref: string | null;
   category: HomeworkActivityCategory;
   id: Generated<Int8>;
+  /**
+   * Matériel nécessaire à l'activité, contenu de référence porté par la base (D66) : 1 000 caractères au plus, facultatif. Aucune donnée personnelle
+   */
+  materials: string | null;
   needs_adult: Generated<boolean>;
+  /**
+   * Étapes de l'activité, contenu de référence porté par la base (D66) : 4 000 caractères au plus, facultatif. Aucune donnée personnelle
+   */
+  steps: string | null;
   title: string;
 }
 
@@ -1293,6 +1301,10 @@ export interface HomeworkExercises {
   id: Generated<Int8>;
   level: HomeworkLevel;
   number: number;
+  /**
+   * Énoncé de l'exercice, contenu de référence du manuel porté par la base (D66) : 2 000 caractères au plus, facultatif. Aucune donnée personnelle : table de référence sans lien avec un compte, un profil ou un membre
+   */
+  statement: string | null;
   textbook_key: string;
   theme: string;
 }

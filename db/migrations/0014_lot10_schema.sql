@@ -163,6 +163,8 @@ CREATE TABLE homework_exercises (
   level        homework_level NOT NULL,
   number       integer NOT NULL CHECK (number >= 1),
   theme        varchar(120) NOT NULL,
+  -- Énoncé de l'exercice (contenu de référence du manuel, D66) : 2 000 caractères au plus, jamais vide quand il est renseigné
+  statement    text CHECK (statement IS NULL OR length(btrim(statement)) BETWEEN 1 AND 2000),
   -- Corrigé affiché au parent
   answer       text,
   UNIQUE (textbook_key, level, number)
@@ -174,6 +176,9 @@ CREATE TABLE homework_activities (
   -- Âge visé, de 6 à 12 ans : proposée à l'âge des devoirs de l'enfant, à un an près
   age          smallint NOT NULL CHECK (age BETWEEN 6 AND 12),
   needs_adult  boolean NOT NULL DEFAULT false,
+  -- Étapes de l'activité (4 000 caractères au plus) et matériel nécessaire (1 000 au plus) : contenus de référence, D66
+  steps        text CHECK (steps IS NULL OR length(btrim(steps)) BETWEEN 1 AND 4000),
+  materials    text CHECK (materials IS NULL OR length(btrim(materials)) BETWEEN 1 AND 1000),
   -- Référence de la carte illustrée imprimable (fichier de l'application)
   card_ref     text,
   UNIQUE (category, title, age)
@@ -828,7 +833,10 @@ COMMENT ON COLUMN family_settings.homework_help_enabled IS $$Aide Devoirs activ�
 COMMENT ON COLUMN family_settings.homework_help_first_enabled_at IS $$Date de la première activation, posée automatiquement : vide = la présentation en trois lignes n'a jamais été montrée (US-118 RF3)$$;
 COMMENT ON COLUMN family_settings.homework_help_disabled_at IS $$Date de la dernière désactivation de l'aide, posée automatiquement quand elle passe de vraie à fausse et remise à vide à la réactivation. Les exercices validés sont gardés jusqu'à homework_validation_grace_days (30) après cette date : une réactivation pendant ce délai les retrouve (D65)$$;
 COMMENT ON TABLE homework_textbooks IS $$Manuels de maths : France (toujours proposé) et manuels étrangers (Singapour, Chine), qui se débloquent par enfant et par niveau. [US-119 RF7, RT4]$$;
+COMMENT ON COLUMN homework_exercises.statement IS $$Énoncé de l'exercice, contenu de référence du manuel porté par la base (D66) : 2 000 caractères au plus, facultatif. Aucune donnée personnelle : table de référence sans lien avec un compte, un profil ou un membre$$;
 COMMENT ON TABLE homework_exercises IS $$Exercices de maths du catalogue : manuel, niveau (CP à CM2), numéro, thème, corrigé. Table de référence chargée une fois ; un rechargement met les lignes à jour sans les supprimer (les progrès les désignent). [US-119 RF2, RF4, RT4]$$;
+COMMENT ON COLUMN homework_activities.steps IS $$Étapes de l'activité, contenu de référence porté par la base (D66) : 4 000 caractères au plus, facultatif. Aucune donnée personnelle$$;
+COMMENT ON COLUMN homework_activities.materials IS $$Matériel nécessaire à l'activité, contenu de référence porté par la base (D66) : 1 000 caractères au plus, facultatif. Aucune donnée personnelle$$;
 COMMENT ON TABLE homework_activities IS $$Activités d'éveil du catalogue : catégorie (nature, philo, STIM, art, imagination, jeux et projets), âge visé, « avec un adulte », carte illustrée. Table de référence chargée une fois. [US-119 RF2, RF4, RT4]$$;
 COMMENT ON TABLE homework_children IS $$Âge des devoirs de chaque enfant suivi par l'aide Devoirs : 6 à 12 ans, saisi par le parent, distinct de la date de naissance (un enfant travaille souvent au-dessus de son âge). Partagé entre les deux parents. Donnée de mineur : supprimée avec le membre et à l'effacement des progrès. [US-118 RF4, RT1, D64 S-11]$$;
 COMMENT ON COLUMN homework_children.homework_age IS $$Âge des devoirs (6 à 12 ans) : donne le niveau de maths (6 CP … 10 CM2, 11 et 12 CM2) et l'âge des activités à un an près. Sans lien avec family_members.birth_year et birth_month, qu'il ne modifie pas$$;

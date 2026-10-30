@@ -6,7 +6,7 @@ import { seal, open } from "../fields";
 import { requireParent } from "../family";
 import { addDays } from "../series";
 import { taskViewer, type TaskViewer } from "../tasks";
-import { ACTIVITY_CATEGORIES, activityContent, cardUrl, categoryLabel, exerciseStatement, LEVEL_LABEL } from "./catalog";
+import { ACTIVITY_CATEGORIES, cardUrl, categoryLabel, LEVEL_LABEL, splitSteps } from "./catalog";
 import { homeworkEnabled, levelForAge } from "./settings";
 
 /**
@@ -137,7 +137,6 @@ export interface ActivityOption {
   title: string;
   ageLabel: string;
   needsAdult: boolean;
-  description: string;
   state: ElementState;
   card: string | null;
 }
@@ -224,16 +223,14 @@ export async function activityOptions(db: Db, accountId: string, memberId: strin
     else byTitle.set(r.title, { ...r, ages: [r.age] });
   }
   const options = [...byTitle.values()].map((r): ActivityOption & { distance: number } => {
-    const content = activityContent(category, r.title);
     const state: ElementState = states.activitiesDone.has(String(r.id)) ? "done" : states.activitiesPlanned.has(String(r.id)) ? "planned" : "free";
-    const ages = content ? undefined : r.ages;
     return {
-      activityId: String(r.id), title: r.title, ageLabel: ages ? `${Math.min(...ages)} ans` : "", needsAdult: r.needs_adult, description: content?.description ?? "", state, card: cardUrl(r.card_ref),
+      activityId: String(r.id), title: r.title, ageLabel: `${Math.min(...r.ages)} ans`, needsAdult: r.needs_adult, state, card: cardUrl(r.card_ref),
       distance: Math.abs(r.age - member.age),
     };
   });
   options.sort((a, b) => Number(a.state !== "free") - Number(b.state !== "free") || a.distance - b.distance || a.title.localeCompare(b.title, "fr"));
-  return options.slice(0, limit).map((o) => ({ activityId: o.activityId, title: o.title, ageLabel: o.ageLabel, needsAdult: o.needsAdult, description: o.description, state: o.state, card: o.card }));
+  return options.slice(0, limit).map((o) => ({ activityId: o.activityId, title: o.title, ageLabel: o.ageLabel, needsAdult: o.needsAdult, state: o.state, card: o.card }));
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------
@@ -471,8 +468,8 @@ export async function getWeek(ctx: Ctx, session: SessionContext, weekId: string)
     .leftJoin("homework_exercises as e", "e.id", "i.exercise_id")
     .leftJoin("homework_activities as a", "a.id", "i.activity_id")
     .select([
-      "i.id", "i.member_id", sql<string>`i.day::text`.as("day"), "i.checked_at", "i.custom_title", "e.textbook_key", "e.level", "e.number", "e.theme", "e.answer",
-      "a.category", "a.title as activity_title", "a.needs_adult", "a.card_ref",
+      "i.id", "i.member_id", sql<string>`i.day::text`.as("day"), "i.checked_at", "i.custom_title", "e.textbook_key", "e.level", "e.number", "e.theme", "e.answer", "e.statement",
+      "a.category", "a.title as activity_title", "a.needs_adult", "a.card_ref", "a.steps", "a.materials",
     ])
     .where("i.week_id", "=", weekId)
     .orderBy("i.day")
@@ -495,14 +492,13 @@ export async function getWeek(ctx: Ctx, session: SessionContext, weekId: string)
           if (r.number !== null && r.textbook_key && r.level) {
             return {
               id: String(r.id), day, kind: "exercise", title: r.theme ?? "", source: `${labels.get(r.textbook_key) ?? r.textbook_key} ${LEVEL_LABEL[r.level]} · Ex ${r.number}`,
-              statement: exerciseStatement(r.textbook_key, r.level, r.number) || null, answer: r.answer, steps: [], materials: null, needsAdult: false, card: null, checked: r.checked_at !== null,
+              statement: r.statement, answer: r.answer, steps: [], materials: null, needsAdult: false, card: null, checked: r.checked_at !== null,
             };
           }
           if (r.activity_title && r.category) {
-            const content = activityContent(r.category, r.activity_title);
             return {
-              id: String(r.id), day, kind: "activity", title: r.activity_title, source: `Fiche ${categoryLabel(r.category)}${r.needs_adult ? " · avec un adulte" : ""}`, statement: content?.description || null,
-              answer: null, steps: content?.steps ?? [], materials: content?.materials || null, needsAdult: Boolean(r.needs_adult), card: cardUrl(r.card_ref), checked: r.checked_at !== null,
+              id: String(r.id), day, kind: "activity", title: r.activity_title, source: `Fiche ${categoryLabel(r.category)}${r.needs_adult ? " · avec un adulte" : ""}`, statement: null,
+              answer: null, steps: splitSteps(r.steps), materials: r.materials, needsAdult: Boolean(r.needs_adult), card: cardUrl(r.card_ref), checked: r.checked_at !== null,
             };
           }
           return { id: String(r.id), day, kind: "custom", title: r.custom_title ? open(r.custom_title) : "", source: "Activité du parent", statement: null, answer: null, steps: [], materials: null, needsAdult: false, card: null, checked: r.checked_at !== null };
