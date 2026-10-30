@@ -11,7 +11,9 @@ export interface OtherBlock { type: string; [key: string]: unknown }
 export type ContentBlock = TextBlock | ToolUseBlock | OtherBlock;
 
 export interface ToolResultBlock { type: "tool_result"; tool_use_id: string; content: string; is_error?: boolean }
-export type ModelMessage = { role: "user"; content: string | (TextBlock | ToolResultBlock)[] } | { role: "assistant"; content: ContentBlock[] };
+/** Image envoyée au modèle pour analyse (photos du travail des enfants, US-119) : jamais conservée par MAAQ, supprimée dès la réponse. */
+export interface ImageBlock { type: "image"; source: { type: "base64"; media_type: "image/jpeg" | "image/png" | "image/webp"; data: string } }
+export type ModelMessage = { role: "user"; content: string | (TextBlock | ToolResultBlock | ImageBlock)[] } | { role: "assistant"; content: ContentBlock[] };
 
 export interface ModelRequest {
   system: string;
