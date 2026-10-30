@@ -12,6 +12,7 @@ import type { ReminderKind } from "@/server/assistant/reminders";
 import { TYPE_LABEL, TYPE_PLURAL } from "./format";
 import { HomeworkSettings } from "./HomeworkSettings";
 import { MyPosition } from "./LocationConsent";
+import { OutingsSettings } from "./OutingsSettings";
 import styles from "./family.module.css";
 
 interface Setting {
@@ -272,6 +273,7 @@ export function SettingsScreen() {
 
       <SchoolZone />
       <HomeworkSettings />
+      <OutingsSettings />
       <Anticipation />
 
       <Section title="Délais de rappel par type de RDV">

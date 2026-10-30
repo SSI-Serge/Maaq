@@ -159,7 +159,7 @@ export function EventScreen({ id }: { id: string }) {
   const who = event.statusChange?.byFirstName;
   const when = event.statusChange ? stamp(event.statusChange.at) : "";
   const requestedByMe = event.requestedBy === user.firstName;
-  const sourceLine = event.source === "mail" ? "Source : mail transféré" : requestedByMe || !event.requestedBy ? "Source : votre message" : `Source : message de ${event.requestedBy}`;
+  const sourceLine = event.source === "outing" ? (requestedByMe || !event.requestedBy ? "Créé par vous" : `Créé par ${event.requestedBy}`) : event.source === "mail" ? "Source : mail transféré" : requestedByMe || !event.requestedBy ? "Source : votre message" : `Source : message de ${event.requestedBy}`;
 
   return (
     <AppShell

@@ -11,6 +11,7 @@ import type { AnticipationView } from "@/server/assistant/anticipation";
 import type { EventView } from "@/server/assistant/events";
 import type { HomeworkSetting } from "@/server/assistant/homework/settings";
 import { clock, dayOf, shortDate } from "./format";
+import { OutingHomeCard } from "./OutingsScreens";
 import { Dots } from "./parts";
 import { AnticipationCards } from "./QuestionCards";
 import styles from "./family.module.css";
@@ -101,6 +102,8 @@ export function AssistantHome() {
           <Item key={e.id} event={e} />
         ))}
       </Section>
+
+      <OutingHomeCard />
 
       {toAnticipate && toAnticipate.enabled && (toAnticipate.questions.length > 0 || toAnticipate.birthCards.length > 0) && (
         <div id="anticiper">

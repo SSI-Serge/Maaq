@@ -3,7 +3,7 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-10-30T17:40:17Z",
+  "updated": "2026-10-30T18:48:12Z",
   "deploys": [
     {
       "at": "2026-10-27T18:29:38Z",
@@ -1991,6 +1991,78 @@
           "state": "idea",
           "env": null,
           "note": "Reportée hors du MVP2 (D60)."
+        },
+        {
+          "id": "f16s113",
+          "title": "US-118 — Activer l'aide Devoirs pour la famille et indiquer l'âge des devoirs de chaque enfant",
+          "state": "testing",
+          "env": null,
+          "note": "Construit en local : interrupteur commun au foyer, présentation à la première activation, âge des devoirs, effacement des progrès.",
+          "at": "2026-10-30T18:48:12Z",
+          "unsure": "Écrans jamais vus sur un téléphone."
+        },
+        {
+          "id": "f16s114",
+          "title": "US-119 — Préparer la semaine de devoirs de mes enfants avec l'aide Devoirs",
+          "state": "testing",
+          "env": null,
+          "note": "Construit en local : carte sur la tâche « devoir », parcours en 4 étapes, semaine par enfant et par jour, tâches, impression, photos analysées puis oubliées.",
+          "at": "2026-10-30T18:48:12Z",
+          "unsure": "Parcours en écran à boutons et non dans le tchat ; photo jamais essayée avec le vrai modèle ; critère de passage de niveau à valider."
+        },
+        {
+          "id": "f16s115",
+          "title": "US-114 — Définir mes critères de proposition de sorties",
+          "state": "testing",
+          "env": null,
+          "note": "Construit en local : critères privés dans les réglages, désactivés par défaut.",
+          "at": "2026-10-30T18:48:12Z",
+          "unsure": "Écran jamais vu sur un téléphone."
+        },
+        {
+          "id": "f16s116",
+          "title": "US-115 — Recevoir une proposition de sortie suggérée automatiquement",
+          "state": "testing",
+          "env": null,
+          "note": "Construit en local, fermé (OUTINGS_MODE=off) : recherche web du sous-agent, règles vérifiées par le code, planificateur, notification générique.",
+          "at": "2026-10-30T18:48:12Z",
+          "unsure": "La recherche web réelle n'a jamais été essayée ; coût inconnu ; avis du DPO attendu."
+        },
+        {
+          "id": "f16s117",
+          "title": "US-116 — Écarter une proposition de sortie sans y donner suite",
+          "state": "testing",
+          "env": null,
+          "note": "Construit en local : « Annuler » avec retour en arrière de 10 secondes, « Pas cette fois ».",
+          "at": "2026-10-30T18:48:12Z",
+          "unsure": ""
+        },
+        {
+          "id": "f16s118",
+          "title": "US-117 — Ne pas voir les propositions de sortie faites à l'autre parent",
+          "state": "testing",
+          "env": null,
+          "note": "Construit en local : protection par le code et tests ; sécurité par ligne de la base testée avec un rôle limité.",
+          "at": "2026-10-30T18:48:12Z",
+          "unsure": "Le rôle limité de l'application est une condition d'ouverture du pilote ; l'export reste à faire (lot 9)."
+        },
+        {
+          "id": "f16s119",
+          "title": "US-120 — Créer le RDV effectif à partir d'une proposition de sortie",
+          "state": "testing",
+          "env": null,
+          "note": "Construit en local : formulaire prérempli sans date, RDV confirmé, conflit signalé, l'autre parent non notifié.",
+          "at": "2026-10-30T18:48:12Z",
+          "unsure": ""
+        },
+        {
+          "id": "f16s120",
+          "title": "US-121 — Être prévenu qu'un RDV de sortie sera visible par l'autre parent",
+          "state": "testing",
+          "env": null,
+          "note": "Construit en local : avertissement au-dessus du bouton, titre discret, « Plus tard ».",
+          "at": "2026-10-30T18:48:12Z",
+          "unsure": ""
         }
       ],
       "decisions": [
@@ -2093,6 +2165,10 @@
         {
           "at": "2026-10-30T17:40:17Z",
           "what": "Lot 10 (Sorties et Devoirs) : protection des données privées des Sorties par le code (asProfile, fonctions *_visible_to, tests « l'autre parent ne voit rien »). Le brouillon des choix Devoirs reste dans le navigateur, sans table."
+        },
+        {
+          "at": "2026-10-30T18:48:12Z",
+          "what": "Lot 10 : Sorties fermées par OUTINGS_MODE=off tant que le DPO n'a pas donné son avis ; aide Devoirs désactivée par défaut au niveau du foyer."
         }
       ],
       "unsure": [
@@ -2103,9 +2179,15 @@
         "Le point de la semaine fait appel à un modèle : coût et qualité du résumé à mesurer sur des semaines fictives avant le pilote.",
         "Le suivi du trajet ne repose pour l'instant que sur un faux service : aucune durée réelle n'a été obtenue de TomTom.",
         "La clé Anthropic a atteint sa limite d'usage jusqu'au 01/11/2026 : l'assistant de la zone de test est aussi arrêté. Deux cas de base du banc d'essai (22 et 23) échouent et restent à diagnostiquer.",
-        "La dictée corrigée (relance automatique, mots répétés) n'a pas été vérifiée sur un vrai Android : à refaire par le PO."
+        "La dictée corrigée (relance automatique, mots répétés) n'a pas été vérifiée sur un vrai Android : à refaire par le PO.",
+        "Lot 10 : recherche web des Sorties, analyse d'une vraie photo, écrans sur téléphone et impression jamais essayés ; avis du DPO attendu (recherche web, données de mineurs)."
       ],
       "activity": [
+        {
+          "at": "2026-10-30T18:48:12Z",
+          "kind": "back",
+          "what": "Lot 10 (Sorties et Devoirs) construit en local : 8 user stories, 855 tests ; livré éteint, pas encore sur la zone de test"
+        },
         {
           "at": "2026-10-30T17:40:17Z",
           "kind": "plan",
