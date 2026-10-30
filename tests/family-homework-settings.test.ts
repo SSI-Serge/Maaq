@@ -58,10 +58,15 @@ describe("catalogue (US-119 RT4)", () => {
   it("D66 : énoncés, étapes et matériel sont portés par la base, sans donnée personnelle ; la base refuse un contenu vide", async () => {
     const exercises = await db.selectFrom("homework_exercises").select(["statement", "answer"]).execute();
     expect(exercises.every((e) => e.statement && e.statement.length <= 2000 && e.answer)).toBe(true);
-    const activities = await db.selectFrom("homework_activities").select(["steps", "materials"]).execute();
+    const activities = await db.selectFrom("homework_activities").select(["steps", "materials", "description"]).execute();
     expect(activities.every((a) => a.steps && a.steps.length <= 4000 && a.materials && a.materials.length <= 1000)).toBe(true);
+    // La description est facultative (42 activités sur 60 en ont une) mais jamais vide ni au-delà de 1 000 caractères.
+    const described = activities.filter((a) => a.description !== null);
+    expect(described.length).toBeGreaterThan(0);
+    expect(described.every((a) => a.description!.trim().length >= 1 && a.description!.length <= 1000)).toBe(true);
     const personal = /[\w.+-]+@[\w-]+\.\w+|\b0[1-9](?:[ .]?\d{2}){4}\b|https?:\/\/|www\./i;
-    expect([...exercises.map((e) => e.statement), ...activities.map((a) => a.steps), ...activities.map((a) => a.materials)].filter((t) => t && personal.test(t))).toEqual([]);
+    expect([...exercises.map((e) => e.statement), ...activities.flatMap((a) => [a.steps, a.materials, a.description])].filter((t) => t && personal.test(t))).toEqual([]);
+    await expect(db.updateTable("homework_activities").set({ description: "  " }).where("category", "=", "nature").execute()).rejects.toThrow();
     await expect(db.updateTable("homework_exercises").set({ statement: "   " }).where("textbook_key", "=", "france").where("level", "=", "cp").where("number", "=", 1).execute()).rejects.toThrow();
   });
 });

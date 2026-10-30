@@ -6,7 +6,7 @@ import type { DB, HomeworkActivityCategory, HomeworkLevel } from "@/server/db/sc
 /**
  * Catalogue de l'aide Devoirs (US-119 RT4) : exercices de maths des manuels France, Singapour et Chine (CP à CM2, 25 par niveau) et activités d'éveil
  * (six catégories, une carte illustrée chacune). Il est préparé une fois à partir des manuels et des fiches dont MAAQ a les droits (D64, S-09) et porté par la base
- * (D66) : numéro, thème, énoncé et corrigé des exercices ; âge, étapes, matériel et carte des activités. Ce sont des contenus de référence, sans donnée de famille.
+ * (D66) : numéro, thème, énoncé et corrigé des exercices ; âge, description, étapes, matériel et carte des activités. Ce sont des contenus de référence, sans donnée de famille.
  * Le fichier source `data/catalogue-devoirs.json` ne sert qu'au chargement (`scripts/load-homework-catalog.ts`) : l'application ne le lit plus.
  */
 
@@ -46,6 +46,7 @@ interface FileActivity {
   ageMin: number;
   ageMax: number;
   adulte: boolean;
+  description: string;
   materiel: string;
   etapes: string[];
 }
@@ -91,8 +92,8 @@ export async function loadHomeworkCatalog(db: Db, file: CatalogFile = readCatalo
     for (let age = a.ageMin; age <= a.ageMax; age++) {
       await db
         .insertInto("homework_activities")
-        .values({ category: CATEGORY_OF_FILE[a.cat], title: a.titre, age, needs_adult: a.adulte, card_ref: a.id, steps: joinSteps(a.etapes), materials: a.materiel.trim() || null })
-        .onConflict((oc) => oc.columns(["category", "title", "age"]).doUpdateSet({ needs_adult: a.adulte, card_ref: a.id, steps: joinSteps(a.etapes), materials: a.materiel.trim() || null }))
+        .values({ category: CATEGORY_OF_FILE[a.cat], title: a.titre, age, needs_adult: a.adulte, card_ref: a.id, steps: joinSteps(a.etapes), materials: a.materiel.trim() || null, description: a.description.trim() || null })
+        .onConflict((oc) => oc.columns(["category", "title", "age"]).doUpdateSet({ needs_adult: a.adulte, card_ref: a.id, steps: joinSteps(a.etapes), materials: a.materiel.trim() || null, description: a.description.trim() || null }))
         .execute();
       activities += 1;
     }

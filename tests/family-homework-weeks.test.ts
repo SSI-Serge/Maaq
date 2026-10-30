@@ -203,12 +203,15 @@ describe("préparer la semaine (US-119 RF4)", () => {
     expect(exerciseItem.statement).toBeTruthy(); // l'énoncé vient de la base (D66)
   });
 
-  it("D66 : une activité du catalogue montre ses étapes, son matériel et sa carte, lus dans la base", async () => {
+  it("D66 : une activité du catalogue montre sa description, ses étapes, son matériel et sa carte, lus dans la base", async () => {
     const f = await family();
-    const [first] = await activityOptions(db, f.accountId, f.leo, "nature", 1);
+    const options = await activityOptions(db, f.accountId, f.leo, "nature", 20);
+    const first = options.find((o) => o.description) ?? options[0];
+    expect(first.description).toBeTruthy(); // proposée dans le parcours de préparation, au-dessus des étapes
     const { weekId } = await prepareWeek(ctx(), f.camilleSession, { weekStart: WEEK, workDays: [1], children: [{ memberId: f.leo, items: [{ kind: "activity", activityId: first.activityId, days: [1] }] }] });
     const item = (await getWeek(ctx(), f.camilleSession, weekId)).children[0].items[0];
     expect(item).toMatchObject({ kind: "activity", needsAdult: first.needsAdult, card: first.card });
+    expect(item.statement).toBe(first.description); // la description s'affiche dans la semaine, avant les étapes
     expect(item.steps.length).toBeGreaterThan(0);
     expect(item.materials).toBeTruthy();
   });

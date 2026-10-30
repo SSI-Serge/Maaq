@@ -137,6 +137,8 @@ export interface ActivityOption {
   title: string;
   ageLabel: string;
   needsAdult: boolean;
+  /** Paragraphe d'introduction : ce que fait l'enfant ; vide si l'activité n'en a pas. */
+  description: string | null;
   state: ElementState;
   card: string | null;
 }
@@ -210,7 +212,7 @@ export async function activityOptions(db: Db, accountId: string, memberId: strin
   if (!member) throw fail("not_found", "Cet enfant n'est pas suivi par l'aide Devoirs.", 404);
   const rows = await db
     .selectFrom("homework_activities")
-    .select(["id", "title", "age", "needs_adult", "card_ref"])
+    .select(["id", "title", "age", "needs_adult", "card_ref", "description"])
     .where("category", "=", category)
     .where("age", ">=", member.age - 1)
     .where("age", "<=", member.age + 1)
@@ -225,12 +227,12 @@ export async function activityOptions(db: Db, accountId: string, memberId: strin
   const options = [...byTitle.values()].map((r): ActivityOption & { distance: number } => {
     const state: ElementState = states.activitiesDone.has(String(r.id)) ? "done" : states.activitiesPlanned.has(String(r.id)) ? "planned" : "free";
     return {
-      activityId: String(r.id), title: r.title, ageLabel: `${Math.min(...r.ages)} ans`, needsAdult: r.needs_adult, state, card: cardUrl(r.card_ref),
+      activityId: String(r.id), title: r.title, ageLabel: `${Math.min(...r.ages)} ans`, needsAdult: r.needs_adult, description: r.description, state, card: cardUrl(r.card_ref),
       distance: Math.abs(r.age - member.age),
     };
   });
   options.sort((a, b) => Number(a.state !== "free") - Number(b.state !== "free") || a.distance - b.distance || a.title.localeCompare(b.title, "fr"));
-  return options.slice(0, limit).map((o) => ({ activityId: o.activityId, title: o.title, ageLabel: o.ageLabel, needsAdult: o.needsAdult, state: o.state, card: o.card }));
+  return options.slice(0, limit).map((o) => ({ activityId: o.activityId, title: o.title, ageLabel: o.ageLabel, needsAdult: o.needsAdult, description: o.description, state: o.state, card: o.card }));
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------
@@ -469,7 +471,7 @@ export async function getWeek(ctx: Ctx, session: SessionContext, weekId: string)
     .leftJoin("homework_activities as a", "a.id", "i.activity_id")
     .select([
       "i.id", "i.member_id", sql<string>`i.day::text`.as("day"), "i.checked_at", "i.custom_title", "e.textbook_key", "e.level", "e.number", "e.theme", "e.answer", "e.statement",
-      "a.category", "a.title as activity_title", "a.needs_adult", "a.card_ref", "a.steps", "a.materials",
+      "a.category", "a.title as activity_title", "a.needs_adult", "a.card_ref", "a.steps", "a.materials", "a.description",
     ])
     .where("i.week_id", "=", weekId)
     .orderBy("i.day")
@@ -497,7 +499,7 @@ export async function getWeek(ctx: Ctx, session: SessionContext, weekId: string)
           }
           if (r.activity_title && r.category) {
             return {
-              id: String(r.id), day, kind: "activity", title: r.activity_title, source: `Fiche ${categoryLabel(r.category)}${r.needs_adult ? " · avec un adulte" : ""}`, statement: null,
+              id: String(r.id), day, kind: "activity", title: r.activity_title, source: `Fiche ${categoryLabel(r.category)}${r.needs_adult ? " · avec un adulte" : ""}`, statement: r.description,
               answer: null, steps: splitSteps(r.steps), materials: r.materials, needsAdult: Boolean(r.needs_adult), card: cardUrl(r.card_ref), checked: r.checked_at !== null,
             };
           }

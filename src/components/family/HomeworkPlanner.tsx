@@ -256,11 +256,14 @@ export function HomeworkPlanner({ weekStart }: { weekStart: string }) {
                           <div className={styles.label}>{c.label}</div>
                           <div className={styles.actionsRow}>
                             {c.options.map((a) => (
-                              <button key={a.activityId} type="button" className={styles.chipToggle} aria-pressed={picks.includes(`a:${a.activityId}`)} onClick={() => pick(`a:${a.activityId}`)}>
-                                {a.title}
-                                {a.needsAdult ? " · avec un adulte" : ""}
-                                {a.state !== "free" ? ` · ${STATE_LABEL[a.state]}` : ""}
-                              </button>
+                              <div key={a.activityId} className={styles.field} style={{ flex: "1 1 100%" }}>
+                                <button type="button" className={styles.chipToggle} aria-pressed={picks.includes(`a:${a.activityId}`)} onClick={() => pick(`a:${a.activityId}`)}>
+                                  {a.title}
+                                  {a.needsAdult ? " · avec un adulte" : ""}
+                                  {a.state !== "free" ? ` · ${STATE_LABEL[a.state]}` : ""}
+                                </button>
+                                {a.description && <span className={styles.hint}>{a.description}</span>}
+                              </div>
                             ))}
                           </div>
                         </div>

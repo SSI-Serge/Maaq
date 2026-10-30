@@ -1272,6 +1272,10 @@ export interface HomeworkActivities {
   age: number;
   card_ref: string | null;
   category: HomeworkActivityCategory;
+  /**
+   * Description de l'activité : paragraphe d'introduction qui dit ce que fait l'enfant, contenu de référence porté par la base : 1 000 caractères au plus, facultatif. Affichée dans les questions de l'aide et sur l'écran de la semaine. Aucune donnée personnelle
+   */
+  description: string | null;
   id: Generated<Int8>;
   /**
    * Matériel nécessaire à l'activité, contenu de référence porté par la base (D66) : 1 000 caractères au plus, facultatif. Aucune donnée personnelle

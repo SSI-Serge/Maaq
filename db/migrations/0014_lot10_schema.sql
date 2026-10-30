@@ -173,6 +173,8 @@ CREATE TABLE homework_activities (
   id           bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   category     homework_activity_category NOT NULL,
   title        varchar(150) NOT NULL,
+  -- Description : paragraphe d'introduction qui dit ce que fait l'enfant (affichée dans les questions et sur l'écran de la semaine) ; 1 000 caractères au plus
+  description  text CHECK (description IS NULL OR length(btrim(description)) BETWEEN 1 AND 1000),
   -- Âge visé, de 6 à 12 ans : proposée à l'âge des devoirs de l'enfant, à un an près
   age          smallint NOT NULL CHECK (age BETWEEN 6 AND 12),
   needs_adult  boolean NOT NULL DEFAULT false,
@@ -835,6 +837,7 @@ COMMENT ON COLUMN family_settings.homework_help_disabled_at IS $$Date de la dern
 COMMENT ON TABLE homework_textbooks IS $$Manuels de maths : France (toujours proposé) et manuels étrangers (Singapour, Chine), qui se débloquent par enfant et par niveau. [US-119 RF7, RT4]$$;
 COMMENT ON COLUMN homework_exercises.statement IS $$Énoncé de l'exercice, contenu de référence du manuel porté par la base (D66) : 2 000 caractères au plus, facultatif. Aucune donnée personnelle : table de référence sans lien avec un compte, un profil ou un membre$$;
 COMMENT ON TABLE homework_exercises IS $$Exercices de maths du catalogue : manuel, niveau (CP à CM2), numéro, thème, corrigé. Table de référence chargée une fois ; un rechargement met les lignes à jour sans les supprimer (les progrès les désignent). [US-119 RF2, RF4, RT4]$$;
+COMMENT ON COLUMN homework_activities.description IS $$Description de l'activité : paragraphe d'introduction qui dit ce que fait l'enfant, contenu de référence porté par la base : 1 000 caractères au plus, facultatif. Affichée dans les questions de l'aide et sur l'écran de la semaine. Aucune donnée personnelle$$;
 COMMENT ON COLUMN homework_activities.steps IS $$Étapes de l'activité, contenu de référence porté par la base (D66) : 4 000 caractères au plus, facultatif. Aucune donnée personnelle$$;
 COMMENT ON COLUMN homework_activities.materials IS $$Matériel nécessaire à l'activité, contenu de référence porté par la base (D66) : 1 000 caractères au plus, facultatif. Aucune donnée personnelle$$;
 COMMENT ON TABLE homework_activities IS $$Activités d'éveil du catalogue : catégorie (nature, philo, STIM, art, imagination, jeux et projets), âge visé, « avec un adulte », carte illustrée. Table de référence chargée une fois. [US-119 RF2, RF4, RT4]$$;
