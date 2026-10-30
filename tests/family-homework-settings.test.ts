@@ -2,10 +2,12 @@ import type { Kysely } from "kysely";
 import { sql } from "kysely";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { addChild } from "@/server/assistant/family";
+import { familyAgentId } from "@/server/assistant/conversation";
 import { loadHomeworkCatalog } from "@/server/assistant/homework/catalog";
 import { eraseHomeworkProgress, getHomeworkSetting, homeworkEnabled, levelForAge, purgeExpiredHomework, setHomeworkAge, setHomeworkEnabled } from "@/server/assistant/homework/settings";
 import type { Ctx } from "@/server/auth/service";
 import type { DB } from "@/server/db/schema.generated";
+import { getLogbook } from "@/server/logbook/service";
 import { Rejection } from "@/server/http";
 import { createGuest, createProfile, sessionFor, testDb } from "./helpers/fixtures";
 
@@ -63,6 +65,18 @@ describe("aide Devoirs du foyer (US-118)", () => {
     expect(seenByJulien).toMatchObject({ enabled: true, canEdit: true });
     await setHomeworkEnabled(ctx(), f.julienSession, { enabled: false });
     expect(await homeworkEnabled(ctx(), f.accountId)).toBe(false);
+  });
+
+  it("D66 S-21 : l'activation et la désactivation sont inscrites au carnet de bord du foyer ; l'autre parent les voit, l'invité secondaire non", async () => {
+    const f = await family();
+    const agent = await familyAgentId(db);
+    await setHomeworkEnabled(ctx(), f.camilleSession, { enabled: true, confirmed: true });
+    await setHomeworkEnabled(ctx(), f.camilleSession, { enabled: true, confirmed: true }); // aucun changement : rien de plus
+    await setHomeworkEnabled(ctx(), f.camilleSession, { enabled: false });
+    const seen = await getLogbook(ctx(), f.julienSession, agent);
+    expect(seen.entries.map((e) => e.summary)).toEqual([expect.stringMatching(/a désactivé l'aide Devoirs$/), expect.stringMatching(/a activé l'aide Devoirs$/)]);
+    expect(seen.entries.every((e) => e.type === "action_done")).toBe(true);
+    expect((await getLogbook(ctx(), f.elodieSession, agent)).entries).toEqual([]);
   });
 
   it("l'invité secondaire voit le réglage en lecture seule et ne peut pas le changer (RF1)", async () => {

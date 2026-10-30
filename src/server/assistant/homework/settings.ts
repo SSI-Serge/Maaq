@@ -1,8 +1,11 @@
+import { randomUUID } from "node:crypto";
 import { sql } from "kysely";
+import { describeError } from "@/server/safe-log";
 import type { Ctx, SessionContext } from "@/server/auth/service";
 import type { HomeworkLevel } from "@/server/db/schema.generated";
 import { Rejection } from "@/server/http";
 import { requireFamilyProfile, requireParent } from "../family";
+import { familyAgentId } from "../conversation";
 import { LEVEL_LABEL } from "./catalog";
 
 /**
@@ -95,7 +98,27 @@ export async function setHomeworkEnabled(ctx: Ctx, session: SessionContext, inpu
     if ((error as { code?: string }).code === "23514") throw new Rejection("no_child", "Ajoutez vos enfants dans les membres pour utiliser l'aide Devoirs.", 422);
     throw error;
   }
+  if (input.enabled !== current.enabled) await journal(ctx, session, accountId, input.enabled);
   return getHomeworkSetting(ctx, session);
+}
+
+/**
+ * L'activation et la désactivation de l'aide sont inscrites au carnet de bord du foyer : « [Prénom] a activé l'aide Devoirs » (US-118 RF3, D66 S-21). Les deux parents le voient (le noyau
+ * voit tout le compte) ; un invité secondaire non. Une erreur d'écriture ne fait jamais échouer le réglage lui-même.
+ */
+async function journal(ctx: Ctx, session: SessionContext, accountId: string, enabled: boolean): Promise<void> {
+  try {
+    const user = await ctx.db.selectFrom("users").select("first_name").where("id", "=", session.user.id).executeTakeFirst();
+    await ctx.db
+      .insertInto("logbook_entries")
+      .values({
+        account_id: accountId, agent_id: await familyAgentId(ctx.db), external_ref: `homework-help-${randomUUID()}`, occurred_at: ctx.now, requester_user_id: session.user.id, entry_type: "action_done",
+        summary: `${user?.first_name ?? "Un parent"} a ${enabled ? "activé" : "désactivé"} l'aide Devoirs`, result: null, synced_at: ctx.now,
+      })
+      .execute();
+  } catch (error) {
+    console.error(`Carnet de bord : ${describeError(error)}`);
+  }
 }
 
 /** Âge des devoirs d'un enfant (6 à 12 ans) : sans lien avec sa date de naissance, qui n'est ni lue ni modifiée (RF4). */

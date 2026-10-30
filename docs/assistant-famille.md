@@ -346,8 +346,10 @@ Schéma : `0013_lot10_valeurs_enumerees.sql` et `0014_lot10_schema.sql`, copies 
 1. Le « critère de passage de niveau » (US-119 RF7) est : **tous les exercices France du niveau validés sur photos** ; l'aide propose alors d'augmenter l'âge des devoirs d'un an (jusqu'à 12), le parent décide.
 2. Le parcours de questions de la préparation est un **écran à boutons en quatre étapes** (`/assistant/devoirs/preparer`) et non des cartes dans le fil du tchat ; les choix sont gardés dans le navigateur (RF10, décision du PO). Les photos s'envoient depuis l'écran de la semaine, pas depuis le tchat.
 3. Le choix du manuel étranger de la semaine est fait par le code (le moins utilisé par l'enfant) ; le parent ne choisit pas lequel.
-4. L'activation de l'aide n'écrit rien dans le carnet de bord (le carnet ne journalise pas les réglages familiaux aujourd'hui).
+4. (D66, 30/10) L'activation et la désactivation de l'aide sont inscrites au carnet de bord du foyer (« [Prénom] a activé l'aide Devoirs », agent « Assistant Famille ») : les deux parents le voient, l'invité secondaire non. Le texte des réglages « Délais de rappel » suit D63 (notification d'abord, email à défaut).
 5. Les activités cochées comptent « faites » mais ne sont jamais « validées » : le schéma ne valide que des exercices de maths.
+
+**Décisions du PO du 30/10 (D66)** : passage de niveau validé ; écran à boutons en 4 étapes accepté ; manuel étranger choisi par le code validé ; **énoncés, étapes et matériel des activités à porter dans la base** : en attente de la nouvelle empreinte du lot 10 (trois colonnes texte), puis migration additive de `catalogue.json` vers la base sur la zone de test, après sauvegarde.
 
 **Pas vérifié** : la recherche web réelle (l'outil doit être activé pour l'organisation Anthropic ; coût d'une proposition jamais mesuré, la recherche est facturée en plus des jetons), l'analyse d'une vraie photo, les écrans sur un téléphone, l'impression papier. **Reste pour le lot 9** : l'export des critères et propositions du parent et des plannings et progrès Devoirs du foyer (US-55), leur effacement, le rôle de base limité, l'avis du DPO et l'AIPD (recherche web des Sorties, données de mineurs, conservation 12 mois).
 
