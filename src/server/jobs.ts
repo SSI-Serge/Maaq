@@ -7,6 +7,7 @@ import { runTaskNotices, type TaskNoticesResult } from "@/server/assistant/task-
 import { runDigests, type DigestsResult } from "@/server/assistant/digest";
 import { runAnticipation, type AnticipationResult } from "@/server/assistant/anticipation";
 import { runPlaceSearches, type PlacesResult } from "@/server/assistant/places";
+import { runOutings, type OutingsResult } from "@/server/assistant/outings/planner";
 import { runTravelNotices, type TravelNoticesResult } from "@/server/assistant/travel";
 import { runReminders, type RemindersResult } from "@/server/assistant/reminders";
 import { cleanupExports } from "@/server/compliance/exports";
@@ -41,6 +42,8 @@ export interface JobsResult {
   travel: TravelNoticesResult;
   /** Recherches « Sur place » reprises, recherches bloquées échouées, notifications « le résultat est prêt » (US-112). */
   places: PlacesResult;
+  /** Propositions de sorties préparées et annoncées (US-115) : fermé tant que OUTINGS_MODE n'est pas « live ». */
+  outings: OutingsResult;
 }
 
 /** Synchronise le carnet toutes les X heures (US-40 RT2) puis nettoie les données expirées (US-40 RT6, US-61 RT2, US-70 RT3). */
@@ -90,10 +93,14 @@ export async function runDueJobs(ctx: Ctx, options: { force?: boolean } = {}): P
     console.error(`Recherches « Sur place » : ${describeError(error)}`);
     return { executed: 0, failedStale: 0, notified: 0 };
   });
-  if (!due) return { logbook: "not_due", purged: null, lifecycle, exports, reminders, notices, taskNotices, digests, anticipation, travel, places };
+  const outings = await runOutings(ctx).catch((error) => {
+    console.error(`Idées de sorties : ${describeError(error)}`);
+    return { prepared: 0, empty: 0, notified: 0, failed: 1 };
+  });
+  if (!due) return { logbook: "not_due", purged: null, lifecycle, exports, reminders, notices, taskNotices, digests, anticipation, travel, places, outings };
 
   const logbook = await syncLogbook(ctx);
-  return { logbook, purged: await purgeExpired(ctx), lifecycle, exports, reminders, notices, taskNotices, digests, anticipation, travel, places };
+  return { logbook, purged: await purgeExpired(ctx), lifecycle, exports, reminders, notices, taskNotices, digests, anticipation, travel, places, outings };
 }
 
 /** Supprime les données arrivées au bout de leur durée de conservation. */

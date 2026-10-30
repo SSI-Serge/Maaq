@@ -354,6 +354,66 @@ async function locked(trx: Kysely<DB>, v: Viewer, id: string): Promise<CalendarE
   return e;
 }
 
+export interface ConfirmedEventInput {
+  type: EventType;
+  title: string;
+  place: string | null;
+  notes: string | null;
+  /** « AAAA-MM-JJTHH:MM » dans le fuseau de la famille. */
+  start: string;
+  end: string;
+  memberIds: string[];
+  allowConflict?: boolean;
+}
+
+/**
+ * Un parent enregistre un RDV lui-même, directement confirmé (US-120 RF4) : il n'est pas proposé par l'agent, donc jamais « à confirmer » ni confirmé d'office. Source « sortie » :
+ * aucun lien avec la proposition d'où il vient, qui reste privée (RT1). Le conflit est contrôlé avant l'enregistrement, avec ses créneaux alternatifs (US-74, RF7). `inTransaction`
+ * permet d'écrire autre chose dans la même transaction (l'idée passe à « ajoutée »). L'autre parent n'est pas prévenu (US-113 ne s'applique pas, RF5).
+ */
+export async function createConfirmedEvent(ctx: Ctx, session: SessionContext, input: ConfirmedEventInput, inTransaction?: (trx: Kysely<DB>, eventId: string) => Promise<void>): Promise<EventView> {
+  const v = await viewerOf(ctx, session);
+  if (!v.parent) throw fail("forbidden", "Seuls les parents du foyer enregistrent un rendez-vous de sortie.", 403);
+  if (!EVENT_TYPES.includes(input.type) || input.type === "medical") throw fail("invalid_type", "Ce type de rendez-vous n'est pas permis ici.", 422);
+  const title = input.title.trim();
+  if (!title || title.length > MAX_EVENT_TITLE) throw fail("invalid_title", `Le titre est obligatoire (${MAX_EVENT_TITLE} caractères au plus).`, 422);
+  const place = input.place?.trim() || null;
+  const notes = input.notes?.trim() || null;
+  if ((place && place.length > MAX_EVENT_PLACE) || (notes && notes.length > MAX_EVENT_NOTES)) throw fail("invalid_text", "Le lieu ou la note est trop long.", 422);
+  if (!isLocalDateTime(input.start) || !isLocalDateTime(input.end) || input.end <= input.start) throw fail("invalid_time", "Choisissez une date et une heure, la fin après le début.", 422);
+  const starts = localToUtc(input.start, v.timeZone);
+  const ends = localToUtc(input.end, v.timeZone);
+  if (ends <= ctx.now) throw fail("event_past", "Ce créneau est déjà passé.", 409);
+  const memberIds = [...new Set(input.memberIds)];
+  const known = memberIds.length ? await ctx.db.selectFrom("family_members").select("id").where("account_id", "=", v.accountId).where("id", "in", memberIds).where("archived_at", "is", null).execute() : [];
+  if (!memberIds.length || known.length !== memberIds.length) throw fail("invalid_members", "Choisissez au moins une personne concernée de la famille.", 422);
+  const typeId = (await eventTypeIds(ctx.db)).get(TYPE_CODE[input.type])!;
+  let created: CalendarEvent | undefined;
+  try {
+    const id = await ctx.db.transaction().execute(async (trx) => {
+      const row = await trx
+        .insertInto("family_events")
+        .values({
+          account_id: v.accountId, event_type_id: typeId, title: seal(title), location: sealOptional(place), note: sealOptional(notes), starts_at: starts, ends_at: ends, status: "confirmed", source: "outing",
+          requested_by_user_id: v.userId, source_at: ctx.now, confirmed_at: ctx.now, confirmed_by_user_id: v.userId, fingerprint: fingerprintOf({ startsAt: starts, endsAt: ends, type: input.type, allFamily: false, memberIds }),
+        })
+        .returning("id")
+        .executeTakeFirstOrThrow();
+      await trx.insertInto("family_event_members").values(memberIds.map((member_id) => ({ event_id: row.id, member_id, account_id: v.accountId }))).execute();
+      await trx.insertInto("family_event_history").values({ event_id: row.id, user_id: v.userId, action: "created", from_status: null, to_status: "confirmed", occurred_at: ctx.now }).execute();
+      created = (await loadCalendarEvent(trx, v.accountId, row.id))!;
+      const { views } = await conflictsOf(trx, v, created);
+      if (views.length && !input.allowConflict) throw fail("conflict", "Ce créneau chevauche un autre rendez-vous.", 409, { conflicts: views, alternatives: await nearestSlots(trx, v, created, ctx.now) });
+      if (inTransaction) await inTransaction(trx, row.id);
+      return row.id;
+    });
+    return getEvent(ctx, session, id);
+  } catch (error) {
+    if (isDuplicate(error)) throw fail("duplicate", "Un rendez-vous identique existe déjà à ce créneau.", 409);
+    throw error;
+  }
+}
+
 /** US-75 RF7 : confirmer (ou, pour un RDV écarté encore visible, « Confirmer quand même », US-77 RF4). */
 export async function confirmEvent(ctx: Ctx, session: SessionContext, id: string, options: ChangeOptions = {}): Promise<EventView> {
   const v = await viewerOf(ctx, session);

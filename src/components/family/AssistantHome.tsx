@@ -9,6 +9,7 @@ import { AppShell, Section } from "@/components/app/AppShell";
 import { Loading, RetryNotice } from "@/components/ui";
 import type { AnticipationView } from "@/server/assistant/anticipation";
 import type { EventView } from "@/server/assistant/events";
+import type { HomeworkSetting } from "@/server/assistant/homework/settings";
 import { clock, dayOf, shortDate } from "./format";
 import { Dots } from "./parts";
 import { AnticipationCards } from "./QuestionCards";
@@ -41,6 +42,9 @@ export function AssistantHome() {
   // Réservé aux parents (US-102 RF8) : un profil sans ce droit n'a pas la section.
   const anticipation = useApiQuery<{ anticipation: AnticipationView }>("/api/family/anticipation");
   const toAnticipate = anticipation.data?.anticipation;
+  // « Préparer les devoirs de la semaine » : accessible à tout moment aux parents quand l'aide Devoirs est activée (US-119 RF9).
+  const homework = useApiQuery<{ setting: HomeworkSetting }>("/api/family/homework");
+  const homeworkOn = Boolean(homework.data?.setting.enabled && homework.data.setting.canEdit);
   const waiting = pending.data?.events ?? [];
   const router = useRouter();
   const { state: push } = usePush();
@@ -63,13 +67,18 @@ export function AssistantHome() {
           Activez vos rappels pour être prévenu à temps ›
         </Link>
       )}
-      <div style={{ display: "flex", gap: 16 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "8px 16px" }}>
         <Link href="/assistant/taches/nouvelle" className={styles.link}>
           + Tâche
         </Link>
         <Link href="/assistant/taches" className={styles.link}>
           Tâches ›
         </Link>
+        {homeworkOn && (
+          <Link href="/assistant/devoirs/preparer" className={styles.link}>
+            Préparer les devoirs de la semaine ›
+          </Link>
+        )}
         <Link href="/assistant/semaine" className={styles.link}>
           Point de la semaine ›
         </Link>

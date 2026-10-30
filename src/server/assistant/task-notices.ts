@@ -110,10 +110,10 @@ function email(to: Recipient, subject: string, lines: string[], path: string): {
 // Réservation et envoi
 // ---------------------------------------------------------------------------------------------------------------------------
 
-type Kind = "task_daily" | "task_due_1h" | "task_assigned" | "weekly_digest" | "travel_first" | "travel_second" | "place_search_ready";
+type Kind = "task_daily" | "task_due_1h" | "task_assigned" | "weekly_digest" | "travel_first" | "travel_second" | "place_search_ready" | "outing_proposal";
 
 /** Réserve une notification du jour ou de la semaine : un seul passage l'obtient (US-97 RF9). Une réservation sans résultat depuis 10 minutes est reprise. */
-export async function claimDaily(ctx: Ctx, kind: "task_daily" | "weekly_digest", userId: string, day: string, dueAt: Date, deadline: Date): Promise<boolean> {
+export async function claimDaily(ctx: Ctx, kind: "task_daily" | "weekly_digest" | "outing_proposal", userId: string, day: string, dueAt: Date, deadline: Date): Promise<boolean> {
   const row = await ctx.db
     .insertInto("scheduled_notifications")
     .values({ kind, subject_date: day, due_at: dueAt, deadline_at: deadline, recipient_user_id: userId, status: "scheduled", attempts: 1 })

@@ -56,6 +56,11 @@ const schema = z.object({
    */
   TRAVEL_MODE: z.enum(["off", "fake", "live"]).default("off"),
   TOMTOM_API_KEY: z.string().min(1).optional(),
+  /**
+   * Idées de sorties (US-115) : « off » (par défaut, fermé : aucune recherche n'est lancée même si un parent a activé ses critères) ou « live » (recherche web du modèle, avec
+   * ASSISTANT_MODE=live). Exception à D52 : à ouvrir seulement après l'avis du DPO et la déclaration du sous-traitant pour le pilote.
+   */
+  OUTINGS_MODE: z.enum(["off", "live"]).default("off"),
 });
 
 const checked = schema.superRefine((value, ctx) => {
@@ -70,6 +75,7 @@ const checked = schema.superRefine((value, ctx) => {
   if (value.ASSISTANT_MODE === "live") {
     if (!value.ANTHROPIC_API_KEY) ctx.addIssue({ code: "custom", path: ["ANTHROPIC_API_KEY"], message: "obligatoire avec ASSISTANT_MODE=live" });
   }
+  if (value.OUTINGS_MODE === "live" && value.ASSISTANT_MODE !== "live") ctx.addIssue({ code: "custom", path: ["OUTINGS_MODE"], message: "demande ASSISTANT_MODE=live" });
   if (value.TRAVEL_MODE === "live" && !value.TOMTOM_API_KEY) ctx.addIssue({ code: "custom", path: ["TOMTOM_API_KEY"], message: "obligatoire avec TRAVEL_MODE=live" });
 });
 

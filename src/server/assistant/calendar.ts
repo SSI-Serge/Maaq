@@ -8,7 +8,8 @@ import { open, openOptional } from "./fields";
 /** Types, statuts et origines tels que l'application les nomme ; `TYPE_CODE`, `STATUS_CODE` et `SOURCE_CODE` donnent leur valeur en base. */
 export type EventType = "school" | "medical" | "work" | "family" | "personal" | "admin";
 export type EventStatus = "provisional" | "confirmed" | "canceled" | "set_aside" | "ignored";
-export type EventSource = "typed" | "dictation" | "capture" | "mail";
+/** « outing » : RDV créé par un parent depuis une idée de sortie (US-120), enregistré confirmé, sans lien avec la proposition qui reste privée. */
+export type EventSource = "typed" | "dictation" | "capture" | "mail" | "outing";
 
 export const EVENT_TYPES: EventType[] = ["school", "medical", "work", "family", "personal", "admin"];
 
@@ -16,7 +17,7 @@ export const TYPE_CODE: Record<EventType, string> = { school: "school", medical:
 export const STATUS_CODE: Record<EventStatus, "provisional" | "confirmed" | "cancelled" | "set_aside" | "dismissed"> = {
   provisional: "provisional", confirmed: "confirmed", canceled: "cancelled", set_aside: "set_aside", ignored: "dismissed",
 };
-export const SOURCE_CODE: Record<EventSource, "chat_text" | "voice" | "photo" | "forwarded_email"> = { typed: "chat_text", dictation: "voice", capture: "photo", mail: "forwarded_email" };
+export const SOURCE_CODE: Record<EventSource, "chat_text" | "voice" | "photo" | "forwarded_email" | "outing"> = { typed: "chat_text", dictation: "voice", capture: "photo", mail: "forwarded_email", outing: "outing" };
 
 const fromCode = <K extends string>(table: Record<K, string>, code: string): K => (Object.keys(table) as K[]).find((k) => table[k] === code) as K;
 
