@@ -51,6 +51,8 @@ export interface TaskView {
   rule: string | null;
   repetition: TaskRepetition | null;
   followsEventSeries: boolean;
+  /** Semaine de devoirs d'où vient la tâche « Devoirs — [prénom] (N éléments) » : le lien ouvre l'écran de la semaine (US-119 RF4). */
+  homeworkWeekId: string | null;
   doneBy: string | null;
   doneAt: string | null;
   version: number;
@@ -160,7 +162,7 @@ export function selectTasks(db: Kysely<DB>) {
     .selectFrom("family_tasks as t")
     .select([
       "t.id", "t.account_id", "t.series_id", sql<string | null>`t.occurrence_date::text`.as("occurrence_date"), "t.event_id", "t.title", "t.note", "t.status", sql<string>`t.due_date::text`.as("due_date"),
-      sql<string | null>`t.due_time::text`.as("due_time"), "t.days_before_event", "t.assigned_member_id", "t.done_by_member_id", "t.done_at", "t.created_by_user_id", "t.version",
+      sql<string | null>`t.due_time::text`.as("due_time"), "t.days_before_event", "t.assigned_member_id", "t.done_by_member_id", "t.done_at", "t.created_by_user_id", "t.version", "t.homework_week_id",
     ]);
 }
 export type TaskRow = Awaited<ReturnType<ReturnType<typeof selectTasks>["execute"]>>[number];
@@ -197,7 +199,7 @@ export async function toTaskViews(db: Kysely<DB>, v: TaskViewer, rows: TaskRow[]
       id: r.id, title: open(r.title), note: openOptional(r.note), status: r.status, due: r.due_date, dueTime: r.due_time ? r.due_time.slice(0, 5) : null, overdue: isOverdue(v, r),
       assignee: r.assigned_member_id ? (chips.get(r.assigned_member_id) ?? null) : null,
       event: event && sees(v, event) ? { id: event.id, title: event.title, start: utcToLocal(event.startsAt, v.timeZone) } : null,
-      daysBefore: r.days_before_event, recurring: Boolean(r.series_id), rule: own ? ruleLabel(own) : null, repetition: own ? taskRepetitionOf(own) : null, followsEventSeries: Boolean(s?.event_series_id),
+      daysBefore: r.days_before_event, recurring: Boolean(r.series_id), rule: own ? ruleLabel(own) : null, repetition: own ? taskRepetitionOf(own) : null, followsEventSeries: Boolean(s?.event_series_id), homeworkWeekId: r.homework_week_id,
       doneBy: r.done_by_member_id ? (chips.get(r.done_by_member_id)?.firstName ?? null) : null, doneAt: r.done_at ? utcToLocal(r.done_at, v.timeZone) : null, version: r.version,
       can: { check: canCheckTask(v, r), manage: canManageTask(v, r) },
     };
@@ -343,7 +345,7 @@ export async function createTask(ctx: Ctx, session: SessionContext, input: NewTa
 function emptyView(task: CheckedTask): TaskView {
   return {
     id: "", title: task.title, note: task.note, status: "todo", due: task.due, dueTime: task.dueTime, overdue: false, assignee: null, event: null, daysBefore: null, recurring: false, rule: null,
-    repetition: null, followsEventSeries: false, doneBy: null, doneAt: null, version: 1, can: { check: true, manage: true },
+    repetition: null, followsEventSeries: false, homeworkWeekId: null, doneBy: null, doneAt: null, version: 1, can: { check: true, manage: true },
   };
 }
 
