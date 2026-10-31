@@ -25,7 +25,7 @@ export function asRejection(error: unknown): unknown {
       break;
   }
   if (error.status === 401 || error.status === 403) {
-    return new Rejection("key_refused", `Digitorn a refusé la clé de cet agent : elle est invalide, révoquée ou non autorisée${trace}.`, 422);
+    return new Rejection("key_refused", `Digitorn a refusé la clé de cet agent : elle est invalide, révoquée ou non autorisée (HTTP ${error.status}, code « ${error.code} »)${trace}.`, 422);
   }
   if (error.retryable || error.status === 0) {
     return new Rejection("digitorn_unavailable", "Digitorn est momentanément indisponible. Réessayez dans quelques instants.", 503);
