@@ -43,11 +43,10 @@ export function matchesPreferences(day: string, prefs: OutingDayPref[]): boolean
   return prefs.some((p) => (p === "weekend" ? weekday >= 6 : p === "weekday_evenings" ? weekday <= 5 : DAY_OF_PREF[p] === weekday));
 }
 
-/** Début de la période de la fréquence choisie : le mois, la quinzaine, la semaine (lundi). Une proposition par période (RF1). */
+/** Début de la période de la fréquence choisie : le mois ou la quinzaine. Une proposition par période (RF1). « Une par semaine » est retiré (D67) : une ancienne valeur vaut « deux par mois ». */
 export function periodStart(today: string, frequency: OutingFrequency): string {
   if (frequency === "monthly") return `${today.slice(0, 7)}-01`;
-  if (frequency === "twice_monthly") return `${today.slice(0, 7)}-${Number(today.slice(8, 10)) < 16 ? "01" : "16"}`;
-  return addDays(today, 1 - isoWeekday(today));
+  return `${today.slice(0, 7)}-${Number(today.slice(8, 10)) < 16 ? "01" : "16"}`;
 }
 
 /** Prochain jour préféré au moins 4 jours plus tard, sans RDV sur toute la journée, et sans proposition déjà faite ce jour-là (RF1, RF9). */

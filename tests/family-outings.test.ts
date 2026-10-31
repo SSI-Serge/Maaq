@@ -141,11 +141,20 @@ describe("critères (US-114)", () => {
 
   it("S-15 : plusieurs jours préférés ; l'invité secondaire n'a ni critères ni sorties (S-02)", async () => {
     const f = await family();
-    const saved = await saveCriteria(at(), f.camilleSession, { ...NATURE_FOODIE, days: ["weekend", "wednesday", "weekday_evenings"], frequency: "weekly", mood: "calm" });
-    expect(saved).toMatchObject({ days: ["weekend", "wednesday", "weekday_evenings"], frequency: "weekly", mood: "calm" });
+    const saved = await saveCriteria(at(), f.camilleSession, { ...NATURE_FOODIE, days: ["weekend", "wednesday", "weekday_evenings"], frequency: "twice_monthly", mood: "calm" });
+    expect(saved).toMatchObject({ days: ["weekend", "wednesday", "weekday_evenings"], frequency: "twice_monthly", mood: "calm" });
     expect((await failure(saveCriteria(at(), f.camilleSession, { ...NATURE_FOODIE, days: [] }))).code).toBe("invalid_days");
     expect((await failure(getCriteria(at(), f.elodieSession))).status).toBe(403);
     expect((await failure(saveCriteria(at(), f.elodieSession, NATURE_FOODIE))).status).toBe(403);
+  });
+
+  it("D67 : « une par semaine » est retiré ; une ancienne valeur est lue comme « deux par mois »", async () => {
+    const f = await family();
+    expect((await failure(saveCriteria(at(), f.camilleSession, { ...NATURE_FOODIE, frequency: "weekly" as never }))).code).toBe("invalid_choice");
+    await saveCriteria(at(), f.camilleSession, NATURE_FOODIE);
+    await db.updateTable("outing_criteria").set({ frequency: "weekly" }).where("user_id", "=", f.camille.id).execute(); // une ligne antérieure à D67
+    expect((await getCriteria(at(), f.camilleSession)).frequency).toBe("twice_monthly");
+    expect(periodStart("2054-11-12", "weekly")).toBe("2054-11-01");
   });
 
   it("l'invité secondaire ne peut pas avoir de critères activés, même directement en base (garde-fou de la base)", async () => {
@@ -165,7 +174,7 @@ describe("jours visés (US-115 RF1)", () => {
     expect(matchesPreferences("2054-11-04", ["wednesday"])).toBe(true);
     expect(matchesPreferences("2054-11-05", ["wednesday", "friday"])).toBe(false); // jeudi
     expect(matchesPreferences("2054-11-06", ["wednesday", "friday"])).toBe(true); // vendredi
-    expect([periodStart("2054-11-12", "monthly"), periodStart("2054-11-12", "twice_monthly"), periodStart("2054-11-20", "twice_monthly"), periodStart("2054-11-12", "weekly")]).toEqual(["2054-11-01", "2054-11-01", "2054-11-16", "2054-11-09"]);
+    expect([periodStart("2054-11-12", "monthly"), periodStart("2054-11-12", "twice_monthly"), periodStart("2054-11-20", "twice_monthly")]).toEqual(["2054-11-01", "2054-11-01", "2054-11-16"]);
   });
 
   it("CA 1.1 : le prochain samedi ou dimanche au moins 4 jours plus tard", async () => {

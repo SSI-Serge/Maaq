@@ -24,7 +24,11 @@ export const DAY_LABEL: Record<OutingDayPref, string> = {
   weekend: "Week-end", weekday_evenings: "Soirs de semaine", monday: "Lundi", tuesday: "Mardi", wednesday: "Mercredi", thursday: "Jeudi", friday: "Vendredi", saturday: "Samedi", sunday: "Dimanche",
 };
 export const MOODS: OutingMood[] = ["calm", "playful", "both"];
-export const FREQUENCIES: OutingFrequency[] = ["monthly", "twice_monthly", "weekly"];
+/** « Une par semaine » est retiré (D67, coût : une proposition coûte environ 0,28 $) ; la valeur existe encore dans le schéma, mais n'est ni proposée ni acceptée. */
+export const FREQUENCIES: OutingFrequency[] = ["monthly", "twice_monthly"];
+
+/** Une ligne restée en « une par semaine » est lue comme « deux par mois » (D67). */
+const limited = (frequency: OutingFrequency | undefined): OutingFrequency => (frequency === "monthly" ? "monthly" : frequency ? "twice_monthly" : "monthly");
 export const DAY_PREFS = Object.keys(DAY_LABEL) as OutingDayPref[];
 
 const fail = (code: string, message: string, status = 422) => new Rejection(code, message, status);
@@ -116,7 +120,7 @@ export async function getCriteria(ctx: Ctx, session: SessionContext): Promise<Cr
     place: row?.departure_place ?? "",
     mood: row?.mood ?? "both",
     days: row?.days ?? ["weekend"],
-    frequency: row?.frequency ?? "monthly",
+    frequency: limited(row?.frequency),
     otherParent: other?.first_name ?? null,
   };
 }

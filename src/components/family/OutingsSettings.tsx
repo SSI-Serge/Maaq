@@ -16,7 +16,6 @@ const MOODS: { value: OutingMood; label: string }[] = [
 const FREQUENCIES: { value: OutingFrequency; label: string }[] = [
   { value: "monthly", label: "Une par mois" },
   { value: "twice_monthly", label: "Deux par mois" },
-  { value: "weekly", label: "Une par semaine" },
 ];
 const DAYS: { value: OutingDayPref; label: string }[] = [
   { value: "weekend", label: "Week-end" },

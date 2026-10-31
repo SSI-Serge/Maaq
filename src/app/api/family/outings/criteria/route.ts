@@ -21,7 +21,7 @@ const schema = z.object({
   place: z.string().max(200),
   mood: z.enum(["calm", "playful", "both"]),
   days: z.array(z.enum(["weekend", "weekday_evenings", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"])).max(9),
-  frequency: z.enum(["monthly", "twice_monthly", "weekly"]),
+  frequency: z.enum(["monthly", "twice_monthly"]),
 });
 
 /** Enregistre les critères (US-114 RF2 à RF6). */
