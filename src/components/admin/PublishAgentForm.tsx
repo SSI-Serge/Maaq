@@ -112,7 +112,8 @@ export function PublishAgentForm({ onCancel, onPublished }: { onCancel: () => vo
     // Sans clé secrète, MAAQ ne peut pas interroger Digitorn : l'adresse de l'application publiée suffit (visiteur anonyme).
     if (!apiKey.trim() && appUrl.trim()) {
       const url = cleanAppUrl(appUrl);
-      if (!url) return setAddressError("L'adresse de l'application doit commencer par https://.");
+      if (!url) return setAddressError("L'adresse de l'application doit commencer par https://, ou être le code d'intégration complet de Digitorn (<script … data-key=\"…\">).");
+      setAppUrl(url);
       const agent: FoundAgent = { ref: refFromAppUrl(url), name: searchName.trim(), description: "", kind: "chat", project: null };
       setFound({ agent, alreadyPublished: false });
       setRef(agent.ref);
@@ -223,7 +224,7 @@ export function PublishAgentForm({ onCancel, onPublished }: { onCancel: () => vo
                 placeholder="https://mon-agent-1a2b.digitorn.app"
               />
               <div className={s.hint}>
-                Adresse de l&apos;application publiée, donnée par Digitorn (Project → Embed). Sans clé secrète, elle suffit : l&apos;utilisateur reste un visiteur anonyme pour Digitorn.
+                Adresse de l&apos;application publiée, donnée par Digitorn (Project → Embed) ; le code d&apos;intégration complet (&lt;script … data-key=…&gt;) est aussi accepté. Sans clé secrète, elle suffit : l&apos;utilisateur reste un visiteur anonyme pour Digitorn.
                 Avec la clé, Digitorn reconnaît l&apos;utilisateur. La clé est conservée chiffrée et n&apos;est jamais réaffichée.
               </div>
             </div>

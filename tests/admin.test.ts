@@ -2,6 +2,7 @@ import type { Kysely } from "kysely";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { activate, inspectActivation } from "@/server/accounts/activate";
 import { createAccount, getAccount, listAccounts, resendActivation, updateDailyLimit } from "@/server/admin/accounts";
+import { cleanAppUrl, refFromAppUrl } from "@/server/admin/agent-ref";
 import { blockAgent, listAgents, lookupAgent, publishAgent, reactivateAgent, type PublishInput } from "@/server/admin/agents";
 import {
   addContract,
@@ -144,6 +145,24 @@ describe("US-45 — mettre un agent à disposition", () => {
       "agent_unavailable",
     );
     expect((await rejectionOf(publishAgent(now(), adminId, agentInput({ digitornRef: "app:x", digitornAppUrl: "ftp://x" })))).code).toBe("invalid_app_url");
+  });
+
+  it("le code d'intégration de Digitorn collé tel quel donne l'adresse du cadre ; deux agents d'un même domaine restent distincts", async () => {
+    const snippet = (key: string) => `<script src="https://studio.exemple-digitorn.test/embed.js"
+        data-key="${key}"></script>`;
+    const first = "dk_aaaa1111_0123456789abcdef0123456789abcdef";
+    const second = "dk_bbbb2222_0123456789abcdef0123456789abcdef";
+    expect(cleanAppUrl(snippet(first))).toBe(`https://studio.exemple-digitorn.test/embed/chat?key=${first}`);
+    expect(cleanAppUrl(snippet(first).replace("https://", "http://"))).toBeNull();
+    expect(cleanAppUrl('<script src="https://studio.exemple-digitorn.test/embed.js"></script>')).toBeNull();
+    expect(refFromAppUrl(cleanAppUrl(snippet(first))!)).toBe("app:studio.exemple-digitorn.test/dk_aaaa1111");
+    const ref = refFromAppUrl(cleanAppUrl(snippet(first))!);
+    const id = await publishAgent(now(), adminId, agentInput({ digitornRef: ref, name: "Admin_Widget_1", digitornAppUrl: snippet(first) }));
+    const row = await db.selectFrom("agent_digitorn_projects").select("app_url").where("agent_id", "=", id).executeTakeFirstOrThrow();
+    expect(row.app_url).toBe(`https://studio.exemple-digitorn.test/embed/chat?key=${first}`);
+    const other = refFromAppUrl(cleanAppUrl(snippet(second))!);
+    expect(other).not.toBe(ref);
+    await publishAgent(now(), adminId, agentInput({ digitornRef: other, name: "Admin_Widget_2", digitornAppUrl: snippet(second) }));
   });
 
   it("refuse deux champs d'information de même libellé", async () => {
