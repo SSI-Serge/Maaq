@@ -264,6 +264,37 @@ export async function publishAgent(ctx: Ctx, adminId: string, input: PublishInpu
   });
 }
 
+/**
+ * Change l'adresse de l'application d'un agent publié par adresse seule (sans clé secrète) : adresse `https://….digitorn.app` ou code d'intégration `<script … data-key>`.
+ * L'identifiant de l'agent suit l'adresse (`app:<domaine>[/<clé publique>]`) ; il ne doit pas déjà servir à un autre agent. Un agent publié avec la clé de son projet
+ * garde son adresse : elle vient de Digitorn.
+ */
+export async function updateAgentAddress(ctx: Ctx, agentId: string, rawUrl: string): Promise<void> {
+  const url = cleanAppUrl(rawUrl);
+  if (!url) throw new Rejection("invalid_app_url", "L'adresse de l'application doit commencer par https://, ou être le code d'intégration complet de Digitorn.", 422);
+  await ctx.db.transaction().execute(async (trx) => {
+    const row = await trx
+      .selectFrom("agents as a")
+      .leftJoin("agent_digitorn_projects as p", "p.agent_id", "a.id")
+      .select(["a.platform_agent_ref", "p.api_key_encrypted"])
+      .where("a.id", "=", agentId)
+      .where("a.platform", "=", "digitorn")
+      .forUpdate("a")
+      .executeTakeFirst();
+    if (!row) throw new Rejection("not_found", "Agent introuvable.", 404);
+    if (!row.platform_agent_ref.startsWith(APP_REF_PREFIX) || row.api_key_encrypted) {
+      throw new Rejection("address_fixed", "L'adresse de cet agent vient de la clé de son projet Digitorn : elle ne se modifie pas ici.", 409);
+    }
+    const ref = refFromAppUrl(url);
+    if (ref !== row.platform_agent_ref) {
+      const taken = await trx.selectFrom("agents").select("id").where("platform", "=", "digitorn").where("platform_agent_ref", "=", ref).executeTakeFirst();
+      if (taken) throw new Rejection("address_taken", "Cette adresse sert déjà à un autre agent.", 409);
+      await trx.updateTable("agents").set({ platform_agent_ref: ref, updated_at: ctx.now }).where("id", "=", agentId).execute();
+    }
+    await trx.updateTable("agent_digitorn_projects").set({ app_url: url, updated_at: ctx.now }).where("agent_id", "=", agentId).execute();
+  });
+}
+
 /** Bloque un agent pour maintenance, pour tous les profils (US-46). Géré par MAAQ seul (RT1). */
 export async function blockAgent(ctx: Ctx, adminId: string, agentId: string, message: string): Promise<void> {
   const text = message.trim();

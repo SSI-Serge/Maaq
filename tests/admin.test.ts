@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { activate, inspectActivation } from "@/server/accounts/activate";
 import { createAccount, getAccount, listAccounts, resendActivation, updateDailyLimit } from "@/server/admin/accounts";
 import { cleanAppUrl, refFromAppUrl } from "@/server/admin/agent-ref";
-import { blockAgent, listAgents, lookupAgent, publishAgent, reactivateAgent, type PublishInput } from "@/server/admin/agents";
+import { blockAgent, listAgents, lookupAgent, publishAgent, reactivateAgent, updateAgentAddress, type PublishInput } from "@/server/admin/agents";
 import {
   addContract,
   addContractField,
@@ -163,6 +163,20 @@ describe("US-45 — mettre un agent à disposition", () => {
     const other = refFromAppUrl(cleanAppUrl(snippet(second))!);
     expect(other).not.toBe(ref);
     await publishAgent(now(), adminId, agentInput({ digitornRef: other, name: "Admin_Widget_2", digitornAppUrl: snippet(second) }));
+  });
+
+  it("l'adresse d'un agent publié par adresse seule se modifie ; un agent publié avec la clé de son projet ne se modifie pas", async () => {
+    const url = "https://ancienne-1a2b3c.digitorn.app";
+    const id = await publishAgent(now(), adminId, agentInput({ digitornRef: "app:ancienne-1a2b3c.digitorn.app", name: "Admin_Adresse_1", digitornAppUrl: url }));
+    await updateAgentAddress(now(), id, "https://nouvelle-4d5e6f.digitorn.app");
+    const row = await db.selectFrom("agents as a").innerJoin("agent_digitorn_projects as p", "p.agent_id", "a.id").select(["a.platform_agent_ref", "p.app_url"]).where("a.id", "=", id).executeTakeFirstOrThrow();
+    expect(row).toEqual({ platform_agent_ref: "app:nouvelle-4d5e6f.digitorn.app", app_url: "https://nouvelle-4d5e6f.digitorn.app" });
+    // Adresse invalide, adresse d'un autre agent, agent publié avec clé.
+    expect((await rejectionOf(updateAgentAddress(now(), id, "http://pas-https.exemple"))).code).toBe("invalid_app_url");
+    const other = await publishAgent(now(), adminId, agentInput({ digitornRef: "app:autre-7g8h9i.digitorn.app", name: "Admin_Adresse_2", digitornAppUrl: "https://autre-7g8h9i.digitorn.app" }));
+    expect((await rejectionOf(updateAgentAddress(now(), other, "https://nouvelle-4d5e6f.digitorn.app"))).code).toBe("address_taken");
+    const withKey = await publishAgent(now(), adminId, agentInput({ digitornRef: "admin_classify", name: "Admin_Classify", digitornApiKey: "sk_test_cle-secrete-0123456789", digitornAppUrl: "https://agent-cle.exemple.fr" }));
+    expect((await rejectionOf(updateAgentAddress(now(), withKey, "https://autre.digitorn.app"))).code).toBe("address_fixed");
   });
 
   it("refuse deux champs d'information de même libellé", async () => {

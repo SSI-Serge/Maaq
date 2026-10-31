@@ -28,6 +28,7 @@ export default function AdminAgentsPage() {
   const [published, setPublished] = useState<string | null>(null);
   const [blocking, setBlocking] = useState<Agent | null>(null);
   const [reactivating, setReactivating] = useState<Agent | null>(null);
+  const [addressing, setAddressing] = useState<Agent | null>(null);
 
   return (
     <>
@@ -109,6 +110,11 @@ export default function AdminAgentsPage() {
                   </span>
                 </td>
                 <td className={s.cellRight}>
+                  {agent.chat === "visitor" && (
+                    <Button variant="secondary" onClick={() => setAddressing(agent)}>
+                      Modifier l&apos;adresse
+                    </Button>
+                  )}{" "}
                   {agent.status === "available" ? (
                     <Button variant="secondary" onClick={() => setBlocking(agent)}>
                       Bloquer
@@ -140,6 +146,16 @@ export default function AdminAgentsPage() {
           }}
         />
       )}
+      {addressing && (
+        <AddressDialog
+          agent={addressing}
+          onClose={() => setAddressing(null)}
+          onDone={() => {
+            setAddressing(null);
+            agents.reload();
+          }}
+        />
+      )}
       {reactivating && (
         <ReactivateDialog
           agent={reactivating}
@@ -151,6 +167,35 @@ export default function AdminAgentsPage() {
         />
       )}
     </>
+  );
+}
+
+/** Nouvelle adresse de l'application Digitorn d'un agent publié par adresse seule : l'adresse `.digitorn.app` ou le code d'intégration complet. */
+function AddressDialog({ agent, onClose, onDone }: { agent: Agent; onClose: () => void; onDone: () => void }) {
+  const [appUrl, setAppUrl] = useState("");
+  const mutation = useApiMutation();
+
+  async function confirm() {
+    const ok = await mutation.run<null>(`/api/admin/agents/${agent.id}/address`, { method: "POST", body: { appUrl: appUrl.trim() } });
+    if (ok !== undefined) onDone();
+  }
+
+  return (
+    <AdminDialog title={`Modifier l'adresse de ${agent.name}`} onClose={() => !mutation.pending && onClose()}>
+      <label className={s.label} htmlFor="address">
+        Nouvelle adresse de l&apos;application publiée (https://….digitorn.app), ou code d&apos;intégration complet de Digitorn
+      </label>
+      <textarea id="address" className={s.textarea} value={appUrl} onChange={(e) => setAppUrl(e.target.value)} placeholder="https://mon-agent-1a2b.digitorn.app" />
+      <ErrorLine error={mutation.error} onRetry={confirm} />
+      <div className={s.actions}>
+        <Button variant="secondary" disabled={mutation.pending} onClick={onClose}>
+          Annuler
+        </Button>
+        <Button loading={mutation.pending} disabled={!appUrl.trim()} onClick={confirm}>
+          Enregistrer
+        </Button>
+      </div>
+    </AdminDialog>
   );
 }
 
