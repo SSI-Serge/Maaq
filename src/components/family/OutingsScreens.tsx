@@ -248,7 +248,7 @@ function IdeaForm({ id, initial, onLater, onAdded }: { id: string; initial: Idea
         <input id="outing-event-place" className={styles.input} value={place} maxLength={200} onChange={(e) => setPlace(e.target.value)} />
       </div>
       <div className={styles.label}>Type</div>
-      <div className={styles.actionsRow}>
+      <div className={styles.wrapRow}>
         {TYPES.map((t) => (
           <button key={t.value} type="button" className={styles.chipToggle} aria-pressed={type === t.value} onClick={() => setType(t.value)}>
             {t.label}
@@ -256,7 +256,7 @@ function IdeaForm({ id, initial, onLater, onAdded }: { id: string; initial: Idea
         ))}
       </div>
       <div className={styles.label}>Qui est concerné</div>
-      <div className={styles.actionsRow}>
+      <div className={styles.wrapRow}>
         {initial.members.map((m) => (
           <button key={m.id} type="button" className={styles.chipToggle} aria-pressed={memberIds.includes(m.id)} onClick={() => void members(memberIds.includes(m.id) ? memberIds.filter((x) => x !== m.id) : [...memberIds, m.id])}>
             {m.firstName}
@@ -295,7 +295,7 @@ function IdeaForm({ id, initial, onLater, onAdded }: { id: string; initial: Idea
           Ce créneau chevauche un autre rendez-vous
           {conflict.conflicts[0]?.title ? ` (${conflict.conflicts[0].title})` : ""}.
           {conflict.alternatives.length > 0 && (
-            <div className={styles.actionsRow}>
+            <div className={styles.wrapRow}>
               {conflict.alternatives.map((a) => (
                 <button key={a.start} type="button" className={styles.chipToggle} onClick={() => void submit(false, a)}>
                   {shortDate(a.start.slice(0, 10))} {a.start.slice(11, 16)}

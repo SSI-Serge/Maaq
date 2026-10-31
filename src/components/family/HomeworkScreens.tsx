@@ -101,7 +101,7 @@ export function HomeworkWeekScreen({ id }: { id: string }) {
               ))}
             </div>
           )}
-          <div className={styles.actionsRow}>
+          <div className={styles.wrapRow}>
             <button type="button" className={styles.chipToggle} aria-pressed={answers} onClick={() => setAnswers((v) => !v)}>
               Afficher les corrigés
             </button>
@@ -189,7 +189,7 @@ function ItemRow({ item, workDays, weekStart, answers, busy, onCheck, onMove, on
               // eslint-disable-next-line @next/next/no-img-element
               <img src={item.card} alt={`Carte : ${item.title}`} style={{ maxWidth: "100%", borderRadius: 8 }} />
             )}
-            <div className={styles.actionsRow}>
+            <div className={styles.wrapRow}>
               <label className={styles.label} htmlFor={`move-${item.id}`}>
                 Déplacer vers
               </label>
@@ -231,7 +231,7 @@ function AddCustom({ weekId, memberId, workDays, weekStart, onDone, onCancel }: 
         <input id="custom-title" className={styles.input} value={title} maxLength={100} onChange={(e) => setTitle(e.target.value)} placeholder="Ex. Lecture 15 min" />
       </div>
       <div className={styles.label}>Jours</div>
-      <div className={styles.actionsRow}>
+      <div className={styles.wrapRow}>
         {workDays.map((d) => (
           <button key={d} type="button" className={styles.chipToggle} aria-pressed={days.includes(d)} onClick={() => setDays((cur) => (cur.includes(d) ? cur.filter((x) => x !== d) : [...cur, d]))}>
             {dayLabel(weekStart, d)}

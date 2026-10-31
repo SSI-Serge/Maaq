@@ -175,7 +175,7 @@ export function HomeworkPlanner({ weekStart }: { weekStart: string }) {
           {d.step === 1 && (
             <div className={styles.form}>
               <div className={styles.label}>Jours de travail</div>
-              <div className={styles.actionsRow}>
+              <div className={styles.wrapRow}>
                 {RHYTHMS.map((r) => (
                   <button key={r.key} type="button" className={styles.chipToggle} aria-pressed={d.rhythm === r.key} onClick={() => change({ rhythm: r.key, workDays: r.days })}>
                     {r.label}
@@ -183,7 +183,7 @@ export function HomeworkPlanner({ weekStart }: { weekStart: string }) {
                 ))}
               </div>
               <div className={styles.label}>Enfants</div>
-              <div className={styles.actionsRow}>
+              <div className={styles.wrapRow}>
                 {children.map((c) => (
                   <button key={c.memberId} type="button" className={styles.chipToggle} aria-pressed={d.memberIds.includes(c.memberId)} onClick={() => change({ memberIds: toggle(d.memberIds, c.memberId) })}>
                     {c.firstName}
@@ -201,7 +201,7 @@ export function HomeworkPlanner({ weekStart }: { weekStart: string }) {
           {d.step === 2 && (
             <div className={styles.form}>
               <div className={styles.label}>Thématiques</div>
-              <div className={styles.actionsRow}>
+              <div className={styles.wrapRow}>
                 {[{ key: MATHS, label: "Maths" }, ...(Object.values(options)[0]?.activities.map((a) => ({ key: a.category, label: a.label })) ?? DEFAULT_CATEGORIES)].map((t) => (
                   <button key={t.key} type="button" className={styles.chipToggle} aria-pressed={d.themes.includes(t.key)} onClick={() => change({ themes: toggle(d.themes, t.key) })}>
                     {t.label}
@@ -235,7 +235,7 @@ export function HomeworkPlanner({ weekStart }: { weekStart: string }) {
                     {d.themes.includes(MATHS) && (
                       <>
                         <div className={styles.label}>Maths</div>
-                        <div className={styles.actionsRow}>
+                        <div className={styles.wrapRow}>
                           {orderedBlocks(o).map((b) => {
                             const key = `${b.textbook}:${b.numbers.join(",")}`;
                             return (
@@ -254,7 +254,7 @@ export function HomeworkPlanner({ weekStart }: { weekStart: string }) {
                       .map((c) => (
                         <div key={c.category}>
                           <div className={styles.label}>{c.label}</div>
-                          <div className={styles.actionsRow}>
+                          <div className={styles.wrapRow}>
                             {c.options.map((a) => (
                               <div key={a.activityId} className={styles.field} style={{ flex: "1 1 100%" }}>
                                 <button type="button" className={styles.chipToggle} aria-pressed={picks.includes(`a:${a.activityId}`)} onClick={() => pick(`a:${a.activityId}`)}>
@@ -357,7 +357,7 @@ function orderedBlocks(o: HomeworkOptions) {
 
 function DayButtons({ weekStart, workDays, value, onChange }: { weekStart: string; workDays: number[]; value: number[]; onChange: (days: number[]) => void }) {
   return (
-    <div className={styles.actionsRow}>
+    <div className={styles.wrapRow}>
       {workDays.map((day) => (
         <button key={day} type="button" className={styles.chipToggle} aria-pressed={value.includes(day)} onClick={() => onChange(toggle(value, day))}>
           {dayName(weekStart, day)}

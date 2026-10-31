@@ -97,7 +97,7 @@ function CriteriaForm({ initial }: { initial: CriteriaView }) {
           {saved.categories.map((category) => (
             <div key={category.category}>
               <div className={styles.label}>{category.label}</div>
-              <div className={styles.actionsRow}>
+              <div className={styles.wrapRow}>
                 {category.themes.map((theme) => (
                   <button
                     key={theme.key}
@@ -128,12 +128,12 @@ function CriteriaForm({ initial }: { initial: CriteriaView }) {
           </div>
           <div className={styles.field}>
             <label className={styles.label} htmlFor="outing-place">
-              Lieu de départ
+              Lieu de départ (une ville ou un secteur)
             </label>
-            <input id="outing-place" className={styles.input} value={place} maxLength={80} onChange={(e) => setPlace(e.target.value)} placeholder="Une ville ou un secteur : Lyon, Paris et Île-de-France" />
+            <input id="outing-place" className={styles.input} value={place} maxLength={80} onChange={(e) => setPlace(e.target.value)} placeholder="Ex. Lyon" />
           </div>
           <div className={styles.label}>Ambiance</div>
-          <div className={styles.actionsRow}>
+          <div className={styles.wrapRow}>
             {MOODS.map((m) => (
               <button key={m.value} type="button" className={styles.chipToggle} aria-pressed={mood === m.value} onClick={() => setMood(m.value)}>
                 {m.label}
@@ -141,7 +141,7 @@ function CriteriaForm({ initial }: { initial: CriteriaView }) {
             ))}
           </div>
           <div className={styles.label}>Jours préférés</div>
-          <div className={styles.actionsRow}>
+          <div className={styles.wrapRow}>
             {DAYS.map((d) => (
               <button key={d.value} type="button" className={styles.chipToggle} aria-pressed={days.includes(d.value)} onClick={() => setDays((cur) => toggle(cur, d.value))}>
                 {d.label}
@@ -149,7 +149,7 @@ function CriteriaForm({ initial }: { initial: CriteriaView }) {
             ))}
           </div>
           <div className={styles.label}>Fréquence</div>
-          <div className={styles.actionsRow}>
+          <div className={styles.wrapRow}>
             {FREQUENCIES.map((f) => (
               <button key={f.value} type="button" className={styles.chipToggle} aria-pressed={frequency === f.value} onClick={() => setFrequency(f.value)}>
                 {f.label}
