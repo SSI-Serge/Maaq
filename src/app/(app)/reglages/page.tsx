@@ -86,6 +86,17 @@ export default function SettingsPage() {
               <span aria-hidden>›</span>
             </Link>
           )}
+          {user.role !== "admin" && (
+            <Link href="/assistant/membres" className={s.navItem}>
+              <span>
+                Membres de la famille
+                <span className={s.muted} style={{ display: "block", fontWeight: 400, fontSize: 12 }}>
+                  Pour toutes les fonctionnalités : RDV, tâches, devoirs, sorties
+                </span>
+              </span>
+              <span aria-hidden>›</span>
+            </Link>
+          )}
           <Link href="/reglages/support" className={s.navItem}>
             Aide et support <span aria-hidden>›</span>
           </Link>

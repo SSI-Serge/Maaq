@@ -317,7 +317,7 @@ export function MembersScreen() {
   }
 
   return (
-    <AppShell title="Membres de la famille" back={{ href: "/assistant", label: "Assistant Famille" }}>
+    <AppShell title="Membres de la famille" back={{ href: "/reglages", label: "Réglages" }}>
       <p className={styles.hint}>
         Un membre peut être concerné par un RDV ou une tâche sans jamais se connecter à MAAQ (ex. un jeune enfant). Un invité a en plus un accès applicatif : il est donc aussi un membre.
       </p>

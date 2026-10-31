@@ -1278,3 +1278,58 @@
   font-weight: 700;
   color: var(--success, #5e7048);
 }
+
+/* ---- Accueil allégé (D69) ---- */
+.headerIcons {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.iconLink {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  color: var(--ink-soft);
+}
+.homeActions {
+  display: flex;
+  gap: 8px;
+}
+.homeActions > * {
+  flex: 1 1 0;
+  min-width: 0;
+  text-align: center;
+}
+.homeTiles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.homeTile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  color: var(--ink);
+}
+.homeTileTitle {
+  font-weight: 700;
+  font-size: 14px;
+}
+.statusBadge {
+  flex-shrink: 0;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--secondary-soft);
+  color: var(--secondary-strong);
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}

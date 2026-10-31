@@ -797,15 +797,15 @@ INSERT INTO outing_themes (category, theme_key, label, sort_order) VALUES
   ('teens', 'parent_teen_time', 'Moment parent-ado', 10);
 -- Sous-groupe « Concerts » (D68) : six thèmes pour « Pour moi », « En couple » et « Ados », aucun pour « Enfants de 3 à 10 ans » (absents du catalogue : refusés par la clé étrangère)
 INSERT INTO outing_themes (category, theme_key, label, theme_group, sort_order) VALUES
-  ('self', 'world_concert', 'Concert du monde', 'concerts', 10), ('self', 'urban_concert', 'Concert urbain', 'concerts', 11),
-  ('self', 'pop_concert', 'Concert pop', 'concerts', 12), ('self', 'hiphop_rap_concert', 'Concert hip-hop / rap', 'concerts', 13),
-  ('self', 'jazz_concert', 'Concert jazz', 'concerts', 14), ('self', 'rock_concert', 'Concert rock', 'concerts', 15),
-  ('couple', 'world_concert', 'Concert du monde', 'concerts', 9), ('couple', 'urban_concert', 'Concert urbain', 'concerts', 10),
-  ('couple', 'pop_concert', 'Concert pop', 'concerts', 11), ('couple', 'hiphop_rap_concert', 'Concert hip-hop / rap', 'concerts', 12),
-  ('couple', 'jazz_concert', 'Concert jazz', 'concerts', 13), ('couple', 'rock_concert', 'Concert rock', 'concerts', 14),
-  ('teens', 'world_concert', 'Concert du monde', 'concerts', 11), ('teens', 'urban_concert', 'Concert urbain', 'concerts', 12),
-  ('teens', 'pop_concert', 'Concert pop', 'concerts', 13), ('teens', 'hiphop_rap_concert', 'Concert hip-hop / rap', 'concerts', 14),
-  ('teens', 'jazz_concert', 'Concert jazz', 'concerts', 15), ('teens', 'rock_concert', 'Concert rock', 'concerts', 16);
+  ('self', 'concert_world', 'Concert du monde', 'concerts', 10), ('self', 'concert_urban', 'Concert urbain', 'concerts', 11),
+  ('self', 'concert_pop', 'Concert pop', 'concerts', 12), ('self', 'concert_hiphop', 'Concert hip-hop / rap', 'concerts', 13),
+  ('self', 'concert_jazz', 'Concert jazz', 'concerts', 14), ('self', 'concert_rock', 'Concert rock', 'concerts', 15),
+  ('couple', 'concert_world', 'Concert du monde', 'concerts', 9), ('couple', 'concert_urban', 'Concert urbain', 'concerts', 10),
+  ('couple', 'concert_pop', 'Concert pop', 'concerts', 11), ('couple', 'concert_hiphop', 'Concert hip-hop / rap', 'concerts', 12),
+  ('couple', 'concert_jazz', 'Concert jazz', 'concerts', 13), ('couple', 'concert_rock', 'Concert rock', 'concerts', 14),
+  ('teens', 'concert_world', 'Concert du monde', 'concerts', 11), ('teens', 'concert_urban', 'Concert urbain', 'concerts', 12),
+  ('teens', 'concert_pop', 'Concert pop', 'concerts', 13), ('teens', 'concert_hiphop', 'Concert hip-hop / rap', 'concerts', 14),
+  ('teens', 'concert_jazz', 'Concert jazz', 'concerts', 15), ('teens', 'concert_rock', 'Concert rock', 'concerts', 16);
 INSERT INTO homework_textbooks (textbook_key, label, is_foreign, sort_order) VALUES
   ('france', 'Manuel France', false, 1), ('singapore', 'Manuel Singapour', true, 2), ('china', 'Manuel Chine', true, 3);
 -- Réglages du lot 10 (US-65)

@@ -57,7 +57,11 @@ export function HomeworkSettings() {
       <p className={styles.hint}>Préparez chaque semaine les devoirs et les activités de vos enfants. Un réglage commun à toute la famille.</p>
       {query.loading && !setting && <Loading slow={query.slow} />}
       {query.error && <RetryNotice message={query.error.kind === "server" ? "L'aide Devoirs n'a pas pu être chargée." : query.error.message} onRetry={query.reload} />}
-      {setting && !setting.hasChildren && <p className={styles.hint}>Ajoutez vos enfants dans les membres pour utiliser l&apos;aide Devoirs.</p>}
+      {setting && !setting.hasChildren && (
+        <p className={styles.hint}>
+          Ajoutez vos enfants dans les membres pour utiliser l&apos;aide Devoirs. <Link href="/assistant/membres">Réglages › Membres</Link>
+        </p>
+      )}
       {setting && setting.hasChildren && (
         <>
           <div className={styles.settingRow} role="group" aria-label="Aide Devoirs">

@@ -5,7 +5,7 @@ import { open } from "@/server/assistant/fields";
 import { loadHomeworkCatalog } from "@/server/assistant/homework/catalog";
 import { setHomeworkAge, setHomeworkEnabled } from "@/server/assistant/homework/settings";
 import {
-  activityOptions, addItem, childOptions, getWeek, listWeeks, moveItem, prepareWeek, removeItem, setItemChecked, shouldOfferHomework, titleMentionsHomework, upcomingMondays, type WeekInput,
+  activityOptions, addItem, childOptions, getWeek, listWeeks, moveItem, prepareWeek, removeItem, setItemChecked, upcomingMondays, weekPreparedFor, type WeekInput,
 } from "@/server/assistant/homework/weeks";
 import type { Ctx } from "@/server/auth/service";
 import type { DB } from "@/server/db/schema.generated";
@@ -79,29 +79,17 @@ async function standardWeek(f: Family): Promise<{ weekId: string; input: WeekInp
 const tasksOf = (weekId: string) =>
   db.selectFrom("family_tasks").select(["title", "status", "assigned_member_id", "source"]).where("homework_week_id", "=", weekId).orderBy("due_date").execute();
 
-describe("détection d'un devoir (US-119 RF1, RT1)", () => {
-  it("repère « devoir » et « devoirs », sans tenir compte des majuscules ni des accents", () => {
-    expect(["Devoirs de maths de Léo", "faire le DEVOIR", "Les dévoirs", "devoir"].map(titleMentionsHomework)).toEqual([true, true, true, true]);
-    expect(["Dévouement", "Redevoir de l'argent", "Aller au parc"].map(titleMentionsHomework)).toEqual([false, false, false]);
-  });
-
-  it("CA 1.1 : la carte est proposée si l'aide est activée et qu'aucune semaine n'est préparée ; CA 1.2 : pas si une semaine l'est déjà", async () => {
-    const f = await family();
-    expect(await shouldOfferHomework(ctx(), f.camilleSession, { title: "Devoirs de maths de Léo", due: "2054-11-11" })).toBe(true);
-    expect(await shouldOfferHomework(ctx(), f.camilleSession, { title: "Acheter du pain", due: "2054-11-11" })).toBe(false);
-    await standardWeek(f);
-    expect(await shouldOfferHomework(ctx(), f.camilleSession, { title: "Un autre devoir", due: "2054-11-12" })).toBe(false); // même semaine
-    expect(await shouldOfferHomework(ctx(), f.camilleSession, { title: "Un autre devoir", due: "2054-11-17" })).toBe(true); // semaine suivante
-  });
-
-  it("CA 5.1 (US-118) : aide désactivée, la carte n'apparaît pas", async () => {
-    const f = await family();
-    await setHomeworkEnabled(ctx(), f.julienSession, { enabled: false });
-    expect(await shouldOfferHomework(ctx(), f.camilleSession, { title: "Devoir de maths", due: "2054-11-11" })).toBe(false);
-  });
-
+describe("semaines à préparer (US-119)", () => {
   it("propose les lundis à venir : la semaine en cours puis les suivantes", () => {
     expect(upcomingMondays("2054-11-05", 3)).toEqual(["2054-11-02", "2054-11-09", "2054-11-16"]);
+  });
+
+  it("une semaine est « préparée » dès qu'une semaine existe pour le lundi de la date demandée (D69 : le lien de la tâche hebdomadaire devient « Voir la semaine »)", async () => {
+    const f = await family();
+    expect(await weekPreparedFor(db, f.accountId, "2054-11-11")).toBe(false);
+    await standardWeek(f);
+    expect(await weekPreparedFor(db, f.accountId, "2054-11-12")).toBe(true); // même semaine
+    expect(await weekPreparedFor(db, f.accountId, "2054-11-17")).toBe(false); // semaine suivante
   });
 });
 

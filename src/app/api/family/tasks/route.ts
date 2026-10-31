@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireProfile } from "@/server/auth/http";
 import { handler, parseBody, Rejection } from "@/server/http";
-import { mondayOf, shouldOfferHomework } from "@/server/assistant/homework/weeks";
 import { createTask, listTasks, listTasksBetween } from "@/server/assistant/tasks";
 import { repetitionSchema } from "./schemas";
 
@@ -34,14 +33,9 @@ const schema = z.object({
   repetition: repetitionSchema.nullable().optional(),
 });
 
-/**
- * Crée une tâche seule ou récurrente (US-110 RF1, RF3). Quand le titre parle de devoirs et que l'aide Devoirs est activée sans semaine déjà préparée pour la semaine de l'échéance,
- * la réponse porte `homeworkOffer` : l'écran propose alors de préparer la semaine (US-119 RF1). La tâche est enregistrée dans tous les cas.
- */
+/** Crée une tâche seule ou récurrente (US-110 RF1, RF3). */
 export const POST = handler(async (request: Request) => {
   const { session, ctx } = await requireProfile();
   const body = await parseBody(request, schema);
-  const task = await createTask(ctx, session, body);
-  const offer = await shouldOfferHomework(ctx, session, { title: body.title, due: body.due }).catch(() => false);
-  return NextResponse.json({ task, homeworkOffer: offer ? { weekStart: mondayOf(body.due) } : null }, { status: 201 });
+  return NextResponse.json({ task: await createTask(ctx, session, body) }, { status: 201 });
 });

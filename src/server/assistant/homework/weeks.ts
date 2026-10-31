@@ -404,24 +404,6 @@ export async function weekPreparedFor(db: Db, accountId: string, day: string): P
   return Boolean(row);
 }
 
-/** Le titre d'une tâche contient « devoir » ou « devoirs », sans tenir compte des majuscules ni des accents (RF1, RT1) : la détection est faite ici, pas par l'agent. */
-export function titleMentionsHomework(title: string): boolean {
-  const plain = title.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
-  return /\bdevoirs?\b/.test(plain);
-}
-
-/**
- * L'aide apparaît sous le formulaire quand le parent crée une tâche dont le titre parle de devoirs, que l'aide est activée pour le foyer et qu'aucune semaine
- * n'est déjà préparée pour la semaine de l'échéance (RF1). La tâche est enregistrée dans tous les cas.
- */
-export async function shouldOfferHomework(ctx: Ctx, session: SessionContext, task: { title: string; due: string }): Promise<boolean> {
-  const accountId = session.user.accountId;
-  if (!accountId || !titleMentionsHomework(task.title)) return false;
-  if (!(await homeworkEnabled(ctx, accountId))) return false;
-  const [children, prepared] = [await loadChildren(ctx.db, accountId), await weekPreparedFor(ctx.db, accountId, task.due)];
-  return children.length > 0 && !prepared;
-}
-
 // ---------------------------------------------------------------------------------------------------------------------------
 // Écran « Semaine de devoirs » (RF4)
 // ---------------------------------------------------------------------------------------------------------------------------

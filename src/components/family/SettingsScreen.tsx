@@ -315,17 +315,6 @@ export function SettingsScreen() {
         })}
       </Section>
 
-      {editable && (
-        <Section title="Famille">
-          <Link href="/assistant/membres" className={styles.linkRow}>
-            <span>
-              Membres de la famille
-              <span className={styles.linkRowSub}>Personnes concernées par les RDV et tâches</span>
-            </span>
-            <span aria-hidden>›</span>
-          </Link>
-        </Section>
-      )}
     </AppShell>
   );
 }
