@@ -136,8 +136,9 @@ describe("répétition annuelle : séances, planificateur, rappels (D70)", () =>
     const { eventIds } = await createSeries(db, base(f, { title: "Réunion annuelle", type: "school", firstDate: "2054-11-10", allDay: false, startTime: "17:00", allFamily: false, memberIds: [f.noahId] }));
     await confirmEvent(ctx, f.camilleSession, eventIds[0], { allowConflict: true });
     send.mockClear();
-    const at = (local: string): Ctx => ({ db, now: new Date(local) });
-    await runReminders(at("2054-11-03T09:00:00Z"), { accountId: f.accountId }); // J-7 du 10 novembre, type école
+    // Midi dans le fuseau d'essai de la famille (celui où il est midi maintenant) : jamais dans les heures de silence, à toute heure d'exécution.
+    const offset = Number((/Etc\/GMT([+-]\d+)/.exec(zoneWhereItIs(12)) ?? [])[1] ?? 0); // Etc/GMT+8 = UTC-8
+    await runReminders({ db, now: new Date(Date.UTC(2054, 10, 3, 12 + offset)) }, { accountId: f.accountId }); // J-7 du 10 novembre, type école
     expect(payloads().map((c) => c.tag)).toContain(`d7-${eventIds[0]}`);
   });
 
