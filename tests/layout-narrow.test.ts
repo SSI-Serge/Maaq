@@ -22,7 +22,7 @@ describe("écrans du lot 10 à 360 px", () => {
   });
 
   it("aucune puce du lot 10 n'est placée dans une ligne `actionsRow`", () => {
-    for (const file of ["OutingsSettings", "OutingsScreens", "HomeworkPlanner", "HomeworkScreens", "HomeworkSettings"]) {
+    for (const file of ["OutingsCriteria", "OutingsScreens", "HomeworkPlanner", "HomeworkScreens", "HomeworkSettings"]) {
       const source = read(`src/components/family/${file}.tsx`);
       // Chaque ligne `actionsRow` ne contient que des boutons d'action (Button) ou des liens, jamais une puce `chipToggle`.
       for (const block of source.split(/className=\{styles\.actionsRow\}/).slice(1)) {
@@ -33,7 +33,7 @@ describe("écrans du lot 10 à 360 px", () => {
   });
 
   it("aucun champ du lot 10 n'a de largeur fixe en pixels", () => {
-    for (const file of ["OutingsSettings", "OutingsScreens", "HomeworkPlanner", "HomeworkScreens", "HomeworkSettings"]) {
+    for (const file of ["OutingsCriteria", "OutingsScreens", "HomeworkPlanner", "HomeworkScreens", "HomeworkSettings"]) {
       const source = read(`src/components/family/${file}.tsx`);
       expect(source, `${file} : largeur fixe`).not.toMatch(/style=\{\{[^}]*\bwidth:\s*\d+/);
     }

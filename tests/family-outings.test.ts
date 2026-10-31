@@ -97,8 +97,38 @@ describe("critères (US-114)", () => {
     const open = await family({ children: [{ born: null }] }); // sans date de naissance, toutes les catégories sont proposées (RF3)
     const view = await getCriteria(at(), open.camilleSession);
     expect(view.categories.map((c) => c.category)).toEqual(["self", "couple", "kids", "teens"]);
-    expect(view.categories.find((c) => c.category === "self")!.themes.map((t) => t.label)).toEqual(["Culture", "Bien-être", "Nature", "Gourmand", "Créatif", "Sport", "Spectacle", "Flânerie", "Entre amis"]);
-    expect(view.categories.find((c) => c.category === "teens")!.themes).toHaveLength(10);
+    expect(view.categories.map((c) => c.label)).toEqual(["Pour moi", "En couple", "Enfants de 3 à 10 ans", "Ados de 11 à 17 ans"]);
+    expect(view.categories.find((c) => c.category === "self")!.themes.filter((t) => !t.group).map((t) => t.label)).toEqual(["Culture", "Bien-être", "Nature", "Gourmand", "Créatif", "Sport", "Spectacle", "Flânerie", "Entre amis"]);
+    expect(view.categories.find((c) => c.category === "teens")!.themes.filter((t) => !t.group)).toHaveLength(10);
+  });
+
+  it("D68 : six thèmes « Concerts » dans un sous-groupe, pour « Pour moi », « En couple » et « Ados » seulement ; ce sont des thèmes ordinaires", async () => {
+    const f = await family({ children: [{ born: null }] });
+    const view = await getCriteria(at(), f.camilleSession);
+    const concerts = (category: string) => view.categories.find((c) => c.category === category)!.themes.filter((t) => t.group === "concerts");
+    for (const category of ["self", "couple", "teens"]) expect(concerts(category).map((t) => t.label)).toEqual(["Concert du monde", "Concert urbain", "Concert pop", "Concert hip-hop / rap", "Concert jazz", "Concert rock"]);
+    expect(concerts("kids")).toEqual([]);
+    const key = concerts("couple")[2].key;
+    // Un thème de concert compte pour la règle « au moins un thème » et se garde comme un autre.
+    const saved = await saveCriteria(at(), f.camilleSession, { ...NATURE_FOODIE, selected: { couple: [key] } });
+    expect(saved.selected).toEqual({ couple: [key] });
+    expect(saved.summary).toBe("Activées · En couple · une par mois");
+    // Refusé pour « Enfants » : la clé étrangère de la base ne connaît pas ce thème pour cette catégorie.
+    expect((await failure(saveCriteria(at(), f.camilleSession, { ...NATURE_FOODIE, selected: { kids: [key] } }))).code).toBe("invalid_theme");
+  });
+
+  it("D68 : le résumé de la ligne d'accès des réglages", async () => {
+    const f = await family();
+    expect((await getCriteria(at(), f.camilleSession)).summary).toBe("Désactivées · touchez pour choisir vos critères");
+    const saved = await saveCriteria(at(), f.camilleSession, { ...NATURE_FOODIE, selected: { self: ["nature"], couple: ["gastronomy"] }, frequency: "twice_monthly" });
+    expect(saved.summary).toBe("Activées · Pour moi, En couple · deux par mois");
+    expect((await saveCriteria(at(), f.camilleSession, { ...NATURE_FOODIE, enabled: false })).summary).toBe("Désactivées · touchez pour choisir vos critères");
+  });
+
+  it("D68, S-15 : « Quand ? » se cumule : week-end, soirs de semaine et jours précis ensemble", async () => {
+    const f = await family();
+    const saved = await saveCriteria(at(), f.camilleSession, { ...NATURE_FOODIE, days: ["weekend", "weekday_evenings", "wednesday", "friday"] });
+    expect(saved.days).toEqual(["weekend", "weekday_evenings", "wednesday", "friday"]);
   });
 
   it("CA 3.1 : sans enfant de 11 à 17 ans, la catégorie ados n'est pas proposée ; sans date de naissance, elle l'est", async () => {

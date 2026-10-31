@@ -12,7 +12,7 @@ import type { ReminderKind } from "@/server/assistant/reminders";
 import { TYPE_LABEL, TYPE_PLURAL } from "./format";
 import { HomeworkSettings } from "./HomeworkSettings";
 import { MyPosition } from "./LocationConsent";
-import { OutingsSettings } from "./OutingsSettings";
+import { OutingsAccessRow } from "./OutingsCriteria";
 import styles from "./family.module.css";
 
 interface Setting {
@@ -109,6 +109,7 @@ function MyNotifications({ pushState }: { pushState: string }) {
       )}
       {error && !error.body?.code && last && <RetryNotice message={error.kind === "server" ? "Le réglage n'a pas pu être enregistré." : error.message} onRetry={() => void save(last.key, last.patch)} />}
       {error && error.body?.code && <Notice tone="error">{error.message}</Notice>}
+      <OutingsAccessRow />
       <Link href="/assistant/rappels" className={styles.linkRow}>
         <span>
           Activer mes notifications
@@ -273,7 +274,6 @@ export function SettingsScreen() {
 
       <SchoolZone />
       <HomeworkSettings />
-      <OutingsSettings />
       <Anticipation />
 
       <Section title="Délais de rappel par type de RDV">

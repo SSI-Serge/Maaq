@@ -1479,6 +1479,9 @@ export interface OutingCriteria {
    * « Recevoir des idées de sorties » : faux par défaut ; vrai exige budget, nombre de personnes, lieu de départ et au moins un thème. Désactiver arrête les propositions sans rien supprimer (SG-2)
    */
   enabled: Generated<boolean>;
+  /**
+   * Fréquence des propositions : une par mois (monthly, défaut) ou deux par mois (twice_monthly). La valeur weekly (une par semaine) est retirée par la décision D67 (coût d'une proposition) : elle reste dans le type énuméré mais la contrainte ck_outing_criteria_frequency la refuse
+   */
   frequency: Generated<OutingFrequency>;
   mood: Generated<OutingMood>;
   people_count: number | null;
@@ -1559,6 +1562,10 @@ export interface OutingThemes {
   category: OutingCategory;
   label: string;
   sort_order: Generated<number>;
+  /**
+   * Sous-groupe d'affichage du thème (clé technique, par exemple « concerts » : l'écran range ces thèmes dans un sous-groupe repliable) ; vide = thème sans sous-groupe. Un thème d'un sous-groupe reste un thème ordinaire de sa catégorie (règle « au moins un thème », choix, idées). Le libellé du sous-groupe est porté par l'écran (D68)
+   */
+  theme_group: string | null;
   theme_key: string;
 }
 

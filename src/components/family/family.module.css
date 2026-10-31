@@ -1066,3 +1066,215 @@
   color: var(--ink);
   cursor: pointer;
 }
+
+/* ---- Critères de sorties : accordéon par catégorie, « Enregistrer » fixé en bas (D68, proposition A) ---- */
+.accordion {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--bg-raised);
+}
+.accItem + .accItem {
+  border-top: 1px solid var(--line);
+}
+.accHead {
+  display: flex;
+  align-items: stretch;
+  min-height: 56px;
+}
+.accCase {
+  width: 56px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-right: 1px solid var(--line);
+  background: var(--bg-sunken);
+  cursor: pointer;
+}
+.accCaseOn {
+  background: var(--primary-soft);
+}
+.accBox {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  border: 2px solid var(--ink-soft);
+  color: var(--bg);
+  font-size: 13px;
+  line-height: 18px;
+  text-align: center;
+}
+.accBoxOn {
+  border-color: var(--primary);
+  background: var(--primary);
+}
+.accRow {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 12px 6px 14px;
+  border: 0;
+  background: none;
+  text-align: left;
+  font: inherit;
+  color: var(--ink);
+  cursor: pointer;
+}
+.accLabel {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+}
+.accSummary {
+  display: block;
+  font-size: 12px;
+  color: var(--ink-soft);
+  overflow-wrap: anywhere;
+}
+.accOpen {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--primary);
+}
+.accChevron {
+  display: inline-block;
+  font-size: 18px;
+  line-height: 1;
+  transition: transform 0.15s;
+}
+.accChevronOpen {
+  transform: rotate(90deg);
+}
+.accBody {
+  padding: 2px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.chipToggle[aria-disabled="true"] {
+  opacity: 0.45;
+}
+.subgroup {
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+}
+.subgroupHead {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.noteBox {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--secondary-soft);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.stepperRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.stepBtn {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--bg-raised);
+  font-size: 18px;
+  color: var(--ink);
+  cursor: pointer;
+}
+.stepBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.stepValue {
+  min-width: 20px;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 700;
+}
+.segGrid {
+  display: grid;
+  gap: 6px;
+}
+.segBtn {
+  min-height: 44px;
+  padding: 6px 4px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--bg-raised);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+}
+.segBtn[aria-pressed="true"],
+.roundBtn[aria-pressed="true"] {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: var(--bg);
+}
+.rounds {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+.roundBtn {
+  height: 44px;
+  padding: 0;
+  border-radius: 22px;
+  border: 1px solid var(--line);
+  background: var(--bg-raised);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  cursor: pointer;
+}
+.saveBar {
+  position: sticky;
+  bottom: calc(76px + env(safe-area-inset-bottom));
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+  background: var(--bg);
+}
+.saveOk {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--success, #5e7048);
+}

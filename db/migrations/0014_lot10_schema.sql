@@ -41,6 +41,8 @@ CREATE TABLE outing_themes (
   category    outing_category NOT NULL,
   theme_key   text NOT NULL CHECK (theme_key ~ '^[a-z_]+$'),
   label       varchar(60) NOT NULL,
+  -- Sous-groupe d'affichage (D68) : « concerts » pour les six thèmes de concert ; vide pour les autres
+  theme_group text CHECK (theme_group ~ '^[a-z_]+$'),
   sort_order  smallint NOT NULL DEFAULT 1,
   PRIMARY KEY (category, theme_key)
 );
@@ -793,6 +795,17 @@ INSERT INTO outing_themes (category, theme_key, label, sort_order) VALUES
   ('teens', 'pop_culture', 'Culture pop', 4), ('teens', 'creative', 'Créatif', 5), ('teens', 'social', 'Social', 6),
   ('teens', 'discovery', 'Découverte', 7), ('teens', 'adventure', 'Aventure', 8), ('teens', 'autonomy', 'Autonomie', 9),
   ('teens', 'parent_teen_time', 'Moment parent-ado', 10);
+-- Sous-groupe « Concerts » (D68) : six thèmes pour « Pour moi », « En couple » et « Ados », aucun pour « Enfants de 3 à 10 ans » (absents du catalogue : refusés par la clé étrangère)
+INSERT INTO outing_themes (category, theme_key, label, theme_group, sort_order) VALUES
+  ('self', 'world_concert', 'Concert du monde', 'concerts', 10), ('self', 'urban_concert', 'Concert urbain', 'concerts', 11),
+  ('self', 'pop_concert', 'Concert pop', 'concerts', 12), ('self', 'hiphop_rap_concert', 'Concert hip-hop / rap', 'concerts', 13),
+  ('self', 'jazz_concert', 'Concert jazz', 'concerts', 14), ('self', 'rock_concert', 'Concert rock', 'concerts', 15),
+  ('couple', 'world_concert', 'Concert du monde', 'concerts', 9), ('couple', 'urban_concert', 'Concert urbain', 'concerts', 10),
+  ('couple', 'pop_concert', 'Concert pop', 'concerts', 11), ('couple', 'hiphop_rap_concert', 'Concert hip-hop / rap', 'concerts', 12),
+  ('couple', 'jazz_concert', 'Concert jazz', 'concerts', 13), ('couple', 'rock_concert', 'Concert rock', 'concerts', 14),
+  ('teens', 'world_concert', 'Concert du monde', 'concerts', 11), ('teens', 'urban_concert', 'Concert urbain', 'concerts', 12),
+  ('teens', 'pop_concert', 'Concert pop', 'concerts', 13), ('teens', 'hiphop_rap_concert', 'Concert hip-hop / rap', 'concerts', 14),
+  ('teens', 'jazz_concert', 'Concert jazz', 'concerts', 15), ('teens', 'rock_concert', 'Concert rock', 'concerts', 16);
 INSERT INTO homework_textbooks (textbook_key, label, is_foreign, sort_order) VALUES
   ('france', 'Manuel France', false, 1), ('singapore', 'Manuel Singapour', true, 2), ('china', 'Manuel Chine', true, 3);
 -- Réglages du lot 10 (US-65)
@@ -813,6 +826,7 @@ COMMENT ON FUNCTION app_current_user_id() IS $$Profil indiqué par l'application
 COMMENT ON FUNCTION looks_like_address(text) IS $$Vrai si le texte ressemble à une adresse (numéro de voie en tête ou mot de type de voie) : refusé pour le lieu de départ des sorties. Filet de sécurité de la base, en plus du contrôle de l'application. [US-114 RF5, RT2, D47]$$;
 COMMENT ON FUNCTION iso_weekdays_valid(smallint[]) IS $$Vrai si la liste contient 1 à 7 jours ISO (1 = lundi) sans doublon. [US-119 RF2]$$;
 COMMENT ON FUNCTION homework_level_for_age(smallint) IS $$Niveau de maths de l'âge des devoirs : 6 ans CP, 7 CE1, 8 CE2, 9 CM1, 10 à 12 ans CM2 ; NULL hors de 6 à 12 ans. [US-118 RF4]$$;
+COMMENT ON COLUMN outing_themes.theme_group IS $$Sous-groupe d'affichage du thème (clé technique, par exemple « concerts » : l'écran range ces thèmes dans un sous-groupe repliable) ; vide = thème sans sous-groupe. Un thème d'un sous-groupe reste un thème ordinaire de sa catégorie (règle « au moins un thème », choix, idées). Le libellé du sous-groupe est porté par l'écran (D68)$$;
 COMMENT ON TABLE outing_themes IS $$Listes fermées des thèmes de sorties, par catégorie (pour moi, en couple, enfants de 3 à 10 ans, ados de 11 à 17 ans). Le même thème peut exister dans plusieurs catégories. [US-114 RF2]$$;
 COMMENT ON TABLE outing_criteria IS $$Critères de sorties d'un profil parent : interrupteur (désactivé par défaut), budget et nombre de personnes, ville ou secteur de départ, ambiance, jours préférés, fréquence. Données PRIVÉES du profil : l'autre parent ne les voit pas. Les catégories et thèmes sont dans outing_criteria_themes. [US-114, US-117, RT1]$$;
 COMMENT ON COLUMN outing_criteria.enabled IS $$« Recevoir des idées de sorties » : faux par défaut ; vrai exige budget, nombre de personnes, lieu de départ et au moins un thème. Désactiver arrête les propositions sans rien supprimer (SG-2)$$;

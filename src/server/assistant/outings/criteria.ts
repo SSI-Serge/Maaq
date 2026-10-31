@@ -13,37 +13,22 @@ import { asProfile } from "./profile";
  * un secteur, jamais une adresse (D47). Les catégories « enfants » et « ados » ne sont proposées que si la famille compte un membre de cet âge (RF3).
  */
 
-export const BUDGET_MIN = 10;
-export const BUDGET_MAX = 2000;
-export const PEOPLE_MIN = 1;
-export const PEOPLE_MAX = 10;
-export const PLACE_MAX = 80;
+import {
+  BUDGET_MAX, BUDGET_MIN, CATEGORIES, CATEGORY_LABEL, DAY_LABEL, DAY_PREFS, FREQUENCIES, MOODS, PEOPLE_MAX, PEOPLE_MIN, PLACE_MAX, criteriaSummary, looksLikeAddress,
+} from "./rules";
 
-export const CATEGORY_LABEL: Record<OutingCategory, string> = { self: "Pour moi", couple: "En couple", kids: "Avec les enfants de 3 à 10 ans", teens: "Avec les ados de 11 à 17 ans" };
-export const DAY_LABEL: Record<OutingDayPref, string> = {
-  weekend: "Week-end", weekday_evenings: "Soirs de semaine", monday: "Lundi", tuesday: "Mardi", wednesday: "Mercredi", thursday: "Jeudi", friday: "Vendredi", saturday: "Samedi", sunday: "Dimanche",
-};
-export const MOODS: OutingMood[] = ["calm", "playful", "both"];
-/** « Une par semaine » est retiré (D67, coût : une proposition coûte environ 0,28 $) ; la valeur existe encore dans le schéma, mais n'est ni proposée ni acceptée. */
-export const FREQUENCIES: OutingFrequency[] = ["monthly", "twice_monthly"];
+export { BUDGET_MAX, BUDGET_MIN, CATEGORY_LABEL, DAY_LABEL, DAY_PREFS, FREQUENCIES, MOODS, PEOPLE_MAX, PEOPLE_MIN, PLACE_MAX, looksLikeAddress };
 
-/** Une ligne restée en « une par semaine » est lue comme « deux par mois » (D67). */
+/** Une ligne restée en « une par semaine » est lue comme « deux par mois » (D67) ; la base la refuse désormais, la lecture reste prudente. */
 const limited = (frequency: OutingFrequency | undefined): OutingFrequency => (frequency === "monthly" ? "monthly" : frequency ? "twice_monthly" : "monthly");
-export const DAY_PREFS = Object.keys(DAY_LABEL) as OutingDayPref[];
 
 const fail = (code: string, message: string, status = 422) => new Rejection(code, message, status);
-
-const ADDRESS_NUMBER = /^\s*[0-9]+\s*(bis|ter|quater)?\s*,?\s+\S/i;
-const ADDRESS_WORD = /(^|[\s,;])(rue|avenue|av\.?|boulevard|bd|chemin|impasse|allée|allee|route|quai|passage|square|esplanade|ruelle|sentier|lotissement|résidence|residence|hameau|lieu-dit)([\s,;]|$)/i;
-
-/** Même contrôle que `looks_like_address` de la base : un numéro de voie en tête, ou un mot de type de voie. « place » et « cours » ne comptent pas (noms de communes et de quartiers). */
-export function looksLikeAddress(text: string): boolean {
-  return ADDRESS_NUMBER.test(text) || ADDRESS_WORD.test(text);
-}
 
 export interface ThemeView {
   key: string;
   label: string;
+  /** Sous-groupe d'affichage (par exemple « concerts », repliable sur l'écran) ; vide pour un thème ordinaire (D68). */
+  group: string | null;
 }
 export interface CategoryView {
   category: OutingCategory;
@@ -65,6 +50,8 @@ export interface CriteriaView {
   mood: OutingMood;
   days: OutingDayPref[];
   frequency: OutingFrequency;
+  /** Résumé de la ligne d'accès des réglages : « Activées · En couple · deux par mois » ou « Désactivées · touchez pour choisir vos critères ». */
+  summary: string;
   /** Prénom de l'autre parent, pour « Ces critères restent privés : [prénom] ne les voit pas. » ; vide s'il n'y en a pas. */
   otherParent: string | null;
 }
@@ -91,10 +78,9 @@ export async function getCriteria(ctx: Ctx, session: SessionContext): Promise<Cr
   const accountId = requireParent(session);
   const userId = session.user.id;
   const available = await availableCategories(ctx, accountId);
-  const themes = await ctx.db.selectFrom("outing_themes").select(["category", "theme_key", "label"]).orderBy("category").orderBy("sort_order").execute();
-  const categories = (Object.keys(CATEGORY_LABEL) as OutingCategory[])
-    .filter((c) => available.has(c))
-    .map((category): CategoryView => ({ category, label: CATEGORY_LABEL[category], themes: themes.filter((t) => t.category === category).map((t) => ({ key: t.theme_key, label: t.label })) }));
+  const themes = await ctx.db.selectFrom("outing_themes").select(["category", "theme_key", "label", "theme_group"]).orderBy("category").orderBy("sort_order").execute();
+  const categories = CATEGORIES.filter((c) => available.has(c))
+    .map((category): CategoryView => ({ category, label: CATEGORY_LABEL[category], themes: themes.filter((t) => t.category === category).map((t) => ({ key: t.theme_key, label: t.label, group: t.theme_group })) }));
   const { row, picked } = await asProfile(ctx.db, userId, async (trx) => ({
     // Les jours préférés sont lus en texte : le pilote ne sait pas lire un tableau de valeurs énumérées.
     row: await trx.selectFrom("outing_criteria").select(["enabled", "budget_eur", "people_count", "departure_place", "mood", "frequency", sql<OutingDayPref[]>`preferred_days::text[]`.as("days")]).where("user_id", "=", userId).executeTakeFirst(),
@@ -121,6 +107,7 @@ export async function getCriteria(ctx: Ctx, session: SessionContext): Promise<Cr
     mood: row?.mood ?? "both",
     days: row?.days ?? ["weekend"],
     frequency: limited(row?.frequency),
+    summary: criteriaSummary({ enabled: row?.enabled ?? false, categories: Object.keys(selected) as OutingCategory[], frequency: limited(row?.frequency) }),
     otherParent: other?.first_name ?? null,
   };
 }
