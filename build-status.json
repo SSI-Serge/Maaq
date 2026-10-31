@@ -3,8 +3,17 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-10-31T09:10:00Z",
+  "updated": "2026-10-31T09:40:00Z",
   "deploys": [
+    {
+      "at": "2026-10-31T09:40:00Z",
+      "env": "preview",
+      "what": "Zone de test (révision 00045) : tâche hebdomadaire de préparation des devoirs (D69) et répétition annuelle des RDV (D70)",
+      "storyIds": [
+        "f16s121",
+        "f16s122"
+      ]
+    },
     {
       "at": "2026-10-30T18:54:10Z",
       "env": "preview",
@@ -2083,18 +2092,18 @@
           "id": "f16s121",
           "title": "Recevoir chaque semaine une tâche « Préparer les devoirs de la semaine »",
           "state": "testing",
-          "env": null,
+          "env": "preview",
           "note": "Créée depuis la carte Aide Devoirs : chaque dimanche à 18 h par défaut, avec le lien vers la préparation de la semaine suivante.",
-          "at": "2026-10-31T09:10:00Z",
+          "at": "2026-10-31T09:40:00Z",
           "unsure": "Jamais essayée sur un téléphone."
         },
         {
           "id": "f16s122",
           "title": "Faire revenir un RDV chaque année (un anniversaire)",
           "state": "testing",
-          "env": null,
+          "env": "preview",
           "note": "Formulaire « Chaque année », demande à l'assistant (« tous les ans »), les deux prochaines occurrences créées d'avance, pas de vacances scolaires.",
-          "at": "2026-10-31T09:10:00Z",
+          "at": "2026-10-31T09:40:00Z",
           "unsure": "Le dessin exact de la maquette (Design) n'a été suivi que pour les libellés ; à regarder sur un vrai écran."
         }
       ],
