@@ -277,7 +277,7 @@ export function SettingsScreen() {
       <Anticipation />
 
       <Section title="Délais de rappel par type de RDV">
-        <p className={styles.hint}>Les rappels et les relances partent par notification sur les appareils autorisés de chaque parent ; un email n'est envoyé qu'à défaut de notification (aucun appareil autorisé, ou envoi échoué). Ces réglages valent pour toute la famille.</p>
+        <p className={styles.hint}>Les rappels et les relances partent par notification sur les appareils autorisés de chaque parent ; un email n&apos;est envoyé qu&apos;à défaut de notification (aucun appareil autorisé, ou envoi échoué). Ces réglages valent pour toute la famille.</p>
         {query.loading && !values && <Loading slow={query.slow} />}
         {query.error && !forbidden && <RetryNotice message={query.error.kind === "server" ? "Les réglages n'ont pas pu être chargés." : query.error.message} onRetry={query.reload} />}
         {forbidden && <Notice tone="info">Ces réglages sont réservés aux profils d&apos;un foyer.</Notice>}
