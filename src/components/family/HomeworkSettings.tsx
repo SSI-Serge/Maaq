@@ -118,6 +118,22 @@ export function HomeworkSettings() {
             </div>
           ))}
 
+          {setting.enabled &&
+            (setting.weeklyTask ? (
+              <p className={styles.hint}>
+                ✓ Tâche « Préparer les devoirs de la semaine » {setting.weeklyTask.label}. <Link href="/assistant/taches">Voir les tâches</Link>
+              </p>
+            ) : (
+              setting.canEdit && (
+                <Link href="/assistant/taches/nouvelle?modele=preparation_devoirs" className={styles.linkRow}>
+                  <span>
+                    Créer une tâche de préparation hebdo des devoirs
+                    <span className={styles.linkRowSub}>Un rappel chaque dimanche à 18 h, avec le lien pour préparer la semaine</span>
+                  </span>
+                  <span aria-hidden>›</span>
+                </Link>
+              )
+            ))}
           {setting.enabled && (
             <Link href="/assistant/devoirs" className={styles.linkRow}>
               <span>

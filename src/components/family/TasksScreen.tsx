@@ -7,7 +7,8 @@ import { useApiQuery } from "@/client/hooks";
 import { AppShell, appStyles as s, Section } from "@/components/app/AppShell";
 import { Loading, Notice, RetryNotice } from "@/components/ui";
 import type { TaskLists, TaskView } from "@/server/assistant/tasks";
-import { TaskForm } from "./TaskForm";
+import { addDays, todayLocal } from "./format";
+import { TaskForm, type TaskFormInitial } from "./TaskForm";
 import { TaskRow } from "./TaskRow";
 import styles from "./family.module.css";
 
@@ -94,15 +95,42 @@ function Group({ title, tasks, data, showDate = true, onChanged }: { title: stri
   );
 }
 
+/** Valeurs de départ de la tâche hebdomadaire de préparation des devoirs (D69) : chaque dimanche à 18 h, assignée au parent qui la crée. */
+function prepInitial(lists: TaskLists): TaskFormInitial {
+  const today = todayLocal();
+  const weekday = ((new Date(`${today}T00:00:00Z`).getUTCDay() + 6) % 7) + 1;
+  return {
+    title: "Préparer les devoirs de la semaine",
+    due: addDays(today, (7 - weekday) % 7),
+    dueTime: "18:00",
+    assigneeId: lists.viewer.memberId,
+    repetition: { frequency: "weekly", weekdays: [7], end: { kind: "never" } },
+  };
+}
+
 /** Nouvelle tâche (US-110 RF1, bouton « + Tâche »). Les valeurs d'une carte du tchat peuvent être reprises par l'adresse. */
-export function NewTaskScreen() {
+export function NewTaskScreen({ model }: { model?: string | null }) {
   const router = useRouter();
   const lists = useApiQuery<{ lists: TaskLists }>("/api/family/tasks");
+  const prep = model === "preparation_devoirs";
   return (
     <AppShell title="Nouvelle tâche" back={{ href: "/assistant/taches", label: "Tâches" }}>
       {lists.error && <RetryNotice message={lists.error.message} onRetry={lists.reload} />}
       {lists.loading && !lists.data && <Loading slow={lists.slow} />}
-      {lists.data && <TaskForm assignable={lists.data.lists.assignable} onSaved={() => router.push("/assistant/taches")} onCancel={() => router.push("/assistant/taches")} />}
+      {prep && lists.data && (
+        <Notice tone="info">
+          Cette tâche vous rappelle chaque semaine de préparer les devoirs : le lien « Préparer les devoirs de la semaine » s&apos;affiche sur la tâche. Le jour, l&apos;heure et la personne restent modifiables.
+        </Notice>
+      )}
+      {lists.data && (
+        <TaskForm
+          assignable={lists.data.lists.assignable}
+          initial={prep ? prepInitial(lists.data.lists) : undefined}
+          homeworkPrep={prep}
+          onSaved={() => router.push("/assistant/taches")}
+          onCancel={() => router.push("/assistant/taches")}
+        />
+      )}
     </AppShell>
   );
 }

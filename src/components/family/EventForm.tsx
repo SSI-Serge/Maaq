@@ -10,7 +10,7 @@ import { clock, dayOf, EVENT_TYPE_OPTIONS, formTime, shortDate } from "./format"
 import { FALLBACK_COLOR } from "./parts";
 import styles from "./family.module.css";
 
-type Frequency = "weekly" | "biweekly" | "monthly_day" | "monthly_weekday";
+type Frequency = "weekly" | "biweekly" | "monthly_day" | "monthly_weekday" | "yearly";
 type Scope = "this" | "following" | "all";
 
 const FREQUENCIES: { value: "none" | Frequency; label: string }[] = [
@@ -19,6 +19,7 @@ const FREQUENCIES: { value: "none" | Frequency; label: string }[] = [
   { value: "biweekly", label: "Toutes les deux semaines" },
   { value: "monthly_day", label: "Chaque mois, le même jour du mois" },
   { value: "monthly_weekday", label: "Chaque mois, le même jour de la semaine" },
+  { value: "yearly", label: "Chaque année" },
 ];
 const WEEKDAYS = [
   { value: 1, label: "L", name: "lundi" },
@@ -127,7 +128,7 @@ export function EventForm({ event, members, onSaved, onCancel, onStale }: Props)
                 frequency,
                 ...(frequency === "weekly" || frequency === "biweekly" ? { weekdays: weekdays.length ? weekdays : undefined } : {}),
                 end: endKind === "date" ? { kind: "date", date: untilDate } : endKind === "count" ? { kind: "count", count: Number(count) } : { kind: "never" },
-                skipSchoolHolidays: skipHolidays && Boolean(zone.data?.setting.zone),
+                skipSchoolHolidays: skipHolidays && frequency !== "yearly" && Boolean(zone.data?.setting.zone),
               },
             }
           : {}),
@@ -248,7 +249,7 @@ export function EventForm({ event, members, onSaved, onCancel, onStale }: Props)
                       {endError}
                     </span>
                   )}
-                  {zone.data?.setting.zone && (
+                  {zone.data?.setting.zone && frequency !== "yearly" && (
                     <label className={styles.check}>
                       <input type="checkbox" checked={skipHolidays} onChange={(e) => setSkipHolidays(e.target.checked)} />
                       Sauf vacances scolaires (zone {zone.data.setting.zone})

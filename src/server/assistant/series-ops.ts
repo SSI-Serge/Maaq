@@ -6,7 +6,7 @@ import { seal, sealOptional } from "./fields";
 import { localDay, utcToLocal } from "./local-time";
 import { copyTemplates, proposedTasksToTemplates } from "./event-tasks";
 import { materializeEventSeriesTasks } from "./task-series";
-import { addDays, holidaysOf, horizonDay, isoWeekday, loadSeries, materialize, ruleLabel, ruleOf, type Db, type SeriesRule } from "./series";
+import { addDays, holidaysOf, horizonDay, isoWeekday, loadSeries, materialize, ruleLabel, ruleOf, unitColumn, type Db, type SeriesRule } from "./series";
 
 /**
  * Ce que l'on fait sur une série déjà créée : la présenter (règle, séances en conflit), la confirmer d'un geste, l'annuler ou la modifier avec une portée
@@ -17,7 +17,7 @@ export type Scope = "this" | "following" | "all";
 export const SCOPES: Scope[] = ["this", "following", "all"];
 
 export interface RepetitionInput {
-  frequency: "weekly" | "biweekly" | "monthly_day" | "monthly_weekday";
+  frequency: "weekly" | "biweekly" | "monthly_day" | "monthly_weekday" | "yearly";
   /** Jours de la semaine ISO (1 = lundi) pour une répétition hebdomadaire ; par défaut, le jour de la première séance. */
   weekdays?: number[];
   end: { kind: "date"; date: string } | { kind: "count"; count: number } | { kind: "never" };
@@ -40,12 +40,14 @@ export function ruleFromRepetition(input: RepetitionInput, firstDate: string): S
       return { unit: "month", interval: 1, monthMode: "day_of_month", monthDay: day, ...base };
     case "monthly_weekday":
       return { unit: "month", interval: 1, monthMode: "nth_weekday", monthNth: Math.ceil(day / 7) > 4 ? -1 : Math.ceil(day / 7), monthWeekday: weekday, ...base };
+    case "yearly":
+      return { unit: "year", interval: 1, ...base };
   }
 }
 
 /** Inverse : ce que le formulaire affiche pour une règle existante. */
 export function repetitionOf(rule: SeriesRule): RepetitionInput {
-  const frequency: RepetitionInput["frequency"] = rule.unit === "week" ? (rule.interval === 2 ? "biweekly" : "weekly") : rule.monthMode === "day_of_month" ? "monthly_day" : "monthly_weekday";
+  const frequency: RepetitionInput["frequency"] = rule.unit === "year" ? "yearly" : rule.unit === "week" ? (rule.interval === 2 ? "biweekly" : "weekly") : rule.monthMode === "day_of_month" ? "monthly_day" : "monthly_weekday";
   return { frequency, ...(rule.weekdays ? { weekdays: rule.weekdays } : {}), end: rule.end, skipSchoolHolidays: rule.skipSchoolHolidays };
 }
 
@@ -93,7 +95,7 @@ export async function seriesView(db: Db, e: CalendarEvent, timeZone: string): Pr
     .executeTakeFirstOrThrow();
   const clashes = series.status === "provisional" ? await conflictingSessions(db, e.seriesId) : [];
   return {
-    id: series.id, version: series.version, rule: ruleLabel(rule), repetition: repetitionOf(rule), modified: e.isModified, sessions: Number(sessions.n),
+    id: series.id, version: series.version, rule: ruleLabel(rule, series.first_date), repetition: repetitionOf(rule), modified: e.isModified, sessions: Number(sessions.n),
     conflicts: { count: clashes.length, sessions: clashes.map((c) => ({ id: c.id, start: utcToLocal(c.startsAt, timeZone) })) },
     status: series.status === "confirmed" ? "confirmed" : "provisional",
   };
@@ -186,13 +188,14 @@ export async function rewriteSeries(db: Db, e: CalendarEvent, edit: SeriesEdit, 
   const typeId = (await eventTypeIds(db)).get(TYPE_CODE[edit.type])!;
   const { startTime, duration } = timing(edit, series.series_timezone);
   const rule = edit.repetition ? ruleFromRepetition(edit.repetition, series.first_date) : ruleOf(series);
+  if (rule.unit === "year" && rule.skipSchoolHolidays) throw fail("no_holidays_yearly", "« Sauf vacances scolaires » n'est pas possible pour une répétition annuelle.", 422);
   if (rule.skipSchoolHolidays && !(await holidaysOf(db, e.accountId)).zone) throw fail("no_school_zone", "« Sauf vacances scolaires » n'est pas possible : la zone scolaire de la famille n'est pas réglée.", 422);
   const medical = edit.type === "medical";
   await db
     .updateTable("family_event_series")
     .set({
       event_type_id: typeId, title: medical || !edit.title ? null : seal(edit.title), location: sealOptional(edit.place), location_point: medical ? null : edit.placePoint, note: sealOptional(edit.notes), start_time: edit.allDay ? "00:00" : startTime,
-      duration_minutes: duration, all_day: edit.allDay, whole_family: edit.allFamily, repeat_unit: rule.unit, repeat_interval: rule.interval, weekdays: rule.weekdays ?? null,
+      duration_minutes: duration, all_day: edit.allDay, whole_family: edit.allFamily, repeat_unit: unitColumn(rule), repeat_interval: rule.interval, weekdays: rule.weekdays ?? null,
       month_mode: rule.monthMode ?? null, month_day: rule.monthDay ?? null, month_nth: rule.monthNth ?? null, month_weekday: rule.monthWeekday ?? null,
       end_kind: rule.end.kind, until_date: rule.end.kind === "date" ? rule.end.date : null, occurrence_count: rule.end.kind === "count" ? rule.end.count : null,
       skip_school_holidays: rule.skipSchoolHolidays, materialized_until: null,
@@ -221,6 +224,7 @@ export async function splitSeries(db: Db, e: CalendarEvent, edit: SeriesEdit, no
   const firstDate = e.occurrenceDate!;
   const oldRule = ruleOf(old);
   const rule = edit.repetition ? ruleFromRepetition(edit.repetition, firstDate) : oldRule;
+  if (rule.unit === "year" && rule.skipSchoolHolidays) throw fail("no_holidays_yearly", "« Sauf vacances scolaires » n'est pas possible pour une répétition annuelle.", 422);
   // L'ancienne règle s'arrête la veille (la fin « après N séances » devient une date) ; ses séances à partir d'ici sont remplacées.
   await endRuleBefore(db, old.id, firstDate);
   const status = old.status === "confirmed" ? ["confirmed"] : ["provisional", "set_aside"];
@@ -234,7 +238,7 @@ export async function splitSeries(db: Db, e: CalendarEvent, edit: SeriesEdit, no
     .values({
       account_id: e.accountId, event_type_id: typeId, title: medical || !edit.title ? null : seal(edit.title), location: sealOptional(edit.place), location_point: medical ? null : edit.placePoint, note: sealOptional(edit.notes),
       start_time: edit.allDay ? "00:00" : startTime, duration_minutes: duration, all_day: edit.allDay, whole_family: edit.allFamily, series_timezone: old.series_timezone, first_date: firstDate,
-      repeat_unit: rule.unit, repeat_interval: rule.interval, weekdays: rule.weekdays ?? null, month_mode: rule.monthMode ?? null, month_day: rule.monthDay ?? null, month_nth: rule.monthNth ?? null,
+      repeat_unit: unitColumn(rule), repeat_interval: rule.interval, weekdays: rule.weekdays ?? null, month_mode: rule.monthMode ?? null, month_day: rule.monthDay ?? null, month_nth: rule.monthNth ?? null,
       month_weekday: rule.monthWeekday ?? null, end_kind: rule.end.kind, until_date: rule.end.kind === "date" ? rule.end.date : null, occurrence_count: rule.end.kind === "count" ? rule.end.count : null,
       skip_school_holidays: rule.skipSchoolHolidays, status: confirmed ? "confirmed" : "provisional", source: old.source as "chat_text", requested_by_user_id: old.requested_by_user_id,
       source_at: now, source_message_id: old.source_message_id === null ? null : Number(old.source_message_id), split_from_series_id: old.id,

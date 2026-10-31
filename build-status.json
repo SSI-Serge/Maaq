@@ -3,7 +3,7 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-10-30T18:54:10Z",
+  "updated": "2026-10-31T09:10:00Z",
   "deploys": [
     {
       "at": "2026-10-30T18:54:10Z",
@@ -2078,6 +2078,24 @@
           "note": "Sur la zone de test : avertissement au-dessus du bouton, titre discret, « Plus tard ».",
           "at": "2026-10-30T18:54:10Z",
           "unsure": ""
+        },
+        {
+          "id": "f16s121",
+          "title": "Recevoir chaque semaine une tâche « Préparer les devoirs de la semaine »",
+          "state": "testing",
+          "env": null,
+          "note": "Créée depuis la carte Aide Devoirs : chaque dimanche à 18 h par défaut, avec le lien vers la préparation de la semaine suivante.",
+          "at": "2026-10-31T09:10:00Z",
+          "unsure": "Jamais essayée sur un téléphone."
+        },
+        {
+          "id": "f16s122",
+          "title": "Faire revenir un RDV chaque année (un anniversaire)",
+          "state": "testing",
+          "env": null,
+          "note": "Formulaire « Chaque année », demande à l'assistant (« tous les ans »), les deux prochaines occurrences créées d'avance, pas de vacances scolaires.",
+          "at": "2026-10-31T09:10:00Z",
+          "unsure": "Le dessin exact de la maquette (Design) n'a été suivi que pour les libellés ; à regarder sur un vrai écran."
         }
       ],
       "decisions": [
@@ -2184,6 +2202,14 @@
         {
           "at": "2026-10-30T18:48:12Z",
           "what": "Lot 10 : Sorties fermées par OUTINGS_MODE=off tant que le DPO n'a pas donné son avis ; aide Devoirs désactivée par défaut au niveau du foyer."
+        },
+        {
+          "at": "2026-10-31T09:10:00Z",
+          "text": "D69 : l'accueil de l'Assistant Famille est allégé, Membres passe dans les Réglages de l'application et les devoirs ne se déclenchent plus par le titre d'une tâche : une tâche hebdomadaire dédiée porte le lien."
+        },
+        {
+          "at": "2026-10-31T09:10:00Z",
+          "text": "D70 : un RDV peut se répéter chaque année (anniversaire) ; les deux prochaines occurrences existent toujours ; pas de vacances scolaires ; une tâche ne se répète pas chaque année."
         }
       ],
       "unsure": [

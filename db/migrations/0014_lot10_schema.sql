@@ -298,10 +298,39 @@ ALTER TABLE family_tasks
     REFERENCES homework_weeks (id, account_id) ON DELETE CASCADE;
 ALTER TABLE family_tasks
   ADD CONSTRAINT ck_tasks_homework CHECK ((source = 'homework') = (homework_week_id IS NOT NULL));
+-- D70 : répétition « chaque année » des RDV récurrents (anniversaires, fêtes) : même jour et même mois, ancre = first_date ; un 29 février tombe le 28 février les années
+-- non bissextiles ; une série annuelle suit les délais de rappel de son type (series_only_d1_reminder) ; les deux prochaines occurrences sont toujours créées par le
+-- planificateur, même au-delà de la fenêtre de 6 mois (code, la base ne porte que la date materialized_until). L'option « sauf vacances scolaires » est interdite pour
+-- une série annuelle ; la répétition annuelle est réservée aux séries de RDV (une tâche récurrente n'est pas annuelle).
+ALTER TABLE family_event_series
+  ADD CONSTRAINT ck_event_series_yearly CHECK (repeat_unit <> 'yearly' OR NOT skip_school_holidays);
+ALTER TABLE family_task_series
+  ADD CONSTRAINT ck_task_series_unit CHECK (repeat_unit IS DISTINCT FROM 'yearly');
 
 -- ---------------------------------------------------------------------
 -- Fonctions et vues
 -- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION series_rule_valid(
+  p_unit series_repeat_unit, p_interval smallint, p_weekdays smallint[],
+  p_month_mode series_month_mode, p_month_day smallint, p_month_nth smallint, p_month_weekday smallint
+) RETURNS boolean LANGUAGE sql IMMUTABLE AS $$
+  SELECT COALESCE(CASE p_unit
+    WHEN 'day' THEN p_interval = 1 AND p_weekdays IS NULL AND p_month_mode IS NULL
+                    AND p_month_day IS NULL AND p_month_nth IS NULL AND p_month_weekday IS NULL
+    WHEN 'week' THEN p_interval IN (1, 2) AND p_weekdays IS NOT NULL
+                    AND cardinality(p_weekdays) BETWEEN 1 AND 7
+                    AND p_weekdays <@ ARRAY[1, 2, 3, 4, 5, 6, 7]::smallint[]
+                    AND (SELECT count(DISTINCT w) FROM unnest(p_weekdays) w) = cardinality(p_weekdays)
+                    AND p_month_mode IS NULL AND p_month_day IS NULL AND p_month_nth IS NULL AND p_month_weekday IS NULL
+    WHEN 'month' THEN p_interval = 1 AND p_weekdays IS NULL AND (
+                      (p_month_mode = 'day_of_month' AND p_month_day BETWEEN 1 AND 31
+                         AND p_month_nth IS NULL AND p_month_weekday IS NULL)
+                   OR (p_month_mode = 'nth_weekday' AND p_month_nth IN (1, 2, 3, 4, -1)
+                         AND p_month_weekday BETWEEN 1 AND 7 AND p_month_day IS NULL))
+    WHEN 'yearly' THEN p_interval = 1 AND p_weekdays IS NULL AND p_month_mode IS NULL
+                    AND p_month_day IS NULL AND p_month_nth IS NULL AND p_month_weekday IS NULL
+    ELSE false END, false)
+$$;
 CREATE OR REPLACE FUNCTION anonymize_family_member(p_member_id uuid, p_write_trace boolean DEFAULT true) RETURNS bigint
 LANGUAGE plpgsql AS $$
 DECLARE v_account uuid; v_msg bigint[]; v_mail uuid[]; v_n bigint;
@@ -709,6 +738,10 @@ CREATE INDEX idx_homework_items_exercise ON homework_week_items (exercise_id) WH
 CREATE INDEX idx_homework_items_activity ON homework_week_items (activity_id) WHERE activity_id IS NOT NULL;
 CREATE UNIQUE INDEX ux_tasks_homework_day ON family_tasks (homework_week_id, assigned_member_id, due_date) WHERE homework_week_id IS NOT NULL;
 CREATE INDEX idx_tasks_homework_week ON family_tasks (homework_week_id, account_id) WHERE homework_week_id IS NOT NULL;
+-- D69 : « Préparer les devoirs de la semaine », tâche récurrente du dimanche à 18 h créée depuis la carte « Aide Devoirs » (source « homework_prep », sans semaine
+-- de devoirs : c'est une série de tâches, pas une tâche liée à une semaine). Une seule série active par foyer. La série reste active quand l'aide est désactivée :
+-- le code masque le lien, la base n'a rien à faire. Ses occurrences copient la source de leur série.
+CREATE UNIQUE INDEX ux_task_series_homework_prep ON family_task_series (account_id) WHERE source = 'homework_prep' AND ended_at IS NULL;
 
 -- ---------------------------------------------------------------------
 -- Triggers et sécurité par ligne
@@ -818,6 +851,8 @@ INSERT INTO platform_settings (setting_key, value_type, value_text, min_value, m
 -- ---------------------------------------------------------------------
 -- Commentaires
 -- ---------------------------------------------------------------------
+COMMENT ON FUNCTION series_rule_valid(series_repeat_unit, smallint, smallint[], series_month_mode, smallint, smallint, smallint) IS $$Vrai si la règle de répétition est cohérente : chaque jour, chaque semaine (un ou plusieurs jours) ou toutes les deux semaines, chaque mois (même jour du mois, ou n-ième jour de la semaine), ou chaque année (même jour et même mois, pour les RDV seulement). [US-109 RF2, US-110 RF3, D70]$$;
+COMMENT ON FUNCTION series_only_d1_reminder(series_repeat_unit, smallint) IS $$Vrai pour une série hebdomadaire ou plus fréquente (rappel J-1 seul) ; faux pour une série toutes les deux semaines, mensuelle ou annuelle (délais du type de RDV). [US-109 RF9, D46, D70]$$;
 COMMENT ON TABLE scheduled_notifications IS $$Rappels (J-7, J-1, jour J), relances (24 h, 48 h) et notifications de trajet programmés par RDV et destinataire ; rappels de tâches, point de la semaine et annonce d'une proposition de sorties sans RDV. Supprimés avec le RDV ; sans RDV, 30 jours après l'échéance. [US-79, 81, 83, 97, 98, 107, 115]$$;
 COMMENT ON TABLE family_settings IS $$Réglages de l'Assistant Famille communs à la famille : zone scolaire, catalogue d'anticipation actif ou non, aide Devoirs. Absence de ligne = valeurs par défaut. [US-102 RF9, US-108 RF8, US-109 RF4, US-118 RF1]$$;
 COMMENT ON FUNCTION anonymize_family_member(uuid, boolean) IS $$Efface un membre (anonymisation) et supprime ses RDV exclusifs et leurs fichiers, ses questions d'anticipation, ses données Devoirs ; ses tâches à faire deviennent non assignées ; trace non nominative. [US-57, 93, 96 RF8, 119 RT5, D34]$$;

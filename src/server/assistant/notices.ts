@@ -92,7 +92,7 @@ async function deliver(ctx: Ctx, id: string, totals: NoticesResult): Promise<voi
       // Une série n'a qu'une notification, qui dit la règle de répétition et la première séance (US-113 RF9).
       if (event.seriesId) {
         const series = await loadSeries(trx, meta.account_id, event.seriesId);
-        if (series) body = (row.kind === "event_to_confirm" ? seriesToConfirmBody : seriesAddedBody)(notified, name, ruleBase(ruleOf(series)), timeZone);
+        if (series) body = (row.kind === "event_to_confirm" ? seriesToConfirmBody : seriesAddedBody)(notified, name, ruleBase(ruleOf(series), series.first_date), timeZone);
       }
       const badge = pushConfigured() ? await pendingConfirmations(trx, meta.account_id, ctx.now) : 0;
       const sent = await sendPush(ctx, row.recipient_user_id, { title: "Assistant Famille", body, url: `/calendrier/rdv/${event.id}`, tag: `notice-${event.id}`, badge });

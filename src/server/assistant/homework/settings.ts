@@ -34,6 +34,8 @@ export interface HomeworkSetting {
   /** Au moins un membre enfant : sans lui l'aide ne s'active pas (RF2). */
   hasChildren: boolean;
   children: HomeworkChildView[];
+  /** Tâche hebdomadaire de préparation (D69) : sa règle en clair (« chaque dimanche à 18 h ») quand une série est active, sinon rien et la carte propose de la créer. */
+  weeklyTask: { label: string } | null;
 }
 
 /** Niveau de maths de l'âge des devoirs : 6 ans CP … 10 ans CM2, et 11 ou 12 ans CM2 (RF4). Même règle que `homework_level_for_age` dans la base. */
@@ -70,7 +72,26 @@ export async function getHomeworkSetting(ctx: Ctx, session: SessionContext): Pro
     canEdit: parent,
     hasChildren: children.length > 0,
     children,
+    weeklyTask: await weeklyTaskOf(ctx, accountId),
   };
+}
+
+const WEEKDAY_NAMES = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"];
+
+/** La série active « Préparer les devoirs de la semaine », décrite en clair ; une seule par foyer (index unique de la base). */
+async function weeklyTaskOf(ctx: Ctx, accountId: string): Promise<{ label: string } | null> {
+  const row = await ctx.db
+    .selectFrom("family_task_series")
+    .select(["weekdays", sql<string | null>`due_time::text`.as("time"), sql<string>`first_date::text`.as("first")])
+    .where("account_id", "=", accountId)
+    .where("source", "=", "homework_prep")
+    .where("ended_at", "is", null)
+    .executeTakeFirst();
+  if (!row) return null;
+  const days = (row.weekdays ?? []).map((d) => WEEKDAY_NAMES[d - 1]).filter(Boolean);
+  const when = days.length ? `chaque ${days.join(" et ")}` : "chaque semaine";
+  const time = row.time ? ` à ${Number(row.time.slice(0, 2))} h${row.time.slice(3, 5) === "00" ? "" : row.time.slice(3, 5)}` : "";
+  return { label: `${when}${time}` };
 }
 
 /** Vrai si l'aide est activée pour ce foyer : porte d'entrée de tout ce qui touche aux devoirs (apparition, tchat, accueil). */

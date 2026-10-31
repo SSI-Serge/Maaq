@@ -14,8 +14,9 @@ import { localDay, localToUtc } from "./local-time";
 export type Db = Kysely<DB>;
 
 export interface SeriesRule {
-  unit: "week" | "month";
-  /** 1 = chaque semaine ou chaque mois, 2 = toutes les deux semaines. */
+  /** « year » (D70) : chaque année, même jour et même mois que la première séance ; le 29 février devient le 28 les années non bissextiles. */
+  unit: "week" | "month" | "year";
+  /** 1 = chaque semaine, chaque mois ou chaque année, 2 = toutes les deux semaines. */
   interval: 1 | 2;
   /** Jours de la semaine, ISO : 1 = lundi … 7 = dimanche (règle hebdomadaire). */
   weekdays?: number[];
@@ -44,6 +45,13 @@ export const addDays = (day: string, n: number) => iso(ms(day) + n * DAY);
 export const isoWeekday = (day: string) => ((new Date(ms(day)).getUTCDay() + 6) % 7) + 1;
 const daysInMonth = (day: string) => new Date(Date.UTC(Number(day.slice(0, 4)), Number(day.slice(5, 7)), 0)).getUTCDate();
 
+/** Date de la répétition annuelle pour l'année donnée : même mois et même jour que la première séance, le 29 février devenant le 28 les années non bissextiles. */
+function yearlyDay(firstDate: string, year: number): string {
+  const month = Number(firstDate.slice(5, 7));
+  const day = Math.min(Number(firstDate.slice(8, 10)), new Date(Date.UTC(year, month, 0)).getUTCDate());
+  return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
 /** Lundi de la semaine du jour donné. */
 const mondayOf = (day: string) => addDays(day, 1 - isoWeekday(day));
 
@@ -67,6 +75,15 @@ export function expandOccurrences(rule: SeriesRule, firstDate: string, upTo: str
   const last = rule.end.kind === "date" && rule.end.date < upTo ? rule.end.date : upTo;
   const maxCount = rule.end.kind === "count" ? rule.end.count : Infinity;
   const out: string[] = [];
+  if (rule.unit === "year") {
+    // Une date par an, sans balayer les jours (une règle sans fin peut être calculée jusqu'à l'an 9999).
+    for (let year = Number(firstDate.slice(0, 4)); out.length < maxCount; year += 1) {
+      const day = yearlyDay(firstDate, year);
+      if (day > last) break;
+      out.push(day);
+    }
+    return out;
+  }
   for (let day = firstDate; day <= last && out.length < maxCount; day = addDays(day, 1)) {
     if (!matches(rule, firstDate, day)) continue;
     if (rule.skipSchoolHolidays && holidays.some(([from, to]) => day >= from && day <= to)) continue;
@@ -81,16 +98,22 @@ export function expandOccurrences(rule: SeriesRule, firstDate: string, upTo: str
 
 const WEEKDAY = ["", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"];
 const NTH: Record<number, string> = { 1: "premier", 2: "deuxième", 3: "troisième", 4: "quatrième", [-1]: "dernier" };
+const MONTH = ["", "janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
 const frDate = (day: string) => `${day.slice(8, 10)}/${day.slice(5, 7)}/${day.slice(0, 4)}`;
 
 function list(items: string[]): string {
   return items.length < 2 ? (items[0] ?? "") : `${items.slice(0, -1).join(", ")} et ${items[items.length - 1]}`;
 }
 
-/** Texte de la règle sans l'heure ni la fin : « Chaque mercredi », « Toutes les deux semaines le lundi et le jeudi », « Le premier mardi de chaque mois »… */
-export function ruleBase(rule: SeriesRule): string {
+/**
+ * Texte de la règle sans l'heure ni la fin : « Chaque mercredi », « Toutes les deux semaines le lundi et le jeudi », « Le premier mardi de chaque mois »… La règle annuelle
+ * (D70) n'a pas de jour propre : `firstDate` la date (« Chaque année le 8 novembre »).
+ */
+export function ruleBase(rule: SeriesRule, firstDate?: string): string {
   let text: string;
-  if (rule.unit === "week") {
+  if (rule.unit === "year") {
+    text = firstDate ? `Chaque année le ${Number(firstDate.slice(8, 10)) === 1 ? "1er" : Number(firstDate.slice(8, 10))} ${MONTH[Number(firstDate.slice(5, 7))]}` : "Chaque année";
+  } else if (rule.unit === "week") {
     const days = [...(rule.weekdays ?? [])].sort((a, b) => a - b);
     text = rule.interval === 2
       ? `Toutes les deux semaines le ${list(days.map((d) => WEEKDAY[d]))}`
@@ -104,8 +127,8 @@ export function ruleBase(rule: SeriesRule): string {
 }
 
 /** Texte de la règle avec sa fin : « Chaque mercredi jusqu'au 30/06/2027 » (RF10). */
-export function ruleLabel(rule: SeriesRule): string {
-  let text = ruleBase(rule);
+export function ruleLabel(rule: SeriesRule, firstDate?: string): string {
+  let text = ruleBase(rule, firstDate);
   if (rule.end.kind === "date") text += ` jusqu'au ${frDate(rule.end.date)}`;
   else if (rule.end.kind === "count") text += ` (${rule.end.count} séance${rule.end.count > 1 ? "s" : ""})`;
   return text;
@@ -117,7 +140,7 @@ export function ruleLabel(rule: SeriesRule): string {
 
 type SeriesRow = {
   id: string; account_id: string; event_type_id: number; title: Buffer | null; location: Buffer | null; location_point: Buffer | null; note: Buffer | null; start_time: string; duration_minutes: number;
-  all_day: boolean; whole_family: boolean; series_timezone: string; first_date: string; repeat_unit: "day" | "week" | "month"; repeat_interval: number; weekdays: number[] | null;
+  all_day: boolean; whole_family: boolean; series_timezone: string; first_date: string; repeat_unit: "day" | "week" | "month" | "yearly"; repeat_interval: number; weekdays: number[] | null;
   month_mode: "day_of_month" | "nth_weekday" | null; month_day: number | null; month_nth: number | null; month_weekday: number | null; end_kind: "date" | "count" | "never";
   until_date: string | null; occurrence_count: number | null; skip_school_holidays: boolean; status: string; materialized_until: string | null; version: number;
   source: string; requested_by_user_id: string | null; confirmed_by_user_id: string | null; source_message_id: string | number | null;
@@ -140,7 +163,7 @@ export type RuleColumns = Pick<SeriesRow, "repeat_unit" | "repeat_interval" | "w
 
 export function ruleOf(row: RuleColumns): SeriesRule {
   return {
-    unit: row.repeat_unit === "month" ? "month" : "week",
+    unit: row.repeat_unit === "month" ? "month" : row.repeat_unit === "yearly" ? "year" : "week",
     interval: row.repeat_interval === 2 ? 2 : 1,
     ...(row.weekdays ? { weekdays: row.weekdays.map(Number) } : {}),
     ...(row.month_mode ? { monthMode: row.month_mode, monthDay: row.month_day ?? undefined, monthNth: row.month_nth ?? undefined, monthWeekday: row.month_weekday ?? undefined } : {}),
@@ -170,6 +193,9 @@ export async function horizonDay(db: Db, now: Date, timeZone: string): Promise<s
 // ---------------------------------------------------------------------------------------------------------------------------
 // Création et complétion
 // ---------------------------------------------------------------------------------------------------------------------------
+
+/** Valeur de la colonne d'unité pour une règle (la base écrit « yearly » pour l'année). */
+export const unitColumn = (rule: SeriesRule): "week" | "month" | "yearly" => (rule.unit === "year" ? "yearly" : rule.unit);
 
 export interface NewSeries {
   accountId: string;
@@ -204,13 +230,24 @@ function bounds(series: Pick<SeriesRow, "start_time" | "duration_minutes" | "all
 }
 
 /**
+ * Dates des séances à créer jusqu'à `until`. Une série annuelle (D70) a toujours ses deux prochaines séances créées, même au-delà de l'horizon de 6 mois : un anniversaire dans
+ * huit mois existe dès la création, et la suivante aussi.
+ */
+function seriesDates(rule: SeriesRule, firstDate: string, until: string, holidays: readonly HolidayPeriod[], today: string): string[] {
+  const dates = expandOccurrences(rule, firstDate, until, holidays);
+  if (rule.unit !== "year") return dates;
+  const ahead = expandOccurrences(rule, firstDate, addDays(today, 3 * 366)).filter((d) => d >= today).slice(0, 2);
+  return [...new Set([...dates, ...ahead])].sort();
+}
+
+/**
  * Crée les séances manquantes de la série jusqu'à `until` (inclus), au statut de la série (provisoire, ou confirmé pour une série déjà confirmée). Idempotent : une séance
  * déjà créée à cette date d'origine n'est jamais recréée (index unique). Retourne les identifiants des séances créées, dans l'ordre des dates.
  */
 export async function materialize(db: Db, series: SeriesRow, memberIds: string[], until: string, now: Date): Promise<string[]> {
   const holidays = series.skip_school_holidays ? (await holidaysOf(db, series.account_id)).periods : [];
   const from = series.materialized_until;
-  const dates = expandOccurrences(ruleOf(series), series.first_date, until, holidays).filter((d) => !from || d > from);
+  const dates = seriesDates(ruleOf(series), series.first_date, until, holidays, localDay(now, series.series_timezone)).filter((d) => !from || d > from);
   const typeId = series.event_type_id;
   const code = [...(await eventTypeIds(db)).entries()].find(([, id]) => id === typeId)?.[0] ?? "personal";
   const typeName = typeOfCode(code);
@@ -241,6 +278,7 @@ export async function materialize(db: Db, series: SeriesRow, memberIds: string[]
 
 /** Crée une série provisoire et ses séances des 6 prochains mois. Lève `SeriesError` si la règle ne produit aucune séance ou si une option n'est pas possible. */
 export async function createSeries(db: Db, input: NewSeries): Promise<{ seriesId: string; eventIds: string[] }> {
+  if (input.rule.unit === "year" && input.rule.skipSchoolHolidays) throw new SeriesError("« Sauf vacances scolaires » n'est pas possible pour une répétition annuelle.");
   const { zone } = await holidaysOf(db, input.accountId);
   if (input.rule.skipSchoolHolidays && !zone) throw new SeriesError("« Sauf vacances scolaires » n'est pas possible : la zone scolaire de la famille n'est pas réglée.");
   const typeId = (await eventTypeIds(db)).get(TYPE_CODE[input.type])!;
@@ -248,7 +286,7 @@ export async function createSeries(db: Db, input: NewSeries): Promise<{ seriesId
   const rule = input.rule;
   const until = await horizonDay(db, input.now, input.timeZone);
   const holidays = rule.skipSchoolHolidays ? (await holidaysOf(db, input.accountId)).periods : [];
-  if (!expandOccurrences(rule, input.firstDate, until, holidays).length) throw new SeriesError("La règle de répétition ne produit aucune séance dans les 6 prochains mois.");
+  if (!seriesDates(rule, input.firstDate, until, holidays, localDay(input.now, input.timeZone)).length) throw new SeriesError("La règle de répétition ne produit aucune séance dans les 6 prochains mois.");
 
   let seriesId: string;
   try {
@@ -257,7 +295,7 @@ export async function createSeries(db: Db, input: NewSeries): Promise<{ seriesId
       .values({
         account_id: input.accountId, event_type_id: typeId, title: medical || !input.title ? null : seal(input.title), location: sealOptional(input.place), location_point: input.placePoint ?? null, note: sealOptional(input.notes),
         start_time: input.allDay ? "00:00" : input.startTime, duration_minutes: input.durationMinutes, all_day: input.allDay, whole_family: input.allFamily, series_timezone: input.timeZone,
-        first_date: input.firstDate, repeat_unit: rule.unit, repeat_interval: rule.interval, weekdays: rule.weekdays ?? null, month_mode: rule.monthMode ?? null,
+        first_date: input.firstDate, repeat_unit: unitColumn(rule), repeat_interval: rule.interval, weekdays: rule.weekdays ?? null, month_mode: rule.monthMode ?? null,
         month_day: rule.monthDay ?? null, month_nth: rule.monthNth ?? null, month_weekday: rule.monthWeekday ?? null,
         end_kind: rule.end.kind, until_date: rule.end.kind === "date" ? rule.end.date : null, occurrence_count: rule.end.kind === "count" ? rule.end.count : null,
         skip_school_holidays: rule.skipSchoolHolidays, status: "provisional", source: SOURCE_CODE[input.source], requested_by_user_id: input.userId, source_at: input.now,

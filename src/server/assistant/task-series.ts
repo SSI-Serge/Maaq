@@ -3,7 +3,7 @@ import { Rejection } from "@/server/http";
 import { integerSetting } from "@/server/settings";
 import { open, openOptional, seal } from "./fields";
 import { localDay } from "./local-time";
-import { addDays, expandOccurrences, isoWeekday, ruleOf, type Db, type SeriesRule } from "./series";
+import { addDays, expandOccurrences, isoWeekday, ruleOf, unitColumn, type Db, type SeriesRule } from "./series";
 import { ruleFromRepetition, repetitionOf, type RepetitionInput } from "./series-ops";
 
 /**
@@ -14,7 +14,7 @@ import { ruleFromRepetition, repetitionOf, type RepetitionInput } from "./series
 const fail = (code: string, message: string, status = 409) => new Rejection(code, message, status);
 
 export interface TaskRepetition {
-  frequency: "daily" | RepetitionInput["frequency"];
+  frequency: "daily" | Exclude<RepetitionInput["frequency"], "yearly">;
   weekdays?: number[];
   end: RepetitionInput["end"];
 }
@@ -27,6 +27,7 @@ export function ruleFromTaskRepetition(repetition: TaskRepetition, firstDate: st
 
 export function taskRepetitionOf(rule: SeriesRule): TaskRepetition {
   const { frequency, weekdays, end } = repetitionOf(rule);
+  if (frequency === "yearly") throw new Error("Une tâche récurrente n'est jamais annuelle.");
   if (frequency === "weekly" && weekdays?.length === 7) return { frequency: "daily", end };
   return { frequency, ...(weekdays ? { weekdays } : {}), end };
 }
@@ -60,7 +61,7 @@ export async function loadTaskSeries(db: Db, accountId: string, id: string, opti
 export type TaskSeriesRow = NonNullable<Awaited<ReturnType<typeof loadTaskSeries>>>;
 
 /** Règle d'une tâche à règle propre (la colonne d'unité n'est vide que pour une tâche qui suit une série de RDV). */
-export const taskRuleOf = (row: TaskSeriesRow): SeriesRule => ruleOf({ ...row, repeat_unit: row.repeat_unit ?? "week" });
+export const taskRuleOf = (row: TaskSeriesRow): SeriesRule => ruleOf({ ...row, repeat_unit: row.repeat_unit === null || row.repeat_unit === "yearly" ? "week" : row.repeat_unit });
 
 /** Fin de l'horizon de création : aujourd'hui (jour de la famille) plus 8 semaines glissantes (réglage de la plateforme). */
 export async function taskHorizon(db: Db, today: string): Promise<string> {
@@ -146,7 +147,7 @@ export interface SeriesTaskEdit {
 }
 
 const ruleColumns = (rule: SeriesRule) => ({
-  repeat_unit: rule.unit, repeat_interval: rule.interval, weekdays: rule.weekdays ?? null, month_mode: rule.monthMode ?? null, month_day: rule.monthDay ?? null, month_nth: rule.monthNth ?? null,
+  repeat_unit: unitColumn(rule), repeat_interval: rule.interval, weekdays: rule.weekdays ?? null, month_mode: rule.monthMode ?? null, month_day: rule.monthDay ?? null, month_nth: rule.monthNth ?? null,
   month_weekday: rule.monthWeekday ?? null, end_kind: rule.end.kind, until_date: rule.end.kind === "date" ? rule.end.date : null, occurrence_count: rule.end.kind === "count" ? rule.end.count : null,
 });
 

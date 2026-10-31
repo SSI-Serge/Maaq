@@ -5,11 +5,12 @@ import { Rejection } from "@/server/http";
 import { loadCalendarEventsByIds, type CalendarEvent, type EventType } from "./calendar";
 import { open, openOptional, seal, sealOptional } from "./fields";
 import { isParent } from "./family";
+import { homeworkEnabled } from "./homework/settings";
 import { utcToLocal } from "./local-time";
 import { loadMembers, type MemberChip } from "./member-chips";
 import { familyTimeZone } from "./reminders";
 import { notifyTaskAssigned } from "./task-notices";
-import { addDays, expandOccurrences, ruleLabel, type SeriesRule } from "./series";
+import { addDays, expandOccurrences, ruleLabel, unitColumn, type SeriesRule } from "./series";
 import type { Scope } from "./series-ops";
 import {
   endOwnRuleBefore, loadTaskSeries, materializeOwnSeries, occurrencesBefore, rewriteOwnSeries, ruleFromTaskRepetition, shiftRule, splitOwnSeries, taskHorizon, taskRepetitionOf, taskRuleOf,
@@ -53,6 +54,11 @@ export interface TaskView {
   followsEventSeries: boolean;
   /** Semaine de devoirs d'où vient la tâche « Devoirs — [prénom] (N éléments) » : le lien ouvre l'écran de la semaine (US-119 RF4). */
   homeworkWeekId: string | null;
+  /**
+   * Tâche hebdomadaire « Préparer les devoirs de la semaine » (D69) : reconnue par sa source, pas par son titre. Le lien ouvre la préparation de la semaine qui suit son échéance, puis
+   * « Voir la semaine de devoirs » une fois la semaine prête. Vide pour les autres tâches, pour un profil qui n'est pas parent, et quand l'aide Devoirs est désactivée (la tâche reste, sans lien).
+   */
+  homeworkPrep: { weekStart: string; weekId: string | null } | null;
   doneBy: string | null;
   doneAt: string | null;
   version: number;
@@ -99,6 +105,12 @@ export async function taskViewer(ctx: Ctx, session: SessionContext): Promise<Tas
 // ---------------------------------------------------------------------------------------------------------------------------
 // Validation
 // ---------------------------------------------------------------------------------------------------------------------------
+
+/** Lundi qui suit strictement le jour donné (« AAAA-MM-JJ ») : un dimanche, le lendemain ; un lundi, le lundi suivant. */
+export function mondayAfter(day: string): string {
+  const weekday = ((new Date(`${day}T00:00:00Z`).getUTCDay() + 6) % 7) + 1;
+  return addDays(day, 8 - weekday);
+}
 
 export const isDay = (value: unknown): value is string => typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
 const isTime = (value: unknown): value is string => typeof value === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
@@ -162,7 +174,7 @@ export function selectTasks(db: Kysely<DB>) {
     .selectFrom("family_tasks as t")
     .select([
       "t.id", "t.account_id", "t.series_id", sql<string | null>`t.occurrence_date::text`.as("occurrence_date"), "t.event_id", "t.title", "t.note", "t.status", sql<string>`t.due_date::text`.as("due_date"),
-      sql<string | null>`t.due_time::text`.as("due_time"), "t.days_before_event", "t.assigned_member_id", "t.done_by_member_id", "t.done_at", "t.created_by_user_id", "t.version", "t.homework_week_id",
+      sql<string | null>`t.due_time::text`.as("due_time"), "t.days_before_event", "t.assigned_member_id", "t.done_by_member_id", "t.done_at", "t.created_by_user_id", "t.version", "t.homework_week_id", "t.source",
     ]);
 }
 export type TaskRow = Awaited<ReturnType<ReturnType<typeof selectTasks>["execute"]>>[number];
@@ -191,6 +203,16 @@ export async function toTaskViews(db: Kysely<DB>, v: TaskViewer, rows: TaskRow[]
     const s = await loadTaskSeries(db, v.accountId, id);
     if (s) series.set(id, s);
   }
+  // Lien de la tâche hebdomadaire des devoirs : la semaine qui suit l'échéance, préparée ou non (D69).
+  const prepRows = v.parent ? rows.filter((r) => r.source === "homework_prep") : [];
+  const prepWeeks = new Map<string, string>();
+  const prepOn = prepRows.length > 0 && Boolean((await db.selectFrom("family_settings").select("homework_help_enabled").where("account_id", "=", v.accountId).executeTakeFirst())?.homework_help_enabled);
+  if (prepOn) {
+    const starts = [...new Set(prepRows.map((r) => mondayAfter(r.due_date)))];
+    const found = await db.selectFrom("homework_weeks").select(["id", sql<string>`week_start::text`.as("start")]).where("account_id", "=", v.accountId).where(sql<boolean>`week_start = any(${starts}::date[])`).execute();
+    for (const w of found) prepWeeks.set(w.start, w.id);
+  }
+  const prep = (r: TaskRow): TaskView["homeworkPrep"] => (prepOn && r.source === "homework_prep" ? { weekStart: mondayAfter(r.due_date), weekId: prepWeeks.get(mondayAfter(r.due_date)) ?? null } : null);
   return rows.map((r): TaskView => {
     const event = r.event_id ? events.get(r.event_id) : undefined;
     const s = r.series_id ? series.get(r.series_id) : undefined;
@@ -199,7 +221,7 @@ export async function toTaskViews(db: Kysely<DB>, v: TaskViewer, rows: TaskRow[]
       id: r.id, title: open(r.title), note: openOptional(r.note), status: r.status, due: r.due_date, dueTime: r.due_time ? r.due_time.slice(0, 5) : null, overdue: isOverdue(v, r),
       assignee: r.assigned_member_id ? (chips.get(r.assigned_member_id) ?? null) : null,
       event: event && sees(v, event) ? { id: event.id, title: event.title, start: utcToLocal(event.startsAt, v.timeZone) } : null,
-      daysBefore: r.days_before_event, recurring: Boolean(r.series_id), rule: own ? ruleLabel(own) : null, repetition: own ? taskRepetitionOf(own) : null, followsEventSeries: Boolean(s?.event_series_id), homeworkWeekId: r.homework_week_id,
+      daysBefore: r.days_before_event, recurring: Boolean(r.series_id), rule: own ? ruleLabel(own) : null, repetition: own ? taskRepetitionOf(own) : null, followsEventSeries: Boolean(s?.event_series_id), homeworkWeekId: r.homework_week_id, homeworkPrep: prep(r),
       doneBy: r.done_by_member_id ? (chips.get(r.done_by_member_id)?.firstName ?? null) : null, doneAt: r.done_at ? utcToLocal(r.done_at, v.timeZone) : null, version: r.version,
       can: { check: canCheckTask(v, r), manage: canManageTask(v, r) },
     };
@@ -293,6 +315,8 @@ async function viewOf(db: Kysely<DB>, v: TaskViewer, id: string): Promise<TaskVi
 export interface NewTask extends TaskFields {
   /** Répétition (US-110 RF3) : la tâche devient une règle dont les occurrences se cochent séparément. */
   repetition?: TaskRepetition | null;
+  /** « homework_prep » : tâche hebdomadaire de préparation des devoirs (D69), créée depuis la carte Aide Devoirs ; une seule série active par foyer. */
+  kind?: "homework_prep";
 }
 
 /** Une tâche seule, ou une tâche qui revient (au plus 50 règles actives, RF11). Retourne la tâche créée, ou la première occurrence d'une règle. */
@@ -300,6 +324,11 @@ export async function createTask(ctx: Ctx, session: SessionContext, input: NewTa
   const v = await taskViewer(ctx, session);
   const members = await loadMembers(ctx.db, v.accountId);
   const task = checkFields(v, input, members);
+  if (input.kind === "homework_prep") {
+    if (!v.parent) throw fail("forbidden", "Seuls les parents du foyer créent cette tâche.", 403);
+    if (!(await homeworkEnabled(ctx, v.accountId))) throw fail("homework_disabled", "L'aide Devoirs n'est pas activée pour la famille.", 409);
+    if (input.repetition?.frequency !== "weekly") throw fail("prep_needs_weekly", "La préparation des devoirs revient chaque semaine.", 422);
+  }
   try {
     const id = await ctx.db.transaction().execute(async (trx) => {
       if (!input.repetition) {
@@ -321,9 +350,9 @@ export async function createTask(ctx: Ctx, session: SessionContext, input: NewTa
         .insertInto("family_task_series")
         .values({
           account_id: v.accountId, title: seal(task.title), note: sealOptional(task.note), assigned_member_id: task.assigneeId, due_time: task.dueTime, first_date: task.due,
-          repeat_unit: rule.unit, repeat_interval: rule.interval, weekdays: rule.weekdays ?? null, month_mode: rule.monthMode ?? null, month_day: rule.monthDay ?? null, month_nth: rule.monthNth ?? null,
+          repeat_unit: unitColumn(rule), repeat_interval: rule.interval, weekdays: rule.weekdays ?? null, month_mode: rule.monthMode ?? null, month_day: rule.monthDay ?? null, month_nth: rule.monthNth ?? null,
           month_weekday: rule.monthWeekday ?? null, end_kind: rule.end.kind, until_date: rule.end.kind === "date" ? rule.end.date : null, occurrence_count: rule.end.kind === "count" ? rule.end.count : null,
-          created_by_user_id: v.userId, source: "user",
+          created_by_user_id: v.userId, source: input.kind === "homework_prep" ? "homework_prep" : "user",
         })
         .returning("id")
         .executeTakeFirstOrThrow();
@@ -338,6 +367,7 @@ export async function createTask(ctx: Ctx, session: SessionContext, input: NewTa
     if (task.assigneeId) await notifyTaskAssigned(ctx, id, v.userId);
     return viewOf(ctx.db, v, id);
   } catch (error) {
+    if ((error as { constraint?: string }).constraint === "ux_task_series_homework_prep") throw fail("prep_exists", "La tâche de préparation hebdomadaire des devoirs existe déjà.", 409);
     throw translateDbError(error);
   }
 }
@@ -345,7 +375,7 @@ export async function createTask(ctx: Ctx, session: SessionContext, input: NewTa
 function emptyView(task: CheckedTask): TaskView {
   return {
     id: "", title: task.title, note: task.note, status: "todo", due: task.due, dueTime: task.dueTime, overdue: false, assignee: null, event: null, daysBefore: null, recurring: false, rule: null,
-    repetition: null, followsEventSeries: false, homeworkWeekId: null, doneBy: null, doneAt: null, version: 1, can: { check: true, manage: true },
+    repetition: null, followsEventSeries: false, homeworkWeekId: null, homeworkPrep: null, doneBy: null, doneAt: null, version: 1, can: { check: true, manage: true },
   };
 }
 

@@ -381,8 +381,8 @@ export async function runReminders(ctx: Ctx, options: { accountId?: string } = {
   for (const row of confirmed) {
     const { timeZone, recipients, settings } = await family(row.account_id);
     const timing = { startsAt: new Date(row.starts_at), allDay: row.all_day, updatedAt: new Date(row.updated_at) };
-    // Une série hebdomadaire n'envoie que le rappel J-1 de chaque séance ; toutes les deux semaines ou chaque mois, les délais du type de RDV (US-109 RF9, D46).
-    const onlyD1 = row.repeat_unit !== null && row.repeat_unit !== "month" && row.repeat_interval === 1;
+    // Une série hebdomadaire n'envoie que le rappel J-1 de chaque séance ; toutes les deux semaines, chaque mois ou chaque année, les délais du type de RDV (US-109 RF9, D46, D70).
+    const onlyD1 = row.repeat_unit !== null && row.repeat_unit !== "month" && row.repeat_unit !== "yearly" && row.repeat_interval === 1;
     const due = dueKinds(timing, settings.get(typeOfCode(row.code))!, timeZone, ctx.now).filter((k) => !onlyD1 || k === "d1");
     const kind = due[due.length - 1];
     if (!kind) continue;

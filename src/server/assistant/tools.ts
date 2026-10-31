@@ -31,7 +31,7 @@ export const TYPE_TO_DB: Record<string, EventType> = {
 const TYPE_FROM_DB: Record<EventType, string> = Object.fromEntries(Object.entries(TYPE_TO_DB).map(([fr, en]) => [en, fr])) as Record<EventType, string>;
 const DAYS_FR: Record<string, number> = { lundi: 1, mardi: 2, mercredi: 3, jeudi: 4, vendredi: 5, samedi: 6, dimanche: 7 };
 const FREQUENCY: Record<string, RepetitionInput["frequency"]> = {
-  hebdomadaire: "weekly", toutes_les_2_semaines: "biweekly", mensuelle_jour_du_mois: "monthly_day", mensuelle_jour_de_la_semaine: "monthly_weekday",
+  hebdomadaire: "weekly", toutes_les_2_semaines: "biweekly", mensuelle_jour_du_mois: "monthly_day", mensuelle_jour_de_la_semaine: "monthly_weekday", annuelle: "yearly",
 };
 
 /** Répétition décrite par l'agent → règle de l'application ; toute incohérence revient au modèle comme une erreur d'outil. */
@@ -54,6 +54,7 @@ function repetitionOf(value: unknown): RepetitionInput {
     fin = { kind: "count", count: n };
   } else if (end.type === "jamais") fin = { kind: "never" };
   else throw new ToolError("type de fin inconnu (attendu : date, seances, jamais)");
+  if (frequency === "yearly" && input.sauf_vacances_scolaires === true) throw new ToolError("« sauf_vacances_scolaires » n'est pas possible pour une répétition annuelle");
   return { frequency, ...(days ? { weekdays: days } : {}), end: fin, skipSchoolHolidays: input.sauf_vacances_scolaires === true };
 }
 
@@ -72,6 +73,7 @@ function taskRepetitionOf(value: unknown): TaskRepetition {
     return { frequency: "daily", end: repetitionOf({ ...(value as object), frequence: "hebdomadaire" }).end };
   }
   const { frequency, weekdays, end } = repetitionOf(value);
+  if (frequency === "yearly") throw new ToolError("une tâche ne se répète pas chaque année : « annuelle » est réservée aux rendez-vous");
   return { frequency, ...(weekdays ? { weekdays } : {}), end };
 }
 

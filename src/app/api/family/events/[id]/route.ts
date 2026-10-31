@@ -16,7 +16,7 @@ export const GET = handler(async (_request: Request, context: Context) => {
 });
 
 const repetition = z.object({
-  frequency: z.enum(["weekly", "biweekly", "monthly_day", "monthly_weekday"]),
+  frequency: z.enum(["weekly", "biweekly", "monthly_day", "monthly_weekday", "yearly"]),
   weekdays: z.array(z.number().int().min(1).max(7)).max(7).optional(),
   end: z.discriminatedUnion("kind", [
     z.object({ kind: z.literal("date"), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) }),

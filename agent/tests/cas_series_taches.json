@@ -599,6 +599,40 @@
           "aucune": true
         }
       }
+    },
+    {
+      "id": "67-serie-annuelle-question",
+      "titre": "Anniversaire qui revient chaque année, fin non indiquée : « Jusqu'à quand ? » avant de créer",
+      "source": "saisie",
+      "message": "L'anniversaire de Léo, c'est le 14 novembre, tous les ans",
+      "attendu": {
+        "creations": 0,
+        "question": true,
+        "texte_contient": [
+          "quand"
+        ],
+        "sans_serie": true
+      }
+    },
+    {
+      "id": "68-serie-annuelle-sans-fin",
+      "titre": "Anniversaire chaque année, sans fin : série annuelle, jamais « sauf vacances scolaires »",
+      "source": "saisie",
+      "message": "L'anniversaire de Léo, c'est le 14 novembre, tous les ans, sans fin",
+      "attendu": {
+        "creations": 1,
+        "serie": {
+          "frequence": "annuelle",
+          "fin": "jamais",
+          "sauf_vacances": false
+        },
+        "taches_rdv": {
+          "max": 3
+        },
+        "outils_requis": [
+          "rechercher_doublon"
+        ]
+      }
     }
   ]
 }

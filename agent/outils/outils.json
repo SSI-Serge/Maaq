@@ -86,7 +86,7 @@
           "type": "object",
           "description": "Si le rendez-vous se répète (« tous les mercredis »). `debut` et `fin` décrivent la première séance. Une seule série est créée, que la famille confirme d'un geste.",
           "properties": {
-            "frequence": {"type": "string", "enum": ["hebdomadaire", "toutes_les_2_semaines", "mensuelle_jour_du_mois", "mensuelle_jour_de_la_semaine"], "description": "mensuelle_jour_du_mois : chaque mois le même jour (le 5). mensuelle_jour_de_la_semaine : chaque mois le même jour de la semaine (le premier mardi)."},
+            "frequence": {"type": "string", "enum": ["hebdomadaire", "toutes_les_2_semaines", "mensuelle_jour_du_mois", "mensuelle_jour_de_la_semaine", "annuelle"], "description": "mensuelle_jour_du_mois : chaque mois le même jour (le 5). mensuelle_jour_de_la_semaine : chaque mois le même jour de la semaine (le premier mardi). annuelle : chaque année le même jour et le même mois que `debut` (un anniversaire, un anniversaire de mariage) ; jamais avec sauf_vacances_scolaires."},
             "jours": {"type": "array", "items": {"type": "string", "enum": ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]}, "description": "Jours de la semaine, pour hebdomadaire et toutes_les_2_semaines. Par défaut, le jour de `debut`."},
             "fin": {
               "type": "object",

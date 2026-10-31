@@ -76,13 +76,15 @@ interface Props {
   onCancel: () => void;
   /** La tâche a été annulée (« Annuler la tâche »). */
   onRemoved?: (cancelled: number) => void;
+  /** Tâche hebdomadaire de préparation des devoirs (D69) : elle revient chaque semaine (le jour reste modifiable) et porte le repère de l'aide Devoirs. */
+  homeworkPrep?: boolean;
 }
 
 /**
  * Formulaire de tâche (US-110 RF2) : titre obligatoire (100 caractères), échéance et heure facultative, personne assignée, note (500) et, à la création, répétition.
  * Une tâche récurrente se modifie ou s'annule pour une portée choisie (RF5). Le serveur refuse une version périmée.
  */
-export function TaskForm({ task, initial, assignable, onSaved, onCancel, onRemoved }: Props) {
+export function TaskForm({ task, initial, assignable, onSaved, onCancel, onRemoved, homeworkPrep }: Props) {
   const start = task ? { title: task.title, note: task.note, due: task.due, dueTime: task.dueTime, assigneeId: task.assignee?.id ?? null, repetition: null } : (initial ?? { title: "", due: todayLocal() });
   const [title, setTitle] = useState(start.title);
   const [due, setDue] = useState(start.due);
@@ -114,6 +116,7 @@ export function TaskForm({ task, initial, assignable, onSaved, onCancel, onRemov
           method: "POST",
           body: {
             ...fields,
+            ...(homeworkPrep ? { kind: "homework_prep" } : {}),
             ...(repeating
               ? {
                   repetition: {
@@ -163,13 +166,16 @@ export function TaskForm({ task, initial, assignable, onSaved, onCancel, onRemov
       {!task && (
         <fieldset className={styles.field} disabled={save.pending}>
           <legend className={styles.label}>Répétition</legend>
-          <select className={styles.select} value={frequency} onChange={(e) => setFrequency(e.target.value as "none" | Frequency)} aria-label="Répétition">
-            {FREQUENCIES.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
+          {!homeworkPrep && (
+            <select className={styles.select} value={frequency} onChange={(e) => setFrequency(e.target.value as "none" | Frequency)} aria-label="Répétition">
+              {FREQUENCIES.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          )}
+          {homeworkPrep && <span className={styles.hint}>Chaque semaine, le jour de votre choix.</span>}
           {(frequency === "weekly" || frequency === "biweekly") && (
             <div className={styles.members} role="group" aria-label="Jours de la semaine">
               {WEEKDAYS.map((w) => (

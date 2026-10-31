@@ -4,4 +4,6 @@
 
 ALTER TYPE event_source ADD VALUE 'outing' AFTER 'calendar_sync';
 ALTER TYPE notification_kind ADD VALUE 'outing_proposal' AFTER 'event_to_confirm';
+ALTER TYPE series_repeat_unit ADD VALUE 'yearly' AFTER 'month';
 ALTER TYPE task_source ADD VALUE 'homework' AFTER 'anticipation';
+ALTER TYPE task_source ADD VALUE 'homework_prep' AFTER 'homework';

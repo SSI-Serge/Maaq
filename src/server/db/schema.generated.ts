@@ -167,7 +167,7 @@ export type SeriesEndKind = "count" | "date" | "never";
 
 export type SeriesMonthMode = "day_of_month" | "nth_weekday";
 
-export type SeriesRepeatUnit = "day" | "month" | "week";
+export type SeriesRepeatUnit = "day" | "month" | "week" | "yearly";
 
 export type SessionEndReason = "account_grace_period" | "device_revoked" | "expired" | "guest_removed" | "logout";
 
@@ -177,7 +177,7 @@ export type SyncStatus = "failed" | "running" | "succeeded";
 
 export type TaskCancelReason = "event_cancelled" | "expired" | "series_ended" | "user";
 
-export type TaskSource = "agent" | "anticipation" | "homework" | "user";
+export type TaskSource = "agent" | "anticipation" | "homework" | "homework_prep" | "user";
 
 export type TaskStatus = "cancelled" | "done" | "proposed" | "todo";
 

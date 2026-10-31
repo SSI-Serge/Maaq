@@ -31,6 +31,7 @@ const schema = z.object({
   dueTime: z.string().max(5).nullable().optional(),
   assigneeId: z.uuid().nullable().optional(),
   repetition: repetitionSchema.nullable().optional(),
+  kind: z.enum(["homework_prep"]).optional(),
 });
 
 /** Crée une tâche seule ou récurrente (US-110 RF1, RF3). */

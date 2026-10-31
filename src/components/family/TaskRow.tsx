@@ -97,6 +97,12 @@ export function TaskRow({ task, assignable, showDate = true, onChanged }: Props)
           {task.recurring && <span title={task.rule ?? "À chaque séance"}>↻ {task.rule ?? "À chaque séance"}</span>}
           {task.event && <Link href={`/calendrier/rdv/${task.event.id}`}>{task.event.title} ›</Link>}
           {task.homeworkWeekId && <Link href={`/assistant/devoirs/${task.homeworkWeekId}`}>Semaine de devoirs ›</Link>}
+          {task.homeworkPrep &&
+            (task.homeworkPrep.weekId ? (
+              <Link href={`/assistant/devoirs/${task.homeworkPrep.weekId}`}>Voir la semaine de devoirs ›</Link>
+            ) : (
+              <Link href={`/assistant/devoirs/preparer?semaine=${task.homeworkPrep.weekStart}`}>Préparer les devoirs de la semaine ›</Link>
+            ))}
           {checked && task.status === "done" && task.doneBy && <span>Faite par {task.doneBy}</span>}
           {justDone && (
             <>
