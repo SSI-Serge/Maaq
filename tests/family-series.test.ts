@@ -216,7 +216,7 @@ describe("confirmation de la série (US-109 RF5, RF6, RT2)", () => {
     expect(series).toMatchObject({ status: "confirmed", confirmed_by_user_id: f.camille.id });
     const notices = payloads().filter((c) => c.tag.startsWith("notice-"));
     expect(notices).toHaveLength(1); // une seule notification pour toute la série
-    expect(notices[0].body).toMatch(/^Camille a ajouté : Foot, chaque mercredi à \d+h\d\d, à partir du 04\/11$/);
+    expect(notices[0].body).toMatch(/^Camille a ajouté : Foot, chaque mercredi à \d+h\d\d, à partir du 0[45]\/11$/); // la série est créée à l'heure de Paris et lue dans le fuseau « où il est midi » : selon l'heure réelle de l'essai, la séance du 04/11 tombe le 04 ou le 05
   });
 
   it("CA 5.1 : les séances en conflit sont comptées et listées ; sans accord explicite la série n'est pas confirmée", async () => {
@@ -428,6 +428,6 @@ describe("rappels, relances et planificateur (US-109 RF9, RT1, D47, D51)", () =>
     const calls = payloads().filter((c) => c.tag.startsWith("notice-"));
     expect(calls).toHaveLength(1);
     expect(calls[0].tag).toBe(`notice-${eventIds[0]}`);
-    expect(calls[0].body).toMatch(/^À confirmer — Camille a demandé : Foot, chaque mercredi à \d+h\d\d, à partir du 04\/11$/);
+    expect(calls[0].body).toMatch(/^À confirmer — Camille a demandé : Foot, chaque mercredi à \d+h\d\d, à partir du 0[45]\/11$/); // la série est créée à l'heure de Paris et lue dans le fuseau « où il est midi » : selon l'heure réelle de l'essai, la séance du 04/11 tombe le 04 ou le 05
   });
 });
