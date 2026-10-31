@@ -148,13 +148,13 @@ describe("critères (US-114)", () => {
     expect((await failure(saveCriteria(at(), f.elodieSession, NATURE_FOODIE))).status).toBe(403);
   });
 
-  it("D67 : « une par semaine » est retiré ; une ancienne valeur est lue comme « deux par mois »", async () => {
+  it("D67 : « une par semaine » est retiré : le serveur le refuse et la base aussi (contrainte), même enregistré directement", async () => {
     const f = await family();
     expect((await failure(saveCriteria(at(), f.camilleSession, { ...NATURE_FOODIE, frequency: "weekly" as never }))).code).toBe("invalid_choice");
     await saveCriteria(at(), f.camilleSession, NATURE_FOODIE);
-    await db.updateTable("outing_criteria").set({ frequency: "weekly" }).where("user_id", "=", f.camille.id).execute(); // une ligne antérieure à D67
-    expect((await getCriteria(at(), f.camilleSession)).frequency).toBe("twice_monthly");
-    expect(periodStart("2054-11-12", "weekly")).toBe("2054-11-01");
+    await expect(db.updateTable("outing_criteria").set({ frequency: "weekly" }).where("user_id", "=", f.camille.id).execute()).rejects.toThrow(/ck_outing_criteria_frequency/);
+    expect((await getCriteria(at(), f.camilleSession)).frequency).toBe("monthly"); // valeur par défaut de la base, en attendant le choix du PO
+    expect(periodStart("2054-11-12", "weekly")).toBe("2054-11-01"); // une ancienne valeur, si elle existait encore, vaudrait « deux par mois »
   });
 
   it("l'invité secondaire ne peut pas avoir de critères activés, même directement en base (garde-fou de la base)", async () => {

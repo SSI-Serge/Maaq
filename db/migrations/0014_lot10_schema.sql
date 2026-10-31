@@ -67,7 +67,9 @@ CREATE TABLE outing_criteria (
     REFERENCES users (id, account_id) ON DELETE CASCADE,
   CONSTRAINT ck_outing_criteria_enabled CHECK (NOT enabled OR (budget_eur IS NOT NULL AND people_count IS NOT NULL AND departure_place IS NOT NULL)),
   CONSTRAINT ck_outing_criteria_place CHECK (departure_place IS NULL OR (length(btrim(departure_place)) >= 2 AND NOT looks_like_address(departure_place))),
-  CONSTRAINT ck_outing_criteria_days CHECK (cardinality(preferred_days) BETWEEN 1 AND 9)
+  CONSTRAINT ck_outing_criteria_days CHECK (cardinality(preferred_days) BETWEEN 1 AND 9),
+  -- D67 : « une par semaine » est retiré ; la valeur reste dans le type (on n'en retire pas une valeur), la contrainte la refuse
+  CONSTRAINT ck_outing_criteria_frequency CHECK (frequency <> 'weekly')
 );
 -- Thèmes choisis : la catégorie est choisie si elle a au moins un thème (« au moins un thème par catégorie choisie », US-114 RF2)
 CREATE TABLE outing_criteria_themes (
@@ -815,6 +817,7 @@ COMMENT ON TABLE outing_themes IS $$Listes fermées des thèmes de sorties, par 
 COMMENT ON TABLE outing_criteria IS $$Critères de sorties d'un profil parent : interrupteur (désactivé par défaut), budget et nombre de personnes, ville ou secteur de départ, ambiance, jours préférés, fréquence. Données PRIVÉES du profil : l'autre parent ne les voit pas. Les catégories et thèmes sont dans outing_criteria_themes. [US-114, US-117, RT1]$$;
 COMMENT ON COLUMN outing_criteria.enabled IS $$« Recevoir des idées de sorties » : faux par défaut ; vrai exige budget, nombre de personnes, lieu de départ et au moins un thème. Désactiver arrête les propositions sans rien supprimer (SG-2)$$;
 COMMENT ON COLUMN outing_criteria.departure_place IS $$Ville ou secteur (« Lyon », « Paris et Île-de-France »), 80 caractères au plus, jamais une adresse : refusé si la saisie ressemble à une adresse (looks_like_address). Aucune adresse de domicile n'est stockée (D47)$$;
+COMMENT ON COLUMN outing_criteria.frequency IS $$Fréquence des propositions : une par mois (monthly, défaut) ou deux par mois (twice_monthly). La valeur weekly (une par semaine) est retirée par la décision D67 (coût d'une proposition) : elle reste dans le type énuméré mais la contrainte ck_outing_criteria_frequency la refuse$$;
 COMMENT ON COLUMN outing_criteria.preferred_days IS $$Jours préférés : week-end (samedi, dimanche), soirs de semaine, ou un jour précis. Au moins un ; « week-end » par défaut. Le jour visé est choisi par l'application (US-115 RF1)$$;
 COMMENT ON TABLE outing_criteria_themes IS $$Thèmes choisis par un profil, par catégorie : une catégorie est choisie quand elle a au moins un thème. Des critères activés exigent au moins un thème (contrôle différé à la fin de la transaction). Privé au profil. [US-114 RF2, RF6]$$;
 COMMENT ON TABLE outing_proposals IS $$Proposition de sorties préparée pour un profil parent, pour un jour visé : statut (prête, écartée, ajoutée) et critères du moment. Donnée PRIVÉE du profil : jamais dans le calendrier familial, le carnet de bord, le point de la semaine ni le compteur de l'icône ; sans lien avec le RDV éventuellement créé. Supprimée 30 jours après le jour visé. [US-115, US-116, US-117]$$;
