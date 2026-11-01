@@ -9,7 +9,7 @@ import { Button, Loading, Notice } from "@/components/ui";
 
 interface Setting {
   key: string;
-  type: "integer" | "email";
+  type: "integer" | "email" | "free_text";
   value: string | null;
   min: number | null;
   max: number | null;
@@ -33,7 +33,16 @@ const SECTIONS: { title: string; items: { key: string; label: string; note?: str
     title: "Contrats",
     items: [
       { key: "max_document_size_mb", label: "Taille maximale d'un document (Mo)" },
-      { key: "max_documents_per_contract", label: "Documents maximum par contrat" },
+      { key: "max_contracts_per_category", label: "Contrats au plus par catégorie et par famille", note: "Plafond technique, contrat de base compris : invisible en usage normal." },
+      { key: "contract_document_retention_days", label: "Conservation d'un document sans transmission (jours)", note: "Après une transmission, les documents sont supprimés au bout de 48 h dans tous les cas." },
+      { key: "contract_read_confidence_threshold_pct", label: "Seuil de confiance de lecture (%)", note: "En dessous, la lecture d'un document est incertaine et l'analyse attend la décision d'un administrateur." },
+    ],
+  },
+  {
+    title: "Challenge des contrats",
+    items: [
+      { key: "contract_broker_name", label: "Nom du courtier partenaire", note: "Tant que le nom et l'adresse du courtier ne sont pas renseignés, le challenge est bloqué pour toutes les familles." },
+      { key: "contract_broker_email", label: "Adresse de la boîte du courtier" },
     ],
   },
   {
@@ -69,6 +78,7 @@ const EMAIL_FORMAT = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 function check(setting: Setting, raw: string): string | null {
   const value = raw.trim();
+  if (setting.type === "free_text") return value.length <= 120 ? null : "120 caractères au plus.";
   if (setting.type === "email") return value === "" || EMAIL_FORMAT.test(value) ? null : "Adresse email invalide";
   if (!/^\d+$/.test(value)) return "Indiquez un nombre entier.";
   const n = Number(value);
@@ -155,7 +165,8 @@ function SettingsForm({ initial }: { initial: SettingsData }) {
                     <input
                       id={item.key}
                       className={`${s.input} ${errors[item.key] ? s.inputError : ""}`}
-                      type={setting.type === "email" ? "email" : "number"}
+                      type={setting.type === "email" ? "email" : setting.type === "free_text" ? "text" : "number"}
+                      maxLength={setting.type === "free_text" ? 120 : undefined}
                       min={setting.min ?? undefined}
                       max={setting.max ?? undefined}
                       value={values[item.key] ?? ""}

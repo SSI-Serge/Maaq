@@ -313,9 +313,12 @@ describe("US-48 — contrats obligatoires", () => {
     names = (await listContracts(now())).map((c) => c.name);
     expect(names.indexOf(`Prévoyance ${suffix}`)).toBeLessThan(names.indexOf(`Assurance voyages ${suffix}`));
 
+    // Archivée (C-19) : la catégorie reste dans la liste, grisée, après les catégories proposées.
     await archiveContract(now(), adminId, a);
-    expect((await listContracts(now())).map((c) => c.id)).not.toContain(a);
-    // Un contrat retiré libère son nom.
+    const archivedList = await listContracts(now());
+    expect(archivedList.find((c) => c.id === a)?.archivedAt).not.toBeNull();
+    expect(archivedList.findIndex((c) => c.id === b)).toBeLessThan(archivedList.findIndex((c) => c.id === a));
+    // Une catégorie archivée libère son nom.
     await addContract(now(), adminId, `Assurance voyages ${suffix}`);
   });
 

@@ -7,12 +7,23 @@ Spécification validée : `Projets Claude/Business Analyst/MAAQ_US_Detaillees_BA
 | Étape | Contenu | État |
 |---|---|---|
 | E0 | Moteur de masquage (US-136) et jeu de non-fuite (C-16) | fait (module pur, non branché) |
-| E1 | Administration : catégories, champs de documents, archivage, réglages | attend le schéma du lot 11 |
+| E1 | Administration : catégories, champs de documents, archivage, réglages | fait sur la branche `contrats-v2` (non déployé : le schéma du lot 11 ne s'applique à la zone de test qu'avec E2) |
 | E2 | Famille : contrats groupés, complémentaires, dépôt, purge, J-3, consentements | attend le schéma, le stockage des documents |
 | E3 | Transmission et challenge par email | après E2 |
 | E4 | OCR, reconnaissance des noms propres, aperçu (US-137) | attend l'accord sur le coût du stockage et du service interne |
 | E5 | Analyse, rapport, validation administrateur (US-138) | après E4 |
 | E6 | Recette, mise en service | à la fin |
+
+## Branche et schéma
+
+Développement sur la branche `contrats-v2` (partie de `assistant-famille`). Le schéma final du lot 11 est recopié depuis la base de données : `db/migrations/0015_lot11_valeurs_enumerees.sql` (930347978665…), `0016_lot11_schema.sql` pour une base neuve (df7dbf501a46…) ; pour une base qui contient déjà des contrats (zone de test, base locale) : `0015` puis `deploy/rattrapage_lot_11_donnees_existantes.sql` (72a5f7168a69…) À LA PLACE de `0016`, une seule fois, après une sauvegarde vérifiée et un contrôle des empreintes juste avant. Appliqué sur la base locale le 02/11/2026 ; structure comparée à une base neuve migrée d'un coup : aucun écart sur le lot 11 (seules les partitions mensuelles du carnet de bord diffèrent, créées selon la date). **Ne pas appliquer sur la zone de test avant le déploiement d'E2**, qui remplace la page Contrats de la V1 (le rattrapage change `account_contracts` et vide `contract_documents`). Tant qu'E2 n'est pas livrée, les tests de la V1 des contrats échouent sur cette branche : c'est attendu.
+
+## E1 : administration (US-122, US-123, US-139, US-65)
+
+- `src/server/admin/contracts.ts` : catégories (liste avec archivées, nombre de familles et de contrats), champs de documents (ajout, renommage, aide, obligatoire, ordre, retrait avec le nombre de documents supprimés), archivage, suppression d'une catégorie sans contrat. Les refus de la base (nom déjà pris, 10 champs au plus, au moins un champ obligatoire, catégorie archivée) sont traduits en messages. Journal d'administration : `contract_document_field_changed` ; la suppression d'une catégorie est notée `contract_updated` avec `deleted: true` (la liste d'actions de la base n'a pas de valeur dédiée).
+- Routes : `/api/admin/contracts/[id]/archive`, `/document-fields`, `/document-fields/[fieldId]` ; `DELETE /api/admin/contracts/[id]` supprime (et n'archive plus).
+- Écrans : liste « Catégories de contrats » (archivées grisées), détail avec « Documents attendus » (`DocumentFieldsPanel`) puis les champs de détail ; Réglages : plafond de contrats, conservation, seuil de lecture, nom et adresse du courtier (texte libre ajouté).
+- Tests : `tests/admin-contracts-v2.test.ts`.
 
 ## Interrupteur de l'analyse IA : `CONTRACT_ANALYSIS_MODE`
 

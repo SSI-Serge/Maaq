@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { archiveContract, listContracts, moveContract, renameContract } from "@/server/admin/contracts";
+import { deleteContract, listContracts, moveContract, renameContract } from "@/server/admin/contracts";
 import { requireAdmin } from "@/server/auth/http";
 import { handler, parseBody } from "@/server/http";
 import { idempotent } from "@/server/idempotency";
@@ -23,12 +23,12 @@ export const PATCH = handler(async (request: Request, { params }: Params) => {
   });
 });
 
-/** Retire un contrat de la liste (US-48 RF4). */
+/** Supprime une catégorie sans contrat, avec ses champs (US-139 RF6) ; une catégorie qui a des contrats s'archive (POST …/archive). */
 export const DELETE = handler(async (request: Request, { params }: Params) => {
   const { session, ctx } = await requireAdmin();
   const { id } = await params;
   return idempotent(ctx, request, session.user.id, async () => {
-    await archiveContract(ctx, session.user.id, id);
+    await deleteContract(ctx, session.user.id, id);
     return NextResponse.json({ contracts: await listContracts(ctx) });
   });
 });

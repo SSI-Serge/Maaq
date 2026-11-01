@@ -6,7 +6,7 @@ import { adminName } from "./audit";
 
 export interface Setting {
   key: string;
-  type: "integer" | "email" | "timestamp";
+  type: "integer" | "email" | "timestamp" | "free_text";
   value: string | null;
   min: number | null;
   max: number | null;
@@ -52,6 +52,7 @@ export async function settingHistory(ctx: Ctx, limit = 50): Promise<SettingChang
 /** Contrôle d'une valeur selon son type et ses bornes ; renvoie le message d'erreur ou null (RF2). */
 export function validateSetting(setting: Setting, raw: string): string | null {
   const value = raw.trim();
+  if (setting.type === "free_text") return value.length <= 120 ? null : "120 caractères au plus."; // vide autorisé : nom du courtier non renseigné
   if (setting.type === "email") {
     if (value === "") return null; // adresse non renseignée : autorisé
     return EMAIL_FORMAT.test(value) ? null : "Adresse email invalide";

@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import { useState } from "react";
 import { useApiMutation, useApiQuery } from "@/client/hooks";
 import { BackLink, PageHead, adminStyles as s } from "@/components/admin/AdminShell";
+import { DocumentFieldsPanel, type DocumentFieldsData } from "@/components/admin/DocumentFieldsPanel";
 import { ErrorLine } from "@/components/auth/parts";
 import { Button, Loading } from "@/components/ui";
 
@@ -16,9 +17,11 @@ interface ContractFields {
 
 const TYPE_LABEL: Record<FieldType, string> = { text: "Texte", date: "Date", amount: "Montant", choice: "Liste de choix" };
 
-/** Champs de détail d'un contrat proposés aux clients (US-48 RF10). */
+/** Catégorie de contrat : documents attendus (US-122, US-123) et champs de détail proposés aux clients (US-48 RF10, US-33). */
 export default function ContractFieldsPage() {
   const { id } = useParams<{ id: string }>();
+  const docs = useApiQuery<DocumentFieldsData>(`/api/admin/contracts/${id}/document-fields`);
+  // Les champs de détail d'une catégorie archivée ne se consultent plus ici (la catégorie n'est plus proposée) : la requête échoue, la section est alors absente.
   const query = useApiQuery<ContractFields>(`/api/admin/contracts/${id}/fields`);
   const [updated, setUpdated] = useState<ContractFields | null>(null);
   const data = updated ?? query.data;
@@ -50,14 +53,20 @@ export default function ContractFieldsPage() {
 
   return (
     <>
-      <BackLink href="/admin/contrats">Contrats obligatoires</BackLink>
-      {query.loading && !data && <Loading slow={query.slow} />}
-      <ErrorLine error={query.error} onRetry={query.reload} />
+      <BackLink href="/admin/contrats">Catégories de contrats</BackLink>
+      {docs.loading && !docs.data && <Loading slow={docs.slow} />}
+      <ErrorLine error={docs.error} onRetry={docs.reload} />
+      {docs.data && (
+        <>
+          <PageHead title={docs.data.category} lead={docs.data.archived ? "Catégorie archivée : elle n'est plus proposée et ses contrats sont en lecture seule." : undefined} />
+          <DocumentFieldsPanel categoryId={id} initial={docs.data} />
+        </>
+      )}
       {data && (
         <>
           <PageHead
-            title={`Champs — ${data.name}`}
-            lead="Ajouter ou retirer un champ s'applique immédiatement aux fiches de tous les clients pour ce contrat."
+            title="Champs de détail"
+            lead="Ajouter ou retirer un champ s'applique immédiatement aux fiches de tous les clients pour cette catégorie."
           />
           <table className={s.table} style={{ maxWidth: 820, marginBottom: 18 }}>
             <thead>
@@ -87,7 +96,7 @@ export default function ContractFieldsPage() {
               {data.fields.length === 0 && (
                 <tr>
                   <td colSpan={4} className={s.empty}>
-                    Aucun champ pour ce contrat.
+                    Aucun champ de détail pour cette catégorie.
                   </td>
                 </tr>
               )}
