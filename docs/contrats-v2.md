@@ -10,7 +10,7 @@ Spécification validée : `Projets Claude/Business Analyst/MAAQ_US_Detaillees_BA
 | E1 | Administration : catégories, champs de documents, archivage, réglages | fait sur la branche `contrats-v2` (non déployé : le schéma du lot 11 ne s'applique à la zone de test qu'avec E2) |
 | E2 | Famille : contrats groupés, complémentaires, dépôt, purge, J-3, consentements | fait et **en ligne sur la zone de test** (révision 00054, 02/11/2026) avec le lot 11 |
 | E3 | Transmission et challenge par email (US-129, 130, 134, 135) | fait (tests verts), mise en ligne sur la zone de test à la suite |
-| E4 | OCR, reconnaissance des noms propres, aperçu (US-137) | attend l'accord sur le coût du stockage et du service interne |
+| E4 | Lecture (PDF, OCR), reconnaissance des noms propres, masquage branché, aperçu et confirmation (US-136, US-137) | fait (tests verts) ; service interne `maaq-lecture` en ligne sur le projet de test |
 | E5 | Analyse, rapport, validation administrateur (US-138) | après E4 |
 | E6 | Recette, mise en service | à la fin |
 
@@ -42,6 +42,19 @@ Développement sur la branche `contrats-v2` (partie de `assistant-famille`). Le 
 - **Proposition de l'autre canal** (US-130) : fenêtre « Oui, aussi … » / « Non, seulement … » puis texte de consentement ; Échap ou le fond ferment sans rien envoyer. Écart assumé avec l'US-130 RF4 : refuser le consentement ramène à la question au lieu de transmettre tout de suite, pour qu'aucun envoi ne parte par accident.
 - **Messagerie** : les adaptateurs (`types.ts`, `smtp.ts`, `dev-outbox.ts`) acceptent des pièces jointes ; la boîte de développement ne garde que les noms et tailles.
 - **Texte du consentement au challenge** : nouvelle version publiée par donnée (`deploy/donnees_lot_11_texte_challenge.sql`), pas par schéma.
+
+## E4 : lecture, masquage et aperçu (US-136, US-137)
+
+- **Service interne `maaq-lecture`** (`services/contract-reader/`, Python) : Cloud Run du projet de test, `europe-west1`, **sans accès public** (403 sans jeton), 2 vCPU / 4 Go, aucune instance au repos (`min-instances 0`), 2 requêtes par instance, 3 images conservées (politique de nettoyage d'Artifact Registry limitée au paquet `maaq-lecture`). Il reçoit les fichiers, rend le texte de chaque page et les noms propres repérés (`POST /read`, `GET /status`), et ne garde rien : ni fichier, ni texte, ni journal du contenu.
+  - PDF avec texte : lu directement (confiance 100). Page de PDF sans texte, ou photo : OCR Tesseract 5, modèle français « best », rotation corrigée si la lecture est médiocre ; confiance = moyenne des mots reconnus pondérée par leur longueur. Limites : 30 pages, images réduites à 3600 px.
+  - Noms propres : spaCy `fr_core_news_md`. **Bruyant** (il prend « Conducteur » ou une ligne de tableau pour une personne) : l'application ne garde que les zones « personne », écarte les mots de fonction et les assureurs courants, et exige des majuscules. Les lieux et organisations repérés ne sont pas utilisés : l'adresse est traitée par les règles, l'employeur par son étiquette.
+  - L'application s'authentifie avec le jeton d'identité de son compte de service (`reader.ts`) ; `CONTRACT_READER_URL` désigne le service. Sans cette variable, rien n'est lu et les documents restent « en attente ».
+- **Du dépôt au texte masqué** (`process.ts`) : l'écran lance `POST /api/contracts/[id]/process` dès qu'un document attend et que l'analyse est active sur le contrat (dépôt ou activation) ; l'entretien de 5 minutes reprend ce qui est resté en attente (service indisponible, serveur arrêté, masquage « en cours » depuis plus de 15 minutes). La prise d'un document est atomique. Confiance sous 30 % ou moins de 30 caractères : « Illisible » ; sous le seuil de la console (80 % par défaut) : « Lecture incertaine » ; sinon « À vérifier ». Service injoignable : retour à « en attente », nouvel essai.
+- **Texte masqué stocké** chiffré dans le document : pages, compteurs par type, références aux membres, masques à la main (avec ce que disait chaque occurrence, pour les annuler à l'identique, supprimé avec le document) et empreintes à clé des jetons déjà attribués dans le contrat (pour qu'un même nom garde le même jeton d'un document à l'autre ; jamais une valeur). Table `contract_document_mask_counts` mise à jour avec les compteurs ; versions de l'outil et des règles gardées.
+- **Aperçu** (`/contrats/[id]/documents/[docId]`) : texte masqué page par page, jetons surlignés (« Personne 1 »…), toucher un mot propose « Masquer aussi ce mot » (toutes les occurrences du document, hors jetons), champ pour masquer une expression, « Annuler ce masque », ce qui reste visible signalé par type, pages de santé retirées signalées, « Confirmer ce document » (« Vérifié par … le … »). Un document vérifié ne se retouche plus : on le remplace. Une page de santé douteuse bloque la confirmation et l'analyse.
+- **Moteur de masquage** : couche 3 branchée (`entitySpans`) ; correction d'un défaut des règles de personnes, qui pouvaient avaler le mot suivant à la ligne d'après (« Souscripteur : Paul Roux » suivi de « Bénéficiaire : … »).
+- **Ouverture** : `CONTRACT_ANALYSIS_MODE=preview` ouvre le masquage et l'aperçu ; `CONTRACT_ANALYSIS_SEND=off` ferme l'envoi à l'analyse tant que l'agent n'existe pas (E5, à retirer alors). La ligne de transmission dit alors « L'envoi à l'analyse n'est pas encore ouvert ».
+- **Non mesuré** : la qualité de l'OCR sur de vraies photos de documents (seuls des documents fictifs fabriqués ont été lus : 88 à 100 % de confiance, aucun identifiant resté visible) ; les documents fictifs photographiés demandés au PO serviront à la mesurer. Le délai de lecture d'un scan de 30 pages n'est pas mesuré (de l'ordre de 6 s par page).
 
 ## Mise en ligne d'E2 sur la zone de test (02/11/2026)
 

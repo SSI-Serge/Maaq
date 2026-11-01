@@ -8,7 +8,7 @@ import { planAnalysis, reasonText, type DocumentState, type DocumentView } from 
 export interface PlanContract {
   analysis: { enabled: boolean };
   challenge: { enabled: boolean };
-  slots: { fieldId: string; name: string; required: boolean; document: { transmittedAt: string | null; expiresAt: string; masking: { status: string } } | null }[];
+  slots: { fieldId: string; name: string; required: boolean; document: { transmittedAt: string | null; expiresAt: string; masking: { status: string; healthDoubt?: boolean } } | null }[];
   missingRequired: number;
 }
 
@@ -54,6 +54,7 @@ export function planTransmission(contract: PlanContract, context: PlanContext): 
     required: s.required,
     state: s.document ? (STATE[s.document.masking.status] ?? "masking") : null,
     confirmed: s.document?.masking.status === "verified",
+    healthDoubt: s.document?.masking.healthDoubt ?? false,
   }));
   const analysis = planAnalysis(views, context.verificationRequired ?? true);
   // Les champs obligatoires vides sont dits une fois, pour les deux canaux : l'analyse n'ajoute que ses propres raisons.
@@ -73,6 +74,7 @@ export function planTransmission(contract: PlanContract, context: PlanContext): 
           ? "analysis"
           : null
       : null;
-  const line = forAnalysis && forChallenge ? "Pour analyse et challenge" : forAnalysis ? "Pour analyse" : forChallenge ? "Pour challenge" : "Activez l'analyse ou le challenge pour transmettre";
+  // L'analyse voulue mais bloquée (texte à vérifier…) reste annoncée : les raisons du blocage s'affichent juste dessous.
+  const line = forAnalysis && forChallenge ? "Pour analyse et challenge" : forAnalysis || (wantsAnalysis && !forChallenge) ? "Pour analyse" : forChallenge ? "Pour challenge" : contract.analysis.enabled && !context.analysisOpen ? "L'envoi à l'analyse n'est pas encore ouvert" : "Activez l'analyse ou le challenge pour transmettre";
   return { forAnalysis, forChallenge, ready, alreadyTransmitted, analysisBlockers, skipped: wantsAnalysis ? analysis.skipped : [], needsAdmin: forAnalysis && analysis.needsAdmin, offer, line };
 }

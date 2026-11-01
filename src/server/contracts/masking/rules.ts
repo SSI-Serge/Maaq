@@ -123,13 +123,47 @@ export function labelledSpans(text: string): Span[] {
 // Personnes (sans modèle : civilité ou étiquette) ; le modèle de langue (couche 3) complète
 // ---------------------------------------------------------------------------------------------------------------------------
 
-const CIVILITY = new RegExp(`\\b(?:M\\.|MM\\.|Mme|Mlle|Monsieur|Madame|Mademoiselle|Messieurs|Docteur|Dr|Ma[îi]tre|Me)\\s+(?<value>${WORD}(?:\\s+${WORD}){0,3})`, "gu");
+const CIVILITY = new RegExp(`\\b(?:M\\.|MM\\.|Mme|Mlle|Monsieur|Madame|Mademoiselle|Messieurs|Docteur|Dr|Ma[îi]tre|Me)\\s+(?<value>${WORD}(?:[ \\t\\u00a0]+${WORD}){0,3})`, "gu");
 const PERSON_LABELS =
   "nom(?:\\s+et\\s+pr[ée]nom)?|pr[ée]nom|nom\\s+d['’]usage|nom\\s+de\\s+naissance|titulaire|souscripteur|assur[ée](?:\\s+principal)?|conducteur(?:\\s+principal|\\s+secondaire|\\s+d[ée]sign[ée])?|b[ée]n[ée]ficiaire|adh[ée]rent|co-?emprunteur|emprunteur|conjoint|repr[ée]sentant|interlocuteur|gestionnaire|agent|conseiller";
-const PERSON_AFTER_LABEL = new RegExp(`\\b(?:${PERSON_LABELS})\\s*:\\s*(?<value>${WORD}(?:\\s+${WORD}){0,3})`, "giu");
+const PERSON_AFTER_LABEL = new RegExp(`\\b(?:${PERSON_LABELS})\\s*:\\s*(?<value>${WORD}(?:[ \\t\\u00a0]+${WORD}){0,3})`, "giu");
 const NOT_A_NAME = new Set(["non", "oui", "aucun", "aucune", "neant", "néant", "sans", "madame", "monsieur", "mme", "mlle", "assurance", "assureur", "mutuelle", "banque", "france", "maaq", "n/a"]);
 
-const capitalised = (value: string) => new RegExp(`^${WORD}(?:\\s+${WORD}){0,3}$`, "u").test(value);
+const capitalised = (value: string) => new RegExp(`^${WORD}(?:[ \\t\\u00a0]+${WORD}){0,3}$`, "u").test(value);
+
+/** Zone repérée par le modèle de langue (couche 3) : positions dans le texte de la page, étiquette du modèle (PER, LOC, ORG). */
+export interface DetectedEntity {
+  start: number;
+  end: number;
+  label: string;
+}
+
+// Mots que le modèle prend parfois pour des noms : fonctions dans un contrat et assureurs, banques et courtiers courants (l'assureur est gardé, US-136 RF4).
+const NER_KEEP = new Set([
+  "conducteur", "souscripteur", "assure", "assuree", "beneficiaire", "titulaire", "adherent", "adherente", "locataire", "proprietaire", "emprunteur", "coemprunteur", "conjoint", "conjointe",
+  "client", "cliente", "mandataire", "representant", "interlocuteur", "gestionnaire", "conseiller", "agent", "declarant", "tiers", "enfant", "enfants", "pere", "mere",
+  "allianz", "axa", "maif", "macif", "maaf", "matmut", "gmf", "groupama", "generali", "mma", "gan", "april", "swisslife", "harmonie", "malakoff", "humanis", "mgen", "mgp", "aviva", "direct",
+  "lemonade", "ornikar", "luko", "alan", "cardif", "afi", "esca", "credit", "agricole", "mutuel", "mutuelle", "lcl", "bnp", "paribas", "societe", "generale", "caisse", "epargne",
+]);
+const foldWord = (word: string) => word.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[-'’\s]/g, "").toLowerCase();
+
+/**
+ * Couche 3 : les noms de personnes repérés par le modèle de langue. Seules les personnes sont masquées ici : les lieux sont couverts par les règles d'adresse (la ville seule
+ * n'identifie pas) et les employeurs par l'étiquette « Employeur : ». Un mot de fonction (« Conducteur ») ou un assureur connu n'est pas un nom.
+ */
+export function entitySpans(text: string, entities: DetectedEntity[]): Span[] {
+  const out: Span[] = [];
+  for (const entity of entities) {
+    if (entity.label !== "PER") continue;
+    const value = text.slice(entity.start, entity.end).replace(/\s+/g, " ").trim();
+    const words = value.split(" ").filter((w) => /\p{L}/u.test(w));
+    if (value.length < 3 || value.length > 60 || words.length === 0 || words.length > 5) continue;
+    if (words.every((w) => NER_KEEP.has(foldWord(w)) || NOT_A_NAME.has(w.toLowerCase()))) continue;
+    if (!words.every((w) => new RegExp(`^[${CAP}]`, "u").test(w))) continue;
+    out.push({ start: entity.start, end: entity.end, type: "PERSONNE", key: words.map(foldWord).join(" "), priority: priority.name + 0.5 });
+  }
+  return out;
+}
 
 export function personSpans(text: string): Span[] {
   const out: Span[] = [];

@@ -13,6 +13,7 @@ import type { ContractView, ContractsView, DocumentSlot } from "@/server/contrac
 import { ChannelSwitch, contractState, frDate, TONE_CLASS } from "./ContractParts";
 import { TransmitArea } from "./TransmitArea";
 import { DetailsForm } from "./DetailsForm";
+import { DocumentMasking } from "./DocumentMasking";
 import styles from "./contracts.module.css";
 
 const FORMATS = /\.(jpe?g|gif|pdf)$/i;
@@ -61,6 +62,27 @@ function Detail({ contract, view, archived, uploads, onChanged, onDeleted }: { c
   const rename = useApiMutation();
   const state = contractState(contract, archived);
   const mine = uploads.filter((u) => u.contractId === contract.id);
+
+  // Lecture et masquage des documents (US-136 RF1) : lancés dès qu'un document attend et que l'analyse est active ; tant qu'un masquage est en cours, on redemande l'état.
+  const maskingNeeded = view.analysis.mode !== "off" && contract.analysis.enabled && !archived;
+  const waiting = maskingNeeded ? contract.slots.filter((x) => x.document && !x.document.transmittedAt && x.document.masking.status === "pending").map((x) => x.document!.id) : [];
+  const running = maskingNeeded && contract.slots.some((x) => x.document?.masking.status === "masking");
+  const waitingKey = waiting.join(",");
+  const attempted = useRef(new Set<string>());
+  const refresh = useApiMutation();
+  const { run: runRefresh } = refresh;
+  useEffect(() => {
+    if (!waitingKey || attempted.current.has(waitingKey)) return;
+    attempted.current.add(waitingKey);
+    void runRefresh<ContractView>(`/api/contracts/${contract.id}/process`, { method: "POST" }).then((result) => result && onChanged(result));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [waitingKey, contract.id]);
+  useEffect(() => {
+    if (!running) return;
+    const timer = setInterval(() => void runRefresh<ContractView>(`/api/contracts/${contract.id}/process`, { method: "POST" }).then((result) => result && onChanged(result)), 6000);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [running, contract.id]);
 
   async function saveName(event: React.FormEvent) {
     event.preventDefault();
@@ -241,6 +263,7 @@ function Slot({ slot, contract, view, archived, jobs, onChanged }: { slot: Docum
             {plural(doc.pages, "page", "pages")} · déposé par {doc.uploadedByFirstName ?? "un profil supprimé"} le {frDate(doc.uploadedAt)}
             {doc.transmittedAt ? ` · transmis le ${frDate(doc.transmittedAt)}` : ""} · supprimé le {frDate(doc.expiresAt)}
           </div>
+          <DocumentMasking doc={doc} contractId={contract.id} analysisActive={view.analysis.mode !== "off" && contract.analysis.enabled} />
           <div className={styles.docActions}>
             <a className={s.smallButton} href={`/api/contracts/documents/${doc.id}`} target="_blank" rel="noreferrer">
               Aperçu

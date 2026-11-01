@@ -6,6 +6,7 @@ import { updateSettings } from "@/server/admin/settings";
 import { messenger } from "@/server/adapters/messaging";
 import type { Ctx, SessionContext } from "@/server/auth/service";
 import { addContract, addDocument, getContracts, setChannel, type ContractView } from "@/server/contracts/service";
+import { sealBlob } from "@/server/contracts/masked";
 import { planTransmission } from "@/server/contracts/plan";
 import { runContractMaintenance } from "@/server/contracts/maintenance";
 import { familyReference, relaunchChannel, transmitContract } from "@/server/contracts/transmit";
@@ -92,6 +93,10 @@ describe("plan de transmission (US-129 RF1, RF2, US-130)", () => {
     expect(planTransmission({ analysis: { enabled: true }, challenge: { enabled: false }, slots: [slot({ status: "verified" })], missingRequired: 0 }, { ...context, challengeAvailable: false }).offer).toBeNull();
     // Analyse fermée : seul le challenge compte.
     expect(planTransmission({ analysis: { enabled: true }, challenge: { enabled: true }, slots: [slot()], missingRequired: 0 }, { ...context, analysisOpen: false }).line).toBe("Pour challenge");
+    // Analyse activée mais envoi pas encore ouvert (masquage et aperçu seuls) : on le dit au lieu de demander d'activer un canal.
+    expect(planTransmission({ analysis: { enabled: true }, challenge: { enabled: false }, slots: [slot()], missingRequired: 0 }, { ...context, analysisOpen: false })).toMatchObject({ line: "L'envoi à l'analyse n'est pas encore ouvert", ready: false });
+    // L'analyse voulue mais bloquée reste annoncée (« Pour analyse »), les raisons s'affichent dessous.
+    expect(planTransmission({ analysis: { enabled: true }, challenge: { enabled: false }, slots: [slot({ status: "to_verify" })], missingRequired: 0 }, context)).toMatchObject({ line: "Pour analyse", ready: false });
   });
 
   it("l'analyse attend un masquage vérifié ; le challenge n'en dépend pas ; un champ obligatoire vide, un envoi déjà fait ou une catégorie archivée bloquent", () => {
@@ -182,7 +187,7 @@ describe("transmission pour analyse : masquage vérifié, plafond quotidien (US-
     const doc = await db.selectFrom("contract_field_documents").select("id").where("account_contract_id", "=", base.id).executeTakeFirstOrThrow();
     // Le masquage arrive avec l'étape suivante : on suit le chemin d'états que la base autorise.
     await db.updateTable("contract_field_documents").set({ masking_status: "masking" }).where("id", "=", doc.id).execute();
-    await db.updateTable("contract_field_documents").set({ masking_status: "to_verify", masked_text: Buffer.from("texte masqué"), confidence_pct: 95 }).where("id", "=", doc.id).execute();
+    await db.updateTable("contract_field_documents").set({ masking_status: "to_verify", masked_text: sealBlob({ v: 1, pages: [{ text: "texte masqué", state: "ok" }], counts: {}, references: {}, removedHealthPages: 0, doubtHealthPages: 0, manual: [], tokens: {} }), confidence_pct: 95 }).where("id", "=", doc.id).execute();
     await db.updateTable("contract_field_documents").set({ masking_status: "verified", verified_by_user_id: (await db.selectFrom("users").select("id").where("account_id", "=", f.accountId).where("role", "=", "primary_user").executeTakeFirstOrThrow()).id }).where("id", "=", doc.id).execute();
     await setChannel(at(), f.session, base.id, "analysis", { enabled: true, accepted: true });
     return base;

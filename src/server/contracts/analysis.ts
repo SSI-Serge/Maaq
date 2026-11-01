@@ -10,6 +10,8 @@ import { skippedNotice } from "./transmission";
 
 export type AnalysisMode = "off" | "preview" | "live";
 export const analysisMode = (): AnalysisMode => env().CONTRACT_ANALYSIS_MODE;
+/** La transmission pour analyse est-elle possible ? Le masquage et l'aperçu, eux, suivent `analysisMode`. */
+export const analysisSendOpen = (): boolean => analysisMode() !== "off" && env().CONTRACT_ANALYSIS_SEND === "on";
 
 /** Mention affichée tant que le brief du consultant n'est pas livré (C-05). */
 export const DEMO_CONTENT_NOTICE = "Contenu de démonstration : le plan du rapport sera défini avec le consultant.";

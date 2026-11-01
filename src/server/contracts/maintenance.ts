@@ -5,6 +5,7 @@ import { env } from "@/server/env";
 import { pushConfigured, sendPush } from "@/server/push/service";
 import { describeError } from "@/server/safe-log";
 import { notBeforeMorning, warningText, WARNING_DAYS_BEFORE } from "./retention";
+import { processPending } from "./process";
 import { drainStorageDeletions } from "./storage";
 import { runChallengeDeliveries } from "./transmit";
 
@@ -12,6 +13,7 @@ import { runChallengeDeliveries } from "./transmit";
  * Entretien horaire des documents de contrat (C-01, US-126 RF7, RT2, US-139 RF4) :
  * - purge des documents échus (48 h après la transmission, ou 30 jours sans transmission) et fermeture des demandes « Analyses à valider » échues : fonction de la base ;
  * - effacement des fichiers dont la ligne a disparu (file de suppression du stockage) ;
+ * - lecture et masquage des documents restés en attente (l'écran les lance au dépôt ; ceci rattrape un service de lecture indisponible ou un serveur arrêté) ;
  * - avertissement unique « supprimés dans 3 jours » au déposant, reporté à 8 h s'il tombe entre 21 h et 8 h (heure de la famille).
  * Sans danger à relancer : chaque passage ne fait que ce qui est dû.
  */
@@ -24,12 +26,14 @@ export interface ContractMaintenanceResult {
   failed: number;
   challengeSent: number;
   challengeFailed: number;
+  masked: number;
+  maskingRetry: number;
 }
 
 const HOUR = 3_600_000;
 
 export async function runContractMaintenance(ctx: Ctx): Promise<ContractMaintenanceResult> {
-  const result: ContractMaintenanceResult = { purged: 0, filesDeleted: 0, filesFailed: 0, warned: 0, failed: 0, challengeSent: 0, challengeFailed: 0 };
+  const result: ContractMaintenanceResult = { purged: 0, filesDeleted: 0, filesFailed: 0, warned: 0, failed: 0, challengeSent: 0, challengeFailed: 0, masked: 0, maskingRetry: 0 };
   const purged = await sql<{ n: string }>`select purge_expired_contract_documents() as n`.execute(ctx.db);
   result.purged = Number(purged.rows[0]?.n ?? 0);
   const files = await drainStorageDeletions(ctx.db);
@@ -40,6 +44,13 @@ export async function runContractMaintenance(ctx: Ctx): Promise<ContractMaintena
   const challenge = await runChallengeDeliveries(ctx);
   result.challengeSent = challenge.sent;
   result.challengeFailed = challenge.failed;
+
+  const masking = await processPending(ctx).catch((error) => {
+    console.error(`Masquage des documents en attente : ${describeError(error)}`);
+    return { processed: 0, retry: 0 };
+  });
+  result.masked = masking.processed;
+  result.maskingRetry = masking.retry;
 
   // Documents jamais transmis qui seront supprimés dans 3 jours ou moins, pas encore avertis.
   const rows = await ctx.db

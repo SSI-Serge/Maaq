@@ -103,7 +103,7 @@ export async function runDueJobs(ctx: Ctx, options: { force?: boolean } = {}): P
   // Documents de contrat : la suppression 48 h après la transmission demande un passage à chaque tour, pas une purge quotidienne.
   const contracts = await runContractMaintenance(ctx).catch((error) => {
     console.error(`Documents de contrat : ${describeError(error)}`);
-    return { purged: 0, filesDeleted: 0, filesFailed: 0, warned: 0, failed: 1, challengeSent: 0, challengeFailed: 0 };
+    return { purged: 0, filesDeleted: 0, filesFailed: 0, warned: 0, failed: 1, challengeSent: 0, challengeFailed: 0, masked: 0, maskingRetry: 0 };
   });
   if (!due) return { logbook: "not_due", purged: null, lifecycle, exports, reminders, notices, taskNotices, digests, anticipation, travel, places, outings, contracts };
 

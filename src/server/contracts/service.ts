@@ -6,7 +6,8 @@ import { env } from "@/server/env";
 import { Rejection } from "@/server/http";
 import { emailFingerprint } from "@/server/security/crypto";
 import { integerSetting } from "@/server/settings";
-import { analysisMode, type AnalysisMode } from "./analysis";
+import { analysisMode, analysisSendOpen, type AnalysisMode } from "./analysis";
+import { openBlob } from "./masked";
 import { planTransmission, type TransmitPlan } from "./plan";
 import { loadDocument, objectStore, storeDocument } from "./storage";
 import type { DocumentState } from "./transmission";
@@ -44,7 +45,7 @@ export interface DocumentView {
   expiresAt: string;
   /** Verrouillé pendant les 48 h qui suivent la transmission : ni remplacement, ni retrait (US-126 RF8). */
   locked: boolean;
-  masking: { status: MaskingStatus; confidencePct: number | null; verifiedByFirstName: string | null; verifiedAt: string | null };
+  masking: { status: MaskingStatus; confidencePct: number | null; verifiedByFirstName: string | null; verifiedAt: string | null; healthDoubt: boolean; removedHealthPages: number };
 }
 
 export interface DocumentSlot {
@@ -124,10 +125,17 @@ const MAX_NAME = 60;
 const MAX_PHOTOS = 10;
 
 /** Les contrats ne concernent que le noyau du compte : utilisateur principal et invité 1 (US-30 RF3, US-32 RT1). */
-function requireCore(session: SessionContext): string {
+export function requireCore(session: SessionContext): string {
   const isCore = session.user.role === "primary_user" || (session.user.role === "guest" && session.user.guestRank === "core");
   if (!isCore || !session.user.accountId) throw new Rejection("forbidden", "Les contrats sont réservés à l'utilisateur principal et à l'invité 1.", 403);
   return session.user.accountId;
+}
+
+/** Ce que le texte masqué dit de la santé : pages retirées (signalées à la famille) et page douteuse restée (analyse bloquée, US-136 RF5). */
+function healthOf(maskedText: Buffer | null): { healthDoubt: boolean; removedHealthPages: number } {
+  if (!maskedText) return { healthDoubt: false, removedHealthPages: 0 };
+  const blob = openBlob(maskedText);
+  return { healthDoubt: blob.doubtHealthPages > 0, removedHealthPages: blob.removedHealthPages };
 }
 
 const iso = (value: Date | string | null | undefined) => (value ? new Date(value).toISOString() : null);
@@ -281,7 +289,7 @@ async function loadView(ctx: Ctx, accountId: string): Promise<ContractsView> {
                   transmittedAt: iso(d.transmitted_at),
                   expiresAt: iso(d.expires_at)!,
                   locked: d.transmitted_at !== null && new Date(d.expires_at) > ctx.now,
-                  masking: { status: d.masking_status, confidencePct: d.confidence_pct, verifiedByFirstName: nameOf(d.verified_by_user_id), verifiedAt: iso(d.verified_at) },
+                  masking: { status: d.masking_status, confidencePct: d.confidence_pct, verifiedByFirstName: nameOf(d.verified_by_user_id), verifiedAt: iso(d.verified_at), ...healthOf(d.masked_text) },
                 }
               : null,
           };
@@ -316,7 +324,7 @@ async function loadView(ctx: Ctx, accountId: string): Promise<ContractsView> {
         reportAt: iso(report?.generated_at),
         challengeSentRecently: transmissions.some((t) => t.account_contract_id === c.id && t.challenge_sent_at !== null && ctx.now.getTime() - new Date(t.challenge_sent_at).getTime() < 48 * 3_600_000),
       };
-      return { ...contract, transmit: planTransmission(contract, { analysisOpen: analysisMode() !== "off", challengeAvailable: available, archived, now: ctx.now }) };
+      return { ...contract, transmit: planTransmission(contract, { analysisOpen: analysisSendOpen(), challengeAvailable: available, archived, now: ctx.now }) };
     });
     const atLimit = own.length >= maxContracts;
     return { id: def.id, name: def.name, archived, archivedAt: iso(def.archived_at), canAdd: !archived && !atLimit, atLimit, contracts };
@@ -337,7 +345,7 @@ export async function getContracts(ctx: Ctx, session: SessionContext): Promise<C
   return loadView(ctx, accountId);
 }
 
-async function contractView(ctx: Ctx, accountId: string, contractId: string): Promise<ContractView> {
+export async function contractView(ctx: Ctx, accountId: string, contractId: string): Promise<ContractView> {
   const view = await loadView(ctx, accountId);
   const found = view.categories.flatMap((c) => c.contracts).find((c) => c.id === contractId);
   if (!found) throw new Rejection("not_found", "Ce contrat n'existe pas ou n'existe plus.", 404);

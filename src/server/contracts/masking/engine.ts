@@ -1,10 +1,11 @@
 import { classifyPage, REMOVED_PAGE_LINE } from "./health";
 import { householdSpans, manualSpans, personIdentity } from "./household";
-import { addressSpans, dateSpans, labelledSpans, personSpans, structuredSpans, type Span } from "./rules";
+import { addressSpans, dateSpans, entitySpans, labelledSpans, personSpans, structuredSpans, type DetectedEntity, type Span } from "./rules";
 import { createTokenSpace, type MaskedDocument, type MaskedPage, type MaskOptions, type TokenSpace, type TokenType } from "./types";
 
 export { createTokenSpace } from "./types";
 export type { HouseholdFacts, MaskedDocument, MaskOptions, TokenSpace } from "./types";
+export type { DetectedEntity } from "./rules";
 
 /** Garde les zones sans chevauchement : la plus prioritaire d'abord, puis la plus longue. Une zone englobée par une autre est absorbée. */
 export function resolve(spans: Span[]): Span[] {
@@ -15,7 +16,8 @@ export function resolve(spans: Span[]): Span[] {
 }
 
 function tokenFor(space: TokenSpace, type: TokenType, key: string): string {
-  const id = `${type}:${key}`;
+  const raw = `${type}:${key}`;
+  const id = space.hash ? space.hash(raw) : raw;
   const known = space.assigned.get(id);
   if (known) return known;
   const n = (space.counters[type] = (space.counters[type] ?? 0) + 1);
@@ -38,13 +40,14 @@ function mergeNames(text: string, spans: Span[], options: MaskOptions): Span[] {
 }
 
 /** Tous les repérages sur un texte, des plus sûrs (identifiants à forme connue) aux plus larges (liste du foyer, mots ajoutés à la main). */
-function detect(text: string, options: MaskOptions): Span[] {
+function detect(text: string, options: MaskOptions, entities: DetectedEntity[]): Span[] {
   return [
     ...structuredSpans(text),
     ...labelledSpans(text),
     ...dateSpans(text, options.now),
     ...addressSpans(text),
     ...personSpans(text),
+    ...entitySpans(text, entities),
     ...householdSpans(text, options.household),
     ...manualSpans(text, options.extraWords ?? []),
   ];
@@ -79,7 +82,7 @@ export function maskDocument(pages: string[], options: MaskOptions): MaskedDocum
   const out: MaskedPage[] = [];
   let removed = 0;
   let doubt = 0;
-  for (const original of pages) {
+  for (const [index, original] of pages.entries()) {
     const state = classifyPage(original);
     if (state === "removed") {
       removed += 1;
@@ -89,7 +92,7 @@ export function maskDocument(pages: string[], options: MaskOptions): MaskedDocum
     if (state === "doubt") doubt += 1;
     let text = "";
     let cursor = 0;
-    for (const span of mergeNames(original, resolve(detect(original, options)), options)) {
+    for (const span of mergeNames(original, resolve(detect(original, options, options.entities?.[index] ?? [])), options)) {
       text += original.slice(cursor, span.start);
       cursor = span.end;
       counts[span.type] = (counts[span.type] ?? 0) + 1;

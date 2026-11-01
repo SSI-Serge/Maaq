@@ -31,12 +31,14 @@ export interface HouseholdFacts {
 
 /** Jetons d'un contrat : un même nom garde le même jeton dans tous les documents du contrat. Aucune valeur n'est conservée (RT3). */
 export interface TokenSpace {
-  /** Clé interne (valeur normalisée, déjà haché) → jeton. Jamais exposé, jamais stocké. */
+  /** Clé interne (type et valeur normalisée, passés par `hash` s'il existe) → jeton. Jamais exposé. */
   assigned: Map<string, string>;
   counters: Partial<Record<TokenType, number>>;
+  /** Empreinte à clé de l'application : permet de garder les jetons déjà attribués dans les documents du contrat sans jamais conserver une valeur (US-136 RT3). */
+  hash?: (id: string) => string;
 }
 
-export const createTokenSpace = (): TokenSpace => ({ assigned: new Map(), counters: {} });
+export const createTokenSpace = (hash?: (id: string) => string): TokenSpace => ({ assigned: new Map(), counters: {}, hash });
 
 export type PageState = "ok" | "removed" | "doubt";
 
@@ -69,4 +71,6 @@ export interface MaskOptions {
   space?: TokenSpace;
   /** « Masquer aussi ce mot » (US-137 RF3) : toutes les occurrences, dans ce document seulement. */
   extraWords?: string[];
+  /** Noms repérés par le modèle de langue (couche 3), page par page. Absents : seules les règles et la liste du foyer travaillent. */
+  entities?: { start: number; end: number; label: string }[][];
 }
