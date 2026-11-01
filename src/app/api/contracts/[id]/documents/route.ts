@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { requireProfile } from "@/server/auth/http";
-import { addDocument, classifyInBackground } from "@/server/contracts/service";
+import { addDocument } from "@/server/contracts/service";
 import { handler, Rejection } from "@/server/http";
 import { idempotent } from "@/server/idempotency";
 import { numericParam } from "../../ids";
 
 export const dynamic = "force-dynamic";
 
-/** Ajoute un document scanné à un contrat (US-34) ; le classement dans le Drive se fait ensuite en arrière-plan. */
+/** Dépose ou remplace le document d'un champ : un PDF, ou de 1 à 10 photos (champ `file`, répété) qui forment un seul document (US-126, C-09). */
 export const POST = handler(async (request: Request, context: { params: Promise<{ id: string }> }) => {
   const { session, ctx } = await requireProfile();
   return idempotent(ctx, request, session.user.id, async () => {
@@ -17,13 +17,10 @@ export const POST = handler(async (request: Request, context: { params: Promise<
     } catch {
       throw new Rejection("invalid_body", "Requête invalide.", 400);
     }
-    const file = form.get("file");
-    if (!(file instanceof File)) throw new Rejection("invalid_body", "Requête invalide.", 400);
-    const { contract, documentId } = await addDocument(ctx, session, await numericParam(context.params, "id"), {
-      fileName: file.name,
-      content: Buffer.from(await file.arrayBuffer()),
-    });
-    classifyInBackground(ctx.db, documentId);
-    return NextResponse.json({ contract, documentId }, { status: 201 });
+    const fieldId = form.get("fieldId");
+    const files = form.getAll("file").filter((f): f is File => f instanceof File);
+    if (typeof fieldId !== "string" || !/^\d{1,18}$/.test(fieldId) || files.length === 0) throw new Rejection("invalid_body", "Requête invalide.", 400);
+    const uploaded = await Promise.all(files.map(async (f) => ({ name: f.name, content: Buffer.from(await f.arrayBuffer()) })));
+    return NextResponse.json(await addDocument(ctx, session, await numericParam(context.params, "id"), fieldId, uploaded), { status: 201 });
   });
 });

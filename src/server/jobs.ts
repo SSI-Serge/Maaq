@@ -11,6 +11,7 @@ import { runOutings, type OutingsResult } from "@/server/assistant/outings/plann
 import { runTravelNotices, type TravelNoticesResult } from "@/server/assistant/travel";
 import { runReminders, type RemindersResult } from "@/server/assistant/reminders";
 import { cleanupExports } from "@/server/compliance/exports";
+import { runContractMaintenance, type ContractMaintenanceResult } from "@/server/contracts/maintenance";
 import { runLifecycle, type LifecycleResult } from "@/server/compliance/lifecycle";
 import { syncLogbook, type SyncResult } from "@/server/logbook/service";
 import { describeError } from "@/server/safe-log";
@@ -44,6 +45,8 @@ export interface JobsResult {
   places: PlacesResult;
   /** Propositions de sorties préparées et annoncées (US-115) : fermé tant que OUTINGS_MODE n'est pas « live ». */
   outings: OutingsResult;
+  /** Documents de contrat : purge des échus, fichiers effacés, avertissements « supprimés dans 3 jours » (Contrats V2, C-01). */
+  contracts: ContractMaintenanceResult;
 }
 
 /** Synchronise le carnet toutes les X heures (US-40 RT2) puis nettoie les données expirées (US-40 RT6, US-61 RT2, US-70 RT3). */
@@ -97,10 +100,15 @@ export async function runDueJobs(ctx: Ctx, options: { force?: boolean } = {}): P
     console.error(`Idées de sorties : ${describeError(error)}`);
     return { prepared: 0, empty: 0, notified: 0, failed: 1 };
   });
-  if (!due) return { logbook: "not_due", purged: null, lifecycle, exports, reminders, notices, taskNotices, digests, anticipation, travel, places, outings };
+  // Documents de contrat : la suppression 48 h après la transmission demande un passage à chaque tour, pas une purge quotidienne.
+  const contracts = await runContractMaintenance(ctx).catch((error) => {
+    console.error(`Documents de contrat : ${describeError(error)}`);
+    return { purged: 0, filesDeleted: 0, filesFailed: 0, warned: 0, failed: 1 };
+  });
+  if (!due) return { logbook: "not_due", purged: null, lifecycle, exports, reminders, notices, taskNotices, digests, anticipation, travel, places, outings, contracts };
 
   const logbook = await syncLogbook(ctx);
-  return { logbook, purged: await purgeExpired(ctx), lifecycle, exports, reminders, notices, taskNotices, digests, anticipation, travel, places, outings };
+  return { logbook, purged: await purgeExpired(ctx), lifecycle, exports, reminders, notices, taskNotices, digests, anticipation, travel, places, outings, contracts };
 }
 
 /** Supprime les données arrivées au bout de leur durée de conservation. */

@@ -77,7 +77,7 @@ describe("US-34 — envoi de documents en arrière-plan", () => {
   it("RF7 : la progression avance, puis l'envoi réussi prévient tous les écrans", async () => {
     const done: UploadJob[] = [];
     onUploadDone((job) => done.push(job));
-    const id = startUpload({ contractId: "1", contractName: "Assurance Auto", file: file() });
+    const id = startUpload({ contractId: "1", contractName: "Assurance Auto", fieldId: "7", files: [file()] });
     expect(latest().headers["Idempotency-Key"]).toBe(id);
 
     latest().progress(50, 100);
@@ -92,7 +92,7 @@ describe("US-34 — envoi de documents en arrière-plan", () => {
   it("RF7, CA 7.1 : « Annuler » arrête l'envoi, rien n'est ajouté", async () => {
     const done: UploadJob[] = [];
     onUploadDone((job) => done.push(job));
-    const id = startUpload({ contractId: "1", contractName: "Assurance Auto", file: file() });
+    const id = startUpload({ contractId: "1", contractName: "Assurance Auto", fieldId: "7", files: [file()] });
     const request = latest();
     cancelUpload(id);
     expect(request.aborted).toBe(true);
@@ -103,7 +103,7 @@ describe("US-34 — envoi de documents en arrière-plan", () => {
   });
 
   it("RF9, CA 9.1 : sans progression pendant 30 s, l'envoi est interrompu et « Réessayer » est proposé", async () => {
-    const id = startUpload({ contractId: "1", contractName: "Assurance Auto", file: file() });
+    const id = startUpload({ contractId: "1", contractName: "Assurance Auto", fieldId: "7", files: [file()] });
     const request = latest();
     await vi.advanceTimersByTimeAsync(STALL_AFTER_MS - 1);
     expect(request.aborted).toBe(false);
@@ -119,7 +119,7 @@ describe("US-34 — envoi de documents en arrière-plan", () => {
   });
 
   it("RF8, RF11 : une coupure est reprise jusqu'à 3 fois en silence, puis « L'envoi du document a échoué »", async () => {
-    const id = startUpload({ contractId: "1", contractName: "Assurance Auto", file: file() });
+    const id = startUpload({ contractId: "1", contractName: "Assurance Auto", fieldId: "7", files: [file()] });
     for (let attempt = 0; attempt < MAX_AUTOMATIC_RETRIES; attempt++) {
       expect(FakeXhr.all).toHaveLength(attempt + 1);
       latest().networkError();
@@ -135,7 +135,7 @@ describe("US-34 — envoi de documents en arrière-plan", () => {
   it("RF11, CA 11.1 : après une micro-coupure, la reprise aboutit sans message d'erreur", async () => {
     const done: UploadJob[] = [];
     onUploadDone((job) => done.push(job));
-    startUpload({ contractId: "1", contractName: "Assurance Auto", file: file() });
+    startUpload({ contractId: "1", contractName: "Assurance Auto", fieldId: "7", files: [file()] });
     latest().networkError();
     await settle();
     expect(FakeXhr.all).toHaveLength(2);
@@ -145,7 +145,7 @@ describe("US-34 — envoi de documents en arrière-plan", () => {
   });
 
   it("un refus du serveur (format, taille) n'est pas rejoué automatiquement", async () => {
-    const id = startUpload({ contractId: "1", contractName: "Assurance Auto", file: file() });
+    const id = startUpload({ contractId: "1", contractName: "Assurance Auto", fieldId: "7", files: [file()] });
     latest().respond(422, { error: { code: "too_large", message: "Ce document dépasse 15 Mo." } });
     await settle();
     expect(FakeXhr.all).toHaveLength(1);
@@ -153,7 +153,7 @@ describe("US-34 — envoi de documents en arrière-plan", () => {
   });
 
   it("« Réessayer » après un échec relance l'envoi avec la même clé d'idempotence", async () => {
-    const id = startUpload({ contractId: "1", contractName: "Assurance Auto", file: file() });
+    const id = startUpload({ contractId: "1", contractName: "Assurance Auto", fieldId: "7", files: [file()] });
     for (let attempt = 0; attempt <= MAX_AUTOMATIC_RETRIES; attempt++) {
       latest().networkError();
       await settle();

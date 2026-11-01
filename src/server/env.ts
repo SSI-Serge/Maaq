@@ -67,6 +67,9 @@ const schema = z.object({
    * (C-07, C-17).
    */
   CONTRACT_ANALYSIS_MODE: z.enum(["off", "preview", "live"]).default("off"),
+  /** Stockage des documents de contrat : « local » (dossier de données, par défaut) ou « gcs » (bucket Cloud Storage en Union européenne, avec CONTRACT_BUCKET). */
+  CONTRACT_STORAGE: z.enum(["local", "gcs"]).default("local"),
+  CONTRACT_BUCKET: z.string().min(3).optional(),
 });
 
 const checked = schema.superRefine((value, ctx) => {
@@ -83,6 +86,7 @@ const checked = schema.superRefine((value, ctx) => {
   }
   if (value.OUTINGS_MODE === "live" && value.ASSISTANT_MODE !== "live") ctx.addIssue({ code: "custom", path: ["OUTINGS_MODE"], message: "demande ASSISTANT_MODE=live" });
   if (value.CONTRACT_ANALYSIS_MODE === "live" && value.ASSISTANT_MODE !== "live") ctx.addIssue({ code: "custom", path: ["CONTRACT_ANALYSIS_MODE"], message: "demande ASSISTANT_MODE=live" });
+  if (value.CONTRACT_STORAGE === "gcs" && !value.CONTRACT_BUCKET) ctx.addIssue({ code: "custom", path: ["CONTRACT_BUCKET"], message: "obligatoire avec CONTRACT_STORAGE=gcs" });
   if (value.TRAVEL_MODE === "live" && !value.TOMTOM_API_KEY) ctx.addIssue({ code: "custom", path: ["TOMTOM_API_KEY"], message: "obligatoire avec TRAVEL_MODE=live" });
 });
 

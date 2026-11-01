@@ -8,7 +8,7 @@ Spécification validée : `Projets Claude/Business Analyst/MAAQ_US_Detaillees_BA
 |---|---|---|
 | E0 | Moteur de masquage (US-136) et jeu de non-fuite (C-16) | fait (module pur, non branché) |
 | E1 | Administration : catégories, champs de documents, archivage, réglages | fait sur la branche `contrats-v2` (non déployé : le schéma du lot 11 ne s'applique à la zone de test qu'avec E2) |
-| E2 | Famille : contrats groupés, complémentaires, dépôt, purge, J-3, consentements | attend le schéma, le stockage des documents |
+| E2 | Famille : contrats groupés, complémentaires, dépôt, purge, J-3, consentements | fait sur la branche `contrats-v2` ; déployé avec le lot 11 sur la zone de test |
 | E3 | Transmission et challenge par email | après E2 |
 | E4 | OCR, reconnaissance des noms propres, aperçu (US-137) | attend l'accord sur le coût du stockage et du service interne |
 | E5 | Analyse, rapport, validation administrateur (US-138) | après E4 |
@@ -24,6 +24,15 @@ Développement sur la branche `contrats-v2` (partie de `assistant-famille`). Le 
 - Routes : `/api/admin/contracts/[id]/archive`, `/document-fields`, `/document-fields/[fieldId]` ; `DELETE /api/admin/contracts/[id]` supprime (et n'archive plus).
 - Écrans : liste « Catégories de contrats » (archivées grisées), détail avec « Documents attendus » (`DocumentFieldsPanel`) puis les champs de détail ; Réglages : plafond de contrats, conservation, seuil de lecture, nom et adresse du courtier (texte libre ajouté).
 - Tests : `tests/admin-contracts-v2.test.ts`.
+
+## E2 : famille, contrats et documents (US-124 à 128, 130 en partie, 133, 134)
+
+- `src/server/contracts/service.ts` (remplace la V1) : « Mes contrats » groupés par catégorie, contrat de base créé d'office (`ensure_base_contracts`) ; contrats complémentaires (ajout, nom unique, plafond, renommage, suppression avec retrait des consentements journalisé) ; détails texte (US-33, US-35) ; interrupteurs « Analyse IA » et « Challenge » avec preuve de consentement par contrat et version du texte ; dépôt d'un document par champ (un PDF, ou 1 à 10 photos qui forment un seul document), remplacement, retrait, aperçu. Un contrat est celui d'une famille : aucune opération ne traverse un compte.
+- Stockage (`storage.ts`) : les fichiers sont chiffrés par l'application (AES-256-GCM) avant d'être confiés au stockage ; seule la clé d'objet est en base. `CONTRACT_STORAGE=local` (dossier de données : développement et tests) ou `gcs` (bucket Cloud Storage en `europe-west1`, avec `CONTRACT_BUCKET`, accès par le compte de service de Cloud Run). La suppression d'un fichier passe par la file de la base (`storage_deletion_queue`) : jamais avant la suppression de la ligne.
+- Entretien horaire (`maintenance.ts`, branché sur `/api/cron/run`) : purge des documents échus (48 h après la transmission, 30 jours sans transmission), fichiers effacés, avertissement unique « supprimés dans 3 jours » au déposant (push, sinon email), reporté à 8 h s'il tombe entre 21 h et 8 h, texte propre aux catégories archivées.
+- Conformité : l'export (US-55) contient les documents encore présents, les rapports, les consentements par canal et par contrat ; la suppression d'un compte vide la file de suppression des fichiers.
+- Écrans : liste « Mes contrats » (catégories, cartes à interrupteurs), détail d'un contrat (`/contrats/[id]`) avec nom, détails, documents par champ (envoi avec progression, « Annuler », « Réessayer »). La transmission arrive avec E3, le masquage et l'aperçu avec E4.
+- **Écarts à connaître** : (1) le texte du consentement au challenge en base est celui de la V1 (« L'entreprise [nom du partenaire] … ») : il est affiché tel quel avec le nom du courtier ; l'US-128 RF2 demande « Les documents de [nom du contrat] seront transmis à [courtier], partenaire de MAAQ, pour challenger votre contrat. » : à publier comme nouvelle version du texte (donnée de la base). (2) Le texte du consentement à l'analyse est PROVISOIRE et marqué comme tel, en attendant le DPO (C-07) ; il est créé dans la base au premier consentement. (3) « Supprimé le [date] » après la purge (US-134 RF3) n'est pas affiché : la base ne garde pas la date de suppression d'un document ; la date de suppression est annoncée avant (`expiresAt`).
 
 ## Interrupteur de l'analyse IA : `CONTRACT_ANALYSIS_MODE`
 

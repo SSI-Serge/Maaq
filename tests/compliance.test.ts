@@ -3,7 +3,6 @@ import { existsSync } from "node:fs";
 import type { Kysely } from "kysely";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { MockDigitorn } from "@/server/adapters/digitorn/mock";
-import { drive } from "@/server/adapters/drive";
 import { createSession, getSession, type Ctx } from "@/server/auth/service";
 import { cleanupExports, getExportState, prepareExport, readExport, requestExport } from "@/server/compliance/exports";
 import { acceptCurrent, currentDocuments, pendingAcceptance, publishVersion } from "@/server/compliance/legal";
@@ -19,6 +18,8 @@ import {
   runLifecycle,
 } from "@/server/compliance/lifecycle";
 import { createZip, crc32, readZip } from "@/server/compliance/zip";
+import { seal } from "@/server/assistant/fields";
+import { storeDocument } from "@/server/contracts/storage";
 import { getLogbook } from "@/server/logbook/service";
 import { encrypt } from "@/server/security/crypto";
 import { hashSecret } from "@/server/security/password";
@@ -250,12 +251,14 @@ describe("US-55 — export des données", () => {
     const { primary } = await household();
     const def = await db.insertInto("contract_definitions").values({ name: `Contrat ${tag()}`, sort_order: 999 }).returning("id").executeTakeFirstOrThrow();
     const field = await db.insertInto("contract_field_definitions").values({ contract_definition_id: def.id, label: "Assureur", field_type: "text" }).returning("id").executeTakeFirstOrThrow();
-    const ac = await db.insertInto("account_contracts").values({ account_id: primary.accountId!, contract_definition_id: def.id }).returning("id").executeTakeFirstOrThrow();
+    const ac = await db.insertInto("account_contracts").values({ account_id: primary.accountId!, contract_definition_id: def.id, name: "Contrat de test" }).returning("id").executeTakeFirstOrThrow();
     await db.insertInto("contract_field_values").values({ account_contract_id: ac.id, field_definition_id: field.id, value_text: "Maif", updated_by_user_id: primary.id }).execute();
-    const stored = await drive().upload({ accountId: primary.accountId!, fileName: "attestation.pdf", mimeType: "application/pdf", content: Buffer.from("%PDF-1.4 attestation") });
+    // Document déposé dans un champ de la catégorie : chiffré dans le stockage, lu à l'export tant qu'il existe encore.
+    const docField = await db.insertInto("contract_document_fields").values({ contract_definition_id: def.id, name: "Attestation", is_required: true }).returning("id").executeTakeFirstOrThrow();
+    const storageKey = await storeDocument(primary.accountId!, Buffer.from("%PDF-1.4 attestation"));
     await db
-      .insertInto("contract_documents")
-      .values({ account_contract_id: ac.id, file_name: "attestation.pdf", mime_type: "application/pdf", size_bytes: 20, added_by_user_id: primary.id, classification_status: "classified", drive_file_ref: stored.fileId })
+      .insertInto("contract_field_documents")
+      .values({ account_contract_id: ac.id, field_id: docField.id, source_kind: "pdf", page_count: 1, size_bytes: 20, file_name: seal("attestation.pdf"), storage_key: storageKey, uploaded_by_user_id: primary.id, expires_at: new Date(Date.now() + 86_400_000) })
       .execute();
     const version = await db.selectFrom("legal_document_versions").select("id").where("document_type", "=", "contract_challenge_consent").executeTakeFirstOrThrow();
     await db
@@ -436,7 +439,7 @@ describe("US-56, US-58, US-59 — suppression, délai de grâce, reprise", () =>
     const a = await agent();
     await db.insertInto("profile_agents").values({ user_id: primary.id, agent_id: a.id }).execute();
     const def = await db.insertInto("contract_definitions").values({ name: `Contrat ${tag()}`, sort_order: 998 }).returning("id").executeTakeFirstOrThrow();
-    const ac = await db.insertInto("account_contracts").values({ account_id: primary.accountId!, contract_definition_id: def.id }).returning("id").executeTakeFirstOrThrow();
+    const ac = await db.insertInto("account_contracts").values({ account_id: primary.accountId!, contract_definition_id: def.id, name: "Contrat de test" }).returning("id").executeTakeFirstOrThrow();
     const version = await db.selectFrom("legal_document_versions").select("id").where("document_type", "=", "contract_challenge_consent").executeTakeFirstOrThrow();
     await db
       .insertInto("contract_consent_events")
@@ -585,7 +588,7 @@ describe("US-57 — anonymisation des demandes d'un invité supprimé", () => {
     const a = await agent();
     const def = await db.insertInto("contract_definitions").values({ name: `Contrat ${tag()}`, sort_order: 997 }).returning("id").executeTakeFirstOrThrow();
     const field = await db.insertInto("contract_field_definitions").values({ contract_definition_id: def.id, label: "Assureur", field_type: "text" }).returning("id").executeTakeFirstOrThrow();
-    const ac = await db.insertInto("account_contracts").values({ account_id: primary.accountId!, contract_definition_id: def.id }).returning("id").executeTakeFirstOrThrow();
+    const ac = await db.insertInto("account_contracts").values({ account_id: primary.accountId!, contract_definition_id: def.id, name: "Contrat de test" }).returning("id").executeTakeFirstOrThrow();
     await db.insertInto("contract_field_values").values({ account_contract_id: ac.id, field_definition_id: field.id, value_text: "Maif", updated_by_user_id: core.id }).execute();
     await db.insertInto("profile_agents").values({ user_id: core.id, agent_id: a.id }).execute();
     await db.updateTable("agents").set({ cc_addresses_max_count: 3 }).where("id", "=", a.id).execute();

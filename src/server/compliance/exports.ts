@@ -2,10 +2,12 @@ import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { sql } from "kysely";
 import { digitorn } from "@/server/adapters/digitorn";
-import { drive } from "@/server/adapters/drive";
 import { messenger } from "@/server/adapters/messaging";
 import type { Ctx, SessionContext } from "@/server/auth/service";
-import { readStaged } from "@/server/contracts/staging";
+import { unbundlePhotos } from "@/server/contracts/service";
+import { loadDocument } from "@/server/contracts/storage";
+import { open } from "@/server/assistant/fields";
+import { textOf } from "@/server/contracts/report";
 import { dataDir } from "@/server/data-dir";
 import type { DB } from "@/server/db/schema.generated";
 import { env } from "@/server/env";
@@ -105,6 +107,7 @@ interface Collected {
   logbook: unknown[];
   contractDetails: unknown[];
   contractDocuments: unknown[];
+  contractReports: unknown[];
   consents: unknown[];
   devices: unknown[];
   digitorn: unknown;
@@ -142,7 +145,7 @@ async function collect(db: Kysely<DB>, userId: string, now: Date): Promise<{ dat
     ? await db.selectFrom("users").select("id").where("account_id", "=", user.account_id!).where("role", "=", "guest").execute()
     : [];
 
-  const [legal, agents, own, guestInfo, connections, accountConnections, cc, logbook, values, docs, consents, devices] = await Promise.all([
+  const [legal, agents, own, guestInfo, connections, accountConnections, cc, logbook, values, docs, reports, consents, devices] = await Promise.all([
     db
       .selectFrom("legal_acceptances as la")
       .innerJoin("legal_document_versions as v", "v.id", "la.version_id")
@@ -208,19 +211,33 @@ async function collect(db: Kysely<DB>, userId: string, now: Date): Promise<{ dat
       .orderBy("d.name")
       .orderBy("f.label")
       .execute(),
+    // Documents de contrat que cette personne a déposés et qui existent encore (supprimés 48 h après la transmission, ou 30 jours après le dépôt).
     db
-      .selectFrom("contract_documents as cd")
+      .selectFrom("contract_field_documents as cd")
       .innerJoin("account_contracts as ac", "ac.id", "cd.account_contract_id")
       .innerJoin("contract_definitions as d", "d.id", "ac.contract_definition_id")
-      .select(["cd.id", "d.name as contract", "cd.file_name", "cd.mime_type", "cd.added_at", "cd.classification_status", "cd.drive_file_ref", "cd.staging_storage_key", "ac.account_id"])
-      .where("cd.added_by_user_id", "=", userId)
-      .orderBy("cd.added_at")
+      .innerJoin("contract_document_fields as f", "f.id", "cd.field_id")
+      .select(["cd.id", "ac.name as contract", "d.name as category", "f.name as field", "cd.file_name", "cd.source_kind", "cd.page_count", "cd.uploaded_at", "cd.storage_key", "cd.expires_at"])
+      .where("cd.uploaded_by_user_id", "=", userId)
+      .orderBy("cd.uploaded_at")
+      .execute(),
+    // Rapports d'analyse des contrats du compte, pour le noyau (utilisateur principal et invité 1).
+    db
+      .selectFrom("contract_reports as r")
+      .innerJoin("account_contracts as ac", "ac.id", "r.account_contract_id")
+      .innerJoin("contract_definitions as d", "d.id", "ac.contract_definition_id")
+      .innerJoin("users as u", "u.account_id", "ac.account_id")
+      .select(["ac.name as contract", "d.name as category", "r.generated_at", "r.html"])
+      .where("u.id", "=", userId)
+      .where((eb) => eb.or([eb("u.role", "=", "primary_user"), eb("u.guest_rank", "=", "core")]))
+      .orderBy("r.generated_at")
       .execute(),
     db
       .selectFrom("contract_consent_events as e")
       .innerJoin("contract_definitions as d", "d.id", "e.contract_definition_id")
+      .leftJoin("account_contracts as ac", "ac.id", "e.account_contract_id")
       .innerJoin("legal_document_versions as v", "v.id", "e.legal_version_id")
-      .select(["d.name as contract", "e.action_type", "e.trigger_reason", "e.occurred_at", "v.version_label"])
+      .select(["d.name as category", "ac.name as contract", "e.channel", "e.action_type", "e.trigger_reason", "e.occurred_at", "v.version_label"])
       .where("e.actor_user_id", "=", userId)
       .orderBy("e.occurred_at")
       .execute(),
@@ -234,24 +251,29 @@ async function collect(db: Kysely<DB>, userId: string, now: Date): Promise<{ dat
 
   const documents: ZipEntry[] = [];
   const documentRows: unknown[] = [];
+  const safe = (text: string) => text.replace(/[\\/:*?"<>|]/g, "_");
   for (const doc of docs) {
     let included = false;
+    const fileName = open(doc.file_name);
     try {
-      const content =
-        doc.classification_status === "classified" && doc.drive_file_ref
-          ? (await drive().read(doc.account_id, doc.drive_file_ref)).content
-          : doc.staging_storage_key
-            ? await readStaged(doc.staging_storage_key)
-            : null;
-      if (content) {
-        documents.push({ name: `documents/${doc.contract.replace(/[\\/:*?"<>|]/g, "_")}/${doc.id}-${doc.file_name}`, data: content });
-        included = true;
-      }
+      const content = await loadDocument(doc.storage_key);
+      if (doc.source_kind === "pdf") documents.push({ name: `documents/${safe(doc.contract)}/${doc.id}-${safe(fileName)}`, data: content });
+      else for (const [i, page] of unbundlePhotos(content).entries()) documents.push({ name: `documents/${safe(doc.contract)}/${doc.id}-page${i + 1}.${page.mime === "image/gif" ? "gif" : "jpg"}`, data: page.content });
+      included = true;
     } catch {
       // Fichier momentanément illisible : la fiche reste dans l'export, avec la mention « non inclus ».
     }
-    documentRows.push({ contrat: doc.contract, fichier: doc.file_name, ajouteLe: date(doc.added_at), inclusDansLExport: included });
+    documentRows.push({ contrat: doc.contract, categorie: doc.category, champ: doc.field, fichier: fileName, pages: doc.page_count, ajouteLe: date(doc.uploaded_at), supprimeLe: date(doc.expires_at), inclusDansLExport: included });
   }
+  const reportRows = reports.map((r) => {
+    let text: string | null = null;
+    try {
+      text = textOf(open(r.html));
+    } catch {
+      // Rapport illisible : la fiche reste, sans texte.
+    }
+    return { contrat: r.contract, categorie: r.category, genereLe: date(r.generated_at), texte: text };
+  });
 
   // Données détenues par Digitorn : historique, configuration des agents (RT1).
   let digitornData: unknown = null;
@@ -285,7 +307,8 @@ async function collect(db: Kysely<DB>, userId: string, now: Date): Promise<{ dat
       modifieLe: date(v.updated_at),
     })),
     contractDocuments: documentRows,
-    consents: consents.map((c) => ({ contrat: c.contract, action: c.action_type === "granted" ? "Consentement donné" : "Consentement retiré", origine: c.trigger_reason, date: date(c.occurred_at), versionDuTexte: c.version_label })),
+    contractReports: reportRows,
+    consents: consents.map((c) => ({ contrat: c.contract ?? "(contrat supprimé)", categorie: c.category, canal: c.channel === "analysis" ? "Analyse IA" : "Challenge", action: c.action_type === "granted" ? "Consentement donné" : "Consentement retiré", origine: c.trigger_reason, date: date(c.occurred_at), versionDuTexte: c.version_label })),
     devices: devices.map((d) => ({ type: d.device_type, navigateur: d.browser, premiereConnexion: date(d.first_connected_at), derniereActivite: date(d.last_activity_at), revoqueLe: date(d.revoked_at) })),
     digitorn: digitornData,
   };
@@ -301,7 +324,8 @@ const SECTIONS: [keyof Collected, string][] = [
   ["ccAddresses", "Adresses en copie"],
   ["logbook", "Carnet de bord (mes demandes et actions)"],
   ["contractDetails", "Détails de contrats que j'ai renseignés"],
-  ["contractDocuments", "Documents de contrats que j'ai ajoutés"],
+  ["contractDocuments", "Documents de contrats que j'ai ajoutés (ceux qui existent encore)"],
+  ["contractReports", "Rapports d'analyse de mes contrats"],
   ["consents", "Mes consentements"],
   ["devices", "Mes appareils"],
 ];

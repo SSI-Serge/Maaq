@@ -7,10 +7,11 @@ import { numericParam } from "../../ids";
 
 export const dynamic = "force-dynamic";
 
-/** Aperçu d'un document, réservé au noyau du compte (US-34 RF6). */
-export const GET = handler(async (_request: Request, context: { params: Promise<{ docId: string }> }) => {
+/** Aperçu d'un document (`?page=N` pour une page de photos), réservé au noyau du compte (US-126 RF4). */
+export const GET = handler(async (request: Request, context: { params: Promise<{ docId: string }> }) => {
   const { session, ctx } = await requireProfile();
-  const file = await readDocument(ctx, session, await numericParam(context.params, "docId"));
+  const page = Number(new URL(request.url).searchParams.get("page") ?? "1");
+  const file = await readDocument(ctx, session, await numericParam(context.params, "docId"), Number.isInteger(page) ? page : 1);
   return new Response(new Uint8Array(file.content), {
     headers: {
       "Content-Type": file.mimeType,
@@ -21,7 +22,7 @@ export const GET = handler(async (_request: Request, context: { params: Promise<
   });
 });
 
-/** Retire un document du contrat ; il reste dans le Google Drive (US-35 RF2). */
+/** Retire un document du contrat ; refusé pendant les 48 h qui suivent sa transmission (US-126 RF4, RF8). */
 export const DELETE = handler(async (request: Request, context: { params: Promise<{ docId: string }> }) => {
   const { session, ctx } = await requireProfile();
   return idempotent(ctx, request, session.user.id, async () => NextResponse.json(await removeDocument(ctx, session, await numericParam(context.params, "docId"))));

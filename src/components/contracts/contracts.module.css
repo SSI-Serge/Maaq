@@ -320,3 +320,24 @@
   line-height: 1.5;
   margin: 0;
 }
+
+/* Contrats V2 : regroupement par catégorie, cartes à interrupteurs, détail d'un contrat */
+.group { display: flex; flex-direction: column; gap: 10px; margin-bottom: 22px; }
+.groupArchived { opacity: 0.75; }
+.groupTitle { font-family: var(--font-serif); font-size: 18px; font-weight: 500; margin: 8px 0 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.archivedPill { font-family: var(--font-sans); font-size: 11px; font-weight: 600; background: var(--bg-sunken); color: var(--ink-soft); border: 1px solid var(--line); border-radius: 100px; padding: 2px 8px; }
+.cardLink { display: block; color: inherit; text-decoration: none; }
+.channels { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+.channel { display: flex; flex-direction: column; gap: 4px; }
+.channelHead { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.channelName { font-weight: 700; font-size: 14px; }
+.addForm { display: flex; flex-direction: column; gap: 8px; background: var(--bg-raised); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; }
+.pillMuted { background: var(--bg-sunken); color: var(--ink-soft); }
+.detail { display: flex; flex-direction: column; gap: 14px; }
+.nameLine { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.panel { display: flex; flex-direction: column; gap: 10px; background: var(--bg-raised); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; }
+.optional { font-weight: 500; color: var(--ink-soft); font-size: 12px; }
+.transmit { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.facts { display: flex; flex-direction: column; gap: 6px; margin: 0; }
+.facts dt { font-size: 11px; color: var(--ink-soft); }
+.facts dd { margin: 0; font-size: 14px; }

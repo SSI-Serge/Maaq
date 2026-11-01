@@ -4,7 +4,7 @@ import { useSyncExternalStore } from "react";
 import { newIdempotencyKey } from "./api";
 
 /**
- * Envois de documents de contrats. Ils vivent hors des écrans : quitter la page du contrat ne les
+ * Envois de documents de contrats (un PDF, ou jusqu'à 10 photos qui forment un seul document, dans un champ attendu). Ils vivent hors des écrans : quitter la page du contrat ne les
  * interrompt pas tant que l'application reste ouverte (US-34 RF10, CC-10).
  *  - barre de progression et « Annuler » (RF7) ;
  *  - sans progression pendant 30 s : message de connexion lente et « Réessayer », rien n'est ajouté (RF9) ;
@@ -17,6 +17,8 @@ export interface UploadJob {
   id: string;
   contractId: string;
   contractName: string;
+  /** Champ de documents de la catégorie où le document est déposé (US-126). */
+  fieldId: string;
   fileName: string;
   state: UploadState;
   /** Avancement entre 0 et 1. */
@@ -34,7 +36,7 @@ export const UPLOAD_MESSAGES = {
 } as const;
 
 let jobs: UploadJob[] = [];
-const files = new Map<string, File>();
+const files = new Map<string, File[]>();
 const requests = new Map<string, XMLHttpRequest>();
 const listeners = new Set<() => void>();
 const doneListeners = new Set<(job: UploadJob) => void>();
@@ -71,10 +73,11 @@ export function onUploadDone(listener: (job: UploadJob) => void): () => void {
   return () => doneListeners.delete(listener);
 }
 
-export function startUpload(input: { contractId: string; contractName: string; file: File }): string {
+export function startUpload(input: { contractId: string; contractName: string; fieldId: string; files: File[] }): string {
   const id = newIdempotencyKey();
-  files.set(id, input.file);
-  publish([...jobs, { id, contractId: input.contractId, contractName: input.contractName, fileName: input.file.name, state: "uploading", progress: 0 }]);
+  files.set(id, input.files);
+  const fileName = input.files.length === 1 ? input.files[0].name : `${input.files.length} photos`;
+  publish([...jobs, { id, contractId: input.contractId, contractName: input.contractName, fieldId: input.fieldId, fileName, state: "uploading", progress: 0 }]);
   void run(id, 0);
   return id;
 }
@@ -101,7 +104,7 @@ export function dismissUpload(id: string): void {
 
 type Outcome = { kind: "done" } | { kind: "rejected"; message: string } | { kind: "network" } | { kind: "stalled" } | { kind: "aborted" };
 
-function send(job: UploadJob, file: File, onProgress: (ratio: number) => void): { outcome: Promise<Outcome>; request: XMLHttpRequest } {
+function send(job: UploadJob, list: File[], onProgress: (ratio: number) => void): { outcome: Promise<Outcome>; request: XMLHttpRequest } {
   const request = new XMLHttpRequest();
   const outcome = new Promise<Outcome>((resolve) => {
     let stall: ReturnType<typeof setTimeout>;
@@ -140,7 +143,8 @@ function send(job: UploadJob, file: File, onProgress: (ratio: number) => void): 
     request.ontimeout = () => finish({ kind: "network" });
     request.onabort = () => finish({ kind: "aborted" });
     const form = new FormData();
-    form.append("file", file);
+    form.append("fieldId", job.fieldId);
+    for (const file of list) form.append("file", file);
     armStall();
     request.send(form);
   });
@@ -149,10 +153,10 @@ function send(job: UploadJob, file: File, onProgress: (ratio: number) => void): 
 
 async function run(id: string, attempt: number): Promise<void> {
   const job = jobs.find((j) => j.id === id);
-  const file = files.get(id);
-  if (!job || !file) return;
+  const list = files.get(id);
+  if (!job || !list) return;
 
-  const sending = send(job, file, (ratio) => patch(id, { progress: ratio }));
+  const sending = send(job, list, (ratio) => patch(id, { progress: ratio }));
   requests.set(id, sending.request);
   const outcome = await sending.outcome;
   requests.delete(id);

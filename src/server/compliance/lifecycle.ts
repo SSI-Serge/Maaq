@@ -1,8 +1,9 @@
 import { sql, type Kysely, type Transaction } from "kysely";
 import { digitorn } from "@/server/adapters/digitorn";
+import { describeError } from "@/server/safe-log";
 import { messenger } from "@/server/adapters/messaging";
 import { processChatErasure, unlockWithPassword, type Ctx, type SessionContext } from "@/server/auth/service";
-import { unstage } from "@/server/contracts/staging";
+import { drainStorageDeletions } from "@/server/contracts/storage";
 import type { DB } from "@/server/db/schema.generated";
 import { Rejection } from "@/server/http";
 import { alertAdmin } from "@/server/logbook/service";
@@ -314,12 +315,6 @@ async function usersOfAccount(db: Executor, accountId: string): Promise<Leaving[
 /** Supprime un compte entier et tout ce qu'il contient, chez MAAQ puis chez Digitorn (US-58 RF4). */
 export async function purgeAccount(ctx: Ctx, accountId: string): Promise<void> {
   const people = await usersOfAccount(ctx.db, accountId);
-  const staged = await ctx.db
-    .selectFrom("contract_documents as d")
-    .innerJoin("account_contracts as c", "c.id", "d.account_contract_id")
-    .select("d.staging_storage_key")
-    .where("c.account_id", "=", accountId)
-    .execute();
   await deleteExportFiles(ctx.db, people.map((p) => p.id));
 
   await ctx.db.transaction().execute(async (trx) => {
@@ -332,7 +327,8 @@ export async function purgeAccount(ctx: Ctx, accountId: string): Promise<void> {
     await leaveTrace(trx, people, ctx.now);
     await trx.deleteFrom("accounts").where("id", "=", accountId).execute();
   });
-  for (const key of staged) await unstage(key.staging_storage_key).catch(() => undefined);
+  // Les documents de contrat du compte ont été supprimés en cascade : leurs fichiers chiffrés partent maintenant de la file de suppression du stockage.
+  await drainStorageDeletions(ctx.db).catch((error) => console.error(`Fichiers de contrat non supprimés : ${describeError(error)}`));
   await processErasures(ctx, { force: true });
 }
 
