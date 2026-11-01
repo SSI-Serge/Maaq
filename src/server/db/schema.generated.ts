@@ -23,7 +23,7 @@ export type ArrayTypeImpl<T> = T extends ColumnType<infer S, infer I, infer U>
   ? ColumnType<S[], I[], U[]>
   : T[];
 
-export type AuditAction = "account_created" | "account_updated" | "activation_link_resent" | "agent_blocked" | "agent_published" | "agent_reactivated" | "contract_archived" | "contract_created" | "contract_field_changed" | "contract_updated" | "device_revoked_by_admin";
+export type AuditAction = "account_created" | "account_updated" | "activation_link_resent" | "agent_blocked" | "agent_published" | "agent_reactivated" | "contract_analysis_decided" | "contract_archived" | "contract_created" | "contract_document_field_changed" | "contract_field_changed" | "contract_review_viewed" | "contract_updated" | "device_revoked_by_admin";
 
 export type ChangeScope = "all" | "following" | "this";
 
@@ -39,9 +39,21 @@ export type ConnectionStatus = "connected" | "partial" | "pending" | "reconnect_
 
 export type ConsentAction = "granted" | "withdrawn";
 
-export type ConsentTrigger = "contract_details_deleted" | "user_action";
+export type ConsentTrigger = "contract_deleted" | "contract_details_deleted" | "user_action";
+
+export type ContractAnalysisStatus = "awaiting_admin" | "cancelled" | "completed" | "failed" | "running";
+
+export type ContractChannel = "analysis" | "challenge";
+
+export type ContractDocumentKind = "pdf" | "photos";
 
 export type ContractFieldType = "amount" | "choice" | "date" | "text";
+
+export type ContractMaskingStatus = "masking" | "pending" | "to_verify" | "uncertain" | "unreadable" | "verified";
+
+export type ContractMaskType = "account_identifier" | "address" | "bank_account" | "contract_number" | "email" | "employer" | "manual" | "other" | "person" | "phone" | "social_security" | "vehicle";
+
+export type ContractReviewDecision = "continue" | "stop";
 
 export type DecisionKind = "abandoned" | "pending" | "refused" | "validated";
 
@@ -99,7 +111,7 @@ export type JsonPrimitive = boolean | number | string | null;
 
 export type JsonValue = JsonArray | JsonObject | JsonPrimitive;
 
-export type LegalDocumentType = "contract_challenge_consent" | "forwarded_mail_consent" | "privacy_policy" | "terms_of_use";
+export type LegalDocumentType = "contract_analysis_consent" | "contract_challenge_consent" | "forwarded_mail_consent" | "privacy_policy" | "terms_of_use";
 
 export type LocationConsentCause = "device_deleted" | "device_revoked" | "user_action";
 
@@ -171,7 +183,7 @@ export type SeriesRepeatUnit = "day" | "month" | "week" | "yearly";
 
 export type SessionEndReason = "account_grace_period" | "device_revoked" | "expired" | "guest_removed" | "logout";
 
-export type SettingValueType = "email" | "integer" | "timestamp";
+export type SettingValueType = "email" | "free_text" | "integer" | "timestamp";
 
 export type SyncStatus = "failed" | "running" | "succeeded";
 
@@ -208,17 +220,32 @@ export interface AccountConnections {
 
 export interface AccountContracts {
   account_id: string;
+  analysis_changed_at: Timestamp | null;
+  analysis_changed_by_user_id: string | null;
   /**
-   * État courant du consentement (la preuve est dans contract_consent_events). Remis à false par la suppression complète du contrat (US-35 RF5)
+   * Interrupteur « Analyse IA » du contrat : désactivé par défaut, durable, partagé par le noyau. La preuve est dans contract_consent_events (canal analysis). [US-127]
+   */
+  analysis_enabled: Generated<boolean>;
+  /**
+   * Interrupteur « challenge » du contrat : désactivé par défaut, partagé par le noyau, impossible à activer tant que le courtier n'est pas désigné (C-10). La preuve est dans contract_consent_events (canal challenge). Remis à false par la suppression complète des informations du contrat (US-35 RF5). [US-128]
    */
   consent_active: Generated<boolean>;
   consent_changed_at: Timestamp | null;
   consent_changed_by_user_id: string | null;
   contract_definition_id: Int8;
   created_at: Generated<Timestamp>;
+  created_by_user_id: string | null;
   id: Generated<Int8>;
+  /**
+   * Contrat de base de la catégorie : un seul par famille, créé d'office, jamais supprimé ; le premier contrat d'une catégorie est toujours le contrat de base. Faux = contrat complémentaire, supprimable. [US-124, US-133, CT-2]
+   */
+  is_base: Generated<boolean>;
   last_modified_at: Timestamp | null;
   last_modified_by_user_id: string | null;
+  /**
+   * Nom libre du contrat, de 1 à 60 caractères, unique dans la catégorie pour la famille sans tenir compte des majuscules. Le contrat de base porte d'abord le nom de sa catégorie. Jamais envoyé à l'agent d'analyse (il peut contenir un prénom). [US-125]
+   */
+  name: string;
   updated_at: Generated<Timestamp>;
 }
 
@@ -580,7 +607,22 @@ export interface ConnectorTypes {
   requires_oauth: boolean;
 }
 
+export interface ContractAnalysisReviews {
+  created_at: Generated<Timestamp>;
+  decided_at: Timestamp | null;
+  decided_by_user_id: string | null;
+  decision: ContractReviewDecision | null;
+  expires_at: Timestamp;
+  id: Generated<Int8>;
+  masks_added_count: Generated<number>;
+  transmission_id: Int8;
+}
+
 export interface ContractConsentEvents {
+  /**
+   * Contrat concerné (identifiant seul, SANS clé étrangère : la preuve est conservée après la suppression du contrat). Vide pour une preuve antérieure aux contrats par catégorie
+   */
+  account_contract_id: Int8 | null;
   /**
    * Identifiant du compte, SANS FK : référence conservée après suppression du compte (point à valider DPO, H14)
    */
@@ -591,6 +633,10 @@ export interface ContractConsentEvents {
    */
   actor_email_hash: Buffer;
   actor_user_id: string | null;
+  /**
+   * Canal du consentement : analysis (analyse IA) ou challenge. Le texte accepté (legal_version_id) est celui du canal
+   */
+  channel: Generated<ContractChannel>;
   contract_definition_id: Int8;
   id: Generated<Int8>;
   legal_version_id: Int8;
@@ -609,6 +655,26 @@ export interface ContractDefinitions {
   name: string;
   sort_order: number;
   updated_at: Generated<Timestamp>;
+}
+
+export interface ContractDocumentFields {
+  contract_definition_id: Int8;
+  created_at: Generated<Timestamp>;
+  help: string | null;
+  id: Generated<Int8>;
+  is_required: Generated<boolean>;
+  /**
+   * Nom du champ (80 caractères au plus), unique dans la catégorie sans tenir compte des majuscules, par exemple « Conditions particulières »
+   */
+  name: string;
+  sort_order: Generated<number>;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface ContractDocumentMaskCounts {
+  document_id: Int8;
+  mask_count: number;
+  mask_type: ContractMaskType;
 }
 
 export interface ContractDocuments {
@@ -649,6 +715,43 @@ export interface ContractFieldDefinitions {
   updated_at: Generated<Timestamp>;
 }
 
+export interface ContractFieldDocuments {
+  account_contract_id: Int8;
+  /**
+   * Score de confiance de la lecture (OCR), de 0 à 100 ; comparé au seuil contract_read_confidence_threshold_pct
+   */
+  confidence_pct: number | null;
+  created_at: Generated<Timestamp>;
+  /**
+   * Date de suppression, tenue par trigger : dépôt + 30 jours (réglage contract_document_retention_days) ; à la transmission, transmission + 48 h. La purge supprime le document à cette date (C-01)
+   */
+  expires_at: Timestamp;
+  expiry_warned_at: Timestamp | null;
+  field_id: Int8;
+  file_name: Buffer;
+  id: Generated<Int8>;
+  /**
+   * Texte masqué chiffré, jetons typés seulement ([PERSONNE_1]…) : pseudonymisation, le texte reste une donnée personnelle. Aucune table de correspondance entre jetons et valeurs n'existe. Supprimé avec le document. [US-136 RT3, RT6]
+   */
+  masked_text: Buffer | null;
+  masking_rules_version: string | null;
+  /**
+   * pending = en attente ; masking = masquage en cours ; to_verify = à vérifier (masquage terminé) ; verified = vérifié par l'utilisateur ; uncertain = lecture incertaine (score sous le seuil) ; unreadable = illisible (à remplacer). [US-136 RF7]
+   */
+  masking_status: Generated<ContractMaskingStatus>;
+  masking_tool_version: string | null;
+  page_count: number;
+  size_bytes: Int8;
+  source_kind: ContractDocumentKind;
+  storage_key: string;
+  transmitted_at: Timestamp | null;
+  updated_at: Generated<Timestamp>;
+  uploaded_at: Generated<Timestamp>;
+  uploaded_by_user_id: string | null;
+  verified_at: Timestamp | null;
+  verified_by_user_id: string | null;
+}
+
 export interface ContractFieldOptions {
   field_definition_id: Int8;
   id: Generated<Int8>;
@@ -669,6 +772,55 @@ export interface ContractFieldValues {
   value_date: Timestamp | null;
   value_option_id: Int8 | null;
   value_text: string | null;
+}
+
+export interface ContractReportRefs {
+  account_contract_id: Int8;
+  account_id: string;
+  field_definition_id: Int8 | null;
+  member_id: string | null;
+  token: string;
+}
+
+export interface ContractReports {
+  account_contract_id: Int8;
+  account_id: string;
+  generated_at: Generated<Timestamp>;
+  html: Buffer;
+}
+
+export interface ContractTransmissionRelaunches {
+  channel: ContractChannel;
+  id: Generated<Int8>;
+  relaunched_at: Generated<Timestamp>;
+  relaunched_by_user_id: string | null;
+  transmission_id: Int8;
+}
+
+export interface ContractTransmissions {
+  account_contract_id: Int8;
+  analysis_attempts: Generated<number>;
+  analysis_failure_notified_at: Timestamp | null;
+  analysis_finished_at: Timestamp | null;
+  /**
+   * Dernier message d'erreur technique de l'analyse : aucun contenu de document ni donnée personnelle
+   */
+  analysis_last_error: string | null;
+  analysis_status: ContractAnalysisStatus | null;
+  challenge_attempts: Generated<number>;
+  /**
+   * Dernier message d'erreur technique de l'envoi du challenge : aucune donnée personnelle
+   */
+  challenge_last_error: string | null;
+  challenge_sent_at: Timestamp | null;
+  challenge_status: DeliveryStatus | null;
+  created_at: Generated<Timestamp>;
+  for_analysis: boolean;
+  for_challenge: boolean;
+  id: Generated<Int8>;
+  transmitted_at: Generated<Timestamp>;
+  transmitted_by_user_id: string | null;
+  updated_at: Generated<Timestamp>;
 }
 
 export interface ConversationAttachments {
@@ -1783,6 +1935,18 @@ export interface VAccountGuestQuota {
   places_left: Int8 | null;
 }
 
+export interface VContractReviewsToDecide {
+  category_name: string | null;
+  confidence_pct: number | null;
+  created_at: Timestamp | null;
+  expires_at: Timestamp | null;
+  field_name: string | null;
+  masked_text: Buffer | null;
+  masking_status: ContractMaskingStatus | null;
+  page_count: number | null;
+  review_id: Int8 | null;
+}
+
 export interface VDashboardAgents {
   added_at: Timestamp | null;
   agent_id: Int8 | null;
@@ -1924,12 +2088,20 @@ export interface DB {
   chat_erasure_requests: ChatErasureRequests;
   chat_requests: ChatRequests;
   connector_types: ConnectorTypes;
+  contract_analysis_reviews: ContractAnalysisReviews;
   contract_consent_events: ContractConsentEvents;
   contract_definitions: ContractDefinitions;
+  contract_document_fields: ContractDocumentFields;
+  contract_document_mask_counts: ContractDocumentMaskCounts;
   contract_documents: ContractDocuments;
   contract_field_definitions: ContractFieldDefinitions;
+  contract_field_documents: ContractFieldDocuments;
   contract_field_options: ContractFieldOptions;
   contract_field_values: ContractFieldValues;
+  contract_report_refs: ContractReportRefs;
+  contract_reports: ContractReports;
+  contract_transmission_relaunches: ContractTransmissionRelaunches;
+  contract_transmissions: ContractTransmissions;
   conversation_attachments: ConversationAttachments;
   daily_request_counters: DailyRequestCounters;
   data_exports: DataExports;
@@ -1997,6 +2169,7 @@ export interface DB {
   user_assistant_settings: UserAssistantSettings;
   users: Users;
   v_account_guest_quota: VAccountGuestQuota;
+  v_contract_reviews_to_decide: VContractReviewsToDecide;
   v_dashboard_agents: VDashboardAgents;
   v_family_logbook: VFamilyLogbook;
   v_family_tasks: VFamilyTasks;
