@@ -61,6 +61,12 @@ const schema = z.object({
    * ASSISTANT_MODE=live). Exception à D52 : à ouvrir seulement après l'avis du DPO et la déclaration du sous-traitant pour le pilote.
    */
   OUTINGS_MODE: z.enum(["off", "live"]).default("off"),
+  /**
+   * Analyse IA des contrats (Contrats V2, US-131) : « off » (par défaut, fermé : l'interrupteur « Analyse IA » est inactif, aucun appel), « preview » (le masquage et l'aperçu
+   * fonctionnent, la transmission pour analyse ne fait aucun appel au modèle) ou « live » (appel réel, avec ASSISTANT_MODE=live). À ouvrir seulement après l'avis du DPO
+   * (C-07, C-17).
+   */
+  CONTRACT_ANALYSIS_MODE: z.enum(["off", "preview", "live"]).default("off"),
 });
 
 const checked = schema.superRefine((value, ctx) => {
@@ -76,6 +82,7 @@ const checked = schema.superRefine((value, ctx) => {
     if (!value.ANTHROPIC_API_KEY) ctx.addIssue({ code: "custom", path: ["ANTHROPIC_API_KEY"], message: "obligatoire avec ASSISTANT_MODE=live" });
   }
   if (value.OUTINGS_MODE === "live" && value.ASSISTANT_MODE !== "live") ctx.addIssue({ code: "custom", path: ["OUTINGS_MODE"], message: "demande ASSISTANT_MODE=live" });
+  if (value.CONTRACT_ANALYSIS_MODE === "live" && value.ASSISTANT_MODE !== "live") ctx.addIssue({ code: "custom", path: ["CONTRACT_ANALYSIS_MODE"], message: "demande ASSISTANT_MODE=live" });
   if (value.TRAVEL_MODE === "live" && !value.TOMTOM_API_KEY) ctx.addIssue({ code: "custom", path: ["TOMTOM_API_KEY"], message: "obligatoire avec TRAVEL_MODE=live" });
 });
 
