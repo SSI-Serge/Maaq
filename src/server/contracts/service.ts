@@ -7,6 +7,7 @@ import { Rejection } from "@/server/http";
 import { emailFingerprint } from "@/server/security/crypto";
 import { integerSetting } from "@/server/settings";
 import { analysisMode, type AnalysisMode } from "./analysis";
+import { planTransmission, type TransmitPlan } from "./plan";
 import { loadDocument, objectStore, storeDocument } from "./storage";
 import type { DocumentState } from "./transmission";
 
@@ -89,6 +90,8 @@ export interface ContractView {
   transmission: TransmissionView | null;
   /** Date du rapport d'analyse courant (US-132 RF5) ; le rapport lui-même vient avec E5. */
   reportAt: string | null;
+  /** Ce que « Transmettre » ferait (US-129) : canaux, blocages, proposition d'activer l'autre canal (US-130). */
+  transmit: TransmitPlan;
   /** Un email de challenge est parti depuis moins de 48 h : la suppression ne peut pas le rappeler (US-133 RF4). */
   challengeSentRecently: boolean;
 }
@@ -286,7 +289,7 @@ async function loadView(ctx: Ctx, accountId: string): Promise<ContractsView> {
       const last = transmissions.find((t) => t.account_contract_id === c.id);
       const report = reports.find((r) => r.account_contract_id === c.id);
       const detailValues = values.filter((v) => v.account_contract_id === c.id);
-      return {
+      const contract: Omit<ContractView, "transmit"> = {
         id: c.id,
         categoryId: def.id,
         name: c.name,
@@ -313,6 +316,7 @@ async function loadView(ctx: Ctx, accountId: string): Promise<ContractsView> {
         reportAt: iso(report?.generated_at),
         challengeSentRecently: transmissions.some((t) => t.account_contract_id === c.id && t.challenge_sent_at !== null && ctx.now.getTime() - new Date(t.challenge_sent_at).getTime() < 48 * 3_600_000),
       };
+      return { ...contract, transmit: planTransmission(contract, { analysisOpen: analysisMode() !== "off", challengeAvailable: available, archived, now: ctx.now }) };
     });
     const atLimit = own.length >= maxContracts;
     return { id: def.id, name: def.name, archived, archivedAt: iso(def.archived_at), canAdd: !archived && !atLimit, atLimit, contracts };

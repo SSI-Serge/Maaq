@@ -104,12 +104,16 @@ export interface ConfirmDialogProps {
   onConfirm: () => void;
   onCancel: () => void;
   confirming?: boolean;
+  /** Libellé du second bouton (« Annuler » par défaut). */
+  cancelLabel?: string;
+  /** Second bouton qui décide autre chose que fermer : « Non, seulement … ». Échap et le fond de la fenêtre, eux, ne font que fermer (`onCancel`). */
+  onDecline?: () => void;
   /** Contenu complémentaire, par exemple un message d'erreur, affiché dans la fenêtre. */
   children?: ReactNode;
 }
 
 /** Fenêtre de confirmation (US-9 RF2, RF3). */
-export function ConfirmDialog({ title, text, confirmLabel, onConfirm, onCancel, confirming, children }: ConfirmDialogProps) {
+export function ConfirmDialog({ title, text, confirmLabel, onConfirm, onCancel, confirming, cancelLabel, onDecline, children }: ConfirmDialogProps) {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => event.key === "Escape" && !confirming && onCancel();
     window.addEventListener("keydown", onKey);
@@ -128,8 +132,8 @@ export function ConfirmDialog({ title, text, confirmLabel, onConfirm, onCancel, 
           <Button block loading={confirming} onClick={onConfirm}>
             {confirmLabel}
           </Button>
-          <Button block variant="secondary" disabled={confirming} onClick={onCancel}>
-            Annuler
+          <Button block variant="secondary" disabled={confirming} onClick={onDecline ?? onCancel}>
+            {cancelLabel ?? "Annuler"}
           </Button>
         </div>
       </div>

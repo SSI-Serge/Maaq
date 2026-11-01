@@ -90,7 +90,7 @@ describe("US-45 — mettre un agent à disposition", () => {
     expect(fields).toMatchObject([{ label: "Téléphone", data_type: "phone", shared_key: "telephone", max_items: 1 }]);
     const prompts = await db.selectFrom("agent_sample_prompts").select("kind").where("agent_id", "=", id).execute();
     expect(prompts.map((p) => p.kind).sort()).toEqual(["example", "first_suggestion"]);
-    const audit = await db.selectFrom("admin_audit_log").selectAll().where("entity_id", "=", id).execute();
+    const audit = await db.selectFrom("admin_audit_log").selectAll().where("entity_type", "=", "agent").where("entity_id", "=", id).execute();
     expect(audit.map((a) => a.action_type)).toEqual(["agent_published"]);
   });
 
@@ -211,7 +211,7 @@ describe("US-46 / US-47 — bloquer et réactiver un agent", () => {
     expect((await listAgents(now(), "Admin_RDV"))[0]).toMatchObject({ status: "available", maintenanceMessage: null });
     expect((await rejectionOf(reactivateAgent(now(), adminId, id))).code).toBe("not_blocked");
 
-    const actions = await db.selectFrom("admin_audit_log").select("action_type").where("entity_id", "=", id).orderBy("id").execute();
+    const actions = await db.selectFrom("admin_audit_log").select("action_type").where("entity_type", "=", "agent").where("entity_id", "=", id).orderBy("id").execute();
     expect(actions.map((a) => a.action_type)).toEqual(["agent_published", "agent_blocked", "agent_reactivated"]);
   });
 });

@@ -15,6 +15,8 @@ export function contractState(contract: ContractView, archived: boolean): { labe
   if (t?.analysisStatus === "running") return { label: "Analyse en cours", tone: "info" };
   if (t?.analysisStatus === "awaiting_admin") return { label: "En cours de vérification par MAAQ", tone: "info" };
   if (t?.analysisStatus === "failed") return { label: "L'analyse a échoué", tone: "warn" };
+  if (t?.challengeStatus === "failed") return { label: "L'envoi au challenge a échoué", tone: "warn" };
+  if (t?.challengeStatus === "sending") return { label: "Envoi au challenge en cours", tone: "info" };
   if (contract.reportAt) return { label: `Rapport du ${frDate(contract.reportAt)}`, tone: "ok" };
   if (t && t.challengeStatus === "sent") return { label: `Envoyé au challenge le ${frDate(t.at)}`, tone: "ok" };
   if (archived) return { label: contract.filled ? "Renseigné" : "Non renseigné", tone: "muted" };
@@ -58,7 +60,7 @@ export function ChannelSwitch({
         : "Le challenge sera disponible quand notre partenaire courtier sera désigné.";
   const [asking, setAsking] = useState(false);
   const mutation = useApiMutation();
-  const text = channel === "analysis" ? view.analysis.text.replace("Les documents de ce contrat", `Les documents de ${contract.name}`) : view.challenge.text;
+  const text = channel === "analysis" ? view.analysis.text.replace("Les documents de ce contrat", `Les documents de ${contract.name}`) : view.challenge.text.replace("[nom du contrat]", contract.name);
 
   async function change(enabled: boolean, accepted?: boolean) {
     const result = await mutation.run<ContractView>(`/api/contracts/${contract.id}/consent`, { method: "POST", body: { channel, enabled, accepted } });

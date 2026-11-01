@@ -80,6 +80,7 @@ function check(setting: Setting, raw: string): string | null {
   const value = raw.trim();
   if (setting.type === "free_text") return value.length <= 120 ? null : "120 caractères au plus.";
   if (setting.type === "email") return value === "" || EMAIL_FORMAT.test(value) ? null : "Adresse email invalide";
+  if ((value === "" || /^-\d+$/.test(value)) && setting.min !== null) return `La valeur doit être au moins ${setting.min}.`;
   if (!/^\d+$/.test(value)) return "Indiquez un nombre entier.";
   const n = Number(value);
   if (setting.min !== null && n < setting.min) return `La valeur doit être au moins ${setting.min}.`;

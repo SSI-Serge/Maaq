@@ -3,7 +3,7 @@ import type { Messenger, OutgoingEmail, OutgoingSms } from "./types";
 
 /** Ce dont l'envoi a besoin du transport : permet de le remplacer dans les tests. */
 export interface MailTransport {
-  sendMail(message: { from: string; to: string; subject: string; text: string }): Promise<unknown>;
+  sendMail(message: { from: string; to: string; subject: string; text: string; attachments?: OutgoingEmail["attachments"] }): Promise<unknown>;
 }
 
 export interface SmtpSettings {
@@ -41,7 +41,7 @@ export class SmtpMessenger implements Messenger {
   ) {}
 
   async sendEmail(message: OutgoingEmail): Promise<void> {
-    await this.transport.sendMail({ from: this.from, to: message.to, subject: message.subject, text: message.text });
+    await this.transport.sendMail({ from: this.from, to: message.to, subject: message.subject, text: message.text, attachments: message.attachments });
   }
 
   sendSms(message: OutgoingSms): Promise<void> {

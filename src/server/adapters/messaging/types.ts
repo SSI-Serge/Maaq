@@ -3,6 +3,8 @@ export interface OutgoingEmail {
   to: string;
   subject: string;
   text: string;
+  /** Pièces jointes (challenge des contrats, C-03). La boîte de test n'en garde que le nom et la taille : jamais le contenu. */
+  attachments?: { filename: string; content: Buffer; contentType: string }[];
 }
 
 export interface OutgoingSms {

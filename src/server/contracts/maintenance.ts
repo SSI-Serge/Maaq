@@ -6,6 +6,7 @@ import { pushConfigured, sendPush } from "@/server/push/service";
 import { describeError } from "@/server/safe-log";
 import { notBeforeMorning, warningText, WARNING_DAYS_BEFORE } from "./retention";
 import { drainStorageDeletions } from "./storage";
+import { runChallengeDeliveries } from "./transmit";
 
 /**
  * Entretien horaire des documents de contrat (C-01, US-126 RF7, RT2, US-139 RF4) :
@@ -21,17 +22,24 @@ export interface ContractMaintenanceResult {
   filesFailed: number;
   warned: number;
   failed: number;
+  challengeSent: number;
+  challengeFailed: number;
 }
 
 const HOUR = 3_600_000;
 
 export async function runContractMaintenance(ctx: Ctx): Promise<ContractMaintenanceResult> {
-  const result: ContractMaintenanceResult = { purged: 0, filesDeleted: 0, filesFailed: 0, warned: 0, failed: 0 };
+  const result: ContractMaintenanceResult = { purged: 0, filesDeleted: 0, filesFailed: 0, warned: 0, failed: 0, challengeSent: 0, challengeFailed: 0 };
   const purged = await sql<{ n: string }>`select purge_expired_contract_documents() as n`.execute(ctx.db);
   result.purged = Number(purged.rows[0]?.n ?? 0);
   const files = await drainStorageDeletions(ctx.db);
   result.filesDeleted = files.deleted;
   result.filesFailed = files.failed;
+
+  // Envois au challenge restés « en cours » : repris pendant 1 heure, puis « échoué » (US-135 RF3). Avant la purge suivante : 48 h laissent la place.
+  const challenge = await runChallengeDeliveries(ctx);
+  result.challengeSent = challenge.sent;
+  result.challengeFailed = challenge.failed;
 
   // Documents jamais transmis qui seront supprimés dans 3 jours ou moins, pas encore avertis.
   const rows = await ctx.db

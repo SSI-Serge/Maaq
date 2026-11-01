@@ -184,6 +184,9 @@ describe("réglages de la console pour Contrats V2 (US-65, C-08, C-10)", () => {
     expect(validateSetting(byKey.contract_broker_name, "")).toBeNull();
     expect(validateSetting(byKey.contract_broker_email, "pas une adresse")).toBe("Adresse email invalide");
     expect(validateSetting(byKey.contract_read_confidence_threshold_pct, "101")).toMatch(/au plus 100/);
+    expect(validateSetting(byKey.contract_read_confidence_threshold_pct, "-1")).toBe("La valeur doit être au moins 0.");
+    expect(validateSetting(byKey.contract_read_confidence_threshold_pct, "")).toBe("La valeur doit être au moins 0.");
+    expect(validateSetting(byKey.contract_read_confidence_threshold_pct, "12.5")).toBe("Indiquez un nombre entier.");
 
     const available = async () => (await sql<{ ok: boolean }>`select contract_challenge_available() as ok`.execute(db)).rows[0].ok;
     expect(await available()).toBe(false);

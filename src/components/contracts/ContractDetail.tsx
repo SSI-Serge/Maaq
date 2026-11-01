@@ -11,6 +11,7 @@ import { ConfirmDialog, ErrorLine } from "@/components/auth/parts";
 import { Button, Loading, Notice, RetryNotice } from "@/components/ui";
 import type { ContractView, ContractsView, DocumentSlot } from "@/server/contracts/service";
 import { ChannelSwitch, contractState, frDate, TONE_CLASS } from "./ContractParts";
+import { TransmitArea } from "./TransmitArea";
 import { DetailsForm } from "./DetailsForm";
 import styles from "./contracts.module.css";
 
@@ -152,13 +153,7 @@ function Detail({ contract, view, archived, uploads, onChanged, onDeleted }: { c
         )}
         <p className={styles.hint}>Vos documents sont supprimés 48 h après leur transmission, ou au bout de 30 jours s&apos;ils ne sont pas transmis. Seul le rapport d&apos;analyse est conservé.</p>
         {contract.challenge.enabled && <p className={styles.hint}>Une copie est envoyée par email à notre partenaire pour le challenge.</p>}
-        {contract.slots.length > 0 && (
-          <div className={styles.transmit}>
-            <div className={styles.docMeta}>{contract.missingRequired > 0 ? plural(contract.missingRequired, "document obligatoire manquant", "documents obligatoires manquants") : "Prêt à transmettre"}</div>
-            <Button disabled>Transmettre</Button>
-            <div className={styles.hint}>La transmission pour analyse ou pour challenge arrive avec l&apos;étape suivante.</div>
-          </div>
-        )}
+        <TransmitArea contract={contract} view={view} archived={archived} onChanged={onChanged} />
         {contract.transmission && (
           <div className={styles.audit}>
             Historique : transmis par {contract.transmission.byFirstName ?? "un profil supprimé"} le {frDate(contract.transmission.at)} —{" "}

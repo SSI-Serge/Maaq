@@ -9,7 +9,7 @@ Spécification validée : `Projets Claude/Business Analyst/MAAQ_US_Detaillees_BA
 | E0 | Moteur de masquage (US-136) et jeu de non-fuite (C-16) | fait (module pur, non branché) |
 | E1 | Administration : catégories, champs de documents, archivage, réglages | fait sur la branche `contrats-v2` (non déployé : le schéma du lot 11 ne s'applique à la zone de test qu'avec E2) |
 | E2 | Famille : contrats groupés, complémentaires, dépôt, purge, J-3, consentements | fait et **en ligne sur la zone de test** (révision 00054, 02/11/2026) avec le lot 11 |
-| E3 | Transmission et challenge par email | après E2 |
+| E3 | Transmission et challenge par email (US-129, 130, 134, 135) | fait (tests verts), mise en ligne sur la zone de test à la suite |
 | E4 | OCR, reconnaissance des noms propres, aperçu (US-137) | attend l'accord sur le coût du stockage et du service interne |
 | E5 | Analyse, rapport, validation administrateur (US-138) | après E4 |
 | E6 | Recette, mise en service | à la fin |
@@ -33,6 +33,15 @@ Développement sur la branche `contrats-v2` (partie de `assistant-famille`). Le 
 - Conformité : l'export (US-55) contient les documents encore présents, les rapports, les consentements par canal et par contrat ; la suppression d'un compte vide la file de suppression des fichiers.
 - Écrans : liste « Mes contrats » (catégories, cartes à interrupteurs), détail d'un contrat (`/contrats/[id]`) avec nom, détails, documents par champ (envoi avec progression, « Annuler », « Réessayer »). La transmission arrive avec E3, le masquage et l'aperçu avec E4.
 - **Écarts à connaître** : (1) le texte du consentement au challenge en base est celui de la V1 (« L'entreprise [nom du partenaire] … ») : il est affiché tel quel avec le nom du courtier ; l'US-128 RF2 demande « Les documents de [nom du contrat] seront transmis à [courtier], partenaire de MAAQ, pour challenger votre contrat. » : à publier comme nouvelle version du texte (donnée de la base). (2) Le texte du consentement à l'analyse est PROVISOIRE et marqué comme tel, en attendant le DPO (C-07) ; il est créé dans la base au premier consentement. (3) « Supprimé le [date] » après la purge (US-134 RF3) n'est pas affiché : la base ne garde pas la date de suppression d'un document ; la date de suppression est annoncée avant (`expiresAt`).
+
+## E3 : transmission et challenge (US-129, US-130, US-134, US-135)
+
+- **Un seul plan, deux usages** : `src/server/contracts/plan.ts` (`planTransmission`) décide quels canaux partent, ce qui bloque l'analyse et quel canal proposer d'activer. L'écran affiche ce plan (`contract.transmit`) et le serveur le suit au moment d'envoyer : il refuse ce que l'écran n'aurait pas permis.
+- **Transmission** (`transmit.ts`, `POST /api/contracts/[id]/transmit`) : enregistre la transmission, verrouille les documents (suppression 48 h plus tard par déclencheur), compte l'analyse dans le plafond quotidien (`register_agent_request`, libéré en cas d'échec) et remet le challenge à la file d'envoi.
+- **Challenge par email** : pièces jointes = documents originaux déchiffrés au dernier moment, catégorie du contrat, référence famille `F-<HMAC 10 caractères>` ; le nom du contrat n'est jamais envoyé. Nouvelle tentative pendant 1 h (`runChallengeDeliveries`, dans l'entretien horaire et celui de 5 min), puis `failed` et bouton « Renvoyer » (`POST /api/contracts/[id]/relaunch`, la fenêtre d'une heure repart à chaque renvoi).
+- **Proposition de l'autre canal** (US-130) : fenêtre « Oui, aussi … » / « Non, seulement … » puis texte de consentement ; Échap ou le fond ferment sans rien envoyer. Écart assumé avec l'US-130 RF4 : refuser le consentement ramène à la question au lieu de transmettre tout de suite, pour qu'aucun envoi ne parte par accident.
+- **Messagerie** : les adaptateurs (`types.ts`, `smtp.ts`, `dev-outbox.ts`) acceptent des pièces jointes ; la boîte de développement ne garde que les noms et tailles.
+- **Texte du consentement au challenge** : nouvelle version publiée par donnée (`deploy/donnees_lot_11_texte_challenge.sql`), pas par schéma.
 
 ## Mise en ligne d'E2 sur la zone de test (02/11/2026)
 

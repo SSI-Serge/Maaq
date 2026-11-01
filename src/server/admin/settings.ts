@@ -62,6 +62,8 @@ export function validateSetting(setting: Setting, raw: string): string | null {
     if (value === "") return null;
     return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})$/.test(value) && !Number.isNaN(Date.parse(value)) ? null : "Indiquez une date et une heure, par exemple 2026-11-02T08:00:00+01:00.";
   }
+  // Vide ou négatif : le message dit la borne (« La valeur doit être au moins 0. »), comme la maquette.
+  if ((value === "" || /^-\d{1,9}$/.test(value)) && setting.min !== null) return `La valeur doit être au moins ${setting.min}.`;
   if (!/^\d{1,9}$/.test(value)) return "Indiquez un nombre entier.";
   const n = Number(value);
   if (setting.min !== null && n < setting.min) return `La valeur doit être au moins ${setting.min}.`;

@@ -12,7 +12,9 @@ export class DevOutbox implements Messenger {
   constructor(private readonly file: string = path.join(dataDir(), "outbox.jsonl")) {}
 
   async sendEmail(message: OutgoingEmail): Promise<void> {
-    await this.append({ channel: "email", to: message.to, subject: message.subject, text: message.text });
+    // Jamais le contenu d'une pièce jointe dans la boîte de test (fichier en clair sur le disque) : son nom et sa taille seulement.
+    const attached = (message.attachments ?? []).map((a) => `${a.filename} (${Math.max(1, Math.round(a.content.length / 1024))} Ko)`);
+    await this.append({ channel: "email", to: message.to, subject: message.subject, text: attached.length ? `${message.text}\n\nPièces jointes : ${attached.join(", ")}` : message.text });
   }
 
   async sendSms(message: OutgoingSms): Promise<void> {
