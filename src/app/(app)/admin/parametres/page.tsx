@@ -182,6 +182,12 @@ function SettingsForm({ initial }: { initial: SettingsData }) {
                 );
               })}
             </div>
+            {section.title === "Challenge des contrats" && (
+              // Effet des réglages enregistrés, sans passer par l'écran d'une famille (C-10) : ouvert quand le nom du courtier ET l'adresse de sa boîte sont renseignés.
+              <div className={s.hint} style={{ marginTop: 8, fontWeight: 700 }}>
+                {byKey.contract_broker_name?.value?.trim() && byKey.contract_broker_email?.value?.trim() ? "Challenge : ouvert" : "Challenge : bloqué pour les familles"}
+              </div>
+            )}
           </div>
         ))}
         <ErrorLine error={error} onRetry={save} />
