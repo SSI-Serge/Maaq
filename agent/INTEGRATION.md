@@ -10,6 +10,8 @@ Ce guide s'adresse au développeur qui branche l'agent « Assistant Famille » s
 | `outils/outils.json` | Définitions d'outils, envoyées telles quelles dans `tools` ; chaque outil a une implémentation réelle côté backend |
 | `tests/cas_de_test.json` | Comportement attendu ; toute modification de l'agent doit continuer à passer ces cas |
 
+> **Mise à jour du 01/11/2026 : Microsoft Foundry est abandonné** (D54 : Claude n'y est pas disponible en Europe) et son code est retiré de l'application. Les passages de ce guide qui parlent de Foundry (§ 1, § 5, § 6, § 7) sont **historiques** : le backend appelle l'API Anthropic directe. Le traitement hors Union européenne par cette API est un point pour le DPO (C-17, Contrats V2).
+
 État au 25 octobre 2026 : 28 cas sur 28 réussis avec `claude-sonnet-5-5` via l'API Anthropic (rapports dans `resultats/`, non versionnés).
 
 ---

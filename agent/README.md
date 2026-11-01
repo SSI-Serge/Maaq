@@ -1,6 +1,6 @@
 # Agent « Assistant Famille » : instructions, outils et banc d'essai
 
-Ce dossier contient tout ce qui définit l'agent, indépendamment de l'endroit où il tournera (API Anthropic pour les tests, Microsoft Foundry pour le pilote, Vertex AI plus tard).
+Ce dossier contient tout ce qui définit l'agent, indépendamment de l'endroit où il tournera (API Anthropic directe pour les tests et le pilote ; un hébergement en Union européenne plus tard si le DPO l'exige). Microsoft Foundry est abandonné (D54).
 
 | Fichier | Contenu | À modifier par vous ? |
 |---|---|---|
@@ -42,8 +42,8 @@ Un lancement complet coûte de l'ordre de 1 à 3 $ avec Claude Sonnet 5.5. C'est
 2. Ajustez `instructions.md` (une règle à la fois).
 3. Relancez les cas concernés avec `--cas`, puis tous les cas, pour vérifier que rien d'autre ne s'est dégradé.
 
-## Passer sur Microsoft Foundry
+## Microsoft Foundry : abandonné
 
-Quand Claude sera déployé dans Foundry, mettez `FOURNISSEUR=foundry` dans `.env` et renseignez `FOUNDRY_RESOURCE` et `FOUNDRY_API_KEY`. Les mêmes tests tournent alors sur le modèle Foundry. La création de l'agent dans le portail Foundry réutilisera `instructions.md` (copier-coller) et `outils/outils.json` (converti en OpenAPI quand le backend de test existera).
+Foundry a été écarté (décision D54 : Claude n'y est pas disponible en Europe) et son code a été retiré de l'application. Le fournisseur `foundry` du banc d'essai Python et les variables `FOUNDRY_*` de `.env.exemple` sont des restes sans usage. Ce banc Python est lui-même périmé : seul le banc TypeScript (`scripts/assistant-bench.ts`) fait foi. Le traitement par l'API Anthropic directe, qui ne propose pas de région UE (`inference_geo` : « global » ou « us »), est un point à soumettre au DPO (C-17 de la spécification Contrats V2).
 
-Sur l'API Anthropic, le script active le repli automatique d'Anthropic : si Claude refuse une demande pour raison de sécurité, la requête est relancée sur un autre modèle. Ce cas ne devrait pas se présenter avec des rendez-vous familiaux. Foundry ne propose pas cette option.
+Sur l'API Anthropic, le script active le repli automatique d'Anthropic : si Claude refuse une demande pour raison de sécurité, la requête est relancée sur un autre modèle. Ce cas ne devrait pas se présenter avec des rendez-vous familiaux.
