@@ -8,7 +8,7 @@ Spécification validée : `Projets Claude/Business Analyst/MAAQ_US_Detaillees_BA
 |---|---|---|
 | E0 | Moteur de masquage (US-136) et jeu de non-fuite (C-16) | fait (module pur, non branché) |
 | E1 | Administration : catégories, champs de documents, archivage, réglages | fait sur la branche `contrats-v2` (non déployé : le schéma du lot 11 ne s'applique à la zone de test qu'avec E2) |
-| E2 | Famille : contrats groupés, complémentaires, dépôt, purge, J-3, consentements | fait sur la branche `contrats-v2` ; déployé avec le lot 11 sur la zone de test |
+| E2 | Famille : contrats groupés, complémentaires, dépôt, purge, J-3, consentements | fait et **en ligne sur la zone de test** (révision 00054, 02/11/2026) avec le lot 11 |
 | E3 | Transmission et challenge par email | après E2 |
 | E4 | OCR, reconnaissance des noms propres, aperçu (US-137) | attend l'accord sur le coût du stockage et du service interne |
 | E5 | Analyse, rapport, validation administrateur (US-138) | après E4 |
@@ -33,6 +33,12 @@ Développement sur la branche `contrats-v2` (partie de `assistant-famille`). Le 
 - Conformité : l'export (US-55) contient les documents encore présents, les rapports, les consentements par canal et par contrat ; la suppression d'un compte vide la file de suppression des fichiers.
 - Écrans : liste « Mes contrats » (catégories, cartes à interrupteurs), détail d'un contrat (`/contrats/[id]`) avec nom, détails, documents par champ (envoi avec progression, « Annuler », « Réessayer »). La transmission arrive avec E3, le masquage et l'aperçu avec E4.
 - **Écarts à connaître** : (1) le texte du consentement au challenge en base est celui de la V1 (« L'entreprise [nom du partenaire] … ») : il est affiché tel quel avec le nom du courtier ; l'US-128 RF2 demande « Les documents de [nom du contrat] seront transmis à [courtier], partenaire de MAAQ, pour challenger votre contrat. » : à publier comme nouvelle version du texte (donnée de la base). (2) Le texte du consentement à l'analyse est PROVISOIRE et marqué comme tel, en attendant le DPO (C-07) ; il est créé dans la base au premier consentement. (3) « Supprimé le [date] » après la purge (US-134 RF3) n'est pas affiché : la base ne garde pas la date de suppression d'un document ; la date de suppression est annoncée avant (`expiresAt`).
+
+## Mise en ligne d'E2 sur la zone de test (02/11/2026)
+
+- Sauvegarde de la base relue avant la migration (110 tables, 1 097 lignes) ; lot 11 appliqué depuis les fichiers d'origine de la base de données après contrôle des empreintes (`lot_11_1` 9303…44c9, `rattrapage_lot_11_donnees_existantes` 72a5…afd9) ; le contrat V1 existant est devenu le contrat de base de sa catégorie ; script de sécurisation Supabase rejoué. Les copies versionnées ont les mêmes empreintes dans le dépôt (fins de ligne LF) ; une copie extraite sous Windows peut avoir des fins de ligne CRLF et une autre empreinte : toujours contrôler les fichiers d'origine.
+- Bucket `maaq-test-contrats` (Cloud Storage, `europe-west1`, classe Standard, accès uniforme, accès public interdit, règle de sécurité : suppression au bout de 45 jours), droit `objectAdmin` au seul compte de service de Cloud Run ; `CONTRACT_STORAGE=gcs`, `CONTRACT_BUCKET=maaq-test-contrats`. Les appels de dépôt, de lecture et de suppression ont été vérifiés avec un jeton d'administration ; le chemin par le compte de service de Cloud Run attend un premier dépôt réel depuis un compte famille.
+- L'analyse IA reste fermée (`CONTRACT_ANALYSIS_MODE` non défini = `off`). Le service interne OCR et NER n'est pas créé : il le sera avec E4.
 
 ## Interrupteur de l'analyse IA : `CONTRACT_ANALYSIS_MODE`
 
