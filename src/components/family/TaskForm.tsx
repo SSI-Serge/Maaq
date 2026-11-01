@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useApiMutation } from "@/client/hooks";
 import { Button, Notice, RetryNotice } from "@/components/ui";
+import { HOMEWORK_PREP_TITLE } from "@/server/assistant/homework/prep";
 import type { MemberChip } from "@/server/assistant/member-chips";
 import type { TaskRepetition, TaskView } from "@/server/assistant/tasks";
 import { Field } from "./EventForm";
@@ -85,6 +86,8 @@ interface Props {
  * Une tâche récurrente se modifie ou s'annule pour une portée choisie (RF5). Le serveur refuse une version périmée.
  */
 export function TaskForm({ task, initial, assignable, onSaved, onCancel, onRemoved, homeworkPrep }: Props) {
+  // Tâche hebdomadaire des devoirs (D69) : titre fixe en lecture seule, un seul jour par semaine ; le jour, l'heure et la personne restent modifiables.
+  const prepTask = Boolean(homeworkPrep || task?.isHomeworkPrep);
   const start = task ? { title: task.title, note: task.note, due: task.due, dueTime: task.dueTime, assigneeId: task.assignee?.id ?? null, repetition: null } : (initial ?? { title: "", due: todayLocal() });
   const [title, setTitle] = useState(start.title);
   const [due, setDue] = useState(start.due);
@@ -109,7 +112,7 @@ export function TaskForm({ task, initial, assignable, onSaved, onCancel, onRemov
 
   async function submit() {
     if (invalid) return;
-    const fields = { title: title.trim(), note: note.trim() || null, due, dueTime: dueTime || null, assigneeId };
+    const fields = { title: prepTask ? HOMEWORK_PREP_TITLE : title.trim(), note: note.trim() || null, due, dueTime: dueTime || null, assigneeId };
     const result = task
       ? await save.run<{ task: TaskView }>(`/api/family/tasks/${task.id}`, { method: "PATCH", body: { version: task.version, ...(recurringEdit ? { scope } : {}), ...fields } })
       : await save.run<{ task: TaskView }>("/api/family/tasks", {
@@ -147,7 +150,7 @@ export function TaskForm({ task, initial, assignable, onSaved, onCancel, onRemov
       }}
     >
       <Field label="Titre" error={title && titleError ? titleError : null}>
-        <input className={`${styles.input} ${title && titleError ? styles.inputError : ""}`} value={title} onChange={(e) => setTitle(e.target.value)} maxLength={MAX_TITLE + 20} disabled={save.pending} placeholder="Payer la cantine" />
+        <input className={`${styles.input} ${title && titleError ? styles.inputError : ""}`} value={prepTask ? HOMEWORK_PREP_TITLE : title} onChange={(e) => setTitle(e.target.value)} maxLength={MAX_TITLE + 20} disabled={save.pending} readOnly={prepTask} placeholder="Payer la cantine" />
       </Field>
 
       {homeworkPrep && (
@@ -181,15 +184,15 @@ export function TaskForm({ task, initial, assignable, onSaved, onCancel, onRemov
               ))}
             </select>
           )}
-          {homeworkPrep && <span className={styles.hint}>Chaque semaine, le jour de votre choix.</span>}
+          {homeworkPrep && <span className={styles.hint}>Chaque semaine.</span>}
           {(frequency === "weekly" || frequency === "biweekly") && (
             <div className={styles.members} role="group" aria-label="Jours de la semaine">
               {WEEKDAYS.map((w) => (
-                <button key={w.value} type="button" className={styles.chipToggle} aria-pressed={weekdays.includes(w.value)} aria-label={w.name} onClick={() => setWeekdays((cur) => (cur.includes(w.value) ? cur.filter((x) => x !== w.value) : [...cur, w.value]))}>
+                <button key={w.value} type="button" className={styles.chipToggle} aria-pressed={weekdays.includes(w.value)} aria-label={w.name} onClick={() => setWeekdays((cur) => (homeworkPrep ? [w.value] : cur.includes(w.value) ? cur.filter((x) => x !== w.value) : [...cur, w.value]))}>
                   {w.label}
                 </button>
               ))}
-              <span className={styles.hint}>Sans jour choisi, le jour de la première échéance.</span>
+              <span className={styles.hint}>{homeworkPrep ? "Un seul jour par semaine." : "Sans jour choisi, le jour de la première échéance."}</span>
             </div>
           )}
           {repeating && (

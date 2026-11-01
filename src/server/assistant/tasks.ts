@@ -5,6 +5,7 @@ import { Rejection } from "@/server/http";
 import { loadCalendarEventsByIds, type CalendarEvent, type EventType } from "./calendar";
 import { open, openOptional, seal, sealOptional } from "./fields";
 import { isParent } from "./family";
+import { HOMEWORK_PREP_TITLE } from "./homework/prep";
 import { homeworkEnabled } from "./homework/settings";
 import { utcToLocal } from "./local-time";
 import { loadMembers, type MemberChip } from "./member-chips";
@@ -54,6 +55,8 @@ export interface TaskView {
   followsEventSeries: boolean;
   /** Semaine de devoirs d'où vient la tâche « Devoirs — [prénom] (N éléments) » : le lien ouvre l'écran de la semaine (US-119 RF4). */
   homeworkWeekId: string | null;
+  /** Tâche hebdomadaire de préparation des devoirs (source `homework_prep`) : son titre est fixe. */
+  isHomeworkPrep: boolean;
   /**
    * Tâche hebdomadaire « Préparer les devoirs de la semaine » (D69) : reconnue par sa source, pas par son titre. Le lien ouvre la préparation de la semaine qui suit son échéance, puis
    * « Voir la semaine de devoirs » une fois la semaine prête. Vide pour les autres tâches, pour un profil qui n'est pas parent, et quand l'aide Devoirs est désactivée (la tâche reste, sans lien).
@@ -221,7 +224,7 @@ export async function toTaskViews(db: Kysely<DB>, v: TaskViewer, rows: TaskRow[]
       id: r.id, title: open(r.title), note: openOptional(r.note), status: r.status, due: r.due_date, dueTime: r.due_time ? r.due_time.slice(0, 5) : null, overdue: isOverdue(v, r),
       assignee: r.assigned_member_id ? (chips.get(r.assigned_member_id) ?? null) : null,
       event: event && sees(v, event) ? { id: event.id, title: event.title, start: utcToLocal(event.startsAt, v.timeZone) } : null,
-      daysBefore: r.days_before_event, recurring: Boolean(r.series_id), rule: own ? ruleLabel(own) : null, repetition: own ? taskRepetitionOf(own) : null, followsEventSeries: Boolean(s?.event_series_id), homeworkWeekId: r.homework_week_id, homeworkPrep: prep(r),
+      daysBefore: r.days_before_event, recurring: Boolean(r.series_id), rule: own ? ruleLabel(own) : null, repetition: own ? taskRepetitionOf(own) : null, followsEventSeries: Boolean(s?.event_series_id), homeworkWeekId: r.homework_week_id, isHomeworkPrep: r.source === "homework_prep", homeworkPrep: prep(r),
       doneBy: r.done_by_member_id ? (chips.get(r.done_by_member_id)?.firstName ?? null) : null, doneAt: r.done_at ? utcToLocal(r.done_at, v.timeZone) : null, version: r.version,
       can: { check: canCheckTask(v, r), manage: canManageTask(v, r) },
     };
@@ -328,6 +331,8 @@ export async function createTask(ctx: Ctx, session: SessionContext, input: NewTa
     if (!v.parent) throw fail("forbidden", "Seuls les parents du foyer créent cette tâche.", 403);
     if (!(await homeworkEnabled(ctx, v.accountId))) throw fail("homework_disabled", "L'aide Devoirs n'est pas activée pour la famille.", 409);
     if (input.repetition?.frequency !== "weekly") throw fail("prep_needs_weekly", "La préparation des devoirs revient chaque semaine.", 422);
+    if ((input.repetition.weekdays?.length ?? 0) > 1) throw fail("prep_one_day", "La préparation des devoirs revient un seul jour par semaine.", 422);
+    task.title = HOMEWORK_PREP_TITLE;
   }
   try {
     const id = await ctx.db.transaction().execute(async (trx) => {
@@ -375,7 +380,7 @@ export async function createTask(ctx: Ctx, session: SessionContext, input: NewTa
 function emptyView(task: CheckedTask): TaskView {
   return {
     id: "", title: task.title, note: task.note, status: "todo", due: task.due, dueTime: task.dueTime, overdue: false, assignee: null, event: null, daysBefore: null, recurring: false, rule: null,
-    repetition: null, followsEventSeries: false, homeworkWeekId: null, homeworkPrep: null, doneBy: null, doneAt: null, version: 1, can: { check: true, manage: true },
+    repetition: null, followsEventSeries: false, homeworkWeekId: null, isHomeworkPrep: false, homeworkPrep: null, doneBy: null, doneAt: null, version: 1, can: { check: true, manage: true },
   };
 }
 
@@ -410,6 +415,7 @@ export async function updateTask(ctx: Ctx, session: SessionContext, id: string, 
       if (row.status !== "todo") throw settled(row);
       if (row.version !== options.expectedVersion) throw staleVersion(row);
       const task = checkFields(v, changes, members, { keepAssignee: row.assigned_member_id });
+      if (row.source === "homework_prep") task.title = HOMEWORK_PREP_TITLE;
       reassigned = task.assigneeId !== null && task.assigneeId !== row.assigned_member_id;
       const series = row.series_id ? await loadTaskSeries(trx, v.accountId, row.series_id, { forUpdate: true }) : undefined;
       const scope: Scope = options.scope ?? "this";

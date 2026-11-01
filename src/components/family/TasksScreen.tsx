@@ -7,6 +7,7 @@ import { useApiQuery } from "@/client/hooks";
 import { AppShell, appStyles as s, Section } from "@/components/app/AppShell";
 import { Loading, Notice, RetryNotice } from "@/components/ui";
 import type { TaskLists, TaskView } from "@/server/assistant/tasks";
+import { HOMEWORK_PREP_TITLE } from "@/server/assistant/homework/prep";
 import { addDays, todayLocal } from "./format";
 import { TaskForm, type TaskFormInitial } from "./TaskForm";
 import { TaskRow } from "./TaskRow";
@@ -100,7 +101,7 @@ function prepInitial(lists: TaskLists): TaskFormInitial {
   const today = todayLocal();
   const weekday = ((new Date(`${today}T00:00:00Z`).getUTCDay() + 6) % 7) + 1;
   return {
-    title: "Préparer les devoirs de la semaine",
+    title: HOMEWORK_PREP_TITLE,
     due: addDays(today, (7 - weekday) % 7),
     dueTime: "18:00",
     assigneeId: lists.viewer.memberId,

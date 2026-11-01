@@ -4,7 +4,7 @@ import { addChild } from "@/server/assistant/family";
 import { loadHomeworkCatalog } from "@/server/assistant/homework/catalog";
 import { getHomeworkSetting, setHomeworkAge, setHomeworkEnabled } from "@/server/assistant/homework/settings";
 import { childOptions, prepareWeek } from "@/server/assistant/homework/weeks";
-import { createTask, listTasks, mondayAfter, type NewTask, type TaskView } from "@/server/assistant/tasks";
+import { createTask, listTasks, mondayAfter, updateTask, type NewTask, type TaskView } from "@/server/assistant/tasks";
 import type { Ctx } from "@/server/auth/service";
 import type { DB } from "@/server/db/schema.generated";
 import { Rejection } from "@/server/http";
@@ -84,6 +84,23 @@ describe("tâche hebdomadaire de préparation des devoirs (D69)", () => {
     const g = await family();
     expect((await failure(createTask(ctx(), g.camilleSession, prepInput(g, { repetition: null })))).code).toBe("prep_needs_weekly");
     expect((await failure(createTask(ctx(), g.camilleSession, prepInput(g, { repetition: { frequency: "biweekly", end: { kind: "never" } } })))).code).toBe("prep_needs_weekly");
+  });
+
+  it("le titre est fixe : imposé à la création et à la modification, un seul jour par semaine", async () => {
+    const f = await family();
+    await createTask(ctx(), f.camilleSession, prepInput(f, { title: "Autre titre" }));
+    const stored = await prepOf(f);
+    expect(stored.length).toBeGreaterThan(1);
+    expect(stored.every((t) => t.isHomeworkPrep)).toBe(true);
+    const first = stored[0];
+    const updated = await updateTask(ctx(), f.camilleSession, first.id, { title: "Encore un autre titre", note: null, due: first.due, dueTime: "19:00", assigneeId: f.member }, { expectedVersion: first.version, scope: "all" });
+    expect(updated.title).toBe("Préparer les devoirs de la semaine");
+    expect(updated.dueTime).toBe("19:00");
+    const g = await family();
+    expect((await failure(createTask(ctx(), g.camilleSession, prepInput(g, { repetition: { frequency: "weekly", weekdays: [1, 3], end: { kind: "never" } } })))).code).toBe("prep_one_day");
+    // Une tâche ordinaire n'est pas concernée.
+    const plain = await createTask(ctx(), g.camilleSession, { title: "Devoirs de maths", due: SUNDAY, assigneeId: null });
+    expect(plain.isHomeworkPrep).toBe(false);
   });
 
   it("une seule série active par foyer ; une fois terminée, on peut en recréer une", async () => {
