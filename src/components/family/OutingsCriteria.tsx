@@ -261,6 +261,7 @@ function CriteriaForm({ initial }: { initial: CriteriaView }) {
           </Section>
 
           <Section title="Quand ?">
+            <p className={styles.hint}>Plusieurs choix possibles : ils se cumulent.</p>
             <div className={styles.wrapRow}>
               <button type="button" className={styles.chipToggle} aria-pressed={weekend} onClick={() => { setWeekend((v) => !v); setDone(false); }}>
                 {DAY_LABEL.weekend}

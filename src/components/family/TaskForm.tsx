@@ -150,6 +150,12 @@ export function TaskForm({ task, initial, assignable, onSaved, onCancel, onRemov
         <input className={`${styles.input} ${title && titleError ? styles.inputError : ""}`} value={title} onChange={(e) => setTitle(e.target.value)} maxLength={MAX_TITLE + 20} disabled={save.pending} placeholder="Payer la cantine" />
       </Field>
 
+      {homeworkPrep && (
+        <Notice tone="info">
+          Tâche de l&apos;aide Devoirs : elle portera le lien « Préparer les devoirs de la semaine ». Le jour, l&apos;heure et la personne restent modifiables. Une seule tâche de ce type par foyer.
+        </Notice>
+      )}
+
       <div className={styles.two}>
         <Field label="Échéance" error={!due ? "L'échéance est obligatoire." : null}>
           <input type="date" className={styles.input} value={due} onChange={(e) => setDue(e.target.value)} disabled={save.pending} />

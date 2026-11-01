@@ -313,6 +313,7 @@ export function EventScreen({ id }: { id: string }) {
                   {event.series.rule}
                   <span className={styles.rowSub}>
                     <span className={styles.tag}>↻ Série</span> {event.series.modified && <span className={styles.tag}>Modifiée</span>}
+                    {event.series.repetition.end.kind === "never" && " Sans fin"}
                   </span>
                 </span>
               </div>
@@ -397,7 +398,7 @@ export function EventScreen({ id }: { id: string }) {
           <div className={styles.actions}>
             {event.can.confirm && (
               <Button block onClick={() => void act("confirm")} loading={busy && pendingLabel === "confirm"} disabled={busy || mustChoose}>
-                {busy && pendingLabel === "confirm" ? "Confirmation…" : setAside ? "Confirmer quand même" : proposedTasks > 0 ? `Confirmer le RDV et ${proposedTasks} tâche${proposedTasks > 1 ? "s" : ""}` : "Confirmer le rendez-vous"}
+                {busy && pendingLabel === "confirm" ? "Confirmation…" : setAside ? "Confirmer quand même" : proposedTasks > 0 ? `Confirmer ${event.series?.repetition.frequency === "yearly" ? "la série annuelle" : "le RDV"} et ${proposedTasks} tâche${proposedTasks > 1 ? "s" : ""}` : event.series?.repetition.frequency === "yearly" ? "Confirmer la série annuelle" : "Confirmer le rendez-vous"}
               </Button>
             )}
             {event.can.confirm && proposedTasks > 0 && (

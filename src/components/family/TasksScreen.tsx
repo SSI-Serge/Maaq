@@ -117,11 +117,6 @@ export function NewTaskScreen({ model }: { model?: string | null }) {
     <AppShell title="Nouvelle tâche" back={{ href: "/assistant/taches", label: "Tâches" }}>
       {lists.error && <RetryNotice message={lists.error.message} onRetry={lists.reload} />}
       {lists.loading && !lists.data && <Loading slow={lists.slow} />}
-      {prep && lists.data && (
-        <Notice tone="info">
-          Cette tâche vous rappelle chaque semaine de préparer les devoirs : le lien « Préparer les devoirs de la semaine » s&apos;affiche sur la tâche. Le jour, l&apos;heure et la personne restent modifiables.
-        </Notice>
-      )}
       {lists.data && (
         <TaskForm
           assignable={lists.data.lists.assignable}

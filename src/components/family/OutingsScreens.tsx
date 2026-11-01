@@ -43,30 +43,49 @@ export function OutingHomeCard() {
 
   if (removed)
     return (
-      <div className={styles.form} role="status">
+      <div
+        role="status"
+        style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, background: "var(--ink)", color: "var(--primary-ink)", borderRadius: "var(--radius)", padding: "10px 14px", fontSize: 13 }}
+      >
         <span>Proposition retirée</span>
-        <Button variant="ghost" onClick={() => void restore(removed)} loading={mutation.pending}>
+        <button
+          type="button"
+          onClick={() => void restore(removed)}
+          disabled={mutation.pending}
+          style={{ background: "none", border: "none", padding: 0, fontSize: 13, fontWeight: 700, color: "var(--secondary-soft)", textDecoration: "underline", cursor: "pointer" }}
+        >
           Annuler
-        </Button>
+        </button>
       </div>
     );
   if (!current) return null;
   return (
-    <Section title="L'heure de penser à vous">
-      <div className={styles.listItem} style={{ alignItems: "center" }}>
-        <Link href={`/assistant/sorties/${current.id}`} className={styles.listBody} style={{ textDecoration: "none", color: "inherit" }}>
-          <strong>Pour le {longDate(current.targetDate)}</strong>
-          <br />
-          <span className={styles.hint}>
-            {current.ideas} {current.ideas > 1 ? "idées de sorties" : "idée de sortie"} · proposition privée
-          </span>
-        </Link>
-        <button type="button" className={styles.dangerLink} onClick={() => void remove(current.id)} disabled={mutation.pending} aria-label="Retirer la proposition">
+    <div style={{ background: "var(--bg-raised)", border: "1px solid var(--secondary)", borderRadius: "var(--radius)", padding: "12px 14px", display: "flex", flexDirection: "column", gap: 6 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+        <span style={{ fontFamily: "var(--font-mono, monospace)", fontSize: 9, letterSpacing: ".05em", textTransform: "uppercase", color: "var(--secondary-strong)" }}>Privé · pour vous seul·e</span>
+        <button
+          type="button"
+          onClick={() => void remove(current.id)}
+          disabled={mutation.pending}
+          aria-label="Retirer la proposition"
+          style={{ background: "none", border: "none", padding: 0, fontSize: 11, color: "var(--ink-soft)", textDecoration: "underline", cursor: "pointer" }}
+        >
           Annuler
         </button>
       </div>
+      <Link href={`/assistant/sorties/${current.id}`} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, textDecoration: "none", color: "inherit" }}>
+        <span>
+          <span style={{ display: "block", fontFamily: "var(--font-serif, serif)", fontSize: 16, color: "var(--ink)" }}>L&apos;heure de penser à vous</span>
+          <span style={{ display: "block", fontSize: 12, color: "var(--ink-soft)", marginTop: 2 }}>
+            Pour {longDate(current.targetDate)} · {current.ideas} {current.ideas > 1 ? "idées" : "idée"}
+          </span>
+        </span>
+        <span aria-hidden style={{ color: "var(--secondary-strong)" }}>
+          ›
+        </span>
+      </Link>
       {mutation.error && <Notice tone="error">La proposition n&apos;a pas pu être retirée.</Notice>}
-    </Section>
+    </div>
   );
 }
 
