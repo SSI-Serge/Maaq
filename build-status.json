@@ -3,7 +3,7 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-10-31T09:40:00Z",
+  "updated": "2026-11-01T11:40:00Z",
   "deploys": [
     {
       "at": "2026-10-31T09:40:00Z",
@@ -2219,6 +2219,14 @@
         {
           "at": "2026-10-31T09:10:00Z",
           "text": "D70 : un RDV peut se répéter chaque année (anniversaire) ; les deux prochaines occurrences existent toujours ; pas de vacances scolaires ; une tâche ne se répète pas chaque année."
+        },
+        {
+          "at": "2026-11-01T11:40:00Z",
+          "text": "Série de RDV : le bouton devient « Confirmer la série (N séances) » (« Confirmer la série annuelle » pour une série annuelle), avec « … et N tâches » ; la ligne Quand d'une série à confirmer se lit « Dim. 08/11/2026 — toute la journée (1re fois) » ; la sous-ligne « Sauf vacances scolaires (zone A) · N séances » apparaît quand l'option est cochée."
+        },
+        {
+          "at": "2026-11-01T11:40:00Z",
+          "text": "Tâche des devoirs : la répétition reste fixée à « chaque semaine » ; le jour, l'heure et la personne restent modifiables (la maquette sera ajustée par Design)."
         }
       ],
       "unsure": [
@@ -2230,7 +2238,9 @@
         "Le suivi du trajet ne repose pour l'instant que sur un faux service : aucune durée réelle n'a été obtenue de TomTom.",
         "La clé Anthropic a atteint sa limite d'usage jusqu'au 01/11/2026 : l'assistant de la zone de test est aussi arrêté. Deux cas de base du banc d'essai (22 et 23) échouent et restent à diagnostiquer.",
         "La dictée corrigée (relance automatique, mots répétés) n'a pas été vérifiée sur un vrai Android : à refaire par le PO.",
-        "Lot 10 : recherche web des Sorties, analyse d'une vraie photo, écrans sur téléphone et impression jamais essayés ; avis du DPO attendu (recherche web, données de mineurs)."
+        "Lot 10 : recherche web des Sorties, analyse d'une vraie photo, écrans sur téléphone et impression jamais essayés ; avis du DPO attendu (recherche web, données de mineurs).",
+        "Le banc d'essai Python de l'agent (agent/banc_essai/lancer_tests.py) est périmé : seul le banc TypeScript (scripts/assistant-bench.ts) fait foi ; à mettre à jour ou à retirer au lot 9, avant le pilote.",
+        "Écrans de l'accueil, des réglages des sorties, de la tâche des devoirs et de la série annuelle : libellés alignés sur les maquettes (version 53), espacements à vérifier par le PO sur son téléphone pendant la recette."
       ],
       "activity": [
         {

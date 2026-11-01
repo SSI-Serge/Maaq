@@ -11,7 +11,7 @@ import type { ConflictView, EventView, MemberChip } from "@/server/assistant/eve
 import type { LocationConsentView } from "@/server/assistant/location-consent";
 import { conflictSentence, EventForm, nearbySentence } from "./EventForm";
 import { pendingChanged } from "@/client/badge";
-import { clock, dayOf, longDate, reminderState, shortDate, stamp, TYPE_LABEL, whenLabel } from "./format";
+import { clock, dayOf, longDate, numericDate, reminderState, shortDate, stamp, TYPE_LABEL, whenLabel } from "./format";
 import { MemberChips, StatusChip } from "./parts";
 import { PrepareList } from "./PrepareList";
 import { OptionalSection } from "./OptionalSection";
@@ -45,6 +45,7 @@ export function EventScreen({ id }: { id: string }) {
   const detail = useApiQuery<{ event: EventView }>(`/api/family/events/${id}`);
   const members = useApiQuery<{ members: MemberChip[] }>("/api/family/members");
   const location = useApiQuery<{ consent: LocationConsentView }>("/api/family/location-consent");
+  const schoolZone = useApiQuery<{ setting: { zone: string | null } }>("/api/family/school-zone");
   const mutation = useApiMutation();
   const [override, setOverride] = useState<EventView | null>(null);
   const [mode, setMode] = useState<Mode>("view");
@@ -103,6 +104,15 @@ export function EventScreen({ id }: { id: string }) {
   const busy = mutation.pending;
   const proposedTasks = event.tasks?.items.filter((t) => t.status === "proposed").length ?? 0;
   const shownStart = slot ? slot.start : event.start;
+  // Série à confirmer (US-109 RF6) : un seul geste confirme toute la série.
+  const awaiting = Boolean(event.series) && (event.status === "provisional" || event.status === "set_aside");
+  const firstOfSeries = awaiting && !slot;
+  const sessions = event.series?.sessions ?? 0;
+  const confirmLabel = !event.series
+    ? "Confirmer le rendez-vous"
+    : event.series.repetition.frequency === "yearly"
+      ? "Confirmer la série annuelle"
+      : `Confirmer la série (${sessions} séance${sessions > 1 ? "s" : ""})`;
   const shownEnd = slot ? slot.end : event.end;
 
   async function act(action: Action, options: { withoutTasks?: boolean } = {}) {
@@ -314,6 +324,8 @@ export function EventScreen({ id }: { id: string }) {
                   <span className={styles.rowSub}>
                     <span className={styles.tag}>↻ Série</span> {event.series.modified && <span className={styles.tag}>Modifiée</span>}
                     {event.series.repetition.end.kind === "never" && " Sans fin"}
+                    {event.series.repetition.skipSchoolHolidays &&
+                      ` Sauf vacances scolaires${schoolZone.data?.setting.zone ? ` (zone ${schoolZone.data.setting.zone})` : ""} · ${event.series.sessions} séance${event.series.sessions > 1 ? "s" : ""}`}
                   </span>
                 </span>
               </div>
@@ -327,8 +339,15 @@ export function EventScreen({ id }: { id: string }) {
             <div className={styles.row}>
               <span className={styles.rowLabel}>Quand</span>
               <span className={styles.rowValue}>
-                {longDate(dayOf(shownStart))}
-                <span className={styles.rowSub}>{whenLabel({ start: shownStart, end: shownEnd, allDay: event.allDay })}</span>
+                {firstOfSeries ? (
+                  // Série à confirmer : la première séance, dite comme dans la maquette (« Dim. 08/11/2026 — toute la journée (1re fois) »).
+                  `${numericDate(dayOf(shownStart))} — ${event.allDay ? "toute la journée" : clock(shownStart)} (${event.series?.repetition.frequency === "yearly" ? "1re fois" : "1re séance"})`
+                ) : (
+                  <>
+                    {longDate(dayOf(shownStart))}
+                    <span className={styles.rowSub}>{whenLabel({ start: shownStart, end: shownEnd, allDay: event.allDay })}</span>
+                  </>
+                )}
               </span>
             </div>
             {event.place && (
@@ -398,7 +417,7 @@ export function EventScreen({ id }: { id: string }) {
           <div className={styles.actions}>
             {event.can.confirm && (
               <Button block onClick={() => void act("confirm")} loading={busy && pendingLabel === "confirm"} disabled={busy || mustChoose}>
-                {busy && pendingLabel === "confirm" ? "Confirmation…" : setAside ? "Confirmer quand même" : proposedTasks > 0 ? `Confirmer ${event.series?.repetition.frequency === "yearly" ? "la série annuelle" : "le RDV"} et ${proposedTasks} tâche${proposedTasks > 1 ? "s" : ""}` : event.series?.repetition.frequency === "yearly" ? "Confirmer la série annuelle" : "Confirmer le rendez-vous"}
+                {busy && pendingLabel === "confirm" ? "Confirmation…" : setAside ? "Confirmer quand même" : `${confirmLabel}${proposedTasks > 0 ? ` et ${proposedTasks} tâche${proposedTasks > 1 ? "s" : ""}` : ""}`}
               </Button>
             )}
             {event.can.confirm && proposedTasks > 0 && (

@@ -32,6 +32,13 @@ export function longDate(day: string): string {
   return `${WEEKDAYS[d.getUTCDay()]} ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
 }
 
+/** « Dim. 08/11/2026 » */
+export function numericDate(day: string): string {
+  const d = utc(day);
+  const weekday = WEEKDAYS[d.getUTCDay()].slice(0, 3);
+  return `${weekday[0].toUpperCase()}${weekday.slice(1)}. ${pad(d.getUTCDate())}/${pad(d.getUTCMonth() + 1)}/${d.getUTCFullYear()}`;
+}
+
 /** « mar. 3 nov. » */
 export function shortDate(day: string): string {
   const d = utc(day);
