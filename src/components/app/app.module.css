@@ -413,3 +413,11 @@
   max-width: 350px;
   z-index: 30;
 }
+
+/* Page large (semaine de devoirs) : la colonne mobile laisse la place à la grille de sept jours */
+.appWide { max-width: 1320px; }
+.appWide .header { padding-left: max(20px, env(safe-area-inset-left)); padding-right: max(20px, env(safe-area-inset-right)); }
+.appWide .content { padding-left: max(20px, env(safe-area-inset-left)); padding-right: max(20px, env(safe-area-inset-right)); }
+.eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--primary); margin-bottom: 2px; }
+.titleItalic { font-style: italic; }
+.rule { width: 64px; height: 2px; background: var(--secondary); border-radius: 2px; margin-top: 10px; }

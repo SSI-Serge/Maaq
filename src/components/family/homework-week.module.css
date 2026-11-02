@@ -1,0 +1,89 @@
+/*
+ * Semaine de devoirs (US-119 UX, maquette RDV-Devoirs-Semaine) : en-tête, une section par enfant, une GRILLE de sept cartes de jour. Mise en page du skill planning-devoirs-hebdo
+ * (assets/semaine.html) avec la charte MAAQ : couleurs et polices de l'application, jamais celles d'une marque. Pas de barre de progression ni de compteur « X / Y faits » (AT-9).
+ */
+
+.week {
+  --c-maths: #3f6b8a;
+  --c-nature: #5e7048;
+  --c-philo: #6b5b95;
+  --c-stim: #b67a24;
+  --c-art: #a8502e;
+  --c-imagination: #93731f;
+  --c-projets: #7a2e32;
+  --c-perso: #6e5f58;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Barre d'actions : enfants, corrigés, imprimer */
+.bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.spacer { flex: 1; }
+.tab, .toggle, .barLink {
+  font: inherit; font-size: 13px; font-weight: 600; border: 1px solid var(--line); background: var(--bg-raised); color: var(--ink);
+  border-radius: 8px; padding: 7px 12px; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center;
+}
+.tab[aria-selected="true"], .toggle[aria-pressed="true"] { background: var(--primary); border-color: var(--primary); color: var(--primary-ink); }
+.barLink { border-color: var(--primary); color: var(--primary); }
+.tab:focus-visible, .toggle:focus-visible, .barLink:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+/* Section d'un enfant */
+.kid { display: flex; flex-direction: column; gap: 6px; }
+.kidHead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; border-bottom: 2px solid var(--secondary); padding-bottom: 8px; }
+.kidName { font-family: var(--font-serif); font-style: italic; font-weight: 500; font-size: 26px; margin: 0; }
+.kidLevel { font-weight: 700; font-size: 14px; color: var(--ink-soft); }
+.scrollHint { display: none; font-size: 11px; color: var(--ink-soft); }
+
+/* Grille de sept jours : 7, puis 4, puis 2 colonnes ; sur téléphone, défilement horizontal comme la maquette */
+.grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 10px; margin-top: 8px; }
+@media (max-width: 1100px) { .grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 760px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 480px) {
+  .grid { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-inline: 20px; padding: 2px 20px 6px; margin: 8px -20px 0; }
+  .day { flex: 0 0 170px; scroll-snap-align: start; min-height: 330px; }
+  .scrollHint { display: block; }
+}
+
+.day { background: var(--bg-raised); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 10px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.day.rest { background: var(--bg-sunken); border-style: dashed; box-shadow: none; }
+.dayHead { margin: 0; display: flex; justify-content: space-between; align-items: baseline; gap: 6px; font-family: var(--font-mono); font-weight: 500; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink); }
+.dayHead small { text-transform: none; letter-spacing: 0; color: var(--ink-soft); font-size: 11px; }
+.dayLong { display: none; }
+@media (min-width: 761px) { .dayLong { display: inline; } .dayShort { display: none; } }
+.empty { font-size: 12px; color: var(--ink-soft); font-style: italic; }
+
+/* Élément d'un jour */
+.item { display: flex; flex-direction: column; gap: 5px; padding-top: 8px; border-top: 1px dashed var(--line); }
+.item:first-of-type { border-top: 0; padding-top: 0; }
+.itemTop { display: flex; gap: 6px; align-items: flex-start; }
+.check { width: 20px; height: 20px; margin: 0; flex-shrink: 0; accent-color: var(--success); cursor: pointer; }
+.titleBtn { all: unset; display: block; flex: 1; min-width: 0; box-sizing: border-box; cursor: pointer; font-size: 12.5px; font-weight: 700; line-height: 1.35; color: var(--ink); overflow-wrap: anywhere; }
+.titlePlain { cursor: default; }
+.titleBtn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 3px; }
+.done .titleBtn { color: var(--success); text-decoration: line-through; }
+.chip { display: inline-block; font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.05em; text-transform: uppercase; padding: 1px 5px; border-radius: 4px; color: #fff; margin-right: 4px; vertical-align: 1px; background: var(--k, var(--c-perso)); }
+.meta { font-size: 11px; color: var(--ink-soft); }
+.details { font-size: 12px; line-height: 1.45; color: var(--ink); display: flex; flex-direction: column; gap: 4px; }
+.details p, .details ol { margin: 0; }
+.details ol { padding-left: 18px; }
+.card { display: block; padding: 0; width: 100%; border: 1px solid var(--line); background: #fff; border-radius: 8px; overflow: hidden; cursor: zoom-in; text-align: left; font: inherit; color: inherit; }
+.card img { display: block; width: 100%; height: auto; }
+.done .card { opacity: 0.55; }
+.answer { font-size: 11px; background: var(--success-bg); border-radius: 6px; padding: 4px 6px; }
+.act { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+.act select { font: inherit; font-size: 11px; padding: 2px 4px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); max-width: 100px; }
+.small { font: inherit; font-size: 11px; padding: 2px 7px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink-soft); cursor: pointer; }
+.small:disabled, .act select:disabled { opacity: 0.6; cursor: progress; }
+
+/* Ajout d'une activité dans un jour */
+.addBtn { margin-top: auto; width: 100%; font: inherit; font-size: 11px; padding: 6px; border: 1px dashed var(--line); border-radius: 7px; background: transparent; color: var(--ink-soft); cursor: pointer; }
+.addForm { margin-top: auto; display: flex; flex-direction: column; gap: 5px; }
+.addForm input { font: inherit; font-size: 12px; padding: 5px 7px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--ink); width: 100%; }
+.addRow { display: flex; gap: 4px; }
+.addOk { font: inherit; font-size: 11px; font-weight: 600; padding: 4px 9px; border: none; border-radius: 6px; background: var(--primary); color: var(--primary-ink); cursor: pointer; }
+.addOk:disabled { opacity: 0.6; }
+
+/* Agrandissement d'une carte */
+.lightbox { position: fixed; inset: 0; z-index: 40; background: rgba(20, 14, 12, 0.78); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 16px; }
+.lightbox img { max-width: min(520px, 100%); max-height: calc(100% - 60px); border-radius: 10px; background: #fff; }

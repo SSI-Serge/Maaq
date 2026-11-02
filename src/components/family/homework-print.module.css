@@ -1,0 +1,70 @@
+/*
+ * Version imprimable de la semaine de devoirs : une page A4 paysage par enfant (sept colonnes, cases ☐), puis une page de cartes à découper. Polices et couleurs de la charte MAAQ
+ * (pas de system-ui) ; à l'écran, chaque feuille s'affiche comme un aperçu. Pas de barre de progression ni de compteur (AT-9).
+ */
+
+.root {
+  --c-maths: #3f6b8a;
+  --c-nature: #5e7048;
+  --c-philo: #6b5b95;
+  --c-stim: #b67a24;
+  --c-art: #a8502e;
+  --c-imagination: #93731f;
+  --c-projets: #7a2e32;
+  --c-perso: #6e5f58;
+  min-height: 100dvh;
+  background: var(--bg-sunken);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  padding: 16px max(16px, env(safe-area-inset-left));
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.toolbar { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; }
+.link { color: var(--primary); font-weight: 600; font-size: 13px; text-decoration: none; }
+.note { flex: 1; margin: 0; font-size: 12px; color: var(--ink-soft); }
+.button { font: inherit; font-size: 13px; font-weight: 600; background: var(--primary); color: var(--primary-ink); border: none; border-radius: 8px; padding: 10px 18px; cursor: pointer; }
+
+.kid { display: flex; flex-direction: column; gap: 8px; align-items: stretch; }
+.pageLabel { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); }
+.scroll { overflow-x: auto; padding-bottom: 4px; }
+
+/* Feuille : aperçu à l'écran, page A4 paysage à l'impression */
+.sheet { background: #fff; border: 1px solid var(--line); box-shadow: var(--shadow); min-width: 960px; max-width: 1123px; margin: 0 auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+.head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; border-bottom: 2px solid var(--secondary); padding-bottom: 6px; }
+.name { font-family: var(--font-serif); font-style: italic; font-weight: 500; font-size: 22px; }
+.range { font-size: 12px; color: var(--ink-soft); }
+.level { margin-left: auto; font-weight: 700; font-size: 13px; }
+
+.cols { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
+.col { border: 1px solid var(--line); border-radius: 4px; padding: 6px; min-height: 330px; display: flex; flex-direction: column; gap: 6px; background: #fff; }
+.col.rest { background: var(--bg-sunken); border-style: dashed; }
+.dayHead { display: flex; justify-content: space-between; align-items: baseline; font-family: var(--font-mono); font-weight: 500; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; }
+.dayHead small { text-transform: none; letter-spacing: 0; color: var(--ink-soft); font-size: 10px; }
+.empty { font-size: 11px; color: var(--ink-soft); font-style: italic; }
+.item { display: flex; gap: 5px; align-items: flex-start; padding-top: 5px; border-top: 1px dashed var(--line); font-size: 11.5px; line-height: 1.3; break-inside: avoid; }
+.item:first-of-type { border-top: 0; padding-top: 0; }
+.box { font-size: 16px; line-height: 1; flex-shrink: 0; margin-top: -1px; }
+.chip { display: inline-block; font-family: var(--font-mono); font-size: 8px; letter-spacing: 0.05em; text-transform: uppercase; padding: 1px 4px; border-radius: 3px; color: #fff; margin-right: 3px; vertical-align: 1px; background: var(--k, var(--c-perso)); -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.title { font-weight: 700; overflow-wrap: anywhere; }
+.meta { font-size: 10px; color: var(--ink-soft); margin-top: 1px; }
+
+.cardsSheet { min-height: 420px; }
+.cards { display: flex; flex-wrap: wrap; gap: 6mm; align-content: flex-start; }
+.cardFig { margin: 0; width: 62mm; border: 1px dashed #9a8f86; padding: 2mm; break-inside: avoid; }
+.cardFig img { display: block; width: 100%; height: auto; }
+.cardFig figcaption { text-align: center; font-size: 9pt; margin-top: 1.5mm; }
+
+@media print {
+  .root { background: #fff; padding: 0; min-height: 0; gap: 0; display: block; }
+  .toolbar, .pageLabel { display: none !important; }
+  .scroll { overflow: visible; padding: 0; }
+  .sheet { width: 279mm; max-width: none; min-width: 0; min-height: 188mm; margin: 0; border: 0; box-shadow: none; padding: 0; break-after: page; }
+  .cols { flex: 1; }
+  .col { min-height: 150mm; }
+  .item { font-size: 10pt; }
+  .name { font-size: 18pt; }
+  .kid:last-child .scroll:last-child .sheet { break-after: auto; }
+}

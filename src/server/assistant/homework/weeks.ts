@@ -408,8 +408,13 @@ export async function weekPreparedFor(db: Db, accountId: string, day: string): P
 // Écran « Semaine de devoirs » (RF4)
 // ---------------------------------------------------------------------------------------------------------------------------
 
+/** Domaine d'un élément, pour sa pastille de couleur : les maths (exercices), les six catégories d'activités, ou « Perso » (activité ajoutée par le parent). */
+export type WeekDomain = "maths" | "nature" | "philo" | "stim" | "art" | "imagination" | "projets" | "perso";
+const DOMAIN_OF_CATEGORY: Record<HomeworkActivityCategory, WeekDomain> = { nature: "nature", philosophy: "philo", stem: "stim", art: "art", imagination: "imagination", games_projects: "projets" };
+
 export interface WeekItemView {
   id: string;
+  domain: WeekDomain;
   /** Jour ISO 1 à 7. */
   day: number;
   kind: "exercise" | "activity" | "custom";
@@ -475,17 +480,17 @@ export async function getWeek(ctx: Ctx, session: SessionContext, weekId: string)
           const day = isoWeekday(r.day);
           if (r.number !== null && r.textbook_key && r.level) {
             return {
-              id: String(r.id), day, kind: "exercise", title: r.theme ?? "", source: `${labels.get(r.textbook_key) ?? r.textbook_key} ${LEVEL_LABEL[r.level]} · Ex ${r.number}`,
+              id: String(r.id), day, domain: "maths", kind: "exercise", title: r.theme ?? "", source: `${labels.get(r.textbook_key) ?? r.textbook_key} ${LEVEL_LABEL[r.level]} · Ex ${r.number}`,
               statement: r.statement, answer: r.answer, steps: [], materials: null, needsAdult: false, card: null, checked: r.checked_at !== null,
             };
           }
           if (r.activity_title && r.category) {
             return {
-              id: String(r.id), day, kind: "activity", title: r.activity_title, source: `Fiche ${categoryLabel(r.category)}${r.needs_adult ? " · avec un adulte" : ""}`, statement: r.description,
+              id: String(r.id), day, domain: DOMAIN_OF_CATEGORY[r.category], kind: "activity", title: r.activity_title, source: `Fiche ${categoryLabel(r.category)}${r.needs_adult ? " · avec un adulte" : ""}`, statement: r.description,
               answer: null, steps: splitSteps(r.steps), materials: r.materials, needsAdult: Boolean(r.needs_adult), card: cardUrl(r.card_ref), checked: r.checked_at !== null,
             };
           }
-          return { id: String(r.id), day, kind: "custom", title: r.custom_title ? open(r.custom_title) : "", source: "Activité du parent", statement: null, answer: null, steps: [], materials: null, needsAdult: false, card: null, checked: r.checked_at !== null };
+          return { id: String(r.id), day, domain: "perso", kind: "custom", title: r.custom_title ? open(r.custom_title) : "", source: "Activité du parent", statement: null, answer: null, steps: [], materials: null, needsAdult: false, card: null, checked: r.checked_at !== null };
         }),
     });
   }

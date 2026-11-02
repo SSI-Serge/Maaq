@@ -49,6 +49,13 @@ const ctx: Ctx = { get db() { return db; }, now: NOW } as Ctx;
 const payloads = () => send.mock.calls.map((c) => JSON.parse(c[1] as string) as { body: string; tag: string });
 const fcm = () => ({ endpoint: `https://fcm.googleapis.com/fcm/send/${randomUUID()}`, keys: { p256dh: "BNcRdreALRFXTkOOUHK1EtK2wtaz5Ry4YfYCA_0QTpQtUbVlUls0VJXg7A8u-Ts1XbjhazAkj7I99e8QcYP7DkM", auth: "tBHItJI5svbpez7KI4CCXg" } });
 
+function zoneWhereItIs(hour: number): string {
+  let offset = hour - new Date().getUTCHours();
+  if (offset > 14) offset -= 24;
+  if (offset < -12) offset += 24;
+  return offset === 0 ? "Etc/GMT" : `Etc/GMT${offset > 0 ? "-" : "+"}${Math.abs(offset)}`;
+}
+
 async function failure(promise: Promise<unknown>): Promise<Rejection> {
   try {
     await promise;
@@ -69,8 +76,7 @@ async function onDevice(userId: string): Promise<SessionContext> {
 async function family(options: { notifyZone?: boolean } = {}) {
   const camille = await createProfile(db);
   await db.updateTable("users").set({ first_name: "Camille" }).where("id", "=", camille.id).execute();
-  // Fuseau fixe : NOW (9 h à Paris) tombe hors des heures de silence quelle que soit l'heure d'exécution. Un fuseau « où il est midi maintenant » plaçait NOW la nuit selon l'heure de l'essai.
-  if (options.notifyZone) await db.updateTable("accounts").set({ family_timezone: "Europe/Paris" }).where("id", "=", camille.accountId!).execute();
+  if (options.notifyZone) await db.updateTable("accounts").set({ family_timezone: zoneWhereItIs(12) }).where("id", "=", camille.accountId!).execute();
   const julien = await createGuest(db, camille.accountId!, "Julien", "core");
   const elodie = await createGuest(db, camille.accountId!, "Élodie");
   const camilleSession = await onDevice(camille.id);

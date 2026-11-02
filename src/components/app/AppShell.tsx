@@ -74,12 +74,18 @@ export function AppShell({
   subtitle,
   back,
   action,
+  eyebrow,
+  wide,
   children,
 }: {
   title: string;
   subtitle?: ReactNode;
   back?: { href: string; label: string };
   action?: ReactNode;
+  /** Surtitre en police mono majuscule au-dessus du titre (semaine de devoirs) : donne aussi au titre sa forme italique et un filet d'accent. */
+  eyebrow?: string;
+  /** Page large (grille de sept jours) : la colonne de 390 px laisse la place à 1 320 px au plus ; les onglets du bas restent à leur largeur. */
+  wide?: boolean;
   children: ReactNode;
 }) {
   const pathname = usePathname();
@@ -89,17 +95,19 @@ export function AppShell({
   const tabs = TABS.filter((tab) => (!tab.primaryOnly || user.role === "primary_user") && (!tab.coreOnly || isCore));
 
   return (
-    <div className={styles.app}>
+    <div className={`${styles.app} ${wide ? styles.appWide : ""}`}>
       <header className={styles.header}>
         {back && (
           <Link href={back.href} className={styles.back}>
             ‹ {back.label}
           </Link>
         )}
+        {eyebrow && <div className={styles.eyebrow}>{eyebrow}</div>}
         <div className={styles.headerRow}>
-          <h1 className={styles.title}>{title}</h1>
+          <h1 className={`${styles.title} ${eyebrow ? styles.titleItalic : ""}`}>{title}</h1>
           {action}
         </div>
+        {eyebrow && <div className={styles.rule} aria-hidden />}
         {subtitle && <p className={styles.subtitle}>{subtitle}</p>}
       </header>
       <div className={styles.content}>{children}</div>

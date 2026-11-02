@@ -186,7 +186,7 @@ describe("préparer la semaine (US-119 RF4)", () => {
     expect(week).toMatchObject({ weekStart: WEEK, workDays: [1, 2, 3] });
     expect(week.children[0].items.filter((i) => i.day === 1)).toHaveLength(6);
     const exerciseItem = week.children[0].items.find((i) => i.kind === "exercise")!;
-    expect(exerciseItem).toMatchObject({ source: expect.stringContaining("Manuel France CE1 · Ex"), checked: false });
+    expect(exerciseItem).toMatchObject({ domain: "maths", source: expect.stringContaining("Manuel France CE1 · Ex"), checked: false });
     expect(exerciseItem.answer).toBeTruthy();
     expect(exerciseItem.statement).toBeTruthy(); // l'énoncé vient de la base (D66)
   });
@@ -198,7 +198,7 @@ describe("préparer la semaine (US-119 RF4)", () => {
     expect(first.description).toBeTruthy(); // proposée dans le parcours de préparation, au-dessus des étapes
     const { weekId } = await prepareWeek(ctx(), f.camilleSession, { weekStart: WEEK, workDays: [1], children: [{ memberId: f.leo, items: [{ kind: "activity", activityId: first.activityId, days: [1] }] }] });
     const item = (await getWeek(ctx(), f.camilleSession, weekId)).children[0].items[0];
-    expect(item).toMatchObject({ kind: "activity", needsAdult: first.needsAdult, card: first.card });
+    expect(item).toMatchObject({ kind: "activity", domain: "nature", needsAdult: first.needsAdult, card: first.card }); // la pastille de couleur de la semaine suit la catégorie
     expect(item.statement).toBe(first.description); // la description s'affiche dans la semaine, avant les étapes
     expect(item.steps.length).toBeGreaterThan(0);
     expect(item.materials).toBeTruthy();
