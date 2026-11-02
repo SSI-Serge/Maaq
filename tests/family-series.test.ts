@@ -214,7 +214,10 @@ describe("confirmation de la série (US-109 RF5, RF6, RT2)", () => {
     expect(rows.every((r) => r.status === "confirmed")).toBe(true);
     const series = await db.selectFrom("family_event_series").select(["status", "confirmed_by_user_id"]).where("id", "=", seriesId).executeTakeFirstOrThrow();
     expect(series).toMatchObject({ status: "confirmed", confirmed_by_user_id: f.camille.id });
-    const notices = payloads().filter((c) => c.tag.startsWith("notice-"));
+    // Seules les notifications de CETTE série comptent : un passage du planificateur envoie aussi les réservations des autres familles de la base partagée (celles des tests précédents
+    // deviennent dues après 10 minutes, ce que dure une suite lente), qui n'ont rien à voir avec l'assertion.
+    const mine = new Set(rows.map((r) => `notice-${r.id}`));
+    const notices = payloads().filter((c) => mine.has(c.tag));
     expect(notices).toHaveLength(1); // une seule notification pour toute la série
     expect(notices[0].body).toMatch(/^Camille a ajouté : Foot, chaque mercredi à \d+h\d\d, à partir du 0[45]\/11$/); // la série est créée à l'heure de Paris et lue dans le fuseau « où il est midi » : selon l'heure réelle de l'essai, la séance du 04/11 tombe le 04 ou le 05
   });
@@ -424,7 +427,8 @@ describe("rappels, relances et planificateur (US-109 RF9, RT1, D47, D51)", () =>
     const f = await family({ notifyZone: true });
     const { eventIds } = await createSeries(db, base(f));
     await db.updateTable("family_events").set({ created_at: new Date(Date.now() - 11 * 60_000) }).where("account_id", "=", f.accountId).execute();
-    await runEventNotices(ctx);
+    // Le passage est limité au RDV de l'essai : sans cela il enverrait aussi les réservations échues d'autres familles (voir plus haut).
+    await runEventNotices(ctx, { eventId: eventIds[0] });
     const calls = payloads().filter((c) => c.tag.startsWith("notice-"));
     expect(calls).toHaveLength(1);
     expect(calls[0].tag).toBe(`notice-${eventIds[0]}`);
