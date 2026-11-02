@@ -62,15 +62,17 @@ export function ButtonLink({
   href,
   variant = "primary",
   block = false,
+  className,
   children,
 }: {
   href: string;
   variant?: ButtonVariant;
   block?: boolean;
+  className?: string;
   children: ReactNode;
 }) {
   return (
-    <Link href={href} className={cx(styles.button, styles[variant], block && styles.block)}>
+    <Link href={href} className={cx(styles.button, styles[variant], block && styles.block, className)}>
       {children}
     </Link>
   );

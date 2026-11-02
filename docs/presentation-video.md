@@ -8,6 +8,10 @@
 - Sans vidéo configurée, l'écran n'est jamais proposé (`presentationDue` faux) ; si le stockage est illisible, l'application continue sans l'écran.
 - Accès permanent : Réglages › Aide › « Revoir la présentation » (`/reglages/presentation`), sans marquer « vu ».
 
+## Mise en page (maquettes v58)
+
+D'après Decouvrir-MAAQ, -Invite, -Ordinateur et Revoir-Presentation (un seul composant, `src/components/presentation/PresentationPlayer.tsx`) : en-tête (surtitre « Bienvenue » ou « Réglages › Aide », titre, phrase) ; lecteur réduit (200 px, 9:16) à l'accueil d'un téléphone puis pleine largeur, l'en-tête disparaissant pendant la lecture ; cadre 16:9 aux couleurs de la charte sur ordinateur (800 px) ; format qui suit la vidéo (vertical ou horizontal, lu dans les métadonnées). Commandes de MAAQ (pause, barre, heure, CC, son), sous-titres affichés par MAAQ, carte de fin (« M », phrase de clôture, mention des invités secondaires), message d'échec dans le lecteur avec « Continuer » ou « Retour aux réglages », « Revoir la vidéo » après la fin, « Lire le texte de la vidéo » (une phrase par ligne, heure en début de ligne facultative), « Passer » seulement à l'accueil. Dans Réglages, groupe « Aide » : Revoir la présentation puis Aide & support.
+
 ## Fichiers servis
 
 - Stockage : bucket dédié (variable `PRESENTATION_BUCKET`, zone de test : `maaq-test-media`, europe-west1, accès public interdit, compte de service de l'application) ; sans variable, dossier local `.data/presentation-media`. Une description `presentation/manifest.json` dit ce qui est configuré ; aucune table.

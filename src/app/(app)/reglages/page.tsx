@@ -98,20 +98,31 @@ export default function SettingsPage() {
               <span aria-hidden>›</span>
             </Link>
           )}
-          <Link href="/reglages/support" className={s.navItem}>
-            Aide et support <span aria-hidden>›</span>
-          </Link>
+        </div>
+      </Section>
+
+      {/* Groupe « Aide » (maquette Réglages) : la présentation, puis l'aide et le support. */}
+      <Section title="Aide">
+        <div className={s.navList}>
           {presentation.data?.presentation && user.role !== "admin" && (
             <Link href="/reglages/presentation" className={s.navItem}>
               <span>
                 Revoir la présentation
                 <span className={s.muted} style={{ display: "block", fontWeight: 400, fontSize: 12 }}>
-                  Tout ce que MAAQ peut faire, en 1 minute
+                  La vidéo « Découvrir MAAQ en 1 minute »
                 </span>
               </span>
               <span aria-hidden>›</span>
             </Link>
           )}
+          <Link href="/reglages/support" className={s.navItem}>
+            Aide &amp; support <span aria-hidden>›</span>
+          </Link>
+        </div>
+      </Section>
+
+      <section className={s.section}>
+        <div className={s.navList}>
           <Link href="/reglages/carnet" className={s.navItem}>
             <span>
               Carnet
@@ -125,7 +136,7 @@ export default function SettingsPage() {
             Confidentialité et conditions d&apos;utilisation <span aria-hidden>›</span>
           </Link>
         </div>
-      </Section>
+      </section>
 
       <ExportSection />
 

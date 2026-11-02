@@ -129,7 +129,7 @@ export default function AdminPresentationPage() {
             </label>
             <input id="pres-duration" name="durationLabel" className={s.input} style={{ maxWidth: 240 }} maxLength={30} defaultValue={data.view?.durationLabel ?? ""} />
             <label className={s.label} htmlFor="pres-transcript" style={{ marginTop: 12 }}>
-              Transcription du texte de la vidéo (paragraphes séparés par une ligne vide)
+              Texte de la vidéo : une phrase par ligne, avec son heure en début de ligne si vous voulez l&apos;afficher (par exemple « 0:15 Dites ou écrivez un rendez-vous… »)
             </label>
             <textarea id="pres-transcript" name="transcript" className={s.textarea} rows={8} maxLength={8000} defaultValue={data.view?.transcript ?? ""} />
             <div className={s.actions}>

@@ -1,11 +1,79 @@
-/* Vidéo de présentation (US-140) : lecteur dans la charte MAAQ, format de la vidéo respecté (vertical ou horizontal). */
-.player { display: flex; flex-direction: column; gap: 12px; }
-.frame { position: relative; width: 100%; background: var(--bg-sunken); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; display: flex; justify-content: center; }
-.video { display: block; width: 100%; max-height: 62dvh; object-fit: contain; background: var(--bg-sunken); }
-.overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(246, 240, 228, 0.7); }
-.launch { display: flex; flex-direction: column; gap: 6px; }
-.size { margin: 0; font-size: 12px; color: var(--ink-soft); text-align: center; }
-.transcript { font-size: 13px; line-height: 1.55; background: var(--bg-raised); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; }
-.transcript summary { cursor: pointer; font-weight: 700; color: var(--primary); }
-.transcript p { margin: 8px 0 0; }
-.note { margin: 0; font-size: 13px; color: var(--ink-soft); font-style: italic; text-align: center; }
+/*
+ * Vidéo de présentation (US-140), d'après les maquettes Decouvrir-MAAQ, -Invite, -Ordinateur et Revoir-Presentation : en-tête (surtitre, titre, phrase), lecteur réduit à l'accueil puis
+ * plein écran sur téléphone (l'en-tête disparaît pendant la lecture), cadre 16:9 aux couleurs de la charte sur ordinateur, vidéo verticale ou horizontale selon le fichier.
+ */
+.page { min-height: 100dvh; background: var(--bg); color: var(--ink); display: flex; flex-direction: column; align-items: center; font-family: var(--font-sans); }
+.inner { width: 100%; max-width: 800px; display: flex; flex-direction: column; flex: 1; }
+
+.head { padding: 44px 24px 12px; padding-top: max(44px, env(safe-area-inset-top)); }
+.headRow { display: flex; align-items: center; gap: 10px; }
+.headText { flex: 1; }
+.back { width: 36px; height: 36px; margin-left: -8px; display: flex; align-items: center; justify-content: center; color: var(--ink); flex-shrink: 0; text-decoration: none; }
+.eyebrow { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--primary); }
+.title { font-family: var(--font-serif); font-weight: 500; font-size: 23px; line-height: 1.2; margin: 0; color: var(--ink); }
+.desc { font-size: 13px; color: var(--ink-soft); line-height: 1.5; margin: 6px 0 0; }
+
+.body { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 4px 24px 20px; }
+.actions { display: flex; flex-direction: column; gap: 10px; align-self: stretch; }
+
+/* Lecteur : 9:16 réduit à l'accueil, pleine largeur ensuite (téléphone) ; 16:9 sur ordinateur */
+.frame { position: relative; flex-shrink: 0; overflow: hidden; background: #2b211f; border-radius: 12px; }
+.frame[data-shape="portrait"] { width: 200px; aspect-ratio: 9 / 16; }
+.frame[data-shape="landscape"] { width: 100%; aspect-ratio: 16 / 9; }
+.frame[data-phase="idle"] { background: linear-gradient(160deg, #7a2e32, #b4913a); }
+.video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: transparent; }
+.layer { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 20px; text-align: center; }
+.layerLoading { background: #2b211f; }
+.layerEnd { background: linear-gradient(160deg, #5e2126, #7a2e32); }
+.layerError { background: #5e2126; }
+.layerText { font-size: 14px; color: var(--primary-ink); line-height: 1.5; max-width: 28ch; margin: 0; }
+.layerLoading .layerText { font-size: 13px; }
+.spin { width: 34px; height: 34px; border: 3px solid rgba(247, 241, 230, 0.9); border-right-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.badge { position: absolute; top: 50%; left: 50%; width: 64px; height: 64px; margin: -32px 0 0 -32px; border-radius: 50%; background: rgba(43, 33, 31, 0.72); display: flex; align-items: center; justify-content: center; pointer-events: none; }
+.duration { position: absolute; right: 8px; bottom: 8px; font-family: var(--font-mono); font-size: 10px; background: rgba(43, 33, 31, 0.75); color: var(--primary-ink); border-radius: 4px; padding: 2px 6px; }
+
+.endMark { width: 52px; height: 52px; border-radius: 14px; background: var(--primary); color: var(--primary-ink); display: flex; align-items: center; justify-content: center; font-family: var(--font-serif); font-weight: 600; font-size: 22px; }
+.endText { font-family: var(--font-serif); font-size: 19px; color: var(--primary-ink); line-height: 1.35; max-width: 26ch; margin: 0; }
+.endNote { font-size: 13px; color: var(--primary-ink); background: rgba(247, 241, 230, 0.15); border-radius: 8px; padding: 8px 12px; margin: 0; }
+
+.subtitle { position: absolute; left: 12px; right: 12px; bottom: 62px; text-align: center; pointer-events: none; }
+.subtitle span { display: inline-block; background: rgba(43, 33, 31, 0.82); color: #fff; font-size: 14px; line-height: 1.4; border-radius: 6px; padding: 5px 9px; white-space: pre-line; }
+
+.controls { position: absolute; left: 0; right: 0; bottom: 0; padding: 8px 10px; background: linear-gradient(transparent, rgba(43, 33, 31, 0.85)); display: flex; align-items: center; gap: 8px; color: var(--primary-ink); }
+.iconBtn { width: 36px; height: 36px; border: none; background: none; color: inherit; display: flex; align-items: center; justify-content: center; padding: 0; cursor: pointer; }
+.track { flex: 1; height: 4px; border-radius: 2px; background: rgba(247, 241, 230, 0.35); }
+.trackFill { height: 100%; border-radius: 2px; background: var(--secondary); }
+.time { font-family: var(--font-mono); font-size: 10px; white-space: nowrap; }
+.cc { min-width: 36px; height: 28px; border-radius: 5px; font-size: 11px; font-weight: 700; border: 1.5px solid var(--primary-ink); background: transparent; color: var(--primary-ink); cursor: pointer; }
+.cc[aria-pressed="true"] { background: var(--primary-ink); color: #2b211f; }
+
+.cta { min-height: 48px; font-size: 15px; gap: 8px; }
+.size { margin: -4px 0 0; font-size: 12px; color: var(--ink-soft); text-align: center; }
+.link { background: none; border: none; padding: 6px 0; font: inherit; font-size: 13px; font-weight: 700; color: var(--primary); text-decoration: underline; align-self: center; cursor: pointer; }
+.skip { align-self: center; padding: 10px 16px; font-size: 14px; font-weight: 700; color: var(--ink-soft); background: none; border: none; font-family: inherit; cursor: pointer; }
+
+.transcript { align-self: stretch; background: var(--bg-raised); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+.transcriptTitle { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); }
+.line { display: flex; gap: 10px; font-size: 13px; line-height: 1.45; }
+.lineTime { font-family: var(--font-mono); font-size: 11px; color: var(--ink-soft); flex-shrink: 0; width: 34px; }
+
+/* Téléphone, vidéo lancée : l'en-tête disparaît et le lecteur prend toute la largeur */
+@media (max-width: 767px) {
+  .immersive .head { display: none; }
+  .immersive .body { gap: 0; padding: 0 24px 16px; }
+  .immersive .frame { align-self: stretch; width: auto; margin: 0 -24px; border-radius: 0; aspect-ratio: var(--ratio, 9 / 16); }
+  .immersive .actions { padding-top: 14px; }
+  .immersive .transcript { margin-top: 14px; }
+}
+
+/* Ordinateur : cadre 16:9 aux couleurs de la charte, vidéo centrée dedans */
+@media (min-width: 768px) {
+  .head { padding: 40px 0 18px; }
+  .title { font-size: 30px; }
+  .body { padding: 0 0 24px; }
+  .frame, .frame[data-shape="portrait"], .frame[data-shape="landscape"] { width: 100%; aspect-ratio: 16 / 9; background: linear-gradient(160deg, #5e2126, #7a2e32); }
+  .frame[data-phase="idle"] { background: linear-gradient(160deg, #7a2e32, #b4913a); }
+  .subtitle { bottom: 58px; }
+}
