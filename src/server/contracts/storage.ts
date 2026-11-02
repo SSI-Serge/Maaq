@@ -24,13 +24,19 @@ export interface ObjectStore {
   remove(key: string): Promise<void>;
 }
 
-function checkKey(key: string): string {
-  if (!SAFE_KEY.test(key)) throw new Error("Clé de stockage invalide");
+function checkKey(key: string, safe: RegExp = SAFE_KEY): string {
+  if (!safe.test(key)) throw new Error("Clé de stockage invalide");
   return key;
 }
 
-class LocalStore implements ObjectStore {
-  private file = (key: string) => path.join(dataDir(), "contract-documents", ...checkKey(key).slice(KEY_PREFIX.length).split("/"));
+/** Stockage dans le dossier de données local (essais et développement). Réutilisé, avec ses propres clés admises, par les fichiers de la vidéo de présentation. */
+export class LocalStore implements ObjectStore {
+  constructor(
+    private readonly safe: RegExp = SAFE_KEY,
+    private readonly folder = "contract-documents",
+    private readonly prefix = KEY_PREFIX,
+  ) {}
+  private file = (key: string) => path.join(dataDir(), this.folder, ...checkKey(key, this.safe).slice(this.prefix.length).split("/"));
   async put(key: string, bytes: Buffer) {
     const file = this.file(key);
     await mkdir(path.dirname(file), { recursive: true });
@@ -55,14 +61,18 @@ async function accessToken(): Promise<string> {
   return token.value;
 }
 
-class GcsStore implements ObjectStore {
-  constructor(private readonly bucket: string) {}
+/** Stockage dans un bucket Cloud Storage de l'Union européenne, par l'API REST et le jeton du compte de service de Cloud Run. */
+export class GcsStore implements ObjectStore {
+  constructor(
+    private readonly bucket: string,
+    private readonly safe: RegExp = SAFE_KEY,
+  ) {}
   private async call(url: string, init: RequestInit = {}) {
     const response = await fetch(url, { ...init, headers: { ...(init.headers ?? {}), Authorization: `Bearer ${await accessToken()}` } });
     return response;
   }
   async put(key: string, bytes: Buffer) {
-    const response = await this.call(`https://storage.googleapis.com/upload/storage/v1/b/${this.bucket}/o?uploadType=media&name=${encodeURIComponent(checkKey(key))}`, {
+    const response = await this.call(`https://storage.googleapis.com/upload/storage/v1/b/${this.bucket}/o?uploadType=media&name=${encodeURIComponent(checkKey(key, this.safe))}`, {
       method: "POST",
       headers: { "Content-Type": "application/octet-stream" },
       body: new Uint8Array(bytes),
@@ -70,12 +80,12 @@ class GcsStore implements ObjectStore {
     if (!response.ok) throw new Error(`Dépôt dans le stockage refusé (${response.status})`);
   }
   async get(key: string) {
-    const response = await this.call(`https://storage.googleapis.com/storage/v1/b/${this.bucket}/o/${encodeURIComponent(checkKey(key))}?alt=media`);
+    const response = await this.call(`https://storage.googleapis.com/storage/v1/b/${this.bucket}/o/${encodeURIComponent(checkKey(key, this.safe))}?alt=media`);
     if (!response.ok) throw new Error(`Lecture du stockage refusée (${response.status})`);
     return Buffer.from(await response.arrayBuffer());
   }
   async remove(key: string) {
-    const response = await this.call(`https://storage.googleapis.com/storage/v1/b/${this.bucket}/o/${encodeURIComponent(checkKey(key))}`, { method: "DELETE" });
+    const response = await this.call(`https://storage.googleapis.com/storage/v1/b/${this.bucket}/o/${encodeURIComponent(checkKey(key, this.safe))}`, { method: "DELETE" });
     if (!response.ok && response.status !== 404) throw new Error(`Suppression du stockage refusée (${response.status})`);
   }
 }

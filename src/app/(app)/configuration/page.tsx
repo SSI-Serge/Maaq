@@ -151,7 +151,6 @@ function SetupFlow({ initial }: { initial: Setup }) {
               <Field label="Prénom de votre invité" value={guest.firstName} error={errors.firstName} maxLength={100} onChange={(e) => setGuest({ ...guest, firstName: e.target.value })} />
               <Field label="Nom de votre invité" value={guest.lastName} error={errors.lastName} maxLength={100} onChange={(e) => setGuest({ ...guest, lastName: e.target.value })} />
               <Field label="Email de l'invité" type="email" value={guest.email} error={errors.email} placeholder="julien@exemple.fr" onChange={(e) => setGuest({ ...guest, email: e.target.value })} />
-              <Field label="Téléphone de l'invité (facultatif)" type="tel" value={guest.phone} error={errors.phone} placeholder="06 98 76 54 32" onChange={(e) => setGuest({ ...guest, phone: e.target.value })} />
               <Notice tone="info">
                 Optionnel à cette étape — votre invité deviendra votre « Invité 1 ». L&apos;invitation lui sera envoyée depuis l&apos;onglet Invités.
               </Notice>

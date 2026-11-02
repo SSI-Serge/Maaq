@@ -34,6 +34,7 @@ export default function SettingsPage() {
   const user = useSessionUser();
   const router = useRouter();
   const profile = useApiQuery<Profile>("/api/profile");
+  const presentation = useApiQuery<{ presentation: { version: string } | null }>("/api/presentation");
 
   // L'administrateur a ses propres réglages dans la console.
   useEffect(() => {
@@ -100,6 +101,17 @@ export default function SettingsPage() {
           <Link href="/reglages/support" className={s.navItem}>
             Aide et support <span aria-hidden>›</span>
           </Link>
+          {presentation.data?.presentation && user.role !== "admin" && (
+            <Link href="/reglages/presentation" className={s.navItem}>
+              <span>
+                Revoir la présentation
+                <span className={s.muted} style={{ display: "block", fontWeight: 400, fontSize: 12 }}>
+                  Tout ce que MAAQ peut faire, en 1 minute
+                </span>
+              </span>
+              <span aria-hidden>›</span>
+            </Link>
+          )}
           <Link href="/reglages/carnet" className={s.navItem}>
             <span>
               Carnet

@@ -1,0 +1,11 @@
+/* Vidéo de présentation (US-140) : lecteur dans la charte MAAQ, format de la vidéo respecté (vertical ou horizontal). */
+.player { display: flex; flex-direction: column; gap: 12px; }
+.frame { position: relative; width: 100%; background: var(--bg-sunken); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; display: flex; justify-content: center; }
+.video { display: block; width: 100%; max-height: 62dvh; object-fit: contain; background: var(--bg-sunken); }
+.overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(246, 240, 228, 0.7); }
+.launch { display: flex; flex-direction: column; gap: 6px; }
+.size { margin: 0; font-size: 12px; color: var(--ink-soft); text-align: center; }
+.transcript { font-size: 13px; line-height: 1.55; background: var(--bg-raised); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; }
+.transcript summary { cursor: pointer; font-weight: 700; color: var(--primary); }
+.transcript p { margin: 8px 0 0; }
+.note { margin: 0; font-size: 13px; color: var(--ink-soft); font-style: italic; text-align: center; }

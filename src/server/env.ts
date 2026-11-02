@@ -70,6 +70,8 @@ const schema = z.object({
   /** Stockage des documents de contrat : « local » (dossier de données, par défaut) ou « gcs » (bucket Cloud Storage en Union européenne, avec CONTRACT_BUCKET). */
   CONTRACT_STORAGE: z.enum(["local", "gcs"]).default("local"),
   CONTRACT_BUCKET: z.string().min(3).optional(),
+  /** Bucket Cloud Storage (UE) de la vidéo de présentation (US-140), distinct de celui des contrats. Absent : dossier de données local. */
+  PRESENTATION_BUCKET: z.string().min(3).optional(),
   /** Service interne de lecture des documents (OCR, noms propres), `services/contract-reader`. Absent : les documents restent en attente de masquage. */
   CONTRACT_READER_URL: z.string().url().optional(),
 });
