@@ -34,7 +34,7 @@ export default function InstallGuidePage() {
 
   return (
     <Screen>
-      <div className={styles.eyebrow}>Première visite</div>
+      <div className={styles.eyebrow}>Installer MAAQ sur votre téléphone</div>
       <h1 className={styles.title}>Installer MAAQ</h1>
       <p className={styles.lead}>Ajoutez MAAQ à votre écran d&apos;accueil pour l&apos;ouvrir aussi vite qu&apos;une app native.</p>
 
