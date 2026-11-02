@@ -23,7 +23,7 @@ export type ArrayTypeImpl<T> = T extends ColumnType<infer S, infer I, infer U>
   ? ColumnType<S[], I[], U[]>
   : T[];
 
-export type AuditAction = "account_created" | "account_updated" | "activation_link_resent" | "agent_blocked" | "agent_published" | "agent_reactivated" | "contract_analysis_decided" | "contract_archived" | "contract_created" | "contract_document_field_changed" | "contract_field_changed" | "contract_review_viewed" | "contract_updated" | "device_revoked_by_admin";
+export type AuditAction = "account_created" | "account_updated" | "activation_link_resent" | "agent_blocked" | "agent_published" | "agent_reactivated" | "contract_analysis_decided" | "contract_archived" | "contract_created" | "contract_document_field_changed" | "contract_field_changed" | "contract_review_viewed" | "presentation_updated" | "contract_updated" | "device_revoked_by_admin";
 
 export type ChangeScope = "all" | "following" | "this";
 
@@ -1915,6 +1915,10 @@ export interface Users {
    * Téléphone mobile pour SMS (invitation, code de vérification). Distinct du téléphone saisi pour les agents (US-19 RF5)
    */
   phone: string | null;
+  /**
+   * Date à laquelle le profil a vu ou passé l'écran « Découvrir MAAQ » (vidéo de présentation) : l'écran n'est plus proposé ensuite ; vide tant qu'il n'a pas été vu. Seule donnée de lecture conservée (aucune durée, aucun compteur). Entre dans l'export des données du profil et disparaît avec lui. [US-140 RF4, RT3]
+   */
+  presentation_seen_at: Timestamp | null;
   /**
    * Date de suppression définitive des données du profil : délai de grâce de 30 jours (auto-suppression, durée unique décidée le 01/10/2026) ou X jours après retrait (US-20 RT2, paramètre de la console)
    */

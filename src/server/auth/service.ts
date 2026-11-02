@@ -4,6 +4,7 @@ import { digitorn } from "@/server/adapters/digitorn";
 import type { DB, SecurityEventType } from "@/server/db/schema.generated";
 import { randomToken, sha256 } from "@/server/security/crypto";
 import { hashSecret, isStrongPassword, verifySecret } from "@/server/security/password";
+import { presentationConfigured } from "@/server/presentation/service";
 import { checkCode, issueCode, type CheckResult } from "./codes";
 import {
   sendCode,
@@ -45,6 +46,8 @@ export interface SessionContext {
     email: string;
     setupCompleted: boolean;
     inGracePeriod: boolean;
+    /** L'écran « Découvrir MAAQ » reste à voir : une vidéo est configurée et ce profil (hors administrateur) ne l'a ni vue ni passée (US-140). */
+    presentationDue: boolean;
   };
   device: {
     id: string;
@@ -98,6 +101,7 @@ export function homeFor(session: SessionContext): string {
   if (session.user.inGracePeriod) return "/reprise-compte";
   if (session.user.role !== "admin" && (!session.device.hasPattern || session.device.patternLocked)) return "/schema/creer";
   if (session.user.role === "admin") return "/admin/agents";
+  if (session.user.presentationDue) return "/decouvrir";
   if (session.user.role === "primary_user" && !session.user.setupCompleted) return "/configuration";
   return "/accueil";
 }
@@ -142,6 +146,7 @@ export async function getSession(ctx: Ctx, token: string | undefined): Promise<S
       "u.email",
       "u.status",
       "u.initial_setup_step",
+      "u.presentation_seen_at",
       "a.status as account_status",
       "d.id as device_id",
       "d.device_type",
@@ -175,6 +180,7 @@ export async function getSession(ctx: Ctx, token: string | undefined): Promise<S
       email: row.email,
       setupCompleted: row.initial_setup_step === null || row.initial_setup_step === "completed",
       inGracePeriod: row.status === "grace_period" || row.account_status === "grace_period",
+      presentationDue: row.role !== "admin" && row.presentation_seen_at === null && (await presentationConfigured()),
     },
     device: {
       id: row.device_id,

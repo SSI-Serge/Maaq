@@ -3,8 +3,19 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-02T01:30:00Z",
+  "updated": "2026-11-02T22:45:00Z",
   "deploys": [
+    {
+      "at": "2026-11-02T22:45:00Z",
+      "env": "preview",
+      "what": "Zone de test : vidéo « Découvrir MAAQ » dans le parcours (lot 12 appliqué à la base de test), console Vidéo de présentation, clip de démonstration",
+      "storyIds": [
+        "f19s1",
+        "f19s2",
+        "f19s3",
+        "f19s4"
+      ]
+    },
     {
       "at": "2026-11-02T00:30:00Z",
       "env": "preview",
@@ -2604,6 +2615,48 @@
       "unsure": [
         "Production : rien n'est ouvert ; le coût du service de lecture et du bucket n'est accordé que pour le projet de test.",
         "Avis du DPO, brief du consultant et seuil de non-fuite sur de vrais documents encore attendus avant l'ouverture réelle."
+      ]
+    },
+    {
+      "id": "f19",
+      "name": "Découvrir MAAQ en vidéo (US-140)",
+      "desc": "Une courte vidéo de présentation proposée une fois à chaque profil après l'inscription, puis à revoir dans Réglages › Aide ; l'administrateur la remplace sans livraison.",
+      "building": false,
+      "stories": [
+        {
+          "id": "f19s1",
+          "title": "Découvrir MAAQ en vidéo une fois, avec sous-titres et texte, sans son ni lecture automatique",
+          "state": "testing",
+          "env": "preview",
+          "at": "2026-11-02T22:45:00Z",
+          "unsure": [
+            "Mise en page non comparée aux maquettes v58 ; lecture non essayée sur un vrai iPhone ni sur Android."
+          ]
+        },
+        {
+          "id": "f19s2",
+          "title": "Revoir la présentation depuis Réglages › Aide",
+          "state": "testing",
+          "env": "preview",
+          "at": "2026-11-02T22:45:00Z"
+        },
+        {
+          "id": "f19s3",
+          "title": "Remplacer ou retirer la vidéo depuis la console, sans livraison",
+          "state": "testing",
+          "env": "preview",
+          "at": "2026-11-02T22:45:00Z",
+          "unsure": [
+            "La zone de test ne contient qu'un clip de démonstration ; la vraie vidéo reste à déposer."
+          ]
+        },
+        {
+          "id": "f19s4",
+          "title": "Un invité voit la même vidéo, avec la mention des fonctions réservées aux parents",
+          "state": "testing",
+          "env": "preview",
+          "at": "2026-11-02T22:45:00Z"
+        }
       ]
     }
   ],

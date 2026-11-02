@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { logAdminAction } from "@/server/admin/audit";
 import { requireAdmin } from "@/server/auth/http";
 import { handler, Rejection } from "@/server/http";
 import { adminView, removePresentation, savePresentation, type Deposit } from "@/server/presentation/service";
@@ -23,7 +24,7 @@ const textOf = (form: FormData, name: string): string | undefined => {
 
 /** Dépose ou remplace la vidéo, ses sous-titres, l'image d'aperçu, la durée affichée et la transcription (US-140 RF9) : sans livraison de l'application. */
 export const POST = handler(async (request: Request) => {
-  const { session } = await requireAdmin();
+  const { session, ctx } = await requireAdmin();
   let form: FormData;
   try {
     form = await request.formData();
@@ -38,12 +39,16 @@ export const POST = handler(async (request: Request) => {
     transcript: textOf(form, "transcript"),
   };
   await savePresentation(session.user.id, deposit);
+  // Journal d'administration (US-45 RT1) : quels éléments ont été déposés ou modifiés, jamais leur contenu.
+  const elements = Object.entries(deposit).filter(([, value]) => value !== undefined).map(([name]) => name);
+  await logAdminAction(ctx.db, { adminId: session.user.id, action: "presentation_updated", entityType: "presentation", entityId: "video", details: { elements }, now: ctx.now });
   return NextResponse.json(await adminView());
 });
 
 /** Retire la présentation : l'écran n'est plus proposé. */
 export const DELETE = handler(async () => {
-  await requireAdmin();
+  const { session, ctx } = await requireAdmin();
   await removePresentation();
+  await logAdminAction(ctx.db, { adminId: session.user.id, action: "presentation_updated", entityType: "presentation", entityId: "video", details: { removed: true }, now: ctx.now });
   return NextResponse.json(await adminView());
 });

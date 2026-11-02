@@ -115,6 +115,7 @@ export async function sessionFor(db: Kysely<DB>, userId: string): Promise<import
       email: u.email,
       setupCompleted: u.initial_setup_step === null || u.initial_setup_step === "completed",
       inGracePeriod: u.status === "grace_period",
+      presentationDue: false,
     },
     device: { id: randomUUID(), type: "android", timezone: "Europe/Paris", hasPattern: true, patternLocked: false },
   };

@@ -117,7 +117,7 @@ interface Collected {
 async function collect(db: Kysely<DB>, userId: string, now: Date): Promise<{ data: Collected; documents: ZipEntry[] }> {
   const user = await db
     .selectFrom("users")
-    .select(["id", "account_id", "role", "guest_rank", "first_name", "last_name", "email", "phone", "status", "activated_at", "created_at", "digitorn_user_ref"])
+    .select(["id", "account_id", "role", "guest_rank", "first_name", "last_name", "email", "phone", "status", "activated_at", "created_at", "digitorn_user_ref", "presentation_seen_at"])
     .where("id", "=", userId)
     .executeTakeFirstOrThrow();
   const isPrimary = user.role === "primary_user";
@@ -289,6 +289,7 @@ async function collect(db: Kysely<DB>, userId: string, now: Date): Promise<{ dat
       role: user.role === "primary_user" ? "Utilisateur principal" : user.guest_rank === "core" ? "Invité 1" : "Invité",
       creeLe: date(user.created_at),
       activeLe: date(user.activated_at),
+      presentationVueLe: date(user.presentation_seen_at),
     },
     legalAcceptances: legal.map((l) => ({ document: l.document_type === "privacy_policy" ? "Politique de confidentialité" : "Conditions d'utilisation", version: l.version_label, accepteLe: date(l.accepted_at) })),
     agents: agents.map((a) => ({ agent: a.name, ajouteLe: date(a.added_at), retireLe: date(a.removed_at) })),

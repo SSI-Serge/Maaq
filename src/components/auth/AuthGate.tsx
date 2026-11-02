@@ -167,7 +167,7 @@ function forcedDestination(state: SignedIn, pathname: string): string | null {
   const home = state.home;
   if (home === "/schema/creer" || home === "/reprise-compte" || home === "/conditions") return pathname === home ? null : home;
   if (pathname === "/reglages") return null; // accessible à tous, pour pouvoir se déconnecter
-  if (home === "/configuration") return pathname === home ? null : home;
+  if (home === "/decouvrir" || home === "/configuration") return pathname === home ? null : home;
   if (pathname === "/reprise-compte") return home;
   const isAdminArea = pathname.startsWith("/admin");
   if (state.user.role === "admin" && !isAdminArea) return home;
