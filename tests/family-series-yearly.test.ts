@@ -52,10 +52,10 @@ async function onDevice(userId: string): Promise<SessionContext> {
   return session;
 }
 
-async function family(options: { notifyZone?: boolean } = {}) {
+async function family(options: { notifyZone?: boolean; zone?: string } = {}) {
   const camille = await createProfile(db);
   await db.updateTable("users").set({ first_name: "Camille" }).where("id", "=", camille.id).execute();
-  if (options.notifyZone) await db.updateTable("accounts").set({ family_timezone: zoneWhereItIs(12) }).where("id", "=", camille.accountId!).execute();
+  if (options.notifyZone) await db.updateTable("accounts").set({ family_timezone: options.zone ?? zoneWhereItIs(12) }).where("id", "=", camille.accountId!).execute();
   const julien = await createGuest(db, camille.accountId!, "Julien", "core");
   const camilleSession = await onDevice(camille.id);
   const julienSession = await onDevice(julien.id);
@@ -132,12 +132,15 @@ describe("répétition annuelle : séances, planificateur, rappels (D70)", () =>
   });
 
   it("une série annuelle suit les délais du type de RDV (pas seulement J-1), comme une série mensuelle", async () => {
-    const f = await family({ notifyZone: true });
-    const { eventIds } = await createSeries(db, base(f, { title: "Réunion annuelle", type: "school", firstDate: "2054-11-10", allDay: false, startTime: "17:00", allFamily: false, memberIds: [f.noahId] }));
+    // Le fuseau d'essai est choisi UNE fois, et la série y est créée : « 17 h le 10 novembre » est alors le même jour pour la famille et pour le rappel, à toute heure d'exécution
+    // (avec une série créée à l'heure de Paris, 17 h tombait le 11 novembre dans les fuseaux UTC+8 et au-delà : le rappel du 3 n'était plus dû).
+    const zone = zoneWhereItIs(12);
+    const f = await family({ notifyZone: true, zone });
+    const { eventIds } = await createSeries(db, base(f, { title: "Réunion annuelle", type: "school", firstDate: "2054-11-10", allDay: false, startTime: "17:00", allFamily: false, memberIds: [f.noahId], timeZone: zone }));
     await confirmEvent(ctx, f.camilleSession, eventIds[0], { allowConflict: true });
     send.mockClear();
     // Midi dans le fuseau d'essai de la famille (celui où il est midi maintenant) : jamais dans les heures de silence, à toute heure d'exécution.
-    const offset = Number((/Etc\/GMT([+-]\d+)/.exec(zoneWhereItIs(12)) ?? [])[1] ?? 0); // Etc/GMT+8 = UTC-8
+    const offset = Number((/Etc\/GMT([+-]\d+)/.exec(zone) ?? [])[1] ?? 0); // Etc/GMT+8 = UTC-8
     await runReminders({ db, now: new Date(Date.UTC(2054, 10, 3, 12 + offset)) }, { accountId: f.accountId }); // J-7 du 10 novembre, type école
     expect(payloads().map((c) => c.tag)).toContain(`d7-${eventIds[0]}`);
   });
