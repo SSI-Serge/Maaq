@@ -1,5 +1,5 @@
 // `npm run bench:ocr` : banc de lecture et de non-fuite de bout en bout (Contrats V2, C-16), sur des documents ENTIÈREMENT FICTIFS.
-// Rend les documents du jeu annoté (tests/fixtures/contract-corpus.ts) en « photos » (propre, penchée, sombre), les fait lire par le service interne, masque le texte lu et mesure :
+// Rend les documents du jeu annoté (scripts/lib/contract-corpus.ts) en « photos » (propre, penchée, sombre), les fait lire par le service interne, masque le texte lu et mesure :
 // la lecture, ce qui reste visible (identifiants directs, noms) et ce qui est gardé. Échoue (code 1) si un identifiant direct reste lisible.
 // Usage : npm run bench:ocr -- [--url https://…] ; le jeton d'identité vient de `gcloud auth print-identity-token` pour un service Cloud Run privé.
 import { execFileSync } from "node:child_process";
@@ -7,7 +7,7 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "n
 import os from "node:os";
 import path from "node:path";
 import { maskDocument } from "../src/server/contracts/masking/engine";
-import { CORPUS, household } from "../tests/fixtures/contract-corpus";
+import { CORPUS, household } from "./lib/contract-corpus";
 import { loadEnv } from "./lib/load-env";
 
 loadEnv();

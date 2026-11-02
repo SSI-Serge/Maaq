@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createTokenSpace, maskDocument, residualIssues, type HouseholdFacts } from "@/server/contracts/masking/engine";
 import { classifyPage } from "@/server/contracts/masking/health";
 import { ibanValid, nirValid } from "@/server/contracts/masking/rules";
-import { CORPUS, household, NIR_SPACED, nirKey } from "./fixtures/contract-corpus";
+import { CORPUS, household, NIR_SPACED, nirKey } from "../scripts/lib/contract-corpus";
 
 const NOW = new Date("2026-11-02T10:00:00Z");
 

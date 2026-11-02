@@ -1,5 +1,5 @@
 """
-Fabrique des « photos » de documents ENTIÈREMENT FICTIFS pour le banc de lecture (scripts/contract-ocr-bench.ts) : le texte vient de tests/fixtures/contract-corpus.ts,
+Fabrique des « photos » de documents ENTIÈREMENT FICTIFS pour le banc de lecture (scripts/contract-ocr-bench.ts) : le texte vient de scripts/lib/contract-corpus.ts,
 l'image est rendue ici avec plusieurs défauts de prise de vue (page propre, photo penchée et floue, photo sombre et bruitée).
 
 Usage : python render.py <dossier>   (le dossier contient pages.json : {"nom": ["texte page 1", ...]} ; il reçoit nom--variante--page.jpg)
