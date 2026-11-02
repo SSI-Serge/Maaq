@@ -9,6 +9,7 @@ import { describeError } from "@/server/safe-log";
 import { integerSetting } from "@/server/settings";
 import { addManualMask, dbMaskCounts, MASKING_RULES_VERSION, openBlob, removeManualMask, sealBlob, type MaskedBlob } from "./masked";
 import { createTokenSpace, maskDocument, residualIssues, type HouseholdFacts } from "./masking/engine";
+import { possibleNameLines } from "./masking/possible-names";
 import { documentReader, ReaderError, type ReadInput } from "./reader";
 import { contractView, requireCore, unbundlePhotos, type ContractView } from "./service";
 import { loadDocument } from "./storage";
@@ -205,6 +206,8 @@ export interface MaskedPreview {
   manual: { token: string; occurrences: number }[];
   /** Types de motifs personnels qui restent visibles (« email », « nom connu »…), jamais une valeur. */
   residual: string[];
+  /** Lignes qui ressemblent à un nom en majuscules (« Nom possible ») : signalées, jamais masquées d'office (US-137). */
+  possibleNames: string[];
   removedHealthPages: number;
   /** Page de santé douteuse restée dans le texte : l'analyse est bloquée (US-136 RF5). */
   healthDoubt: boolean;
@@ -238,6 +241,7 @@ async function previewOf(ctx: Ctx, accountId: string, row: Awaited<ReturnType<ty
     pages: blob.pages.map((p) => ({ text: p.text, removed: p.state === "removed" })),
     manual: blob.manual.map((m) => ({ token: m.token, occurrences: m.originals.length })),
     residual: residualIssues(visible, { household: await householdFacts(ctx.db, accountId), now: ctx.now }),
+    possibleNames: possibleNameLines(visible),
     removedHealthPages: blob.removedHealthPages,
     healthDoubt: blob.doubtHealthPages > 0,
     verifiedByFirstName: verifier?.first_name ?? null,

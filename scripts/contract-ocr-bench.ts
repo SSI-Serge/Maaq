@@ -7,6 +7,7 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "n
 import os from "node:os";
 import path from "node:path";
 import { maskDocument } from "../src/server/contracts/masking/engine";
+import { possibleNameLines } from "../src/server/contracts/masking/possible-names";
 import { CORPUS, household } from "./lib/contract-corpus";
 import { loadEnv } from "./lib/load-env";
 
@@ -32,7 +33,7 @@ try {
   writeFileSync(path.join(dir, "pages.json"), JSON.stringify(pages), "utf8");
   execFileSync(process.platform === "win32" ? "python" : "python3", [path.join("services", "contract-reader", "bench", "render.py"), dir], { stdio: "inherit" });
 
-  const totals: Record<string, { directLeaks: number; directTotal: number; nameLeaks: number; nameTotal: number; kept: number; keptTotal: number; confidence: number[]; residual: number }> = {};
+  const totals: Record<string, { maskedAway: number; flagged: number; unflagged: number; flaggedTotal: number; directLeaks: number; directTotal: number; nameLeaks: number; nameTotal: number; kept: number; keptTotal: number; confidence: number[]; residual: number }> = {};
   for (const file of readdirSync(dir).filter((f) => f.endsWith(".jpg")).sort()) {
     const [name, variant] = file.replace(".jpg", "").split("--");
     const doc = CORPUS[Number(name.replace("doc", "")) - 1];
@@ -43,7 +44,7 @@ try {
     const read = (await response.json()) as { pages: { text: string; confidence: number; entities: { start: number; end: number; label: string }[] }[] };
     const masked = maskDocument(read.pages.map((p) => p.text), { household, now: new Date("2026-11-02T10:00:00Z"), entities: read.pages.map((p) => p.entities) });
     const seen = norm(masked.text);
-    const t = (totals[variant] ??= { directLeaks: 0, directTotal: 0, nameLeaks: 0, nameTotal: 0, kept: 0, keptTotal: 0, confidence: [], residual: 0 });
+    const t = (totals[variant] ??= { maskedAway: 0, flagged: 0, unflagged: 0, flaggedTotal: 0, directLeaks: 0, directTotal: 0, nameLeaks: 0, nameTotal: 0, kept: 0, keptTotal: 0, confidence: [], residual: 0 });
     t.confidence.push(read.pages[0].confidence);
     for (const value of doc.leaks) {
       const key = norm(value);
@@ -56,6 +57,21 @@ try {
       } else {
         t.nameTotal += 1;
         if (leaked) t.nameLeaks += 1;
+      }
+    }
+    // Noms écrits seuls en majuscules (conjoint non membre) : jamais masqués d'office ; ils doivent être signalés « Nom possible » (US-137), sinon ils passeraient inaperçus.
+    const possible = possibleNameLines(masked.text).map(norm);
+    for (const name of doc.flagged ?? []) {
+      t.flaggedTotal += 1;
+      const key = norm(name);
+      if (!seen.includes(key)) {
+        t.maskedAway += 1; // masqué (par le modèle de langue) ou mal lu : rien de lisible
+        continue;
+      }
+      if (possible.some((line) => line.includes(key))) t.flagged += 1;
+      else {
+        t.unflagged += 1;
+        if (verbose) console.log(`  nom lisible non signalé (${file})`);
       }
     }
     for (const value of doc.kept) {
@@ -73,10 +89,11 @@ try {
   for (const [variant, t] of Object.entries(totals)) {
     const avg = Math.round(t.confidence.reduce((a, b) => a + b, 0) / t.confidence.length);
     console.log(`${variant.padEnd(10)} | ${String(avg).padStart(3)} %          | ${t.directLeaks}/${t.directTotal}`.padEnd(66) + `| ${t.nameLeaks}/${t.nameTotal}`.padEnd(16) + `| ${t.kept}/${t.keptTotal}`.padEnd(25) + `| ${t.residual}`);
-    if (t.directLeaks > 0 || t.residual > 0) failed = true;
+    console.log(`           noms écrits en majuscules sans civilité : ${t.flagged}/${t.flaggedTotal} signalés « Nom possible », ${t.maskedAway} masqués ou illisibles, ${t.unflagged} lisibles non signalés`);
+    if (t.directLeaks > 0 || t.residual > 0 || t.unflagged > 0) failed = true;
   }
   if (failed) {
-    console.error("\nÉCHEC : un identifiant direct reste lisible après masquage (seuil C-16 : aucun).");
+    console.error("\nÉCHEC : un identifiant direct reste lisible après masquage, ou un nom lisible n'est pas signalé (seuil C-16 : aucun).");
     process.exitCode = 1;
   } else console.log("\nSeuil C-16 tenu sur ce jeu : aucun identifiant direct lisible.");
 } finally {

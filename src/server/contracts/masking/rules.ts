@@ -146,6 +146,8 @@ const NER_KEEP = new Set([
   "allianz", "axa", "maif", "macif", "maaf", "matmut", "gmf", "groupama", "generali", "mma", "gan", "april", "swisslife", "harmonie", "malakoff", "humanis", "mgen", "mgp", "aviva", "direct",
   "lemonade", "ornikar", "luko", "alan", "cardif", "afi", "esca", "credit", "agricole", "mutuel", "mutuelle", "lcl", "bnp", "paribas", "societe", "generale", "caisse", "epargne",
 ]);
+/** Mot qui n'est jamais un nom de personne dans un contrat : fonction (« Conducteur ») ou assureur, banque, courtier connus. */
+export const isKnownNonName = (word: string): boolean => NER_KEEP.has(foldWord(word));
 const foldWord = (word: string) => word.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[-'’\s]/g, "").toLowerCase();
 
 /**

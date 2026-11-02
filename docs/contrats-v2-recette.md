@@ -28,6 +28,7 @@ Se connecter avec un compte noyau (utilisateur principal ou invité 1), onglet *
 - [ ] Ouvrir « Assurance Auto », activer **Analyse IA** : le texte de consentement s'affiche (texte provisoire marqué), accepter.
 - [ ] Déposer une photo (ou un PDF) dans « Conditions particulières » : l'état passe à « Masquage en cours » puis « À vérifier ».
 - [ ] Ouvrir « Vérifier le texte masqué » : les jetons sont surlignés (« Personne 1 », « Adresse 1 »…), aucun nom ni numéro lisible. Toucher un mot qui reste visible : « Masquer aussi ce mot » le remplace partout ; « Annuler ce masque » le rend.
+- [ ] Un nom écrit seul sur sa ligne en majuscules (conjoint qui n'est pas membre du foyer, tiers) est surligné en jaune « Nom possible », jamais masqué d'office ; « Masquer ce nom » le masque partout dans le document.
 - [ ] « Confirmer ce document » : « Vérifié par [prénom] le [date] ». Remplacer le document : retour à « Masquage en cours » puis « À vérifier ».
 - [ ] Photo floue ou de travers : « Lecture incertaine » (sous 80 %) ; photo illisible : « Document illisible : reprenez une photo plus nette. ».
 - [ ] Dans un contrat Mutuelle : l'aide du champ dit « Ne déposez que vos documents contractuels… » ; une page de remboursement déposée est retirée et signalée.

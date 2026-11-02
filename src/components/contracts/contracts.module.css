@@ -369,3 +369,7 @@
 .reportBody ul, .reportBody ol { margin: 0 0 8px; padding-left: 20px; }
 .reportBody table { border-collapse: collapse; width: 100%; font-size: 13px; margin: 6px 0; }
 .reportBody th, .reportBody td { border: 1px solid var(--line); padding: 4px 6px; text-align: left; vertical-align: top; }
+
+/* « Nom possible » (US-137) : ligne en majuscules qui ressemble à un nom, signalée jamais masquée d'office ; couleur distincte des jetons */
+.maskedPossible { display: inline; background: var(--warning-bg); outline: 1px dashed var(--warning); border-radius: 4px; padding: 1px 4px; cursor: pointer; }
+.maskedPossibleLabel { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; color: var(--warning); margin-right: 4px; }

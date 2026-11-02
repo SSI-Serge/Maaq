@@ -19,6 +19,8 @@ export interface Doc {
   pages: string[];
   leaks: string[];
   kept: string[];
+  /** Noms écrits seuls en majuscules, sans civilité (conjoint non membre) : jamais masqués d'office, mais signalés « Nom possible » dans l'aperçu (US-137). */
+  flagged?: string[];
 }
 
 export const nirBody = "1840669123456";
@@ -76,6 +78,24 @@ Employeur : Société Dupuis Transport`,
     ],
     leaks: ["PRT-2025-0045-8831", "Camille", "Julien", "Durand", "14 juin 1984", "FR7630006000011234567890189", "AGRIFRPP", "Dupuis"],
     kept: ["245 000 €", "25 ans", "3,45 %", "50 % / 50 %", "PTIA", "IPT", "3 mois", "Banque Exemple"],
+  },
+  {
+    name: "énergie, au nom d'un conjoint qui n'est pas membre du foyer, nom en majuscules sans civilité",
+    pages: [
+      `ATTESTATION DE FOURNITURE D'ÉLECTRICITÉ
+Titulaire du contrat
+MBAYE DIALLO FATOU
+N° client : 4 512 908 331
+N° de compte : 7 20 4 118 903 552
+PDL : 31 009 204 118 776
+Adresse du point de livraison : 8 impasse des Cèdres, 35000 Rennes
+Puissance souscrite : 6 kVA. Option tarifaire : Base. Prix du kWh : 0,2516 €. Abonnement : 14,20 € par mois.
+Date d'effet : 01/04/2025.
+Contact : service.clients@energie-exemple.fr`,
+    ],
+    leaks: ["4 512 908 331", "7 20 4 118 903 552", "31 009 204 118 776", "8 impasse des Cèdres", "35000", "service.clients@energie-exemple.fr"],
+    kept: ["6 kVA", "0,2516 €", "14,20 €", "01/04/2025", "Base"],
+    flagged: ["MBAYE DIALLO FATOU"],
   },
 ];
 

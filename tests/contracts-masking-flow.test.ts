@@ -283,6 +283,18 @@ describe("aperçu, masques et confirmation (US-137)", () => {
     expect(preview.pages[0].text).toContain("Franchise 300 EUR");
   });
 
+  it("un nom en majuscules sans civilité est signalé « Nom possible », jamais masqué d'office ; « Masquer ce nom » le masque partout", async () => {
+    const { f, doc } = await masked("Titulaire du contrat\nMBAYE DIALLO FATOU\nFranchise 300 EUR\nRappel : MBAYE DIALLO FATOU a signé.\nATTESTATION DE FOURNITURE");
+    const preview = await maskedPreview(at(), f.session, doc.id);
+    expect(preview.possibleNames).toEqual(["MBAYE DIALLO FATOU"]);
+    expect(preview.pages[0].text.match(/MBAYE DIALLO FATOU/g)).toHaveLength(2);
+    const after = await addMask(at(), f.session, doc.id, "MBAYE DIALLO FATOU");
+    expect(after.pages[0].text).not.toContain("MBAYE");
+    expect(after.pages[0].text).toContain("Franchise 300 EUR");
+    expect(after.possibleNames).toEqual([]);
+    expect(after.manual).toEqual([{ token: "[DONNEE_1]", occurrences: 2 }]);
+  });
+
   it("« Masquer aussi ce mot » remplace toutes les occurrences, s'annule, et n'est plus possible une fois le document vérifié", async () => {
     const { f, doc } = await masked();
     const after = await addMask(at(), f.session, doc.id, "Dupond");

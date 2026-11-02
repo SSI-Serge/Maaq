@@ -32,6 +32,7 @@ export function MaskedPreview({ contractId, documentId }: { contractId: string; 
   const query = useApiQuery<Preview>(allowed ? `/api/contracts/documents/${documentId}/masked` : null);
   const [latest, setLatest] = useState<Preview>();
   const [picked, setPicked] = useState<string | null>(null);
+  const [pickedName, setPickedName] = useState(false);
   const [typed, setTyped] = useState("");
   const edit = useApiMutation();
   const confirm = useApiMutation();
@@ -63,8 +64,19 @@ export function MaskedPreview({ contractId, documentId }: { contractId: string; 
 
   /** Un appui sur un mot du texte le propose au masquage ; les jetons, eux, ne se choisissent pas. */
   function onText(event: React.MouseEvent<HTMLDivElement>) {
-    const word = (event.target as HTMLElement).dataset.word;
-    if (word && editable) setPicked(word);
+    if (!editable) return;
+    const target = event.target as HTMLElement;
+    // Une ligne signalée « Nom possible » se masque en entier (toutes ses occurrences) ; un mot se masque seul.
+    const name = target.closest<HTMLElement>("[data-name]")?.dataset.name;
+    if (name) {
+      setPickedName(true);
+      return setPicked(name);
+    }
+    const word = target.dataset.word;
+    if (word) {
+      setPickedName(false);
+      setPicked(word);
+    }
   }
 
   return (
@@ -78,13 +90,16 @@ export function MaskedPreview({ contractId, documentId }: { contractId: string; 
           {preview.residual.length > 0 && editable && (
             <Notice tone="warning">Il reste peut-être des données personnelles : {preview.residual.join(", ")}. Touchez le mot concerné pour le masquer.</Notice>
           )}
+          {preview.possibleNames.length > 0 && editable && (
+            <Notice tone="warning">Des noms possibles sont signalés en jaune (nom écrit seul sur sa ligne, en majuscules). Ils ne sont pas masqués d&apos;office : touchez-en un pour le masquer si c&apos;est bien un nom.</Notice>
+          )}
           {preview.healthDoubt && <Notice tone="warning">Ce document contient peut-être des données de santé : il ne peut pas être confirmé. Retirez-le du contrat.</Notice>}
 
           <div className={styles.maskedDoc} onClick={onText}>
             {preview.pages.map((page, index) => (
               <section key={index} className={styles.maskedPage}>
                 <div className={styles.maskedPageNumber}>Page {index + 1}</div>
-                {page.removed ? <p className={styles.hint}>{page.text}</p> : <MaskedText text={page.text} picked={picked} />}
+                {page.removed ? <p className={styles.hint}>{page.text}</p> : <MaskedText text={page.text} picked={picked} possible={new Set(preview.possibleNames)} />}
               </section>
             ))}
           </div>
@@ -146,13 +161,13 @@ export function MaskedPreview({ contractId, documentId }: { contractId: string; 
       )}
 
       {picked && editable && (
-        <div className={styles.maskBar} role="dialog" aria-label="Masquer ce mot">
+        <div className={styles.maskBar} role="dialog" aria-label={pickedName ? "Masquer ce nom" : "Masquer ce mot"}>
           <span>
-            Masquer aussi « <strong>{picked}</strong> » ?
+            {pickedName ? "Masquer ce nom" : "Masquer aussi"} « <strong>{picked}</strong> » ?{pickedName ? " Toutes ses occurrences dans ce document seront masquées." : ""}
           </span>
           <div className={styles.maskRow}>
             <Button onClick={() => void mask(picked)} loading={edit.pending} disabled={edit.pending}>
-              Masquer aussi ce mot
+              {pickedName ? "Masquer ce nom" : "Masquer aussi ce mot"}
             </Button>
             <Button variant="secondary" onClick={() => setPicked(null)} disabled={edit.pending}>
               Annuler
@@ -165,22 +180,38 @@ export function MaskedPreview({ contractId, documentId }: { contractId: string; 
 }
 
 /** Le texte d'une page : les jetons surlignés, chaque autre mot touchable. */
-function MaskedText({ text, picked }: { text: string; picked: string | null }) {
+function MaskedText({ text, picked, possible }: { text: string; picked: string | null; possible: Set<string> }) {
+  const lines = text.split("\n");
   return (
     <p className={styles.maskedText}>
-      {[...text.matchAll(PIECES)].map((m, index) =>
-        m[1] ? (
-          <mark key={index} className={styles.maskedToken}>
-            {tokenLabel(m[1])}
-          </mark>
-        ) : m[2] ? (
-          <span key={index} data-word={m[2]} className={`${styles.maskedWord} ${picked && m[2].toLowerCase() === picked.toLowerCase() ? styles.maskedPicked : ""}`}>
-            {m[2]}
+      {lines.map((line, lineIndex) => {
+        const flagged = possible.has(line.trim().replace(/[\s,;:.]+$/u, ""));
+        const pieces = [...line.matchAll(PIECES)].map((m, index) =>
+          m[1] ? (
+            <mark key={index} className={styles.maskedToken}>
+              {tokenLabel(m[1])}
+            </mark>
+          ) : m[2] ? (
+            <span key={index} data-word={m[2]} className={`${styles.maskedWord} ${picked && m[2].toLowerCase() === picked.toLowerCase() ? styles.maskedPicked : ""}`}>
+              {m[2]}
+            </span>
+          ) : (
+            <span key={index}>{m[3]}</span>
+          ),
+        );
+        return (
+          <span key={lineIndex}>
+            {flagged ? (
+              <span className={`${styles.maskedPossible} ${picked && picked === line.trim().replace(/[\s,;:.]+$/u, "") ? styles.maskedPicked : ""}`} data-name={line.trim().replace(/[\s,;:.]+$/u, "")}>
+                <span className={styles.maskedPossibleLabel}>Nom possible</span> {line}
+              </span>
+            ) : (
+              pieces
+            )}
+            {lineIndex < lines.length - 1 ? "\n" : ""}
           </span>
-        ) : (
-          <span key={index}>{m[3]}</span>
-        ),
-      )}
+        );
+      })}
     </p>
   );
 }
