@@ -3,7 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ApiError, SESSION_EVENTS, apiRequest } from "@/client/api";
-import { fetchAuthState, signOut, type AuthState } from "@/client/auth";
+import { detectPlatform, fetchAuthState, installGuide, installGuideDue, installGuideUrl, signOut, type AuthState } from "@/client/auth";
 import { Button, Field, Logo, Notice, RetryNotice, Screen } from "@/components/ui";
 import styles from "./auth.module.css";
 import { ErrorLine, LockIcon } from "./parts";
@@ -96,7 +96,13 @@ export function AuthGate({ children }: { children: ReactNode }) {
       if (back) return router.replace(back);
     }
     const target = forcedDestination(state, pathname);
-    if (target && target !== pathname) router.replace(target);
+    if (target && target !== pathname) return router.replace(target);
+    // Guidage d'installation à l'arrivée dans l'espace connecté, quel que soit le point d'entrée (lien direct, email, connexion) : sur un téléphone, une seule fois par session,
+    // jamais en mode installé ni après « Plus tard » (US-1 RF1, RF7). L'espace d'administration est une console d'ordinateur.
+    if (!target && state.user.role !== "admin" && installGuideDue(detectPlatform(), { dismissed: installGuide.dismissed(), alreadyShown: installGuide.shown() })) {
+      installGuide.markShown();
+      router.replace(installGuideUrl(window.location.pathname + window.location.search));
+    }
   }, [state, pathname, router]);
 
   const lock = useCallback((tellServer: boolean) => {

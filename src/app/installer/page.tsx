@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useSyncExternalStore } from "react";
-import { detectPlatform, installGuide } from "@/client/auth";
+import { detectPlatform, installGuide, safeNext } from "@/client/auth";
 import { installPrompt } from "@/client/install-prompt";
 import { Button, Notice, Screen } from "@/components/ui";
 import styles from "@/components/auth/auth.module.css";
@@ -20,9 +20,16 @@ export default function InstallGuidePage() {
   // Système détecté ; à défaut, l'onglet iPhone, le parcours le plus détaillé (RT1).
   const os: Os = chosen ?? (platform?.os === "android" ? "android" : "iphone");
 
+  /** Où reprendre après le guidage : l'écran demandé (paramètre `next`, posé par l'activation ou la garde de l'espace connecté), sinon le démarrage. */
+  const resume = () => router.replace(safeNext(new URLSearchParams(window.location.search).get("next")) ?? "/");
+
   function later() {
     installGuide.dismiss();
-    router.replace("/");
+    resume();
+  }
+
+  async function install() {
+    if ((await installPrompt.show()) === "accepted") resume();
   }
 
   return (
@@ -52,11 +59,19 @@ export default function InstallGuidePage() {
             <p className={styles.lead} style={{ margin: 0 }}>
               Votre navigateur peut installer MAAQ directement.
             </p>
-            <Button block onClick={() => installPrompt.show()}>
+            <Button block onClick={() => void install()}>
               Installer MAAQ
             </Button>
           </div>
         ) : (
+          <>
+            {platform?.inApp && (
+              <div style={{ marginBottom: 14 }}>
+                <Notice tone="warning">
+                  Ce navigateur est celui d&apos;une autre application (messagerie, réseau social…) : il ne permet pas d&apos;installer MAAQ. Ouvrez MAAQ dans Chrome : menu <b>⋮</b>, puis <b>« Ouvrir dans Chrome »</b> ou <b>« Ouvrir dans le navigateur »</b>.
+                </Notice>
+              </div>
+            )}
           <ol className={styles.steps}>
             <Step n={1}>
               Ouvrez MAAQ dans <b>Chrome</b>.
@@ -69,12 +84,21 @@ export default function InstallGuidePage() {
             </Step>
             <Step n={4}>Confirmez — l&apos;icône MAAQ apparaît sur votre écran d&apos;accueil.</Step>
           </ol>
+          </>
         )
       ) : (
         <>
           {platform?.iosNonSafari && (
             <div style={{ marginBottom: 14 }}>
-              <Notice tone="warning">Ce navigateur ne permet pas l&apos;ajout à l&apos;écran d&apos;accueil. Ouvrez MAAQ dans Safari.</Notice>
+              <Notice tone="warning">
+                {platform.inApp ? (
+                  <>
+                    Ce navigateur est celui d&apos;une autre application (messagerie, réseau social…) : il ne permet pas l&apos;ajout à l&apos;écran d&apos;accueil. Ouvrez MAAQ dans Safari : touchez <b>⋯</b> ou l&apos;icône de boussole, puis <b>« Ouvrir dans Safari »</b>.
+                  </>
+                ) : (
+                  "Ce navigateur ne permet pas l'ajout à l'écran d'accueil. Ouvrez MAAQ dans Safari."
+                )}
+              </Notice>
             </div>
           )}
           <ol className={styles.steps}>

@@ -3,7 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { ApiError, apiRequest } from "@/client/api";
-import { deviceTimezone } from "@/client/auth";
+import { detectPlatform, deviceTimezone, installGuide, installGuideDue, installGuideUrl } from "@/client/auth";
 import { useApiQuery } from "@/client/hooks";
 import { AuthScreen, ErrorLine, Heading } from "@/components/auth/parts";
 import { Button, ButtonLink, Field, Loading, Notice } from "@/components/ui";
@@ -158,7 +158,11 @@ function PasswordStep({ token }: { token: string }) {
         method: "POST",
         body: { token, accepted: true, password, confirmation, timezone: deviceTimezone() },
       });
-      router.replace(result.next);
+      // Après l'activation, sur un téléphone où MAAQ n'est pas lancée depuis l'écran d'accueil : le guidage d'installation d'abord (US-1 RF1), puis la suite.
+      if (installGuideDue(detectPlatform(), { dismissed: installGuide.dismissed() })) {
+        installGuide.markShown();
+        router.replace(installGuideUrl(result.next));
+      } else router.replace(result.next);
     } catch (err) {
       setPassword("");
       setConfirmation("");

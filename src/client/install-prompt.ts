@@ -38,11 +38,13 @@ export const installPrompt = {
     listeners.add(listener);
     return () => listeners.delete(listener);
   },
-  async show(): Promise<void> {
-    if (!deferred) return;
+  /** Affiche la proposition du navigateur ; retourne le choix (« accepted » : MAAQ s'installe), ou null s'il n'y avait rien à proposer. */
+  async show(): Promise<"accepted" | "dismissed" | null> {
+    if (!deferred) return null;
     await deferred.prompt();
-    await deferred.userChoice;
+    const { outcome } = await deferred.userChoice;
     deferred = null;
     notify();
+    return outcome;
   },
 };

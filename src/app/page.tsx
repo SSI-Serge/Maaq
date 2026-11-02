@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { MESSAGES } from "@/client/api";
-import { detectPlatform, fetchAuthState, installGuide } from "@/client/auth";
+import { detectPlatform, fetchAuthState, installGuide, installGuideDue } from "@/client/auth";
 import { useApiQuery, useOnline } from "@/client/hooks";
 import { Button, Logo, Screen, uiStyles } from "@/components/ui";
 
@@ -28,9 +28,7 @@ export default function StartupPage() {
 
   useEffect(() => {
     if (!health.data || !splashDone) return;
-    const platform = detectPlatform();
-    const onPhone = platform.os === "android" || platform.os === "iphone";
-    if (onPhone && !platform.standalone && !installGuide.dismissed()) {
+    if (installGuideDue(detectPlatform(), { dismissed: installGuide.dismissed() })) {
       router.replace("/installer");
       return;
     }
