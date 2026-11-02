@@ -8,7 +8,7 @@ import { planAnalysis, reasonText, type DocumentState, type DocumentView } from 
 export interface PlanContract {
   analysis: { enabled: boolean };
   challenge: { enabled: boolean };
-  slots: { fieldId: string; name: string; required: boolean; document: { transmittedAt: string | null; expiresAt: string; masking: { status: string; healthDoubt?: boolean } } | null }[];
+  slots: { fieldId: string; name: string; required: boolean; document: { transmittedAt: string | null; expiresAt: string; masking: { status: string; healthDoubt?: boolean; confidencePct?: number | null } } | null }[];
   missingRequired: number;
 }
 
@@ -20,6 +20,8 @@ export interface PlanContext {
   now: Date;
   /** Pendant le pilote, chaque document doit être vérifié avant la première analyse (C-13). */
   verificationRequired?: boolean;
+  /** Seuil de confiance de lecture de la console (en %) : un document en dessous attend un administrateur. */
+  confidenceThresholdPct?: number;
 }
 
 export interface TransmitPlan {
@@ -55,6 +57,7 @@ export function planTransmission(contract: PlanContract, context: PlanContext): 
     state: s.document ? (STATE[s.document.masking.status] ?? "masking") : null,
     confirmed: s.document?.masking.status === "verified",
     healthDoubt: s.document?.masking.healthDoubt ?? false,
+    lowConfidence: context.confidenceThresholdPct !== undefined && s.document?.masking.confidencePct != null && s.document.masking.confidencePct < context.confidenceThresholdPct,
   }));
   const analysis = planAnalysis(views, context.verificationRequired ?? true);
   // Les champs obligatoires vides sont dits une fois, pour les deux canaux : l'analyse n'ajoute que ses propres raisons.

@@ -67,10 +67,6 @@ const schema = z.object({
    * (C-07, C-17).
    */
   CONTRACT_ANALYSIS_MODE: z.enum(["off", "preview", "live"]).default("off"),
-  /**
-   * Transmission pour analyse, tant que l'agent d'analyse n'existe pas (étape E5 de Contrats V2) : « off » ferme l'envoi à l'analyse sans fermer le masquage ni l'aperçu. À retirer avec E5.
-   */
-  CONTRACT_ANALYSIS_SEND: z.enum(["on", "off"]).default("on"),
   /** Stockage des documents de contrat : « local » (dossier de données, par défaut) ou « gcs » (bucket Cloud Storage en Union européenne, avec CONTRACT_BUCKET). */
   CONTRACT_STORAGE: z.enum(["local", "gcs"]).default("local"),
   CONTRACT_BUCKET: z.string().min(3).optional(),

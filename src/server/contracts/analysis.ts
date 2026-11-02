@@ -1,3 +1,4 @@
+import { createModel, type AssistantModel, type TextBlock } from "@/server/assistant/model";
 import { env } from "@/server/env";
 import type { HouseholdFacts } from "./masking/engine";
 import { finalizeReport, reportIssues, sanitizeReportHtml, textOf, withDisclaimer } from "./report";
@@ -10,8 +11,6 @@ import { skippedNotice } from "./transmission";
 
 export type AnalysisMode = "off" | "preview" | "live";
 export const analysisMode = (): AnalysisMode => env().CONTRACT_ANALYSIS_MODE;
-/** La transmission pour analyse est-elle possible ? Le masquage et l'aperçu, eux, suivent `analysisMode`. */
-export const analysisSendOpen = (): boolean => analysisMode() !== "off" && env().CONTRACT_ANALYSIS_SEND === "on";
 
 /** Mention affichée tant que le brief du consultant n'est pas livré (C-05). */
 export const DEMO_CONTENT_NOTICE = "Contenu de démonstration : le plan du rapport sera défini avec le consultant.";
@@ -61,4 +60,60 @@ export function processAnalysisOutput(
   if (issues.length) return { ok: false, reason: "personal_data", issues };
   const notices = (context.skippedFields ?? []).map((name) => `<p><em>${sanitizeReportHtml(skippedNotice(name))}</em></p>`).join("");
   return { ok: true, html: withDisclaimer(finalizeReport(cleaned, context.references) + notices) };
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------
+// Exécution : l'agent (mode « live », API Anthropic) ou le rapport de démonstration (mode « preview », aucun appel)
+// ---------------------------------------------------------------------------------------------------------------------------
+
+export interface AnalysisRunner {
+  /** Retourne le HTML brut du rapport ; lève une erreur si l'agent ne répond pas. */
+  run(input: AnalysisInput): Promise<string>;
+}
+
+/**
+ * Rapport de démonstration du mode « preview » : aucun document n'est envoyé nulle part, le texte n'est même pas relu. Il ne contient que les noms des champs de documents et des
+ * compteurs. Le plan définitif viendra du brief du consultant (C-05).
+ */
+export function demoReport(input: AnalysisInput): string {
+  const chars = (text: string) => `${text.length.toLocaleString("fr-FR")} caractères`;
+  return [
+    `<p><em>${DEMO_CONTENT_NOTICE}</em></p>`,
+    "<h2>En résumé</h2>",
+    `<p>Rapport d'essai pour un contrat de la catégorie « ${input.category.replace(/[<>&]/g, "")} » : ${input.documents.length} document${input.documents.length > 1 ? "s ont été lus" : " a été lu"}, masqués, puis analysés en mode d'essai.</p>`,
+    "<h2>Documents pris en compte</h2>",
+    `<ul>${input.documents.map((d) => `<li>${d.fieldName.replace(/[<>&"]/g, "")} : ${chars(d.text)} de texte masqué</li>`).join("")}</ul>`,
+    "<h2>Garanties</h2><p>Les garanties principales et leurs plafonds seront présentés ici.</p>",
+    "<h2>Franchises et montants</h2><p>Les franchises et le montant de la prime ou de la cotisation seront présentés ici.</p>",
+    "<h2>Dates à retenir</h2><p>Les dates d'effet, d'échéance et de préavis seront présentées ici.</p>",
+    "<h2>Points d'attention</h2><p>Les exclusions et limites à vérifier seront présentées ici.</p>",
+  ].join("");
+}
+
+let modelCache: AssistantModel | undefined;
+/** L'agent d'analyse : un appel de l'API Messages, sans outil, sur le seul texte masqué (US-131 RT1, RT2). */
+function liveRunner(): AnalysisRunner {
+  return {
+    async run(input) {
+      const settings = env();
+      modelCache ??= createModel({ provider: settings.ASSISTANT_PROVIDER, apiKey: settings.ANTHROPIC_API_KEY!, model: settings.ASSISTANT_MODEL, effort: "medium", timeoutMs: 300_000, maxTokens: 8_000 });
+      const answer = await modelCache.send({ system: ANALYSIS_SYSTEM, tools: [], messages: [{ role: "user", content: buildAnalysisMessage(input) }] });
+      return answer.content.filter((b): b is TextBlock => b.type === "text").map((b) => b.text).join("\n");
+    },
+  };
+}
+
+declare global {
+  var __maaqAnalysisRunner: AnalysisRunner | undefined;
+}
+
+/** Le moteur d'analyse du mode courant : « live » appelle l'agent, « preview » produit le rapport de démonstration. */
+export function analysisRunner(): AnalysisRunner {
+  if (globalThis.__maaqAnalysisRunner) return globalThis.__maaqAnalysisRunner;
+  return analysisMode() === "live" ? liveRunner() : { run: async (input) => demoReport(input) };
+}
+
+/** Pour les tests : remplace le moteur d'analyse ; sans argument, revient à la configuration. */
+export function setAnalysisRunner(runner: AnalysisRunner | undefined): void {
+  globalThis.__maaqAnalysisRunner = runner;
 }

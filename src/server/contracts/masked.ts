@@ -19,6 +19,8 @@ export interface MaskedBlob {
   doubtHealthPages: number;
   /** Masque posé à la main : son jeton et, dans l'ordre du texte, ce que disait chaque occurrence. */
   manual: { token: string; originals: string[] }[];
+  /** Mots mal lus par l'OCR (minuscules), gardés avec le texte masqué le temps de la vie du document ; surlignés pour l'administrateur (US-138 RF2). */
+  weak?: string[];
   /** Jetons déjà attribués dans le contrat (empreintes à clé, jamais une valeur), pour que le même nom garde le même jeton d'un document à l'autre. */
   tokens: Record<string, string>;
 }

@@ -13,6 +13,7 @@ import { documentReader, ReaderError, type ReadInput } from "./reader";
 import { contractView, requireCore, unbundlePhotos, type ContractView } from "./service";
 import { loadDocument } from "./storage";
 import { analysisMode } from "./analysis";
+import { runAnalysesOf } from "./analyze";
 
 /**
  * Du dépôt au texte masqué (US-136, US-137) : lecture du document par le service interne, masquage en trois couches, état du document, puis aperçu, masques ajoutés à la main
@@ -128,6 +129,7 @@ export async function processDocument(ctx: Ctx, documentId: string): Promise<Pro
       removedHealthPages: masked.removedHealthPages,
       doubtHealthPages: masked.doubtHealthPages,
       manual: [],
+      weak: [...new Set(result.pages.flatMap((p) => p.weak ?? []))].slice(0, 300),
       tokens: Object.fromEntries(space.assigned),
     };
     const threshold = await integerSetting(ctx.db, "contract_read_confidence_threshold_pct", 80);
@@ -301,10 +303,11 @@ export async function verifyDocument(ctx: Ctx, session: SessionContext, document
 }
 
 
-/** Lit et masque les documents en attente d'un contrat (appelé par l'écran après un dépôt ou l'activation de l'analyse) et renvoie le contrat à jour. */
+/** Lit et masque les documents en attente d'un contrat, puis lance ses analyses « en cours » (appelé par l'écran, qui le redemande tant que quelque chose tourne) ; renvoie le contrat à jour. */
 export async function processContract(ctx: Ctx, session: SessionContext, contractId: string): Promise<ContractView> {
   const accountId = requireCore(session);
   await contractView(ctx, accountId, contractId); // refuse un contrat qui n'est pas celui du compte
   await processPending(ctx, { contractId });
+  await runAnalysesOf(ctx, contractId);
   return contractView(ctx, accountId, contractId);
 }

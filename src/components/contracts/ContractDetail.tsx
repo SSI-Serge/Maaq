@@ -11,6 +11,7 @@ import { ConfirmDialog, ErrorLine } from "@/components/auth/parts";
 import { Button, Loading, Notice, RetryNotice } from "@/components/ui";
 import type { ContractView, ContractsView, DocumentSlot } from "@/server/contracts/service";
 import { ChannelSwitch, contractState, frDate, TONE_CLASS } from "./ContractParts";
+import { ReportCard } from "./ReportCard";
 import { TransmitArea } from "./TransmitArea";
 import { DetailsForm } from "./DetailsForm";
 import { DocumentMasking } from "./DocumentMasking";
@@ -66,8 +67,11 @@ function Detail({ contract, view, archived, uploads, onChanged, onDeleted }: { c
   // Lecture et masquage des documents (US-136 RF1) : lancés dès qu'un document attend et que l'analyse est active ; tant qu'un masquage est en cours, on redemande l'état.
   const maskingNeeded = view.analysis.mode !== "off" && contract.analysis.enabled && !archived;
   const waiting = maskingNeeded ? contract.slots.filter((x) => x.document && !x.document.transmittedAt && x.document.masking.status === "pending").map((x) => x.document!.id) : [];
-  const running = maskingNeeded && contract.slots.some((x) => x.document?.masking.status === "masking");
-  const waitingKey = waiting.join(",");
+  const analysisStatus = contract.transmission?.analysisStatus ?? null;
+  // L'analyse tourne côté serveur pendant la requête : on la lance une fois, puis on redemande l'état tant qu'elle tourne ou qu'elle attend un administrateur.
+  const analysisKey = analysisStatus === "running" ? `analysis:${contract.transmission!.at}` : "";
+  const running = (maskingNeeded && contract.slots.some((x) => x.document?.masking.status === "masking")) || analysisStatus === "running" || analysisStatus === "awaiting_admin";
+  const waitingKey = [...waiting, analysisKey].filter(Boolean).join(",");
   const attempted = useRef(new Set<string>());
   const refresh = useApiMutation();
   const { run: runRefresh } = refresh;
@@ -79,10 +83,10 @@ function Detail({ contract, view, archived, uploads, onChanged, onDeleted }: { c
   }, [waitingKey, contract.id]);
   useEffect(() => {
     if (!running) return;
-    const timer = setInterval(() => void runRefresh<ContractView>(`/api/contracts/${contract.id}/process`, { method: "POST" }).then((result) => result && onChanged(result)), 6000);
+    const timer = setInterval(() => void runRefresh<ContractView>(`/api/contracts/${contract.id}/process`, { method: "POST" }).then((result) => result && onChanged(result)), analysisStatus === "awaiting_admin" ? 30000 : 6000);
     return () => clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [running, contract.id]);
+  }, [running, analysisStatus, contract.id]);
 
   async function saveName(event: React.FormEvent) {
     event.preventDefault();
@@ -130,12 +134,7 @@ function Detail({ contract, view, archived, uploads, onChanged, onDeleted }: { c
         </Notice>
       )}
 
-      {contract.reportAt && (
-        <section className={styles.panel}>
-          <div className={styles.label}>Rapport d&apos;analyse</div>
-          <p className={styles.hint}>Rapport du {frDate(contract.reportAt)}. Son affichage arrive avec l&apos;étape suivante.</p>
-        </section>
-      )}
+      <ReportCard contract={contract} />
 
       <section className={styles.panel}>
         <ChannelSwitch contract={contract} channel="analysis" view={view} archived={archived} onChanged={onChanged} />

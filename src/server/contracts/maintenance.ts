@@ -5,6 +5,7 @@ import { env } from "@/server/env";
 import { pushConfigured, sendPush } from "@/server/push/service";
 import { describeError } from "@/server/safe-log";
 import { notBeforeMorning, warningText, WARNING_DAYS_BEFORE } from "./retention";
+import { notifyAnalysisOutcomes, runAnalyses } from "./analyze";
 import { processPending } from "./process";
 import { drainStorageDeletions } from "./storage";
 import { runChallengeDeliveries } from "./transmit";
@@ -28,12 +29,16 @@ export interface ContractMaintenanceResult {
   challengeFailed: number;
   masked: number;
   maskingRetry: number;
+  analysesCompleted: number;
+  analysesFailed: number;
+  analysesTimedOut: number;
+  analysisNotified: number;
 }
 
 const HOUR = 3_600_000;
 
 export async function runContractMaintenance(ctx: Ctx): Promise<ContractMaintenanceResult> {
-  const result: ContractMaintenanceResult = { purged: 0, filesDeleted: 0, filesFailed: 0, warned: 0, failed: 0, challengeSent: 0, challengeFailed: 0, masked: 0, maskingRetry: 0 };
+  const result: ContractMaintenanceResult = { purged: 0, filesDeleted: 0, filesFailed: 0, warned: 0, failed: 0, challengeSent: 0, challengeFailed: 0, masked: 0, maskingRetry: 0, analysesCompleted: 0, analysesFailed: 0, analysesTimedOut: 0, analysisNotified: 0 };
   const purged = await sql<{ n: string }>`select purge_expired_contract_documents() as n`.execute(ctx.db);
   result.purged = Number(purged.rows[0]?.n ?? 0);
   const files = await drainStorageDeletions(ctx.db);
@@ -51,6 +56,21 @@ export async function runContractMaintenance(ctx: Ctx): Promise<ContractMaintena
   });
   result.masked = masking.processed;
   result.maskingRetry = masking.retry;
+
+  // Analyses : délai de 10 minutes, analyses en cours (écran fermé, serveur arrêté, décision d'un administrateur), puis notification des échecs (US-135 RF2, US-138 RF5).
+  const analyses = await runAnalyses(ctx).catch((error) => {
+    console.error(`Analyses : ${describeError(error)}`);
+    return { completed: 0, failed: 0, timedOut: 0 };
+  });
+  result.analysesCompleted = analyses.completed;
+  result.analysesFailed = analyses.failed;
+  result.analysesTimedOut = analyses.timedOut;
+  const notices = await notifyAnalysisOutcomes(ctx).catch((error) => {
+    console.error(`Notifications d'analyse : ${describeError(error)}`);
+    return { notified: 0, failed: 0 };
+  });
+  result.analysisNotified = notices.notified;
+  result.failed += notices.failed;
 
   // Documents jamais transmis qui seront supprimés dans 3 jours ou moins, pas encore avertis.
   const rows = await ctx.db

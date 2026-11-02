@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
+import { useApiQuery } from "@/client/hooks";
 import styles from "./admin.module.css";
 
 const NAV = [
@@ -23,6 +24,16 @@ const NAV = [
       <>
         <path d="M7 3h8l4 4v14H7z" />
         <path d="M15 3v4h4M10 12h6M10 16h6" />
+      </>
+    ),
+  },
+  {
+    href: "/admin/analyses",
+    label: "Analyses à valider",
+    icon: (
+      <>
+        <path d="M9 11l3 3 8-8" />
+        <path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h9" />
       </>
     ),
   },
@@ -61,6 +72,9 @@ const NAV = [
 /** Gabarit de la console : barre latérale de navigation et zone de contenu (maquettes Admin-*). */
 export function AdminShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  // Nombre d'analyses à valider, affiché sur l'entrée du menu (US-138 RF1).
+  const reviews = useApiQuery<{ count: number }>("/api/admin/reviews");
+  const pending = reviews.data?.count ?? 0;
   return (
     <div className={styles.shell}>
       <nav className={styles.sidebar} aria-label="Console d'administration">
@@ -81,6 +95,11 @@ export function AdminShell({ children }: { children: ReactNode }) {
                 {item.icon}
               </svg>
               {item.label}
+              {item.href === "/admin/analyses" && pending > 0 && (
+                <span className={`${styles.badge} ${styles.badgeWarn}`} aria-label={`${pending} en attente`}>
+                  {pending}
+                </span>
+              )}
             </Link>
           );
         })}

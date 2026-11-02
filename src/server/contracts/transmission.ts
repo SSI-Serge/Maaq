@@ -24,6 +24,8 @@ export interface DocumentView {
   confirmed: boolean;
   /** Page de santé douteuse restée dans le texte : analyse bloquée (US-136 RF5). */
   healthDoubt?: boolean;
+  /** Lecture sous le seuil de confiance : même vérifiée par l'utilisateur, l'analyse attend un administrateur (US-136 CA 6.2, US-138). */
+  lowConfidence?: boolean;
 }
 
 export type BlockReason =
@@ -69,7 +71,7 @@ export function planAnalysis(documents: DocumentView[], verificationRequired = t
       reasons.push({ code: "masking_in_progress", fieldName: doc.fieldName });
       continue;
     }
-    if (doc.state === "uncertain") needsAdmin = true;
+    if (doc.state === "uncertain" || doc.lowConfidence) needsAdmin = true;
     if (verificationRequired && !doc.confirmed) reasons.push({ code: "not_verified", fieldName: doc.fieldName });
   }
   return { allowed: reasons.length === 0, reasons, skipped, needsAdmin };

@@ -44,17 +44,21 @@ def entities(text: str) -> list[dict]:
     return [{"start": e.start_char, "end": e.end_char, "label": e.label_} for e in doc.ents if e.label_ in ("PER", "LOC", "ORG")]
 
 
-def ocr(image: Image.Image) -> tuple[str, int]:
-    """Lecture d'une image : (texte, confiance 0 à 100). La confiance est la moyenne des mots lus, pondérée par leur longueur."""
+WEAK_BELOW = 60  # un mot lu avec moins de confiance que cela est signalé « mal lu » (aperçu de l'administrateur, US-138)
+
+
+def ocr(image: Image.Image) -> tuple[str, int, list[str]]:
+    """Lecture d'une image : (texte, confiance 0 à 100, mots mal lus). La confiance est la moyenne des mots lus, pondérée par leur longueur."""
     image = ImageOps.exif_transpose(image).convert("L")
     image = ImageOps.autocontrast(image)
     if max(image.size) > MAX_IMAGE_SIDE:
         image.thumbnail((MAX_IMAGE_SIDE, MAX_IMAGE_SIDE))
 
-    def run(img: Image.Image) -> tuple[str, int]:
+    def run(img: Image.Image) -> tuple[str, int, list[str]]:
         data = pytesseract.image_to_data(img, lang="fra", config="--oem 1 --psm 3", output_type=pytesseract.Output.DICT)
         lines: dict[tuple[int, int, int], list[str]] = {}
         weight = total = 0
+        weak: list[str] = []
         for i, word in enumerate(data["text"]):
             word = word.strip()
             conf = float(data["conf"][i])
@@ -64,10 +68,12 @@ def ocr(image: Image.Image) -> tuple[str, int]:
             lines.setdefault(key, []).append(word)
             weight += len(word)
             total += conf * len(word)
+            if conf < WEAK_BELOW and sum(c.isalpha() for c in word) >= 3:
+                weak.append(word.lower())
         text = "\n".join(" ".join(words) for _, words in sorted(lines.items()))
-        return text, round(total / weight) if weight else 0
+        return text, (round(total / weight) if weight else 0), sorted(set(weak))[:200]
 
-    text, confidence = run(image)
+    text, confidence, weak = run(image)
     if confidence < 60:
         # Photo prise de travers : on laisse Tesseract estimer l'orientation et on garde la meilleure lecture.
         try:
@@ -77,8 +83,8 @@ def ocr(image: Image.Image) -> tuple[str, int]:
         if angle:
             better = run(image.rotate(-angle, expand=True))
             if better[1] > confidence:
-                text, confidence = better
-    return text, confidence
+                text, confidence, weak = better
+    return text, confidence, weak
 
 
 def read_pdf(content: bytes) -> list[dict]:
@@ -97,8 +103,8 @@ def read_pdf(content: bytes) -> list[dict]:
             pages.append({"text": text, "confidence": 100, "method": "text"})
             continue
         pixmap = page.get_pixmap(dpi=PDF_DPI, alpha=False)
-        text, confidence = ocr(Image.open(io.BytesIO(pixmap.tobytes("png"))))
-        pages.append({"text": text, "confidence": confidence, "method": "ocr"})
+        text, confidence, weak = ocr(Image.open(io.BytesIO(pixmap.tobytes("png"))))
+        pages.append({"text": text, "confidence": confidence, "method": "ocr", "weak": weak})
     return pages
 
 
@@ -108,8 +114,8 @@ def read_image(content: bytes) -> dict:
         image.load()
     except Exception as error:  # noqa: BLE001
         raise HTTPException(422, "unreadable") from error
-    text, confidence = ocr(image)
-    return {"text": text, "confidence": confidence, "method": "ocr"}
+    text, confidence, weak = ocr(image)
+    return {"text": text, "confidence": confidence, "method": "ocr", "weak": weak}
 
 
 @app.get("/status")

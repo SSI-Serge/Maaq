@@ -12,6 +12,8 @@ export interface ReadPage {
   confidence: number;
   method: "text" | "ocr";
   entities: DetectedEntity[];
+  /** Mots lus avec peu de confiance (minuscules), pour surligner les passages mal lus dans l'aperçu de l'administrateur (US-138 RF2). */
+  weak?: string[];
 }
 
 export interface ReadResult {

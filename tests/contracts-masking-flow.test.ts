@@ -336,7 +336,7 @@ describe("aperçu, masques et confirmation (US-137)", () => {
     expect(doc.masking.status).toBe("uncertain");
     expect((await verifyDocument(at(), f.session, doc.id)).status).toBe("verified");
     const contract = (await getContracts(at(), f.session)).categories.find((x) => x.id === c.id)!.contracts.find((x) => x.id === base.id)!;
-    expect(contract.transmit).toMatchObject({ forAnalysis: true, needsAdmin: false });
+    expect(contract.transmit).toMatchObject({ forAnalysis: true, needsAdmin: true }); // lecture à 60 % : sous le seuil de 80 %, même vérifiée
   });
 });
 

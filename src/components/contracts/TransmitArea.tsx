@@ -82,6 +82,9 @@ export function TransmitArea({ contract, view, archived, onChanged }: { contract
           </Button>
         </div>
       )}
+      {t?.analysisStatus === "running" && <div className={styles.docMeta}>Analyse en cours…</div>}
+      {t?.analysisStatus === "awaiting_admin" && <div className={styles.docMeta}>En cours de vérification par MAAQ.</div>}
+      {t?.analysisStatus === "cancelled" && documentsLeft && <div className={styles.hint}>La lecture de vos documents n&apos;était pas assez fiable pour les analyser. Déposez une photo plus nette pour relancer.</div>}
       {t?.analysisStatus === "failed" && documentsLeft && (
         <div className={styles.channel}>
           <div className={styles.error}>L&apos;analyse a échoué.</div>

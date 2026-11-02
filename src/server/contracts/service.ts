@@ -6,8 +6,9 @@ import { env } from "@/server/env";
 import { Rejection } from "@/server/http";
 import { emailFingerprint } from "@/server/security/crypto";
 import { integerSetting } from "@/server/settings";
-import { analysisMode, analysisSendOpen, type AnalysisMode } from "./analysis";
+import { analysisMode, type AnalysisMode } from "./analysis";
 import { openBlob } from "./masked";
+import { displayReport } from "./report";
 import { planTransmission, type TransmitPlan } from "./plan";
 import { loadDocument, objectStore, storeDocument } from "./storage";
 import type { DocumentState } from "./transmission";
@@ -91,6 +92,8 @@ export interface ContractView {
   transmission: TransmissionView | null;
   /** Date du rapport d'analyse courant (US-132 RF5) ; le rapport lui-même vient avec E5. */
   reportAt: string | null;
+  /** Rapport d'analyse (US-132) : HTML nettoyé, jetons déjà résolus (prénoms des membres) ou en forme neutre. */
+  report: { html: string; generatedAt: string } | null;
   /** Ce que « Transmettre » ferait (US-129) : canaux, blocages, proposition d'activer l'autre canal (US-130). */
   transmit: TransmitPlan;
   /** Un email de challenge est parti depuis moins de 48 h : la suppression ne peut pas le rappeler (US-133 RF4). */
@@ -192,10 +195,11 @@ type Contract = { id: string; contract_definition_id: string };
 
 async function loadView(ctx: Ctx, accountId: string): Promise<ContractsView> {
   const db = ctx.db;
-  const [mine, maxDocumentMb, maxContracts, available, broker] = await Promise.all([
+  const [mine, maxDocumentMb, maxContracts, confidenceThresholdPct, available, broker] = await Promise.all([
     db.selectFrom("account_contracts").selectAll().where("account_id", "=", accountId).orderBy("created_at").orderBy("id").execute(),
     integerSetting(db, "max_document_size_mb", 15),
     integerSetting(db, "max_contracts_per_category", 20),
+    integerSetting(db, "contract_read_confidence_threshold_pct", 80),
     challengeAvailable(db),
     brokerName(db),
   ]);
@@ -232,7 +236,7 @@ async function loadView(ctx: Ctx, accountId: string): Promise<ContractsView> {
       : [],
     contractIds.length ? db.selectFrom("contract_field_documents").selectAll().where("account_contract_id", "in", contractIds).execute() : [],
     contractIds.length ? db.selectFrom("contract_transmissions").selectAll().where("account_contract_id", "in", contractIds).orderBy("transmitted_at", "desc").execute() : [],
-    contractIds.length ? db.selectFrom("contract_reports").select(["account_contract_id", "generated_at"]).where("account_contract_id", "in", contractIds).execute() : [],
+    contractIds.length ? db.selectFrom("contract_reports").select(["account_contract_id", "generated_at", "html"]).where("account_contract_id", "in", contractIds).execute() : [],
   ]);
 
   const userIds = [
@@ -244,6 +248,9 @@ async function loadView(ctx: Ctx, accountId: string): Promise<ContractsView> {
       ].filter((id): id is string => id !== null),
     ),
   ];
+  const memberNames = new Map(
+    reports.length ? (await db.selectFrom("family_members").select(["id", "first_name"]).where("account_id", "=", accountId).where("anonymized_at", "is", null).execute()).flatMap((m) => (m.first_name ? [[m.id, m.first_name] as const] : [])) : [],
+  );
   const names = new Map(userIds.length ? (await db.selectFrom("users").select(["id", "first_name"]).where("id", "in", userIds).execute()).map((u) => [u.id, u.first_name] as const) : []);
   const nameOf = (id: string | null) => (id ? (names.get(id) ?? null) : null);
 
@@ -322,9 +329,10 @@ async function loadView(ctx: Ctx, accountId: string): Promise<ContractsView> {
             }
           : null,
         reportAt: iso(report?.generated_at),
+        report: report ? { html: displayReport(open(report.html), memberNames), generatedAt: iso(report.generated_at)! } : null,
         challengeSentRecently: transmissions.some((t) => t.account_contract_id === c.id && t.challenge_sent_at !== null && ctx.now.getTime() - new Date(t.challenge_sent_at).getTime() < 48 * 3_600_000),
       };
-      return { ...contract, transmit: planTransmission(contract, { analysisOpen: analysisSendOpen(), challengeAvailable: available, archived, now: ctx.now }) };
+      return { ...contract, transmit: planTransmission(contract, { analysisOpen: analysisMode() !== "off", challengeAvailable: available, archived, now: ctx.now, confidenceThresholdPct }) };
     });
     const atLimit = own.length >= maxContracts;
     return { id: def.id, name: def.name, archived, archivedAt: iso(def.archived_at), canAdd: !archived && !atLimit, atLimit, contracts };

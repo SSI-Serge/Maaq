@@ -74,11 +74,19 @@ export async function transmitContract(ctx: Ctx, session: SessionContext, contra
     }
   }
   try {
-    const row = await ctx.db
-      .insertInto("contract_transmissions")
-      .values({ account_contract_id: contractId, transmitted_by_user_id: session.user.id, transmitted_at: ctx.now, for_analysis: forAnalysis, for_challenge: forChallenge })
-      .returning("id")
-      .executeTakeFirstOrThrow();
+    const row = await ctx.db.transaction().execute(async (trx) => {
+      const inserted = await trx
+        .insertInto("contract_transmissions")
+        .values({ account_contract_id: contractId, transmitted_by_user_id: session.user.id, transmitted_at: ctx.now, for_analysis: forAnalysis, for_challenge: forChallenge })
+        .returning("id")
+        .executeTakeFirstOrThrow();
+      if (forAnalysis && plan.needsAdmin) {
+        // Lecture incertaine : l'analyse attend la décision d'un administrateur, qui ne voit que le texte masqué ; la demande expire avec les documents, 48 h après (US-138 RF1, RF6).
+        await trx.updateTable("contract_transmissions").set({ analysis_status: "awaiting_admin" }).where("id", "=", inserted.id).execute();
+        await trx.insertInto("contract_analysis_reviews").values({ transmission_id: inserted.id, expires_at: new Date(ctx.now.getTime() + 48 * HOUR) }).execute();
+      }
+      return inserted;
+    });
     if (forChallenge) await deliverChallenge(ctx, row.id).catch((error) => console.error(`Envoi au challenge : ${describeError(error)}`));
   } catch (error) {
     // Rien n'est parti : la demande comptée au plafond est rendue.
