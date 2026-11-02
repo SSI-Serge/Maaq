@@ -1,6 +1,6 @@
 import { classifyPage, REMOVED_PAGE_LINE } from "./health";
 import { householdSpans, manualSpans, personIdentity } from "./household";
-import { addressSpans, dateSpans, entitySpans, labelledSpans, personSpans, structuredSpans, type DetectedEntity, type Span } from "./rules";
+import { addressSpans, dateSpans, entitySpans, labelledSpans, longNumberSpans, personSpans, structuredSpans, type DetectedEntity, type Span } from "./rules";
 import { createTokenSpace, type MaskedDocument, type MaskedPage, type MaskOptions, type TokenSpace, type TokenType } from "./types";
 
 export { createTokenSpace } from "./types";
@@ -44,6 +44,7 @@ function detect(text: string, options: MaskOptions, entities: DetectedEntity[]):
   return [
     ...structuredSpans(text),
     ...labelledSpans(text),
+    ...longNumberSpans(text),
     ...dateSpans(text, options.now),
     ...addressSpans(text),
     ...personSpans(text),

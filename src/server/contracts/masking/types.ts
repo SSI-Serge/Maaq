@@ -18,6 +18,7 @@ export type TokenType =
   | "SECU"
   | "EMPLOYEUR"
   | "COMPTE"
+  | "IDENTIFIANT"
   | "DONNEE";
 
 /** Ce que MAAQ sait déjà du foyer (profils, membres, véhicule, adresse) : couche 2 du masquage (RT2), recherche en liste fermée. */

@@ -39,7 +39,11 @@ interface Needle {
 function needlesOf(facts: HouseholdFacts): Needle[] {
   const out: Needle[] = [];
   const add = (value: string | null | undefined, kind: Needle["kind"], memberId?: string) => {
-    for (const w of (value ?? "").split(/[\s,]+/)) if (w.replace(/[^\p{L}]/gu, "").length >= 3) out.push({ word: ocrFold(w), memberId, kind });
+    for (const w of (value ?? "").split(/[\s,]+/)) {
+      if (w.replace(/[^\p{L}]/gu, "").length >= 3) out.push({ word: ocrFold(w), memberId, kind });
+      // Un nom composé s'écrit tel quel (« Ndiaye-Bello ») ou en deux mots dans le désordre d'un courrier : chaque partie est aussi cherchée.
+      if (w.includes("-")) for (const part of w.split("-")) if (part.replace(/[^\p{L}]/gu, "").length >= 3) out.push({ word: ocrFold(part), memberId, kind });
+    }
   };
   // Un prénom désigne un membre ; un nom de famille est partagé par plusieurs membres : il ne désigne personne en particulier.
   for (const p of facts.people) {

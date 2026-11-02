@@ -14,7 +14,7 @@ import styles from "./contracts.module.css";
 
 const TOKEN_LABEL: Record<string, string> = {
   PERSONNE: "Personne", ADRESSE: "Adresse", EMAIL: "Email", TELEPHONE: "Téléphone", CONTRAT: "Contrat", IBAN: "IBAN", BIC: "BIC", RIB: "RIB", IMMATRICULATION: "Immatriculation",
-  VIN: "Numéro de série", SECU: "Sécurité sociale", EMPLOYEUR: "Employeur", COMPTE: "Compte", DONNEE: "Masque ajouté",
+  VIN: "Numéro de série", SECU: "Sécurité sociale", EMPLOYEUR: "Employeur", COMPTE: "Compte", IDENTIFIANT: "Identifiant", DONNEE: "Masque ajouté",
 };
 const PIECES = /(\[[A-Z]+_\d+\])|([\p{L}\p{N}][\p{L}\p{N}'’-]*)|([^\p{L}\p{N}\[]+|\[)/gu;
 

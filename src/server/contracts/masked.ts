@@ -75,7 +75,7 @@ export function removeManualMask(blob: MaskedBlob, token: string): MaskedBlob {
 
 const MASK_TYPE: Record<string, string> = {
   PERSONNE: "person", ADRESSE: "address", EMAIL: "email", TELEPHONE: "phone", CONTRAT: "contract_number", IBAN: "bank_account", BIC: "bank_account", RIB: "bank_account",
-  IMMATRICULATION: "vehicle", VIN: "vehicle", SECU: "social_security", EMPLOYEUR: "employer", COMPTE: "account_identifier", DONNEE: "manual",
+  IMMATRICULATION: "vehicle", VIN: "vehicle", SECU: "social_security", EMPLOYEUR: "employer", COMPTE: "account_identifier", IDENTIFIANT: "account_identifier", DONNEE: "manual",
 };
 
 /** Compteurs par type de masque, au vocabulaire de la base (US-136 RT4) ; ce qui n'est pas un jeton (âge, ancienneté, département) compte comme « autre ». */

@@ -77,6 +77,7 @@ const NEUTRAL: Record<TokenType, string> = {
   SECU: "le numéro de sécurité sociale",
   EMPLOYEUR: "l'employeur",
   COMPTE: "l'identifiant de compte",
+  IDENTIFIANT: "un identifiant",
   DONNEE: "une donnée masquée",
 };
 

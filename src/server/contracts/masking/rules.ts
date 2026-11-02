@@ -28,7 +28,7 @@ const PLATE_SIV = /(?<![A-Za-z0-9])[A-HJ-NP-TV-Z]{2}[-\s]?\d{3}[-\s]?[A-HJ-NP-TV
 const PLATE_FNI = /(?<=(?:immatriculation|plaque|immat\.?)\s*(?:n[°ºo]\s*)?:?\s*)\d{1,4}[-\s]?[A-Z]{1,3}[-\s]?\d{2,3}(?![A-Za-z0-9])/giu;
 const VIN = /(?<![A-Za-z0-9])[A-HJ-NPR-Z0-9]{17}(?![A-Za-z0-9])/g;
 
-const priority = { structured: 1, labelled: 2, address: 3, name: 4, household: 5, manual: 0 } as const;
+const priority = { structured: 1, labelled: 2, address: 3, name: 4, household: 5, net: 6, manual: 0 } as const;
 
 const compact = (value: string) => value.replace(/[\s\u00a0.-]/g, "").toUpperCase();
 
@@ -81,9 +81,10 @@ export function structuredSpans(text: string): Span[] {
 
 const ID_LABELS = [
   "contrat", "police", "adh[ée]rent", "sinistre", "pr[êe]t", "client", "dossier", "souscripteur", "soci[ée]taire", "carte", "compte", "certificat", "attestation", "bordereau", "avis d['’]?[ée]ch[ée]ance",
+  "pdl", "pce", "point\\s+de\\s+(?:livraison|comptage)", "avis", "facture", "infraction", "contravention", "abonn[ée]", "installation",
 ];
 const ID_AFTER_LABEL = new RegExp(
-  `(?<label>(?:\\b(?:n[°ºo]|num[ée]ro|r[ée]f(?:[ée]rence)?\\.?)\\s*(?:de\\s+|d['’])?)?(?:${ID_LABELS.join("|")})\\s*(?:n[°ºo]|num[ée]ro)?\\s*[:：\\-]?\\s*)(?<value>[A-Za-z0-9][A-Za-z0-9/.\\-]{3,30})`,
+  `(?<label>(?:\\b(?:n[°ºo]|num[ée]ro|r[ée]f(?:[ée]rence)?\\.?)\\s*(?:de\\s+|d['’])?)?(?:${ID_LABELS.join("|")})\\s*(?:n[°ºo]|num[ée]ro)?\\s*[:：\\-]?\\s*)(?<value>\\d{1,4}(?:[ \\u00a0.]\\d{1,4}){2,8}|[A-Za-z0-9][A-Za-z0-9/.\\-]{3,30})`,
   "giu",
 );
 const BARE_NUMBER = /\b(?:n[°ºo]|num[ée]ro)\s*:?\s*(?<value>[A-Za-z0-9][A-Za-z0-9/.\-]{5,30})/giu;
@@ -230,6 +231,17 @@ export function yearsSince(date: { y: number; m: number; d: number }, now: Date)
   let years = now.getUTCFullYear() - date.y;
   if (now.getUTCMonth() + 1 < date.m || (now.getUTCMonth() + 1 === date.m && now.getUTCDate() < date.d)) years -= 1;
   return Math.max(0, years);
+}
+
+/**
+ * Filet de la couche 1 : une longue suite de chiffres (9 et plus, avec des espaces, points ou tirets entre groupes) est un identifiant, même sans étiquette lisible (numéro de
+ * client, de point de livraison, d'avis, d'abonné… mal lu ou posé dans un tableau). Les montants à décimales, les dates et ce que les autres règles reconnaissent gardent leur sens.
+ */
+const LONG_NUMBER = /(?<![\p{L}\p{N}[.,/])\d(?:[  .-]?\d){8,}(?![\p{L}\p{N}\]/]|[.,]\d)/gu;
+export function longNumberSpans(text: string): Span[] {
+  return matches(text, LONG_NUMBER)
+    .filter((m) => m.value.replace(/\D/g, "").length >= 9)
+    .map((m) => ({ start: m.start, end: m.end, type: "IDENTIFIANT" as const, key: compact(m.value), priority: priority.net }));
 }
 
 /** L'étiquette et la date sont remplacées ensemble : « né le 12/03/1985 » devient « âge : 41 ans ». */

@@ -143,10 +143,11 @@ describe("masquage des documents de contrat : jeu fictif annoté (US-136, C-16)"
   });
 
   it("un motif personnel resté visible rend le document « À vérifier » (US-136 RF6), sans jamais citer la valeur", () => {
-    const masked = mask(["Référence interne : 123456789012 — voir le dossier."]);
-    expect(masked.state).toBe("to_verify");
-    expect(masked.residual).toEqual(["longue suite de chiffres"]);
-    expect(JSON.stringify(masked.residual)).not.toContain("1234");
+    // Une longue suite de chiffres est désormais masquée d'office (filet de la couche 1) ; le contrôle final la signale encore si elle survit sur un texte déjà masqué.
+    expect(mask(["Référence interne : 123456789012 — voir le dossier."]).text).toContain("[IDENTIFIANT_1]");
+    const residual = residualIssues("Référence interne : 123456789012 — voir le dossier.", { household, now: NOW });
+    expect(residual).toEqual(["longue suite de chiffres"]);
+    expect(JSON.stringify(residual)).not.toContain("1234");
     expect(residualIssues("écrire à jean.dupont@exemple.fr", { household, now: NOW })).toEqual(["email"]);
   });
 
@@ -199,5 +200,43 @@ describe("rappel sur les identifiants structurés tirés au hasard (C-16)", () =
     expect(samples.length).toBe(240);
     expect(missed / samples.length).toBeLessThanOrEqual(0.01);
     expect(missed).toBe(0);
+  });
+});
+
+// Documents du même modèle que de vrais courriers photographiés (attestation d'un fournisseur d'énergie, avis de contravention), mais ENTIÈREMENT FICTIFS : numéros sans
+// étiquette standard, groupes de chiffres séparés par des espaces, tableau lu en désordre, noms en majuscules dans l'ordre inverse.
+describe("numéros de courriers photographiés : étiquettes inhabituelles et groupes de chiffres (C-16)", () => {
+  const facts: HouseholdFacts = { people: [{ id: "m-1", firstName: "Jean-Pierre", lastName: "Durand" }, { id: "m-2", firstName: "Aïcha", lastName: "Ndiaye-Bello" }] };
+  const doc = [
+    "ATTESTATION DE FOURNITURE D'ÉLECTRICITÉ",
+    "N° client : 1 234 567 890",
+    "N° de compte : 1 23 4 567 890 123",
+    "PDL : 12 345 678 901 234",
+    "Point de livraison n° 98765432109876",
+    "NDIAYE BELLO AÏCHA DURAND 4 rue du Four 35000 Rennes",
+    "Avis de contravention n° 2610458731 du 12/03/2026, montant 135,00 €",
+    "Référence de paiement : 0123 4567 8901 2345 6789",
+    "Puissance souscrite : 6 kVA, consommation annuelle 4 250 kWh, prix 0,2516 €/kWh",
+  ].join("\n");
+
+  it("masque chaque numéro, quel que soit son groupement, et garde puissances, montants, dates et consommations", () => {
+    const masked = maskDocument([doc], { household: facts, now: NOW });
+    for (const digits of ["1 234 567 890", "1 23 4 567 890 123", "12 345 678 901 234", "98765432109876", "2610458731", "0123 4567 8901 2345 6789"]) expect(masked.text).not.toContain(digits);
+    expect(masked.text).not.toMatch(/\d{9,}/);
+    for (const kept of ["6 kVA", "4 250 kWh", "0,2516 €/kWh", "135,00 €", "12/03/2026"]) expect(masked.text).toContain(kept);
+    expect(masked.residual).toEqual([]);
+  });
+
+  it("un nom du foyer en majuscules, dans le désordre, est masqué quel que soit l'ordre des mots", () => {
+    const masked = maskDocument([doc], { household: facts, now: NOW });
+    expect(masked.text).not.toMatch(/NDIAYE|BELLO|AÏCHA|DURAND/);
+    expect(masked.references).toMatchObject({ "[PERSONNE_1]": { kind: "member" } });
+  });
+
+  it("une longue suite de chiffres reste masquée sans étiquette, mais un montant avec décimales ne l'est pas", () => {
+    const masked = maskDocument(["Code 123456789012 puis total 1 234 567,89 € et 3,14159265358"], { household: facts, now: NOW });
+    expect(masked.text).toContain("[IDENTIFIANT_1]");
+    expect(masked.text).toContain("1 234 567,89 €");
+    expect(masked.text).toContain("3,14159265358");
   });
 });
