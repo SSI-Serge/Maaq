@@ -3,8 +3,35 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-01T11:40:00Z",
+  "updated": "2026-11-02T01:30:00Z",
   "deploys": [
+    {
+      "at": "2026-11-02T00:30:00Z",
+      "env": "preview",
+      "what": "Zone de test (révision 00060) : analyse, rapport de démonstration, analyses à valider, notification d'échec",
+      "storyIds": [
+        "f18s8",
+        "f18s9",
+        "f18s10"
+      ]
+    },
+    {
+      "at": "2026-11-01T23:50:00Z",
+      "env": "preview",
+      "what": "Zone de test (révision 00057) et service de lecture : masquage des documents et aperçu du texte masqué",
+      "storyIds": [
+        "f18s6",
+        "f18s7"
+      ]
+    },
+    {
+      "at": "2026-11-01T22:00:00Z",
+      "env": "preview",
+      "what": "Zone de test (révision 00055) : transmission et challenge par email",
+      "storyIds": [
+        "f18s5"
+      ]
+    },
     {
       "at": "2026-10-31T09:40:00Z",
       "env": "preview",
@@ -2468,6 +2495,115 @@
           "kind": "work",
           "what": "Écart entre le schéma de conception et la base en test relevé, table par table ; plan d'alignement décidé"
         }
+      ]
+    },
+    {
+      "id": "f18",
+      "name": "Contrats V2 : documents, masquage et analyse",
+      "desc": "Chaque famille dépose les documents de ses contrats, les fait masquer puis analyser, ou les envoie à un courtier pour challenge.",
+      "building": false,
+      "stories": [
+        {
+          "id": "f18s1",
+          "title": "Configurer les documents attendus d'une catégorie de contrats (US-122, 123, 139)",
+          "state": "testing",
+          "env": "preview",
+          "at": "2026-11-02T01:30:00Z"
+        },
+        {
+          "id": "f18s2",
+          "title": "Ajouter, nommer et supprimer des contrats complémentaires (US-124, 125, 133)",
+          "state": "testing",
+          "env": "preview",
+          "at": "2026-11-02T01:30:00Z"
+        },
+        {
+          "id": "f18s3",
+          "title": "Charger mes documents, supprimés après 30 jours ou 48 h après l'envoi (US-126, 134)",
+          "state": "testing",
+          "env": "preview",
+          "at": "2026-11-02T01:30:00Z"
+        },
+        {
+          "id": "f18s4",
+          "title": "Activer l'analyse IA ou le challenge d'un contrat, avec mon consentement (US-127, 128)",
+          "state": "testing",
+          "env": "preview",
+          "at": "2026-11-02T01:30:00Z"
+        },
+        {
+          "id": "f18s5",
+          "title": "Transmettre mes documents pour analyse et/ou challenge (US-129, 130)",
+          "state": "testing",
+          "env": "preview",
+          "at": "2026-11-02T01:30:00Z",
+          "unsure": [
+            "L'envoi réel du challenge n'a pas été essayé depuis un téléphone sur la zone ; le courtier n'est pas encore désigné."
+          ]
+        },
+        {
+          "id": "f18s6",
+          "title": "Faire masquer mes documents avant l'analyse (US-136)",
+          "state": "testing",
+          "env": "preview",
+          "at": "2026-11-02T01:30:00Z",
+          "unsure": [
+            "Mesuré sur des documents fictifs et deux photos réelles (identifiants) ; les noms (liste du foyer, modèle de langue) restent à mesurer avec de vrais membres."
+          ]
+        },
+        {
+          "id": "f18s7",
+          "title": "Vérifier le texte masqué avant l'analyse (US-137)",
+          "state": "testing",
+          "env": "preview",
+          "at": "2026-11-02T01:30:00Z"
+        },
+        {
+          "id": "f18s8",
+          "title": "Lire le rapport d'analyse d'un contrat (US-131, 132)",
+          "state": "testing",
+          "env": "preview",
+          "at": "2026-11-02T01:30:00Z",
+          "note": "Contenu de démonstration tant que le brief du consultant n'est pas livré ; l'appel réel à l'IA reste fermé jusqu'à l'avis du DPO.",
+          "unsure": [
+            "L'appel réel à l'agent n'a jamais tourné."
+          ]
+        },
+        {
+          "id": "f18s9",
+          "title": "Être prévenu d'un échec d'analyse ou d'envoi, et relancer (US-135)",
+          "state": "testing",
+          "env": "preview",
+          "at": "2026-11-02T01:30:00Z",
+          "unsure": [
+            "La notification d'échec n'a pas été essayée sur un appareil."
+          ]
+        },
+        {
+          "id": "f18s10",
+          "title": "Décider d'une analyse dont la lecture est incertaine, côté administrateur (US-138)",
+          "state": "testing",
+          "env": "preview",
+          "at": "2026-11-02T01:30:00Z"
+        }
+      ],
+      "decisions": [
+        {
+          "at": "2026-11-02T01:30:00Z",
+          "text": "Texte masqué seul : l'agent ne voit jamais l'image ; aperçu obligatoire par document pendant le pilote."
+        },
+        {
+          "at": "2026-11-02T01:30:00Z",
+          "text": "Le besoin d'un administrateur se décide sur le score de lecture comparé au seuil, même après la vérification de l'utilisateur."
+        },
+        {
+          "at": "2026-11-02T01:30:00Z",
+          "text": "Analyse ouverte en mode d'essai sur la zone (rapport de démonstration, aucun envoi à une IA) ; ouverture réelle après l'avis du DPO."
+        }
+      ],
+      "unsure": [
+        "Production : rien n'est ouvert ; le coût du service de lecture et du bucket n'est accordé que pour le projet de test.",
+        "Avis du DPO, brief du consultant et seuil de non-fuite sur de vrais documents encore attendus avant l'ouverture réelle."
       ]
     }
   ],

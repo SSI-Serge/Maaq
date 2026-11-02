@@ -89,7 +89,7 @@ const ID_AFTER_LABEL = new RegExp(
 );
 const BARE_NUMBER = /\b(?:n[°ºo]|num[ée]ro)\s*:?\s*(?<value>[A-Za-z0-9][A-Za-z0-9/.\-]{5,30})/giu;
 const BIC_AFTER_LABEL = /\bBIC\s*(?:\/\s*SWIFT)?\s*:?\s*(?<value>[A-Z]{6}[A-Z0-9]{2}(?:[A-Z0-9]{3})?)\b/g;
-const IBAN_AFTER_LABEL = /\b(?:IBAN|RIB)\s*:?\s*(?<value>[A-Z]{2}\d{2}(?:[ \u00a0]?[A-Za-z0-9]{2,4}){3,8})/g;
+const IBAN_AFTER_LABEL = /\b(?:IBAN|RIB)\s*:?\s*(?<value>[A-Z]{2}\d{2}(?:[ \u00a0]?[A-Za-z0-9]{2,4}){3,8}|[A-Za-z]{2,4}\d[A-Za-z0-9]+(?:[ \u00a0]\d[A-Za-z0-9]{1,12}){0,7})/g;
 const ACCOUNT_AFTER_LABEL = /\b(?:identifiant|login|code\s+d['’]acc[èe]s|espace\s+client)\s*:?\s*(?<value>[A-Za-z0-9._@-]{4,40})/giu;
 const EMPLOYER_AFTER_LABEL = new RegExp(`\\b(?:employeur|soci[ée]t[ée]\\s+employeuse|entreprise\\s+de\\s+l['’]assur[ée])\\s*:\\s*(?<value>[^\\n]{2,60})`, "giu");
 
@@ -212,8 +212,8 @@ const MONTHS: Record<string, number> = {
   janvier: 1, fevrier: 2, février: 2, mars: 3, avril: 4, mai: 5, juin: 6, juillet: 7, aout: 8, août: 8, septembre: 9, octobre: 10, novembre: 11, decembre: 12, décembre: 12,
 };
 const DATE = `(?:\\d{1,2}[/.\\-]\\d{1,2}[/.\\-]\\d{2,4}|\\d{1,2}(?:er)?\\s+(?:${Object.keys(MONTHS).join("|")})\\s+\\d{4})`;
-const BIRTH = new RegExp(`(?:n[ée](?:\\(e\\)|e)?\\s+le|date\\s+de\\s+naissance|naissance)\\s*:?\\s*(?<value>${DATE})`, "giu");
-const LICENCE = new RegExp(`(?:permis(?:\\s+de\\s+conduire)?(?:\\s+(?:obtenu|d[ée]livr[ée]))?(?:\\s+(?:le|en))?|date\\s+d['’]obtention\\s+du\\s+permis)\\s*:?\\s*(?<value>${DATE}|\\d{4})`, "giu");
+const BIRTH = new RegExp(`(?:n[ée](?:\\(e\\)|e)?\\s+(?:le|[A-Za-z1|]{1,2})|date\\s+de\\s+naissance|naissance)\\s*:?\\s*(?<value>${DATE})`, "giu");
+const LICENCE = new RegExp(`(?:permis(?:\\s+de\\s+conduire)?(?:\\s+(?:obtenu|d[ée]livr[ée]))?(?:\\s+(?:le|en|[A-Za-z1|]{1,2}))?|date\\s+d['’]obtention\\s+du\\s+permis)\\s*:?\\s*(?<value>${DATE}|\\d{4})`, "giu");
 
 function parseDate(raw: string): { y: number; m: number; d: number } | null {
   const numeric = /^(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{2,4})$/.exec(raw);
@@ -237,7 +237,7 @@ export function yearsSince(date: { y: number; m: number; d: number }, now: Date)
  * Filet de la couche 1 : une longue suite de chiffres (9 et plus, avec des espaces, points ou tirets entre groupes) est un identifiant, même sans étiquette lisible (numéro de
  * client, de point de livraison, d'avis, d'abonné… mal lu ou posé dans un tableau). Les montants à décimales, les dates et ce que les autres règles reconnaissent gardent leur sens.
  */
-const LONG_NUMBER = /(?<![\p{L}\p{N}[.,/])\d(?:[  .-]?\d){8,}(?![\p{L}\p{N}\]/]|[.,]\d)/gu;
+const LONG_NUMBER = /(?<![\p{L}\p{N}[.,/])(?:\p{L}{1,4})?\d(?:[  .-]?\d){8,}(?![\p{L}\p{N}\]/]|[.,]\d)/gu;
 export function longNumberSpans(text: string): Span[] {
   return matches(text, LONG_NUMBER)
     .filter((m) => m.value.replace(/\D/g, "").length >= 9)

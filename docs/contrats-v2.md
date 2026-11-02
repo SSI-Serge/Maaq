@@ -12,7 +12,7 @@ Spécification validée : `Projets Claude/Business Analyst/MAAQ_US_Detaillees_BA
 | E3 | Transmission et challenge par email (US-129, 130, 134, 135) | fait (tests verts), mise en ligne sur la zone de test à la suite |
 | E4 | Lecture (PDF, OCR), reconnaissance des noms propres, masquage branché, aperçu et confirmation (US-136, US-137) | fait (tests verts) ; service interne `maaq-lecture` en ligne sur le projet de test |
 | E5 | Analyse, rapport, validation administrateur (US-131, 132, 135, 138) | fait (tests verts) ; mode d'essai = rapport de démonstration, l'appel réel à l'agent reste fermé (avis du DPO) |
-| E6 | Recette, mise en service | à la fin |
+| E6 | Recette, mise en service, banc de non-fuite | fait : `docs/contrats-v2-recette.md`, `docs/contrats-v2-mise-en-service.md`, `npm run check:contracts`, `npm run bench:ocr`, étape de CI ; reste l'essai du PO sur la zone |
 
 ## Branche et schéma
 
@@ -68,6 +68,14 @@ Développement sur la branche `contrats-v2` (partie de `assistant-famille`). Le 
 - **Correction** : le besoin d'un administrateur se décidait sur l'état « Lecture incertaine », qui disparaît dès que l'utilisateur confirme ; il se décide désormais sur le score de lecture comparé au seuil.
 - **Essai local** : transmission, rapport de démonstration, demande d'administrateur, liste, ouverture avec surlignage, décision « Poursuivre » avec confirmation, dans le navigateur.
 - **Non fait** : l'appel réel à l'agent n'a jamais tourné (fermé) ; la notification d'échec n'a pas été essayée sur un appareil.
+
+## E6 : recette, mise en service, banc de non-fuite
+
+- **Recette** : `docs/contrats-v2-recette.md` (couverture automatique par US, feuille d'essai à cocher pour le PO sur la zone, y compris sur téléphone).
+- **Mise en service** : `docs/contrats-v2-mise-en-service.md` (trois niveaux d'ouverture, ce qui est en place sur la zone, étapes pour la production avec l'accord du PO à chaque étape, ce qui bloque l'ouverture réelle, retour en arrière) ; `npm run check:contracts` lit la base et l'environnement et ne modifie rien ; avec `-- --live` il échoue tant que l'avis du DPO, le texte de consentement définitif, le brief du consultant, l'accord de coût et la mesure du seuil de non-fuite ne sont pas levés.
+- **Banc de non-fuite** : le jeu fictif annoté vit dans `tests/fixtures/contract-corpus.ts`, partagé par les tests et par `npm run bench:ocr -- --url <service>`, qui rend les documents en photos (propre, penchée, sombre), les fait lire par le service, masque et mesure ; il échoue si un identifiant direct reste lisible. La CI rejoue les tests de masquage dans une étape nommée.
+- **Ce que le banc a révélé** (et corrigé) : une étiquette mal lue (« Permis obtenu te… », « Né te… ») laissait la date visible ; un IBAN dont les lettres du pays sont mal lues (« Frr6300060001… ») échappait à la règle de l'étiquette et au filet des 9 chiffres. Dernier passage : 0 identifiant direct lisible sur 57 contrôles, 0 nom lisible sur 42.
+- **Test d'horaire corrigé** : `family-series-yearly.test.ts` créait sa série à l'heure de Paris dans un fuseau d'essai « où il est midi » ; à 00 h–02 h UTC (fuseaux UTC+10 à UTC+12), 17 h tombait le lendemain et le rappel du 3 n'était plus dû. Test d'horaire seulement : le calcul des échéances se fait bien dans le fuseau de la famille, aucun défaut du produit.
 
 ## Mise en ligne d'E2 sur la zone de test (02/11/2026)
 

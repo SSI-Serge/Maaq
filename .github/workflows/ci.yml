@@ -34,4 +34,7 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
+      # Banc de non-fuite du masquage (Contrats V2, C-16) : aucun identifiant direct lisible, au moins 99 % des identifiants structurés masqués, sur des documents entièrement fictifs.
+      - name: Banc de non-fuite (C-16)
+        run: npx vitest run tests/contract-masking.test.ts tests/contract-bricks.test.ts tests/contracts-masking-flow.test.ts
       - run: npm run build
