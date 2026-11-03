@@ -3,8 +3,22 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-02T22:45:00Z",
+  "updated": "2026-11-03T13:50:00Z",
   "deploys": [
+    {
+      "at": "2026-11-03T13:50:00Z",
+      "env": "preview",
+      "what": "Zone de test : MMF Émotions (cœurs, bilan, point avec charge, mot libre, « Confier à », « Nos envies »), lot 13 appliqué à la base de test",
+      "storyIds": [
+        "f20s1",
+        "f20s2",
+        "f20s3",
+        "f20s4",
+        "f20s5",
+        "f20s6",
+        "f20s7"
+      ]
+    },
     {
       "at": "2026-11-02T22:45:00Z",
       "env": "preview",
@@ -2656,6 +2670,96 @@
           "state": "testing",
           "env": "preview",
           "at": "2026-11-02T22:45:00Z"
+        }
+      ]
+    },
+    {
+      "id": "f20",
+      "name": "Émotions : remercier, bilan et envies à deux (US-141 à US-151)",
+      "desc": "Pour le couple : un cœur de remerciement, un bilan de la semaine sans chiffre puis le point avec la charge de chacun, un mot libre, « Confier à » et « Nos envies ».",
+      "building": false,
+      "stories": [
+        {
+          "id": "f20s1",
+          "title": "Remercier d'un cœur une tâche ou un RDV fait par l'autre parent",
+          "state": "testing",
+          "env": "preview",
+          "at": "2026-11-03T13:50:00Z",
+          "unsure": [
+            "Écrans vus dans un navigateur local à 375 px, jamais sur un vrai téléphone."
+          ]
+        },
+        {
+          "id": "f20s2",
+          "title": "Recevoir une seule notification pour le bilan de la semaine",
+          "state": "testing",
+          "env": "preview",
+          "at": "2026-11-03T13:50:00Z",
+          "unsure": [
+            "Écrans vus dans un navigateur local à 375 px, jamais sur un vrai téléphone."
+          ]
+        },
+        {
+          "id": "f20s3",
+          "title": "Écrire un mot libre à mon partenaire, lu dans son bilan",
+          "state": "testing",
+          "env": "preview",
+          "at": "2026-11-03T13:50:00Z",
+          "unsure": [
+            "Écrans vus dans un navigateur local à 375 px, jamais sur un vrai téléphone.",
+            "Avis du DPO attendu sur le texte libre (durée de 4 semaines, export)."
+          ]
+        },
+        {
+          "id": "f20s4",
+          "title": "Consulter le bilan de la semaine passée, sans chiffre",
+          "state": "testing",
+          "env": "preview",
+          "at": "2026-11-03T13:50:00Z",
+          "unsure": [
+            "Écrans vus dans un navigateur local à 375 px, jamais sur un vrai téléphone."
+          ]
+        },
+        {
+          "id": "f20s5",
+          "title": "Consulter le point de la semaine à venir avec la charge de chacun",
+          "state": "testing",
+          "env": "preview",
+          "at": "2026-11-03T13:50:00Z",
+          "unsure": [
+            "Écrans vus dans un navigateur local à 375 px, jamais sur un vrai téléphone.",
+            "Seuils de charge (2 et 4) à essayer sur des semaines fictives avant le pilote."
+          ]
+        },
+        {
+          "id": "f20s6",
+          "title": "Confier une tâche à l'autre parent depuis le point, avec « Annuler »",
+          "state": "testing",
+          "env": "preview",
+          "at": "2026-11-03T13:50:00Z",
+          "unsure": [
+            "Écrans vus dans un navigateur local à 375 px, jamais sur un vrai téléphone."
+          ]
+        },
+        {
+          "id": "f20s7",
+          "title": "Consulter et ajouter des envies à deux, être prévenu, les retirer, en faire un RDV",
+          "state": "testing",
+          "env": "preview",
+          "at": "2026-11-03T13:50:00Z",
+          "unsure": [
+            "Écrans vus dans un navigateur local à 375 px, jamais sur un vrai téléphone."
+          ]
+        }
+      ],
+      "decisions": [
+        {
+          "at": "2026-11-03T13:50:00Z",
+          "text": "Lot 13 avant la suite de Contrats V2 et avant le pilote ; réservé aux deux parents du couple ; rien de tout cela ne passe par l'agent."
+        },
+        {
+          "at": "2026-11-03T13:50:00Z",
+          "text": "Au retrait de l'invité 1, cœurs, bilans, mots et envies du couple sont supprimés ; la confirmation le dit."
         }
       ]
     }
