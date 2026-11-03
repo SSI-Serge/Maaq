@@ -340,8 +340,12 @@ describe("point de la semaine : résumé, envoi et écran (US-98)", () => {
     const sent = await runDigests(SUNDAY_1905, { accountId: f.accountId, model });
     expect(sent.sent).toBe(3);
     expect(model.inputs).toHaveLength(1); // une seule préparation par famille
-    expect(bodiesFor(f.devices.camille)).toEqual(["Votre semaine est prête : 5 RDV, 3 tâches"]); // elle voit tout : 5 RDV, 3 tâches
-    expect(bodiesFor(f.devices.julien)).toEqual(["Votre semaine est prête : 5 RDV, 3 tâches"]);
+    // Le couple (Camille et Julien) reçoit une seule notification, sans chiffre : elle annonce le bilan (MMF Émotions, US-142 RF1) ; son bilan de la semaine passée est créé avec elle.
+    expect(bodiesFor(f.devices.camille)).toEqual(["Votre bilan de la semaine vous attend."]);
+    expect(bodiesFor(f.devices.julien)).toEqual(["Votre bilan de la semaine vous attend."]);
+    const reviews = await db.selectFrom("weekly_reviews").select([sql<string>`week_start::text`.as("week"), "user_id"]).where("account_id", "=", f.accountId).execute();
+    expect(reviews.map((r) => r.week)).toEqual(["2054-11-02", "2054-11-02"]); // la semaine qui précède le point du 9 novembre (E-17)
+    expect(new Set(reviews.map((r) => r.user_id))).toEqual(new Set([f.camille.id, f.julien.id]));
     const elodieMail = (await messagesTo(f.elodie.email)).filter((m) => m.subject?.startsWith("Votre semaine est prête"));
     expect(elodieMail.map((m) => m.subject)).toEqual(["Votre semaine est prête : 1 RDV, 1 tâche"]); // ses RDV et ses tâches seulement
     // Rejoué : rien de plus (une seule fois par semaine couverte).
@@ -364,8 +368,10 @@ describe("point de la semaine : résumé, envoi et écran (US-98)", () => {
     expect(view.days[1].events[0].title).toBe("RDV médical — Léo");
     expect(view.attention.map((a) => a.kind).sort()).toEqual(["to_confirm", "unassigned"]);
     expect(view.attention.find((a) => a.kind === "unassigned")?.text).toBe("Sans personne : Ranger le garage");
-    expect(view.lastWeek).toMatchObject({ doneTasks: 1 });
-    expect(view.lastWeek.open.map((t) => t.title)).toEqual(["Encore ouverte"]);
+    // Le couple : le point ne parle que de la semaine à venir (la semaine passée est dans le bilan), et montre la charge de chacun (US-145).
+    expect(view.lastWeek).toBeNull();
+    expect(view.couple).toMatchObject({ partner: "Julien" });
+    expect(view.days.every((d) => d.load.length === 2)).toBe(true);
     expect(view.calm).toBe(false);
     // Un invité secondaire : ses RDV et ses tâches, le résumé de MAAQ, rien de l'agent ni des autres (RF3, CA 3.1).
     const elodie = await getDigest(at("2054-11-10T08:00:00Z"), f.elodieSession);
@@ -375,6 +381,10 @@ describe("point de la semaine : résumé, envoi et écran (US-98)", () => {
     expect(elodie.days.flatMap((d) => d.events.map((e) => e.title))).toEqual(["Yoga d'Élodie"]);
     expect(elodie.days.flatMap((d) => d.tasks.map((t) => t.title))).toEqual(["Arroser les plantes d'Élodie"]);
     expect(elodie.attention).toEqual([]);
+    // L'invité secondaire garde le point actuel : semaine passée, sans charge ni couple (E-03, US-145 RF5).
+    expect(elodie.couple).toBeNull();
+    expect(elodie.lastWeek).not.toBeNull();
+    expect(elodie.days.every((d) => d.load.length === 0)).toBe(true);
     // Un RDV que le lecteur ne voit pas devient « un rendez-vous » dans le résumé de l'agent (D39) : testé sur le point d'un parent via une référence inconnue.
     await db.updateTable("weekly_digests").set({ agent_summary: seal("Voir [[evt-00000000]] et [[tch-00000000]].") }).where("account_id", "=", f.accountId).execute();
     expect((await getDigest(at("2054-11-10T08:00:00Z"), f.camilleSession)).summary?.text).toBe("Voir un rendez-vous et une tâche.");
@@ -385,7 +395,7 @@ describe("point de la semaine : résumé, envoi et écran (US-98)", () => {
     const model = fakeModel(() => new Error("indisponible"));
     const out = await runDigests(SUNDAY_1905, { accountId: f.accountId, model });
     expect(out).toMatchObject({ prepared: 0, sent: 3 });
-    expect(bodiesFor(f.devices.camille)).toEqual(["Votre semaine est prête : 0 RDV, 0 tâche"]);
+    expect(bodiesFor(f.devices.camille)).toEqual(["Votre bilan de la semaine vous attend."]);
     const row = await db.selectFrom("weekly_digests").select(["summary_status"]).where("account_id", "=", f.accountId).executeTakeFirstOrThrow();
     expect(row.summary_status).toBe("failed");
     const view = await getDigest(at("2054-11-10T08:00:00Z"), f.camilleSession);
@@ -405,7 +415,9 @@ describe("point de la semaine : résumé, envoi et écran (US-98)", () => {
     expect(bodiesFor(f.devices.julien)).toEqual([]);
     const wednesday = await runDigests(at("2054-11-11T11:05:00Z"), { accountId: f.accountId, model }); // mercredi 12 h 05
     expect(wednesday.sent).toBe(1);
-    expect(bodiesFor(f.devices.camille)).toEqual(["Votre semaine est prête : 1 RDV, 0 tâche"]); // couvre le lundi 16 au dimanche 22
+    expect(bodiesFor(f.devices.camille)).toEqual(["Votre bilan de la semaine vous attend."]); // le point couvre le lundi 16 au dimanche 22, le bilan la semaine d'avant
+    // Julien a désactivé le point : pas de notification, mais son bilan existe et reste consultable depuis l'accueil (US-142 RF4).
+    expect(await db.selectFrom("weekly_reviews").select("id").where("user_id", "=", f.julien.id).execute()).toHaveLength(1);
     const view = await getDigest(at("2054-11-12T08:00:00Z"), f.camilleSession);
     expect(view.weekStart).toBe("2054-11-16");
   });

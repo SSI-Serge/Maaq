@@ -1,8 +1,9 @@
 import { sql, type Kysely } from "kysely";
+import { heartOfEvent, type HeartView } from "@/server/emotions/hearts";
 import type { Ctx, SessionContext } from "@/server/auth/service";
 import type { DB } from "@/server/db/schema.generated";
 import { Rejection } from "@/server/http";
-import { EVENT_TYPES, MEDICAL_TITLE, STATUS_CODE, TYPE_CODE, eventTypeIds, findConflicts, fingerprintOf, loadCalendarEvent, loadCalendarEvents, type CalendarEvent, type EventSource, type EventStatus, type EventType } from "./calendar";
+import { EVENT_TYPES, MEDICAL_TITLE, SOURCE_CODE, STATUS_CODE, TYPE_CODE, eventTypeIds, findConflicts, fingerprintOf, loadCalendarEvent, loadCalendarEvents, type CalendarEvent, type EventSource, type EventStatus, type EventType } from "./calendar";
 import { parsePoint, sealPoint, type PlacePoint } from "./address";
 import { seal, sealOptional } from "./fields";
 import { isParent } from "./family";
@@ -86,6 +87,8 @@ export interface EventView {
   recurring: boolean;
   series: SeriesView | null;
   can: EventActions;
+  /** Cœur de remerciement (US-141) : rempli dans le détail seulement, pour les deux parents du couple, sur un RDV confirmé, terminé et créé par l'un d'eux. */
+  heart: HeartView | null;
   /** Autres rendez-vous en conflit avec celui-ci (provisoires, confirmés ; écartés et annulés ne comptent pas). */
   conflicts: ConflictView[];
   /** Rendez-vous rapprochés, sans chevauchement (US-107 RF1). Rempli dans le détail seulement. */
@@ -163,7 +166,7 @@ function toView(v: Viewer, e: CalendarEvent, members: Map<string, MemberChip>, n
     autoConfirm: autoConfirmOf(v, e),
     recurring: Boolean(e.seriesId),
     series: null,
-    can: actionsFor(v, e, now), conflicts: [], nearby: [], alternatives: [], reminders: [], nudge: null, tasks: null, travel: null,
+    can: actionsFor(v, e, now), heart: null, conflicts: [], nearby: [], alternatives: [], reminders: [], nudge: null, tasks: null, travel: null,
   };
 }
 
@@ -284,7 +287,7 @@ export async function getEvent(ctx: Ctx, session: SessionContext, id: string): P
   const names = await firstNames(ctx.db, [e.createdByUserId, e.statusChangedByUserId]);
   const view = await withConflicts(ctx.db, v, toView(v, e, members, names, ctx.now), e, ctx.now);
   const taskViewer = { accountId: v.accountId, userId: v.userId, parent: v.parent, memberId: v.memberId, timeZone: v.timeZone, today: utcToLocal(ctx.now, v.timeZone).slice(0, 10), nowLocal: utcToLocal(ctx.now, v.timeZone) };
-  return { ...view, series: await seriesView(ctx.db, e, v.timeZone), tasks: await loadEventTasks(ctx.db, taskViewer, e, ctx.now, members), travel: await travelView(ctx.db, v.userId, v.memberId, e, ctx.now), ...(await reminderDetails(ctx.db, v.accountId, e, v.timeZone, ctx.now)) };
+  return { ...view, heart: await heartOfEvent(ctx.db, v.userId, e, ctx.now), series: await seriesView(ctx.db, e, v.timeZone), tasks: await loadEventTasks(ctx.db, taskViewer, e, ctx.now, members), travel: await travelView(ctx.db, v.userId, v.memberId, e, ctx.now), ...(await reminderDetails(ctx.db, v.accountId, e, v.timeZone, ctx.now)) };
 }
 
 /** Confirmations en attente d'un profil (US-75 RF4, US-84) : provisoires qu'il peut traiter, à venir. Les écartés n'y figurent plus. */
@@ -364,6 +367,8 @@ export interface ConfirmedEventInput {
   end: string;
   memberIds: string[];
   allowConflict?: boolean;
+  /** Origine du RDV : « outing » (défaut) n'annonce rien à l'autre parent ; « typed » est un RDV ordinaire (envie transformée en RDV, US-151). */
+  source?: "outing" | "typed";
 }
 
 /**
@@ -394,7 +399,7 @@ export async function createConfirmedEvent(ctx: Ctx, session: SessionContext, in
       const row = await trx
         .insertInto("family_events")
         .values({
-          account_id: v.accountId, event_type_id: typeId, title: seal(title), location: sealOptional(place), note: sealOptional(notes), starts_at: starts, ends_at: ends, status: "confirmed", source: "outing",
+          account_id: v.accountId, event_type_id: typeId, title: seal(title), location: sealOptional(place), note: sealOptional(notes), starts_at: starts, ends_at: ends, status: "confirmed", source: SOURCE_CODE[input.source === "typed" ? "typed" : "outing"],
           requested_by_user_id: v.userId, source_at: ctx.now, confirmed_at: ctx.now, confirmed_by_user_id: v.userId, fingerprint: fingerprintOf({ startsAt: starts, endsAt: ends, type: input.type, allFamily: false, memberIds }),
         })
         .returning("id")

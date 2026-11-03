@@ -1,0 +1,87 @@
+/*
+ * MMF « Émotions » (US-141 à US-151), d'après les maquettes RDV-Taches, RDV-Detail, RDV-Point-Semaine, RDV-Mot-Partenaire, RDV-Envies et RDV-Envie-Form : le registre doré de la carte
+ * Sorties (Newsreader italique, accent doré), sans chiffre ni comparaison.
+ */
+.kick { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--secondary-strong); }
+.italic { font-family: var(--font-serif); font-style: italic; color: var(--ink); }
+
+/* Cœur de remerciement */
+.heartBtn { width: 44px; height: 44px; flex-shrink: 0; border: none; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; line-height: 1; background: transparent; color: var(--secondary-strong); cursor: pointer; }
+.heartBtn[aria-pressed="true"] { background: var(--secondary-soft); }
+.heartBtn:disabled { opacity: 0.6; cursor: default; }
+.thanks { display: block; margin-top: 2px; font-weight: 700; color: var(--secondary-strong); font-size: 12px; }
+.heartLine { display: flex; align-items: center; gap: 8px; background: var(--secondary-soft); border-radius: var(--radius); padding: 4px 6px 4px 12px; font-size: 13px; color: var(--ink); }
+.heartLine > span { flex: 1; }
+
+/* Bilan */
+.card { background: var(--bg-raised); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
+.cardGold { border-color: var(--secondary); }
+.mot { background: var(--secondary-soft); border-left: 3px solid var(--secondary); border-radius: var(--radius); padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+.motText { font-family: var(--font-serif); font-style: italic; font-size: 17px; line-height: 1.45; margin: 0; color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; }
+.cardTitle { font-family: var(--font-serif); font-style: italic; font-size: 16px; color: var(--ink); }
+.line { display: flex; gap: 8px; align-items: baseline; font-size: 13px; color: var(--ink); }
+.lineHeart { color: var(--secondary-strong); }
+.lineDone { color: var(--success); }
+.quiet { text-align: center; padding: 50px 10px; font-family: var(--font-serif); font-style: italic; font-size: 19px; color: var(--ink); }
+.steps { display: flex; align-items: center; gap: 10px; margin: 2px 0 10px; }
+.step { border: none; background: none; padding: 2px 0; font-size: 12px; font-weight: 700; color: var(--ink-soft); text-decoration: none; cursor: pointer; font-family: inherit; }
+.stepOn { color: var(--secondary-strong); text-decoration: underline; text-underline-offset: 4px; }
+.primary { min-height: 48px; border: none; border-radius: 8px; background: var(--primary); color: var(--primary-ink); font-weight: 600; font-size: 15px; display: flex; align-items: center; justify-content: center; text-decoration: none; cursor: pointer; font-family: inherit; }
+.goldLink { align-self: flex-start; display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: var(--secondary-strong); padding: 6px 0; text-decoration: none; }
+
+/* Charge de chacun (point de la semaine) */
+.load { background: var(--bg-raised); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.loadRow { display: flex; align-items: center; gap: 4px; }
+.loadName { width: 72px; flex-shrink: 0; font-size: 11px; font-weight: 700; color: var(--ink); display: flex; align-items: center; gap: 4px; overflow: hidden; }
+.chip { flex: 1; text-align: center; font-size: 8.5px; font-weight: 700; line-height: 1.1; border-radius: 5px; padding: 4px 1px; background: var(--bg-sunken); color: var(--ink-soft); }
+.chipBusy { background: var(--secondary-soft); color: var(--secondary-strong); }
+.chipVery { background: var(--primary); color: var(--primary-ink); }
+.loadLink { text-align: left; background: none; border: none; padding: 2px 0; font-size: 12px; color: var(--ink); font-family: inherit; cursor: pointer; }
+.dayLoad { font-size: 11px; font-weight: 700; color: var(--primary-strong); background: var(--primary-soft); border-radius: 6px; padding: 4px 8px; margin: 2px 0 4px; align-self: flex-start; }
+.handOver { margin: 2px 0 6px 20px; align-self: flex-start; min-height: 36px; padding: 0 12px; border-radius: 8px; font-family: inherit; font-weight: 600; font-size: 12px; cursor: pointer; border: 1px solid var(--line); background: transparent; color: var(--ink); }
+.handOverStrong { border-color: var(--primary); background: var(--primary); color: var(--primary-ink); }
+
+/* Notification annulable en bas d'écran */
+.toast { position: sticky; bottom: 12px; display: flex; justify-content: space-between; align-items: center; gap: 8px; background: var(--ink); color: var(--primary-ink); border-radius: var(--radius); padding: 12px 14px; font-size: 13px; }
+.toastBtn { background: none; border: none; padding: 0; font-size: 13px; font-weight: 700; color: var(--secondary-soft); text-decoration: underline; cursor: pointer; font-family: inherit; }
+
+/* Mot pour le partenaire */
+.noteInput { width: 100%; min-height: 130px; resize: none; padding: 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg-raised); font-family: var(--font-serif); font-style: italic; font-size: 16px; line-height: 1.45; color: var(--ink); }
+.noteMeta { font-size: 11px; color: var(--ink-soft); }
+.noteCard { background: var(--secondary-soft); border-left: 3px solid var(--secondary); border-radius: var(--radius); padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+.row2 { display: flex; gap: 8px; }
+.small { min-height: 40px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--line); background: transparent; font-weight: 600; font-size: 13px; color: var(--ink); font-family: inherit; cursor: pointer; }
+.smallPrimary { min-height: 40px; padding: 0 14px; border: none; border-radius: 8px; font-weight: 600; font-size: 13px; background: var(--primary); color: var(--primary-ink); font-family: inherit; cursor: pointer; }
+.smallPrimary:disabled { opacity: 0.5; cursor: default; }
+
+/* Nos envies */
+.wishCard { background: var(--bg-raised); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; box-shadow: var(--shadow); }
+.wishFresh { border: 2px solid var(--secondary); }
+.wishTitle { font-family: var(--font-serif); font-size: 17px; color: var(--ink); line-height: 1.25; }
+.wishHead { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.horizon { flex-shrink: 0; font-size: 11px; font-weight: 700; border-radius: 100px; padding: 3px 9px; background: var(--bg-sunken); color: var(--ink-soft); }
+.horizonSoon { background: var(--secondary-soft); color: var(--secondary-strong); }
+.horizonYear { background: var(--primary-soft); color: var(--primary-strong); }
+.wishActions { display: flex; gap: 8px; align-items: center; margin-top: 2px; }
+.wishActions > a:first-child { flex: 1; }
+.rdv { display: flex; align-items: center; justify-content: center; min-height: 40px; border-radius: 8px; background: var(--primary); color: var(--primary-ink); font-weight: 600; font-size: 13px; text-decoration: none; }
+.link2 { min-height: 40px; display: flex; align-items: center; padding: 0 12px; border-radius: 8px; border: 1px solid var(--line); font-weight: 600; font-size: 13px; color: var(--ink); text-decoration: none; background: transparent; font-family: inherit; cursor: pointer; }
+.addRound { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: var(--secondary); color: var(--ink); text-decoration: none; border: none; }
+.addRoundOff { background: var(--bg-sunken); color: var(--ink-soft); pointer-events: none; }
+.limit { font-size: 13px; line-height: 1.45; background: var(--secondary-soft); border-radius: var(--radius); padding: 10px 12px; }
+.empty { display: flex; flex-direction: column; gap: 14px; text-align: center; padding: 40px 10px; align-items: center; }
+.cta2 { display: flex; align-items: center; gap: 6px; background: var(--secondary); color: var(--ink); font-weight: 700; font-size: 13px; border-radius: 8px; padding: 10px 16px; text-decoration: none; border: none; font-family: inherit; cursor: pointer; }
+.count { font-size: 11px; color: var(--ink-soft); text-align: right; }
+.horizons { display: flex; gap: 8px; flex-wrap: wrap; }
+.hz { min-height: 40px; padding: 0 16px; border-radius: 100px; font-size: 13px; font-weight: 700; border: 1px solid var(--line); background: transparent; color: var(--ink); font-family: inherit; cursor: pointer; }
+.hz[aria-pressed="true"] { border-color: var(--secondary); background: var(--secondary); }
+.saved { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 10px; padding: 40px 20px; }
+.savedMark { width: 52px; height: 52px; border-radius: 50%; background: var(--secondary-soft); color: var(--secondary-strong); display: flex; align-items: center; justify-content: center; font-size: 24px; }
+
+/* Carte « À deux » de l'accueil */
+.homeCard { background: var(--bg-raised); border: 1px solid var(--secondary); border-radius: var(--radius); padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
+.homeCardHead { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.homeWish { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 0; border-top: 1px solid var(--line); font-size: 13px; color: var(--ink); text-decoration: none; }
+.homeLinks { display: flex; justify-content: space-between; gap: 8px; }
+.homeLinks a { font-size: 12px; font-weight: 700; text-decoration: none; }
+.noteInputLine { width: 100%; padding: 11px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg-raised); font-size: 15px; color: var(--ink); font-family: inherit; }

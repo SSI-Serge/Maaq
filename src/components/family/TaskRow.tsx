@@ -8,6 +8,7 @@ import type { MemberChip } from "@/server/assistant/member-chips";
 import type { TaskView } from "@/server/assistant/tasks";
 import { clock, shortDate } from "./format";
 import { AssigneePicker } from "./TaskForm";
+import { HeartButton } from "./HeartButton";
 import { FALLBACK_COLOR } from "./parts";
 import styles from "./family.module.css";
 
@@ -104,6 +105,7 @@ export function TaskRow({ task, assignable, showDate = true, onChanged }: Props)
               <Link href={`/assistant/devoirs/preparer?semaine=${task.homeworkPrep.weekStart}`}>Préparer les devoirs de la semaine ›</Link>
             ))}
           {checked && task.status === "done" && task.doneBy && <span>Faite par {task.doneBy}</span>}
+          {task.status === "done" && task.heart?.thanksFrom && <HeartButton target={{ kind: "task", id: task.id }} heart={task.heart} onChanged={onChanged} />}
           {justDone && (
             <>
               <span>Faite</span>
@@ -125,6 +127,7 @@ export function TaskRow({ task, assignable, showDate = true, onChanged }: Props)
         )}
         {mutation.error && code !== "stale_version" && (mutation.error.kind === "rejected" ? <Notice tone="error">{mutation.error.message}</Notice> : <RetryNotice message={mutation.error.kind === "server" ? "L'opération n'a pas pu être enregistrée." : mutation.error.message} onRetry={mutation.reset} />)}
       </div>
+      {task.status === "done" && task.heart?.canGive && <HeartButton target={{ kind: "task", id: task.id }} heart={task.heart} partner={task.doneBy ?? undefined} onChanged={onChanged} />}
     </div>
   );
 }

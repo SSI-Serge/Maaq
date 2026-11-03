@@ -10,11 +10,13 @@ import { Loading, RetryNotice } from "@/components/ui";
 import type { AnticipationView } from "@/server/assistant/anticipation";
 import type { DigestView } from "@/server/assistant/digest";
 import type { EventView } from "@/server/assistant/events";
+import type { EmotionsHome } from "@/server/emotions/home";
 import type { TaskLists } from "@/server/assistant/tasks";
 import { clock, dayOf, shortDate } from "./format";
 import { OutingHomeCard } from "./OutingsScreens";
 import { Dots } from "./parts";
 import { AnticipationCards } from "./QuestionCards";
+import emo from "./emotions.module.css";
 import styles from "./family.module.css";
 
 function Item({ event }: { event: EventView }) {
@@ -49,6 +51,11 @@ export function AssistantHome() {
   const anticipation = useApiQuery<{ anticipation: AnticipationView }>("/api/family/anticipation");
   const tasks = useApiQuery<{ lists: TaskLists }>("/api/family/tasks");
   const digest = useApiQuery<{ digest: DigestView }>("/api/family/digest");
+  // Le couple (utilisateur principal et invité 1) a un bilan, un mot pour son partenaire et « Nos envies » ; les autres profils gardent le point actuel (E-03, E-21).
+  const emotions = useApiQuery<EmotionsHome>("/api/family/emotions");
+  const couple = emotions.data?.couple ?? null;
+  const review = emotions.data?.review ?? null;
+  const wishes = emotions.data?.wishes ?? null;
   const toAnticipate = anticipation.data?.anticipation;
   const waiting = pending.data?.events ?? [];
   const router = useRouter();
@@ -70,6 +77,8 @@ export function AssistantHome() {
   const tasksLine = !lists ? "…" : open === 0 ? "Rien à faire pour le moment" : `${dueToday} aujourd'hui · ${plural(open, "ouverte", "ouvertes")}`;
   const counts = digest.data?.digest.counts;
   const pointLine = !counts ? "…" : `${counts.events} RDV, ${plural(counts.tasks, "tâche", "tâches")}`;
+  // Pour le couple, la tuile ouvre le bilan (jamais de chiffre) ; sans bilan encore, elle ouvre le point.
+  const reviewLine = !emotions.data ? "…" : review ? (review.opened ? "Votre bilan de la semaine" : "Votre bilan vous attend") : "Pas encore de bilan";
 
   return (
     <AppShell
@@ -117,11 +126,50 @@ export function AssistantHome() {
           <span className={styles.homeTileTitle}>Tâches ›</span>
           <span className={styles.hint}>{tasksLine}</span>
         </Link>
-        <Link href="/assistant/semaine" className={styles.homeTile}>
-          <span className={styles.homeTileTitle}>Point de la semaine ›</span>
-          <span className={styles.hint}>{pointLine}</span>
+        <Link href={couple && review ? "/assistant/bilan" : "/assistant/semaine"} className={styles.homeTile}>
+          <span className={styles.homeTileTitle}>{couple ? "Bilan de la semaine ›" : "Point de la semaine ›"}</span>
+          <span className={styles.hint}>{couple ? reviewLine : pointLine}</span>
         </Link>
       </div>
+
+      {couple && (
+        <div className={emo.homeLinks}>
+          <Link href="/assistant/mot" style={{ color: "var(--secondary-strong)" }}>
+            ✎ Un mot pour {couple.partner}
+          </Link>
+          <Link href="/assistant/semaine" style={{ color: "var(--primary)" }}>
+            La semaine qui vient ›
+          </Link>
+        </div>
+      )}
+
+      {couple && wishes && (
+        <div className={emo.homeCard}>
+          <div className={emo.homeCardHead}>
+            <span className={emo.kick}>À deux · {couple.partner}</span>
+            <Link href={wishes.full ? "/assistant/envies" : "/assistant/envies/nouvelle"} aria-label="Ajouter une envie" className={emo.addRound} style={{ width: 32, height: 32 }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+            </Link>
+          </div>
+          <div className={emo.italic} style={{ fontSize: 18, marginTop: -4 }}>
+            Nos envies
+          </div>
+          {wishes.latest.length === 0 && <div className={styles.hint}>Vos envies à deux : un week-end, un projet, une idée…</div>}
+          {wishes.latest.map((w) => (
+            <Link key={w.id} href={`/assistant/envies#${w.id}`} className={emo.homeWish}>
+              <span>{w.title}</span>
+              {w.horizonLabel && <span className={emo.horizon}>{w.horizonLabel}</span>}
+            </Link>
+          ))}
+          {wishes.latest.length > 0 && (
+            <Link href="/assistant/envies" style={{ fontSize: 12, fontWeight: 700, color: "var(--secondary-strong)", paddingTop: 4 }}>
+              Voir toutes nos envies ›
+            </Link>
+          )}
+        </div>
+      )}
 
       <OutingHomeCard />
 

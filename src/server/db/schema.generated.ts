@@ -129,7 +129,7 @@ export type MessageSender = "agent" | "profile";
 
 export type NotificationChannel = "none" | "push";
 
-export type NotificationKind = "auto_confirmed" | "event_added" | "event_to_confirm" | "follow_up_24h" | "follow_up_48h" | "outing_proposal" | "place_search_ready" | "reminder_d1" | "reminder_d7" | "reminder_day_of" | "task_assigned" | "task_daily" | "task_due_1h" | "travel_first" | "travel_second" | "weekly_digest";
+export type NotificationKind = "auto_confirmed" | "event_added" | "event_to_confirm" | "follow_up_24h" | "follow_up_48h" | "outing_proposal" | "place_search_ready" | "reminder_d1" | "reminder_d7" | "reminder_day_of" | "task_assigned" | "task_daily" | "task_due_1h" | "travel_first" | "travel_second" | "weekly_digest" | "wish_added";
 
 export type NotificationStatus = "abandoned" | "cancelled" | "not_applicable" | "scheduled" | "sent";
 
@@ -249,6 +249,54 @@ export interface AccountContracts {
   updated_at: Generated<Timestamp>;
 }
 
+export interface CoupleWishes {
+  account_id: string;
+  created_at: Generated<Timestamp>;
+  created_by_user_id: string | null;
+  /**
+   * Description chiffrée par l'application (200 caractères au plus)
+   */
+  description: Buffer | null;
+  horizon: "someday" | "soon" | "this_year" | null;
+  id: Generated<string>;
+  /**
+   * Retirée le : l'envie n'est plus affichée ni comptée ; supprimée définitivement par le planificateur peu après
+   */
+  removed_at: Timestamp | null;
+  title: Buffer;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface PartnerNotes {
+  account_id: string;
+  author_user_id: string;
+  /**
+   * Texte chiffré par l'application (500 caractères au plus)
+   */
+  body: Buffer;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  recipient_user_id: string;
+  updated_at: Generated<Timestamp>;
+  /**
+   * Bilan du destinataire auquel le mot est rattaché, posé par la base à la première ouverture de ce bilan ; vide = pas encore lu
+   */
+  weekly_review_id: string | null;
+}
+
+export interface WeeklyReviews {
+  account_id: string;
+  created_at: Generated<Timestamp>;
+  generated_at: Generated<Timestamp>;
+  id: Generated<string>;
+  /**
+   * Première ouverture du bilan par son destinataire ; rattache et fige ses mots, posée une seule fois
+   */
+  opened_at: Timestamp | null;
+  user_id: string;
+  week_start: Timestamp;
+}
+
 export interface Accounts {
   created_at: Generated<Timestamp>;
   /**
@@ -286,6 +334,15 @@ export interface Accounts {
    */
   subscription_ended_at: Timestamp | null;
   updated_at: Generated<Timestamp>;
+}
+
+export interface AppreciationHearts {
+  account_id: string;
+  author_user_id: string;
+  created_at: Generated<Timestamp>;
+  event_id: string | null;
+  id: Generated<Int8>;
+  task_id: string | null;
 }
 
 export interface ActionDecisions {
@@ -1785,6 +1842,10 @@ export interface ScheduledNotifications {
   subject_date: Timestamp | null;
   task_id: string | null;
   updated_at: Generated<Timestamp>;
+  /**
+   * Envie dont l'ajout est annoncé à l'autre parent (type wish_added) ; la notification ne cite pas le titre. Notification sur le téléphone, e-mail seulement à défaut (D63), pas d'envoi la nuit. [US-149]
+   */
+  wish_id: string | null;
 }
 
 export interface SchemaMigrations {
@@ -2084,6 +2145,10 @@ export interface DB {
   agent_sample_prompts: AgentSamplePrompts;
   agent_validated_actions: AgentValidatedActions;
   agents: Agents;
+  appreciation_hearts: AppreciationHearts;
+  couple_wishes: CoupleWishes;
+  partner_notes: PartnerNotes;
+  weekly_reviews: WeeklyReviews;
   anticipation_answers: AnticipationAnswers;
   anticipation_catalog_items: AnticipationCatalogItems;
   anticipation_questions: AnticipationQuestions;

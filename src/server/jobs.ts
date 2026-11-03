@@ -3,7 +3,8 @@ import type { Ctx } from "@/server/auth/service";
 import { runAutoConfirm, runEventNotices, type NoticesResult } from "@/server/assistant/notices";
 import { completeSeries } from "@/server/assistant/series";
 import { completeTaskSeries } from "@/server/assistant/task-series";
-import { runTaskNotices, type TaskNoticesResult } from "@/server/assistant/task-notices";
+import { releaseHeldAssignments, runTaskNotices, type TaskNoticesResult } from "@/server/assistant/task-notices";
+import { sendWishNotices } from "@/server/emotions/wishes";
 import { runDigests, type DigestsResult } from "@/server/assistant/digest";
 import { runAnticipation, type AnticipationResult } from "@/server/assistant/anticipation";
 import { runPlaceSearches, type PlacesResult } from "@/server/assistant/places";
@@ -78,6 +79,11 @@ export async function runDueJobs(ctx: Ctx, options: { force?: boolean } = {}): P
     console.error(`Rappels de tâches : ${describeError(error)}`);
     return { daily: 0, dueSoon: 0, abandoned: 0, failed: 0 };
   });
+  // « Confier à » : notifications retenues dont le délai d'annulation est écoulé (US-146, E-18) ; envies : notification au partenaire, reportée à 8 h la nuit (US-149) ; envies retirées
+  // depuis plus de 10 secondes : suppression définitive (US-150).
+  await releaseHeldAssignments(ctx).catch((error) => console.error(`Notifications retenues : ${describeError(error)}`));
+  await sendWishNotices(ctx).catch((error) => console.error(`Notifications d'envies : ${describeError(error)}`));
+  await sql`select purge_removed_wishes()`.execute(ctx.db).catch((error) => console.error(`Envies retirées : ${describeError(error)}`));
   const digests = await runDigests(ctx).catch((error) => {
     console.error(`Point de la semaine : ${describeError(error)}`);
     return { prepared: 0, sent: 0, failed: 0 };
@@ -129,6 +135,8 @@ export async function purgeExpired(ctx: Ctx): Promise<{ logbook: number; errorRe
     "purge_location_consent_events", "purge_travel_data", "purge_place_searches",
     // Lot 10 : propositions de sorties (30 jours après le jour visé) et offres mémorisées (90 jours) ; semaines de devoirs (12 mois) et exercices validés (D65).
     "purge_expired_outing_data", "purge_expired_homework_data",
+    // Lot 13 : bilans de plus de 4 semaines avec leurs mots, et mots jamais lus de plus de 4 semaines (E-22).
+    "purge_expired_emotion_data",
   ]) {
     const done = await sql<{ n: string | null }>`select ${sql.ref(job)}() as n`.execute(ctx.db);
     database += Number(done.rows[0]?.n ?? 0);

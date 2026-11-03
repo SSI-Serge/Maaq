@@ -5,6 +5,7 @@ import { useState } from "react";
 import { ApiError } from "@/client/api";
 import { useApiMutation, useApiQuery } from "@/client/hooks";
 import { AppShell } from "@/components/app/AppShell";
+import { EventHeart } from "./HeartButton";
 import { useSessionUser } from "@/components/auth/AuthGate";
 import { Button, Loading, Notice, RetryNotice } from "@/components/ui";
 import type { ConflictView, EventView, MemberChip } from "@/server/assistant/events";
@@ -221,6 +222,7 @@ export function EventScreen({ id }: { id: string }) {
 
           {event.past && (provisional || setAside) && <Notice tone="warning">Ce rendez-vous est déjà passé.</Notice>}
           {event.past && event.status === "confirmed" && <Notice tone="info">Ce rendez-vous est passé : il n&apos;est plus modifiable.</Notice>}
+          {event.past && event.status === "confirmed" && event.heart && <EventHeart eventId={event.id} heart={event.heart} creator={event.requestedBy} onChanged={reload} />}
           {!event.past && event.status === "confirmed" && event.statusChange?.auto && (
             <Notice tone="info">
               Confirmé par MAAQ (sans réponse) le {when}. Personne n&apos;a confirmé ni écarté ce RDV après deux relances. Vous pouvez encore le modifier ou l&apos;annuler.

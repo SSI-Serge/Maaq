@@ -109,6 +109,11 @@ interface Collected {
   contractDocuments: unknown[];
   contractReports: unknown[];
   consents: unknown[];
+  /** MMF « Émotions » (E-23) : les mots que j'ai écrits, ceux que j'ai reçus et ouverts, les cœurs que j'ai posés, les envies du couple. */
+  emotionNotesWritten: unknown[];
+  emotionNotesReceived: unknown[];
+  emotionHearts: unknown[];
+  emotionWishes: unknown[];
   devices: unknown[];
   digitorn: unknown;
 }
@@ -275,6 +280,16 @@ async function collect(db: Kysely<DB>, userId: string, now: Date): Promise<{ dat
     return { contrat: r.contract, categorie: r.category, genereLe: date(r.generated_at), texte: text };
   });
 
+  // « Émotions » : l'auteur exporte ses mots, le destinataire ceux qu'il a reçus et ouverts ; les cœurs posés par ce profil ; les envies de la famille quand il fait partie du couple (US-143 RT3, E-23).
+  const emotionNotesWritten = await db.selectFrom("partner_notes").select(["body", "created_at", "weekly_review_id"]).where("author_user_id", "=", userId).orderBy("created_at").execute();
+  const emotionNotesReceived = await db.selectFrom("partner_notes").select(["body", "created_at"]).where("recipient_user_id", "=", userId).where("weekly_review_id", "is not", null).orderBy("created_at").execute();
+  const emotionHearts = await db.selectFrom("appreciation_hearts").select(["task_id", "event_id", "created_at"]).where("author_user_id", "=", userId).orderBy("created_at").execute();
+  const emotionWishes = user.account_id
+    ? await sql<{ title: Buffer; description: Buffer | null; horizon: string | null; created_at: Date; first_name: string | null }>`
+        select w.title, w.description, w.horizon, w.created_at, u.first_name from couple_wishes w left join users u on u.id = w.created_by_user_id
+         where w.account_id = ${user.account_id}::uuid and w.removed_at is null and emotion_partner_of(${userId}::uuid) is not null order by w.created_at`.execute(db).then((r) => r.rows)
+    : [];
+
   // Données détenues par Digitorn : historique, configuration des agents (RT1).
   let digitornData: unknown = null;
   if (user.digitorn_user_ref) digitornData = await digitorn().exportUserData(user.digitorn_user_ref);
@@ -310,6 +325,10 @@ async function collect(db: Kysely<DB>, userId: string, now: Date): Promise<{ dat
     contractDocuments: documentRows,
     contractReports: reportRows,
     consents: consents.map((c) => ({ contrat: c.contract ?? "(contrat supprimé)", categorie: c.category, canal: c.channel === "analysis" ? "Analyse IA" : "Challenge", action: c.action_type === "granted" ? "Consentement donné" : "Consentement retiré", origine: c.trigger_reason, date: date(c.occurred_at), versionDuTexte: c.version_label })),
+    emotionNotesWritten: emotionNotesWritten.map((n) => ({ ecritLe: date(n.created_at), lu: n.weekly_review_id !== null, mot: decryptValue(n.body) })),
+    emotionNotesReceived: emotionNotesReceived.map((n) => ({ ecritLe: date(n.created_at), mot: decryptValue(n.body) })),
+    emotionHearts: emotionHearts.map((h) => ({ pose: date(h.created_at), sur: h.task_id ? "une tâche" : "un rendez-vous" })),
+    emotionWishes: emotionWishes.map((w) => ({ envie: decryptValue(w.title), description: w.description ? decryptValue(w.description) : null, horizon: w.horizon, ajouteePar: w.first_name, ajouteeLe: date(w.created_at) })),
     devices: devices.map((d) => ({ type: d.device_type, navigateur: d.browser, premiereConnexion: date(d.first_connected_at), derniereActivite: date(d.last_activity_at), revoqueLe: date(d.revoked_at) })),
     digitorn: digitornData,
   };
@@ -328,6 +347,10 @@ const SECTIONS: [keyof Collected, string][] = [
   ["contractDocuments", "Documents de contrats que j'ai ajoutés (ceux qui existent encore)"],
   ["contractReports", "Rapports d'analyse de mes contrats"],
   ["consents", "Mes consentements"],
+  ["emotionNotesWritten", "Mots que j'ai écrits à mon partenaire"],
+  ["emotionNotesReceived", "Mots que j'ai reçus de mon partenaire (bilans ouverts)"],
+  ["emotionHearts", "Cœurs que j'ai posés"],
+  ["emotionWishes", "Nos envies"],
   ["devices", "Mes appareils"],
 ];
 

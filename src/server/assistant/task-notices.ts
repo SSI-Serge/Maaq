@@ -110,7 +110,7 @@ function email(to: Recipient, subject: string, lines: string[], path: string): {
 // Réservation et envoi
 // ---------------------------------------------------------------------------------------------------------------------------
 
-type Kind = "task_daily" | "task_due_1h" | "task_assigned" | "weekly_digest" | "travel_first" | "travel_second" | "place_search_ready" | "outing_proposal";
+type Kind = "task_daily" | "task_due_1h" | "task_assigned" | "weekly_digest" | "travel_first" | "travel_second" | "place_search_ready" | "outing_proposal" | "wish_added";
 
 /** Réserve une notification du jour ou de la semaine : un seul passage l'obtient (US-97 RF9). Une réservation sans résultat depuis 10 minutes est reprise. */
 export async function claimDaily(ctx: Ctx, kind: "task_daily" | "weekly_digest" | "outing_proposal", userId: string, day: string, dueAt: Date, deadline: Date): Promise<boolean> {
@@ -154,6 +154,8 @@ export interface Slot {
   taskId?: string;
   /** Notification de trajet : liée à un RDV, une seule ligne par profil et par RDV (US-107 RT4). */
   eventId?: string;
+  /** Envie ajoutée à « Nos envies » : une seule ligne par envie et par destinataire (US-149). */
+  wishId?: string;
   dueAt: Date;
 }
 
@@ -164,13 +166,13 @@ async function finish(ctx: Ctx, slot: Slot, patch: { status: "sent" | "abandoned
     .where("kind", "=", slot.kind)
     .where("recipient_user_id", "=", slot.userId)
     .where("status", "=", "scheduled");
-  q = slot.day ? q.where("subject_date", "=", sql<Date>`${slot.day}::date`) : slot.eventId ? q.where("event_id", "=", slot.eventId) : q.where("task_id", "=", slot.taskId!).where("due_at", "=", slot.dueAt);
+  q = slot.day ? q.where("subject_date", "=", sql<Date>`${slot.day}::date`) : slot.eventId ? q.where("event_id", "=", slot.eventId) : slot.wishId ? q.where("wish_id", "=", slot.wishId) : q.where("task_id", "=", slot.taskId!).where("due_at", "=", slot.dueAt);
   await q.execute();
 }
 
 async function release(ctx: Ctx, slot: Slot): Promise<void> {
   let q = ctx.db.deleteFrom("scheduled_notifications").where("kind", "=", slot.kind).where("recipient_user_id", "=", slot.userId).where("status", "=", "scheduled");
-  q = slot.day ? q.where("subject_date", "=", sql<Date>`${slot.day}::date`) : slot.eventId ? q.where("event_id", "=", slot.eventId) : q.where("task_id", "=", slot.taskId!).where("due_at", "=", slot.dueAt);
+  q = slot.day ? q.where("subject_date", "=", sql<Date>`${slot.day}::date`) : slot.eventId ? q.where("event_id", "=", slot.eventId) : slot.wishId ? q.where("wish_id", "=", slot.wishId) : q.where("task_id", "=", slot.taskId!).where("due_at", "=", slot.dueAt);
   await q.execute();
 }
 
@@ -313,25 +315,97 @@ export async function runTaskNotices(ctx: Ctx, options: { accountId?: string } =
  */
 export async function notifyTaskAssigned(ctx: Ctx, taskId: string, byUserId: string): Promise<void> {
   try {
-    const row = await ctx.db
-      .selectFrom("family_tasks as t")
-      .innerJoin("family_members as m", "m.id", "t.assigned_member_id")
-      .innerJoin("accounts as a", "a.id", "t.account_id")
-      .select(["t.account_id", "t.title", sql<string>`t.due_date::text`.as("due"), sql<string | null>`t.due_time::text`.as("due_time"), "m.user_id", "a.family_timezone"])
-      .where("t.id", "=", taskId)
-      .where("t.status", "=", "todo")
-      .executeTakeFirst();
-    if (!row?.user_id || row.user_id === byUserId) return;
-    const [recipient] = (await recipientsOf(ctx.db, row.account_id)).filter((r) => r.id === row.user_id);
-    const by = await ctx.db.selectFrom("users").select("first_name").where("id", "=", byUserId).executeTakeFirst();
-    if (!recipient || !by) return;
-    const timeZone = row.family_timezone ?? "Europe/Paris";
-    const slot: Slot = { kind: "task_assigned", userId: recipient.id, taskId, dueAt: ctx.now };
-    if (!(await claimTask(ctx, "task_assigned", taskId, recipient.id, ctx.now, new Date(ctx.now.getTime() + 24 * ONE_HOUR)))) return;
-    const body = taskAssignedBody(by.first_name, open(row.title), row.due, localDay(ctx.now, timeZone), timeZone, row.due_time);
-    await dispatch(ctx, row.account_id, recipient, slot, { body, url: "/assistant/taches", tag: `task-assigned-${taskId}`, subject: body, lines: [body] }, true);
+    const target = await assignedTarget(ctx, taskId, byUserId);
+    if (!target) return;
+    if (!(await claimTask(ctx, "task_assigned", taskId, target.recipient.id, ctx.now, new Date(ctx.now.getTime() + 24 * ONE_HOUR)))) return;
+    await sendAssigned(ctx, target, taskId, ctx.now);
   } catch (error) {
     console.error(`Notification d'assignation non envoyée : ${describeError(error)}`);
   }
+}
+
+interface AssignedTarget {
+  accountId: string;
+  title: Buffer;
+  due: string;
+  dueTime: string | null;
+  timeZone: string;
+  recipient: Recipient;
+  byFirstName: string;
+}
+
+/** Qui est prévenu d'une assignation et par qui : le membre assigné, s'il a un compte et n'est pas celui qui assigne. */
+async function assignedTarget(ctx: Ctx, taskId: string, byUserId: string): Promise<AssignedTarget | null> {
+  const row = await ctx.db
+    .selectFrom("family_tasks as t")
+    .innerJoin("family_members as m", "m.id", "t.assigned_member_id")
+    .innerJoin("accounts as a", "a.id", "t.account_id")
+    .select(["t.account_id", "t.title", sql<string>`t.due_date::text`.as("due"), sql<string | null>`t.due_time::text`.as("due_time"), "m.user_id", "a.family_timezone"])
+    .where("t.id", "=", taskId)
+    .where("t.status", "=", "todo")
+    .executeTakeFirst();
+  if (!row?.user_id || row.user_id === byUserId) return null;
+  const [recipient] = (await recipientsOf(ctx.db, row.account_id)).filter((r) => r.id === row.user_id);
+  const by = await ctx.db.selectFrom("users").select("first_name").where("id", "=", byUserId).executeTakeFirst();
+  if (!recipient || !by) return null;
+  return { accountId: row.account_id, title: row.title, due: row.due, dueTime: row.due_time, timeZone: row.family_timezone ?? "Europe/Paris", recipient, byFirstName: by.first_name };
+}
+
+async function sendAssigned(ctx: Ctx, target: AssignedTarget, taskId: string, dueAt: Date): Promise<void> {
+  const slot: Slot = { kind: "task_assigned", userId: target.recipient.id, taskId, dueAt };
+  const body = taskAssignedBody(target.byFirstName, open(target.title), target.due, localDay(ctx.now, target.timeZone), target.timeZone, target.dueTime);
+  await dispatch(ctx, target.accountId, target.recipient, slot, { body, url: "/assistant/taches", tag: `task-assigned-${taskId}`, subject: body, lines: [body] }, true);
+}
+
+/** Durée pendant laquelle « Confier à » retient la notification, le temps de pouvoir annuler (E-18, US-146 RF2). */
+export const HANDOVER_HOLD_MS = 15_000;
+
+/**
+ * « Confier à » (US-146) : la notification « [Prénom] vous a confié… » est réservée mais retenue `HANDOVER_HOLD_MS`. Si l'on annule entre-temps, elle disparaît ; sinon elle part au passage
+ * suivant (`releaseHeldAssignments`), appelé par l'écran à la fin du délai ou par le planificateur.
+ */
+export async function holdTaskAssigned(ctx: Ctx, taskId: string, byUserId: string): Promise<void> {
+  try {
+    const target = await assignedTarget(ctx, taskId, byUserId);
+    if (!target) return;
+    await ctx.db
+      .insertInto("scheduled_notifications")
+      .values({ kind: "task_assigned", task_id: taskId, due_at: new Date(ctx.now.getTime() + HANDOVER_HOLD_MS), deadline_at: new Date(ctx.now.getTime() + 24 * ONE_HOUR), recipient_user_id: target.recipient.id, status: "scheduled", attempts: 0 })
+      .onConflict((oc) => oc.columns(["task_id", "kind", "recipient_user_id", "due_at"]).where(sql<boolean>`task_id is not null`).doNothing())
+      .execute();
+  } catch (error) {
+    console.error(`Notification d'assignation non retenue : ${describeError(error)}`);
+  }
+}
+
+/** Annule la notification retenue d'une tâche confiée ; faux si elle est déjà partie. */
+export async function cancelHeldAssignment(ctx: Ctx, taskId: string): Promise<boolean> {
+  const done = await ctx.db.deleteFrom("scheduled_notifications").where("kind", "=", "task_assigned").where("task_id", "=", taskId).where("status", "=", "scheduled").where("attempts", "=", 0).executeTakeFirst();
+  return Number(done.numDeletedRows) > 0;
+}
+
+/** Envoie les notifications retenues dont le délai est écoulé (toutes, ou celles d'une tâche). Une tâche qui n'est plus à faire chez ce destinataire n'est pas annoncée. */
+export async function releaseHeldAssignments(ctx: Ctx, options: { taskId?: string } = {}): Promise<number> {
+  const claimed = await sql<{ id: string; task_id: string; recipient_user_id: string; due_at: Date }>`
+    update scheduled_notifications set attempts = 1
+     where kind = 'task_assigned' and status = 'scheduled' and attempts = 0 and due_at <= ${ctx.now} ${options.taskId ? sql`and task_id = ${options.taskId}::uuid` : sql``}
+    returning id, task_id, recipient_user_id, due_at`.execute(ctx.db);
+  let sent = 0;
+  for (const row of claimed.rows) {
+    try {
+      // « Confier à » ne se fait qu'entre les deux parents : l'auteur est l'autre parent du destinataire.
+      const by = (await sql<{ id: string | null }>`select emotion_partner_of(${row.recipient_user_id}::uuid) as id`.execute(ctx.db)).rows[0]?.id;
+      const target = by ? await assignedTarget(ctx, row.task_id, by) : null;
+      if (!target || target.recipient.id !== row.recipient_user_id) {
+        await ctx.db.updateTable("scheduled_notifications").set({ status: "cancelled" }).where("id", "=", row.id).execute();
+        continue;
+      }
+      await sendAssigned(ctx, target, row.task_id, new Date(row.due_at));
+      sent += 1;
+    } catch (error) {
+      console.error(`Notification d'assignation retenue non envoyée : ${describeError(error)}`);
+    }
+  }
+  return sent;
 }
 

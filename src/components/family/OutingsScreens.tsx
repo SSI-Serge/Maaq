@@ -203,21 +203,29 @@ interface Conflict {
  * visé n'est que suggéré. Au-dessus du bouton, l'avertissement de visibilité (sauf sans autre parent) et l'aide « titre discret ». « Plus tard » ferme sans rien enregistrer.
  */
 export function OutingIdeaFormScreen({ id }: { id: string }) {
+  return <SourceFormScreen api={`/api/family/outings/ideas/${id}`} heading="Depuis une idée de sortie" title="Ajouter au calendrier" back={BACK} visibility />;
+}
+
+/**
+ * Formulaire de RDV prérempli depuis une source (une idée de sortie, ou une envie du couple, US-151) : `api` donne `/form` et `/calendar`. `visibility` : l'avertissement de visibilité
+ * suit les personnes concernées (sorties seulement).
+ */
+export function SourceFormScreen({ api, heading, title, back, visibility = false, then }: { api: string; heading: string; title: string; back: { href: string; label: string }; visibility?: boolean; then?: string }) {
   const router = useRouter();
-  const form = useApiQuery<{ form: IdeaFormView }>(`/api/family/outings/ideas/${id}/form`);
+  const form = useApiQuery<{ form: IdeaFormView }>(`${api}/form`);
   const data = form.data?.form;
   const gone = form.error?.body?.code === "not_found";
   return (
-    <AppShell title="Ajouter au calendrier" back={{ href: "/assistant", label: "Assistant Famille" }}>
+    <AppShell title={title} back={back}>
       {form.loading && !data && <Loading slow={form.slow} />}
       {gone && <Notice tone="info">Cette page n&apos;existe plus ou ne vous est pas accessible.</Notice>}
       {form.error && !gone && <RetryNotice message={form.error.message} onRetry={form.reload} />}
-      {data && <IdeaForm id={id} initial={data} onLater={() => router.back()} onAdded={(eventId) => router.push(`/calendrier/rdv/${eventId}`)} />}
+      {data && <IdeaForm api={api} heading={heading} liveWarning={visibility} initial={data} onLater={() => router.back()} onAdded={(eventId) => router.push(then ?? `/calendrier/rdv/${eventId}`)} />}
     </AppShell>
   );
 }
 
-function IdeaForm({ id, initial, onLater, onAdded }: { id: string; initial: IdeaFormView; onLater: () => void; onAdded: (eventId: string) => void }) {
+function IdeaForm({ api, heading, liveWarning, initial, onLater, onAdded }: { api: string; heading: string; liveWarning: boolean; initial: IdeaFormView; onLater: () => void; onAdded: (eventId: string) => void }) {
   const save = useApiMutation();
   const [title, setTitle] = useState(initial.title);
   const [place, setPlace] = useState(initial.place);
@@ -232,7 +240,8 @@ function IdeaForm({ id, initial, onLater, onAdded }: { id: string; initial: Idea
   // Les personnes concernées changent qui verra le RDV : l'avertissement suit (US-121 RF5).
   async function members(next: string[]) {
     setMemberIds(next);
-    const response = await fetch(`/api/family/outings/ideas/${id}/form?members=${next.join(",")}`, { credentials: "same-origin" }).catch(() => null);
+    if (!liveWarning) return;
+    const response = await fetch(`${api}/form?members=${next.join(",")}`, { credentials: "same-origin" }).catch(() => null);
     const body = response?.ok ? ((await response.json()) as { form: IdeaFormView }) : null;
     if (body) setVisibility(body.form.warning);
   }
@@ -242,7 +251,7 @@ function IdeaForm({ id, initial, onLater, onAdded }: { id: string; initial: Idea
   async function submit(allowConflict = false, slot?: { start: string; end: string }) {
     const start = slot?.start ?? `${date}T${from}`;
     const end = slot?.end ?? `${date}T${to}`;
-    const result = await save.run<{ event: { id: string } }>(`/api/family/outings/ideas/${id}/calendar`, { method: "POST", body: { title: title.trim(), place: place.trim() || null, notes: notes.trim() || null, type, memberIds, start, end, allowConflict } });
+    const result = await save.run<{ event: { id: string } }>(`${api}/calendar`, { method: "POST", body: { title: title.trim(), place: place.trim() || null, notes: notes.trim() || null, type, memberIds, start, end, allowConflict } });
     if (result) onAdded(result.event.id);
   }
 
@@ -252,8 +261,8 @@ function IdeaForm({ id, initial, onLater, onAdded }: { id: string; initial: Idea
 
   return (
     <div className={styles.form}>
-      <div className={styles.confirmTitle}>Depuis une idée de sortie</div>
-      <p className={styles.hint}>Proposé pour le {longDate(initial.suggestedDate)}</p>
+      <div className={styles.confirmTitle}>{heading}</div>
+      {initial.suggestedDate && <p className={styles.hint}>Proposé pour le {longDate(initial.suggestedDate)}</p>}
       <div className={styles.field}>
         <label className={styles.label} htmlFor="outing-title">
           Titre
@@ -330,7 +339,7 @@ function IdeaForm({ id, initial, onLater, onAdded }: { id: string; initial: Idea
       {save.error && !found && <Notice tone="error">{save.error.kind === "server" ? "Le rendez-vous n'a pas pu être enregistré : le formulaire reste rempli, réessayez." : save.error.message}</Notice>}
 
       {visibility && <Notice tone="info">{visibility}</Notice>}
-      <p className={styles.hint}>{initial.help}</p>
+      {initial.help && <p className={styles.hint}>{initial.help}</p>}
       <div className={styles.actionsRow}>
         <Button variant="ghost" onClick={onLater} disabled={save.pending}>
           Plus tard

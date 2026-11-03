@@ -10,7 +10,8 @@ import { homeworkEnabled } from "./homework/settings";
 import { utcToLocal } from "./local-time";
 import { loadMembers, type MemberChip } from "./member-chips";
 import { familyTimeZone } from "./reminders";
-import { notifyTaskAssigned } from "./task-notices";
+import { holdTaskAssigned, notifyTaskAssigned } from "./task-notices";
+import { heartsOfTasks, type HeartView } from "@/server/emotions/hearts";
 import { addDays, expandOccurrences, ruleLabel, unitColumn, type SeriesRule } from "./series";
 import type { Scope } from "./series-ops";
 import {
@@ -66,6 +67,8 @@ export interface TaskView {
   doneAt: string | null;
   version: number;
   can: { check: boolean; manage: boolean };
+  /** Cœur de remerciement (US-141) : seulement pour les deux parents du couple, sur une tâche cochée par l'un d'eux. */
+  heart: HeartView | null;
 }
 
 export interface TaskLists {
@@ -216,6 +219,7 @@ export async function toTaskViews(db: Kysely<DB>, v: TaskViewer, rows: TaskRow[]
     for (const w of found) prepWeeks.set(w.start, w.id);
   }
   const prep = (r: TaskRow): TaskView["homeworkPrep"] => (prepOn && r.source === "homework_prep" ? { weekStart: mondayAfter(r.due_date), weekId: prepWeeks.get(mondayAfter(r.due_date)) ?? null } : null);
+  const hearts = await heartsOfTasks(db, v.userId, rows);
   return rows.map((r): TaskView => {
     const event = r.event_id ? events.get(r.event_id) : undefined;
     const s = r.series_id ? series.get(r.series_id) : undefined;
@@ -226,7 +230,7 @@ export async function toTaskViews(db: Kysely<DB>, v: TaskViewer, rows: TaskRow[]
       event: event && sees(v, event) ? { id: event.id, title: event.title, start: utcToLocal(event.startsAt, v.timeZone) } : null,
       daysBefore: r.days_before_event, recurring: Boolean(r.series_id), rule: own ? ruleLabel(own) : null, repetition: own ? taskRepetitionOf(own) : null, followsEventSeries: Boolean(s?.event_series_id), homeworkWeekId: r.homework_week_id, isHomeworkPrep: r.source === "homework_prep", homeworkPrep: prep(r),
       doneBy: r.done_by_member_id ? (chips.get(r.done_by_member_id)?.firstName ?? null) : null, doneAt: r.done_at ? utcToLocal(r.done_at, v.timeZone) : null, version: r.version,
-      can: { check: canCheckTask(v, r), manage: canManageTask(v, r) },
+      can: { check: canCheckTask(v, r), manage: canManageTask(v, r) }, heart: hearts.get(r.id) ?? null,
     };
   });
 }
@@ -380,7 +384,7 @@ export async function createTask(ctx: Ctx, session: SessionContext, input: NewTa
 function emptyView(task: CheckedTask): TaskView {
   return {
     id: "", title: task.title, note: task.note, status: "todo", due: task.due, dueTime: task.dueTime, overdue: false, assignee: null, event: null, daysBefore: null, recurring: false, rule: null,
-    repetition: null, followsEventSeries: false, homeworkWeekId: null, isHomeworkPrep: false, homeworkPrep: null, doneBy: null, doneAt: null, version: 1, can: { check: true, manage: true },
+    repetition: null, followsEventSeries: false, homeworkWeekId: null, isHomeworkPrep: false, homeworkPrep: null, doneBy: null, doneAt: null, version: 1, can: { check: true, manage: true }, heart: null,
   };
 }
 
@@ -449,7 +453,7 @@ export async function updateTask(ctx: Ctx, session: SessionContext, id: string, 
 }
 
 /** Réassigne une tâche à faire (US-96). Les deux parents réassignent toute tâche ; un invité secondaire, seulement celles qu'il a créées, à lui-même. */
-export async function assignTask(ctx: Ctx, session: SessionContext, id: string, memberId: string | null, options: { expectedVersion?: number } = {}): Promise<TaskView> {
+export async function assignTask(ctx: Ctx, session: SessionContext, id: string, memberId: string | null, options: { expectedVersion?: number; holdNotice?: boolean } = {}): Promise<TaskView> {
   const v = await taskViewer(ctx, session);
   const members = await loadMembers(ctx.db, v.accountId);
   let changed = false;
@@ -471,7 +475,8 @@ export async function assignTask(ctx: Ctx, session: SessionContext, id: string, 
     throw translateDbError(error);
   }
   // Le nouveau membre assigné est prévenu, l'ancien non (US-96 RF4, RF6).
-  if (changed) await notifyTaskAssigned(ctx, id, v.userId);
+  // « Confier à » (US-146) retient la notification le temps de pouvoir annuler (E-18).
+  if (changed) await (options.holdNotice ? holdTaskAssigned : notifyTaskAssigned)(ctx, id, v.userId);
   return viewOf(ctx.db, v, id);
 }
 

@@ -18,6 +18,9 @@ import { getPersonalSettings } from "./notices";
 import { Pseudonymizer } from "./pseudonymize";
 import { addDays, isoWeekday } from "./series";
 import { claimDaily, dispatch, recipientsOf, type Recipient } from "./task-notices";
+import { partnerOf } from "@/server/emotions/couple";
+import { ensureReview, REVIEW_URL, reviewWeekOf } from "@/server/emotions/reviews";
+import { computeWorkload, type LoadLevel } from "@/server/emotions/workload";
 import { isDay, listTasksBetween, taskViewer, type TaskView } from "./tasks";
 
 /**
@@ -88,6 +91,8 @@ export interface DigestDay {
   tasks: TaskView[];
   /** Deux RDV de ce jour se chevauchent pour une même personne. */
   conflict: boolean;
+  /** Charge de chacun des deux parents ce jour-là (US-145 RF2) : jamais en nombre. Vide hors couple. */
+  load: { firstName: string; level: LoadLevel; mine: boolean }[];
 }
 
 export interface AttentionPoint {
@@ -104,8 +109,10 @@ export interface DigestView {
   counts: { events: number; tasks: number; alerts: number; toConfirm: number };
   days: DigestDay[];
   attention: AttentionPoint[];
-  /** « Fait la semaine passée » (AT-9) et « Encore ouvert de la semaine passée », sans couleur d'alerte. */
-  lastWeek: { doneTasks: number; doneEvents: number; open: TaskView[] };
+  /** « Fait la semaine passée » (AT-9) et « Encore ouvert de la semaine passée », sans couleur d'alerte. Vide pour le couple : le point ne parle que de la semaine à venir, la semaine passée est dans le bilan (US-145 RF1). */
+  lastWeek: { doneTasks: number; doneEvents: number; open: TaskView[] } | null;
+  /** Les deux parents du couple (E-03) : le point montre alors la charge de chacun et « Confier à ». Vide pour un invité secondaire ou une famille sans invité 1 actif (E-21). */
+  couple: { partner: string; myMemberId: string | null; partnerMemberId: string | null } | null;
   calm: boolean;
   parent: boolean;
   /** Questions de rappel de la semaine (US-102 RF4) : réservées aux parents. */
@@ -155,8 +162,15 @@ export async function getDigest(ctx: Ctx, session: SessionContext, weekParam?: s
       events: dayEvents.map((e) => ({ id: e.id, title: e.title, start: e.start, end: e.end, allDay: e.allDay, status: e.status, members: e.members, conflict: e.conflictsWith.length > 0 })),
       tasks: tasks.filter((t) => t.due === date),
       conflict: dayEvents.some((e) => e.conflictsWith.length > 0),
+      load: [],
     };
   });
+
+  const partner = v.parent ? await partnerOf(ctx.db, v.userId) : null;
+  if (partner) {
+    const loads = await computeWorkload(ctx.db, v.accountId, weekStart, v.timeZone);
+    for (const day of days) day.load = (loads.get(day.date) ?? []).map((l) => ({ firstName: l.firstName, level: l.level, mine: l.userId === v.userId }));
+  }
 
   const attention: AttentionPoint[] = [];
   const seen = new Set<string>();
@@ -173,8 +187,9 @@ export async function getDigest(ctx: Ctx, session: SessionContext, weekParam?: s
   const toConfirm = events.filter((e) => e.status === "provisional" && e.can.confirm);
   for (const e of toConfirm) attention.push({ kind: "to_confirm", text: `À confirmer : ${e.title}`, link: { type: "event", id: e.id } });
 
-  const lastEvents = await listEvents(ctx, session, previous);
-  const lastTasks = await listTasksBetween(ctx, session, previous);
+  const lastEvents = partner ? [] : await listEvents(ctx, session, previous);
+  const lastTasks = partner ? [] : await listTasksBetween(ctx, session, previous);
+  const partnerMember = partner ? ((await ctx.db.selectFrom("family_members").select("id").where("user_id", "=", partner.id).where("account_id", "=", v.accountId).executeTakeFirst())?.id ?? null) : null;
 
   let summary: DigestView["summary"] = null;
   if (v.parent) {
@@ -186,7 +201,8 @@ export async function getDigest(ctx: Ctx, session: SessionContext, weekParam?: s
     weekStart, weekEnd, summary,
     counts: { events: events.length, tasks: tasks.length, alerts: attention.filter((a) => a.kind !== "to_confirm").length, toConfirm: toConfirm.length },
     days, attention,
-    lastWeek: { doneTasks: lastTasks.filter((t) => t.status === "done").length, doneEvents: lastEvents.filter((e) => e.status === "confirmed" && e.past).length, open: lastTasks.filter((t) => t.status === "todo") },
+    lastWeek: partner ? null : { doneTasks: lastTasks.filter((t) => t.status === "done").length, doneEvents: lastEvents.filter((e) => e.status === "confirmed" && e.past).length, open: lastTasks.filter((t) => t.status === "todo") },
+    couple: partner ? { partner: partner.firstName, myMemberId: v.memberId, partnerMemberId: partnerMember } : null,
     calm: events.length === 0 && tasks.length === 0, parent: v.parent, questions: v.parent ? await presentedQuestions(ctx.db, v.accountId, v.timeZone, ctx.now) : [], today: v.today,
   };
 }
@@ -302,6 +318,9 @@ async function visibleCounts(db: Kysely<DB>, userId: string, weekStart: string, 
 /** « Votre semaine est prête : 5 RDV, 3 tâches » (US-98 RF1). */
 export const digestBody = (events: number, tasks: number) => `Votre semaine est prête : ${events} RDV, ${tasks} tâche${tasks > 1 ? "s" : ""}`;
 
+/** Notification unique des deux parents du couple (US-142 RF1) : sans chiffre, elle ouvre le bilan. */
+export const REVIEW_BODY = "Votre bilan de la semaine vous attend.";
+
 async function digestSettingsOf(db: Kysely<DB>, userId: string): Promise<DigestSettings> {
   const row = await db.selectFrom("user_assistant_settings").select(["weekly_digest_enabled", "weekly_digest_weekday", sql<string>`weekly_digest_time::text`.as("t")]).where("user_id", "=", userId).executeTakeFirst();
   return { enabled: row?.weekly_digest_enabled ?? true, weekday: row?.weekly_digest_weekday ?? 7, hour: Number((row?.t ?? "19:00").slice(0, 2)) };
@@ -323,24 +342,30 @@ export async function runDigests(ctx: Ctx, options: { accountId?: string; model?
     try {
       const timeZone = account.family_timezone ?? "Europe/Paris";
       const recipients = await recipientsOf(ctx.db, account.id);
-      const slots: { r: Recipient; sendAt: Date; weekStart: string }[] = [];
+      // `notify` : le profil a gardé le point activé. `couple` : un parent du couple, dont le bilan existe même si le point est désactivé (il reste consultable depuis l'accueil, US-142 RF4).
+      const slots: { r: Recipient; sendAt: Date; weekStart: string; notify: boolean; couple: boolean }[] = [];
       for (const r of recipients) {
         const settings = await digestSettingsOf(ctx.db, r.id);
-        const slot = settings.enabled ? digestSlot(settings, timeZone, ctx.now) : null;
-        if (slot) slots.push({ r, ...slot });
+        const slot = digestSlot(settings, timeZone, ctx.now);
+        if (!slot) continue;
+        const couple = r.parent && (await partnerOf(ctx.db, r.id)) !== null;
+        if (settings.enabled || couple) slots.push({ r, ...slot, notify: settings.enabled, couple });
       }
       if (!slots.length) continue;
       // Le résumé de l'agent n'est préparé que pour les parents, une fois par famille et par semaine couverte.
-      for (const weekStart of new Set(slots.filter((s) => s.r.parent).map((s) => s.weekStart))) {
+      for (const weekStart of new Set(slots.filter((s) => s.r.parent && s.notify).map((s) => s.weekStart))) {
         const done = await prepareDigest(ctx, account.id, weekStart, timeZone, options.model === undefined ? digestModel() : options.model);
         if (done) totals.prepared += 1;
       }
-      for (const { r, sendAt, weekStart } of slots) {
+      for (const { r, sendAt, weekStart, notify, couple } of slots) {
         if (ctx.now < sendAt) continue;
+        // Le bilan de la semaine qui précède l'envoi est créé à l'heure d'envoi (E-17), avant la notification qui l'annonce.
+        if (couple) await ensureReview(ctx.db, account.id, r.id, reviewWeekOf(weekStart), ctx.now).catch((error) => console.error(`Bilan de la semaine non créé : ${describeError(error)}`));
+        if (!notify) continue;
         if (!(await claimDaily(ctx, "weekly_digest", r.id, weekStart, sendAt, new Date(sendAt.getTime() + GRACE_MS)))) continue;
-        const { events, tasks } = await visibleCounts(ctx.db, r.id, weekStart, timeZone);
-        const body = digestBody(events, tasks);
-        const out = await dispatch(ctx, account.id, r, { kind: "weekly_digest", userId: r.id, day: weekStart, dueAt: sendAt }, { body, url: DIGEST_URL, tag: `digest-${weekStart}`, subject: body, lines: [body] }, true);
+        const { events, tasks } = couple ? { events: 0, tasks: 0 } : await visibleCounts(ctx.db, r.id, weekStart, timeZone);
+        const body = couple ? REVIEW_BODY : digestBody(events, tasks);
+        const out = await dispatch(ctx, account.id, r, { kind: "weekly_digest", userId: r.id, day: weekStart, dueAt: sendAt }, { body, url: couple ? REVIEW_URL : DIGEST_URL, tag: `${couple ? "review" : "digest"}-${weekStart}`, subject: body, lines: [body] }, true);
         if (out === "sent") totals.sent += 1;
         else if (out === "failed") totals.failed += 1;
       }

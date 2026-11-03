@@ -236,7 +236,9 @@ function GuestCard({ guest, canDesignate, onUpdated }: { guest: Guest; canDesign
           text={
             `Son accès est retiré immédiatement, sur tous ses appareils. Ses adresses en copie sont supprimées. ` +
             `Ses demandes restent visibles dans le carnet de bord, sans son nom.` +
-            (guest.rank === "core" ? ` Étant « Invité 1 », il fait partie du noyau du compte : vous pourrez désigner un nouvel invité 1.` : "")
+            (guest.rank === "core"
+              ? ` Étant « Invité 1 », il fait partie du noyau du compte : vous pourrez désigner un nouvel invité 1. Attention : les cœurs, les bilans, les mots et « Nos envies » que vous partagez avec lui seront supprimés, et un nouvel invité 1 repartira d'une carte vide.`
+              : "")
           }
           confirmLabel="Supprimer"
           confirming={mutation.pending}
