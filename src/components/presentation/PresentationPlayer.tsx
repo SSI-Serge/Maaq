@@ -11,7 +11,7 @@ import { clock, parseTranscript } from "./transcript";
 type Phase = "idle" | "loading" | "playing" | "ended" | "failed";
 type Origin = "onboarding" | "settings";
 
-const TAGLINE = "MAAQ. Moins de charge mentale, plus de temps pour vous.";
+const TAGLINE = "MAAQ — Le copilot de la famille, moins de charge mentale, plus de temps pour vous.";
 const SECONDARY_NOTE = "Certaines fonctions sont réservées aux parents.";
 const FAILURE = "La vidéo n’a pas pu être chargée. Vous la retrouverez dans Réglages › Aide.";
 
