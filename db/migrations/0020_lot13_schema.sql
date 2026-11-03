@@ -282,14 +282,15 @@ END $$;
 -- ---------------------------------------------------------------------
 -- Purges : bilans de plus de 4 semaines (avec les mots qui leur sont rattachés) et mots jamais lus de plus de 4 semaines (E-22) ; envies retirées
 -- ---------------------------------------------------------------------
--- Même durée que le point de la semaine (réglage weekly_digest_retention_weeks, 4 semaines) ; le bilan couvre la semaine qui précède l'envoi,
--- une semaine avant celle du point : son lundi de départ est donc compté une semaine plus tôt. À planifier chaque jour.
+-- Aucun historique (E-22) : chaque bilan, ouvert ou non, est supprimé 4 semaines après son envoi (réglage weekly_digest_retention_weeks, comme le point de
+-- la semaine) ; la date de référence est celle de sa préparation par le planificateur (generated_at), juste avant l'envoi. Un mot lu part avec son bilan ;
+-- un mot jamais lu est supprimé 4 semaines après son écriture. À planifier chaque jour.
 CREATE FUNCTION purge_expired_emotion_data() RETURNS bigint LANGUAGE plpgsql AS $$
 DECLARE v_weeks integer; v_a bigint; v_b bigint;
 BEGIN
   SELECT value_text::integer INTO v_weeks FROM platform_settings WHERE setting_key = 'weekly_digest_retention_weeks';
   v_weeks := COALESCE(v_weeks, 4);
-  DELETE FROM weekly_reviews WHERE week_start < current_date - (v_weeks + 1) * 7;
+  DELETE FROM weekly_reviews WHERE generated_at < now() - make_interval(weeks => v_weeks);
   GET DIAGNOSTICS v_a = ROW_COUNT;
   DELETE FROM partner_notes WHERE weekly_review_id IS NULL AND created_at < now() - make_interval(weeks => v_weeks);
   GET DIAGNOSTICS v_b = ROW_COUNT;
@@ -408,5 +409,5 @@ COMMENT ON COLUMN couple_wishes.horizon IS $$Horizon flou facultatif : soon (« 
 COMMENT ON FUNCTION couple_wishes_visible_to(uuid) IS $$Envies visibles d'un profil : celles de sa famille s'il est l'un des deux parents, hors envies retirées ; aucune pour un invité secondaire. [US-147 RF1, RT2]$$;
 COMMENT ON COLUMN scheduled_notifications.wish_id IS $$Envie dont l'ajout est annoncé à l'autre parent (type wish_added) ; la notification ne cite pas le titre. Notification sur le téléphone, e-mail seulement à défaut (D63), pas d'envoi la nuit. [US-149]$$;
 COMMENT ON FUNCTION emotion_couple_dissolved() IS $$Supprime les cœurs, les bilans, les mots et les envies d'une famille quand son invité 1 la quitte (retrait, rétrogradation ou suppression) : sans couple, rien de « Émotions » n'existe ; un nouveau partenaire arrive sur une carte vide. Exécutée avec les droits du propriétaire. [E-15, E-20, E-21]$$;
-COMMENT ON FUNCTION purge_expired_emotion_data() IS $$Supprime les bilans de plus de 4 semaines (avec les mots qui leur sont rattachés) et les mots jamais lus écrits il y a plus de 4 semaines. À planifier chaque jour. [US-143 RT1, US-144 RT1, E-22]$$;
+COMMENT ON FUNCTION purge_expired_emotion_data() IS $$Aucun historique : supprime les bilans préparés il y a plus de 4 semaines, ouverts ou non (avec les mots qui leur sont rattachés), et les mots jamais lus écrits il y a plus de 4 semaines. À planifier chaque jour. [US-143 RT1, US-144 RT1, E-22]$$;
 COMMENT ON FUNCTION purge_removed_wishes() IS $$Supprime définitivement les envies retirées depuis plus de 10 secondes (le délai du bouton « Annuler »). À planifier avec le planificateur existant (toutes les 5 minutes) : tant qu'elle n'a pas passé, l'envie retirée reste en base mais n'est plus affichée ni comptée. [US-150 RF2]$$;

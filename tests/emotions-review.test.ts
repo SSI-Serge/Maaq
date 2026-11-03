@@ -174,10 +174,10 @@ describe("bilan de la semaine (US-144)", () => {
     expect((await failure(openReview(at(), f.elodie))).code).toBe("forbidden");
   });
 
-  it("le bilan de plus de 4 semaines est supprimé avec ses mots, et un mot jamais lu au bout de 4 semaines (E-22)", async () => {
+  it("aucun historique : chaque bilan, ouvert ou non, est supprimé 4 semaines après sa préparation, avec ses mots ; un mot jamais lu 4 semaines après son écriture (E-22)", async () => {
     const f = await coupleFamily(db);
     const old = "2020-01-06";
-    await ensureReview(db, f.accountId, f.userIds.marc, old, new Date());
+    await ensureReview(db, f.accountId, f.userIds.marc, old, new Date(Date.now() - 40 * 86_400_000));
     const attached = await addNote(at(), f.sophie, "Lu autrefois");
     await openReview(at(), f.marc, (await db.selectFrom("weekly_reviews").select("id").where("user_id", "=", f.userIds.marc).executeTakeFirstOrThrow()).id);
     const lonely = await addNote(at(), f.sophie, "Jamais lu");
@@ -187,6 +187,18 @@ describe("bilan de la semaine (US-144)", () => {
     expect(left).toEqual([]);
     expect(await db.selectFrom("weekly_reviews").select("id").where("account_id", "=", f.accountId).execute()).toEqual([]);
     void attached;
+  });
+
+  it("un bilan jamais ouvert est supprimé lui aussi, un bilan récent reste (E-22)", async () => {
+    const f = await coupleFamily(db);
+    const week = thisMonday();
+    // Préparé il y a 29 jours, jamais ouvert : supprimé ; préparé il y a 27 jours : conservé, même si sa semaine de départ est plus ancienne.
+    await ensureReview(db, f.accountId, f.userIds.sophie, "2020-01-06", new Date(Date.now() - 29 * 86_400_000));
+    await ensureReview(db, f.accountId, f.userIds.sophie, "2020-01-13", new Date(Date.now() - 27 * 86_400_000));
+    await ensureReview(db, f.accountId, f.userIds.marc, week, new Date());
+    await sql`select purge_expired_emotion_data()`.execute(db);
+    const left = await db.selectFrom("weekly_reviews").select([sql<string>`week_start::text`.as("week")]).where("account_id", "=", f.accountId).orderBy("week_start").execute();
+    expect(left.map((r) => r.week)).toEqual(["2020-01-13", week]);
   });
 });
 
