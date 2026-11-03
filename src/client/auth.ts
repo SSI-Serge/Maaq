@@ -13,6 +13,8 @@ export type AuthState =
       user: { firstName: string; maskedEmail: string; role: "admin" | "primary_user" | "guest"; guestRank: "core" | "secondary" | null };
       device: { hasPattern: boolean; patternLocked: boolean };
       home: string;
+      /** Présent quand `home` est « Découvrir MAAQ » : la destination suivante, si l'écran ne peut pas être enregistré comme vu (US-140 RF8). */
+      homeAfterPresentation?: string;
     };
 
 export function fetchAuthState(): Promise<AuthState> {
@@ -68,6 +70,56 @@ export function useRememberedEmail(): [string, (value: string) => void] {
 }
 
 const INSTALL_SHOWN = "maaq:install-shown";
+const PRESENTATION_SKIPPED = "maaq:presentation-skipped";
+let presentationSkippedInMemory = false;
+let presentationRetrying = false;
+
+/**
+ * « Découvrir MAAQ » (US-140 RF8) : si l'enregistrement « vu » échoue, l'appareil le retient pour cette session et laisse passer l'utilisateur ; l'enregistrement est retenté ensuite.
+ * L'état est aussi gardé en mémoire, pour un navigateur qui refuse le stockage de session.
+ */
+export const presentationSkip = {
+  active: () => presentationSkippedInMemory || read(() => sessionStorage, PRESENTATION_SKIPPED) === "1",
+  set: () => {
+    presentationSkippedInMemory = true;
+    write(() => sessionStorage, PRESENTATION_SKIPPED, "1");
+  },
+  clear: () => {
+    presentationSkippedInMemory = false;
+    write(() => sessionStorage, PRESENTATION_SKIPPED, null);
+  },
+};
+
+/** L'état de session tel que l'appareil doit le suivre : la vidéo est dépassée quand l'enregistrement a échoué. */
+export function withPresentationSkip(state: AuthState, skipped: boolean = presentationSkip.active()): AuthState {
+  if (!state.authenticated || !skipped || state.home !== "/decouvrir" || !state.homeAfterPresentation) return state;
+  return { ...state, home: state.homeAfterPresentation };
+}
+
+/** Retente l'enregistrement « vu » resté en échec ; en cas de succès l'appareil cesse de le contourner. */
+export function retryPresentationSeen(): void {
+  if (presentationRetrying || !presentationSkip.active()) return;
+  presentationRetrying = true;
+  apiRequest("/api/presentation/seen", { method: "POST", idempotencyKey: newIdempotencyKey() })
+    .then(() => presentationSkip.clear())
+    .catch(() => undefined)
+    .finally(() => {
+      presentationRetrying = false;
+    });
+}
+
+/** Écran imposé avant tout le reste, ou espace réservé au rôle (administration / application). `null` : l'écran demandé convient. */
+export function forcedDestination(state: Extract<AuthState, { authenticated: true }>, pathname: string): string | null {
+  const home = state.home;
+  if (home === "/schema/creer" || home === "/reprise-compte" || home === "/conditions") return pathname === home ? null : home;
+  if (pathname === "/reglages") return null; // accessible à tous, pour pouvoir se déconnecter
+  if (home === "/decouvrir" || home === "/configuration") return pathname === home ? null : home;
+  if (pathname === "/reprise-compte") return home;
+  const isAdminArea = pathname.startsWith("/admin");
+  if (state.user.role === "admin" && !isAdminArea) return home;
+  if (state.user.role !== "admin" && isAdminArea) return home;
+  return null;
+}
 
 /**
  * Guidage d'installation (US-1). « Plus tard » vaut pour la session : reproposé à la prochaine ouverture (RF7). Quand l'application elle-même amène au guidage (à l'arrivée
@@ -104,6 +156,7 @@ export const installGuideUrl = (next: string) => `/installer?next=${encodeURICom
  */
 export async function signOut(): Promise<void> {
   clearAllDrafts();
+  presentationSkip.clear();
   try {
     await apiRequest("/api/auth/logout", { method: "POST", idempotencyKey: newIdempotencyKey() });
     write(() => localStorage, PENDING_LOGOUT, null);

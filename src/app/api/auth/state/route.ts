@@ -22,6 +22,8 @@ export const GET = handler(async () => {
   let home = homeFor(session);
   const legalPending = (await pendingAcceptance(context.db, session.user.id, session.user.role, context.now)).length > 0;
   if (legalPending && home !== "/schema/creer" && home !== "/reprise-compte") home = "/conditions";
+  // Où mène la suite du parcours si l'écran « Découvrir MAAQ » ne pouvait pas être enregistré comme vu : l'appareil ne reste jamais bloqué sur la vidéo (US-140 RF8).
+  const homeAfterPresentation = home === "/decouvrir" ? homeFor({ ...session, user: { ...session.user, presentationDue: false } }) : undefined;
   return NextResponse.json({
     authenticated: true,
     unlocked: await isUnlocked(session, context.now),
@@ -33,5 +35,6 @@ export const GET = handler(async () => {
     },
     device: { hasPattern: session.device.hasPattern, patternLocked: session.device.patternLocked },
     home,
+    ...(homeAfterPresentation ? { homeAfterPresentation } : {}),
   });
 });

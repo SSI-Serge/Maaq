@@ -3,7 +3,19 @@
 import { usePathname, useRouter } from "next/navigation";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ApiError, SESSION_EVENTS, apiRequest } from "@/client/api";
-import { detectPlatform, fetchAuthState, installGuide, installGuideDue, installGuideUrl, signOut, type AuthState } from "@/client/auth";
+import {
+  detectPlatform,
+  fetchAuthState,
+  forcedDestination,
+  installGuide,
+  installGuideDue,
+  installGuideUrl,
+  presentationSkip,
+  retryPresentationSeen,
+  signOut,
+  withPresentationSkip,
+  type AuthState,
+} from "@/client/auth";
 import { Button, Field, Logo, Notice, RetryNotice, Screen } from "@/components/ui";
 import styles from "./auth.module.css";
 import { ErrorLine, LockIcon } from "./parts";
@@ -66,7 +78,10 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const [everUnlocked, setEverUnlocked] = useState(false);
   const [reason, setReason] = useState<"launch" | "idle">("launch");
 
-  const apply = useCallback((next: AuthState) => {
+  const apply = useCallback((received: AuthState) => {
+    // « Découvrir MAAQ » non enregistrée comme vue : l'appareil laisse passer, et retente l'enregistrement (US-140 RF8).
+    const next = withPresentationSkip(received);
+    if (next !== received) retryPresentationSeen();
     setError(undefined);
     setState(next);
     if (next.authenticated && next.unlocked) setEverUnlocked(true);
@@ -95,6 +110,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
       const back = takeReturn();
       if (back) return router.replace(back);
     }
+    if (pathname === "/decouvrir" && presentationSkip.active() && state.home !== "/decouvrir") return router.replace(state.home);
     const target = forcedDestination(state, pathname);
     if (target && target !== pathname) return router.replace(target);
     // Guidage d'installation à l'arrivée dans l'espace connecté, quel que soit le point d'entrée (lien direct, email, connexion) : sur un téléphone, une seule fois par session,
@@ -160,19 +176,6 @@ export function AuthGate({ children }: { children: ReactNode }) {
       )}
     </SessionContext.Provider>
   );
-}
-
-/** Écran imposé avant tout le reste, ou espace réservé au rôle (administration / application). */
-function forcedDestination(state: SignedIn, pathname: string): string | null {
-  const home = state.home;
-  if (home === "/schema/creer" || home === "/reprise-compte" || home === "/conditions") return pathname === home ? null : home;
-  if (pathname === "/reglages") return null; // accessible à tous, pour pouvoir se déconnecter
-  if (home === "/decouvrir" || home === "/configuration") return pathname === home ? null : home;
-  if (pathname === "/reprise-compte") return home;
-  const isAdminArea = pathname.startsWith("/admin");
-  if (state.user.role === "admin" && !isAdminArea) return home;
-  if (state.user.role !== "admin" && isAdminArea) return home;
-  return null;
 }
 
 /**
