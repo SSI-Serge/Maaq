@@ -5,6 +5,7 @@ import { useApiMutation, useApiQuery } from "@/client/hooks";
 import { Button, Notice, RetryNotice } from "@/components/ui";
 import type { PlaceBlock, PlaceSearchView } from "@/server/assistant/places";
 import { shortDate } from "./format";
+import { MapsButton } from "./MapsButton";
 import styles from "./family.module.css";
 
 const POLL_MS = 3_000;
@@ -24,6 +25,9 @@ export function PlaceBlocks({ blocks, checkedOn }: { blocks: PlaceBlock[]; check
                 <a href={item.reviewsUrl} target="_blank" rel="noopener noreferrer" className={styles.link}>
                   Voir les avis
                 </a>
+              </span>
+              <span className={styles.rowSub}>
+                <MapsButton destination={`${item.name}, ${item.city}`} />
               </span>
             </div>
           ))}

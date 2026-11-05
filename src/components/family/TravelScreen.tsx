@@ -10,6 +10,7 @@ import type { LocationConsentView } from "@/server/assistant/location-consent";
 import type { TravelScreenView } from "@/server/assistant/travel";
 import { clockFr, durationLabel } from "@/server/assistant/travel-format";
 import { LocationConsentExplainer } from "./LocationConsent";
+import { MapsButton } from "./MapsButton";
 import styles from "./family.module.css";
 
 const REFRESH_MS = 3 * 60_000;
@@ -73,7 +74,12 @@ export function TravelScreen({ id }: { id: string }) {
     <AppShell title="Suivi du trajet" back={{ href: `/calendrier/rdv/${id}`, label: "Rendez-vous" }} subtitle={e ? <span className={styles.source}>{e.title}</span> : undefined}>
       {(event.loading || consentQuery.loading) && !e && <Loading slow={event.slow} />}
       {event.error && !e && <RetryNotice message={event.error.kind === "server" ? "Ce rendez-vous n'a pas pu être chargé." : event.error.message} onRetry={event.reload} />}
-      {e && e.place && <div className={styles.hint}>Vers : {e.place}</div>}
+      {e && e.place && (
+        <div className={styles.hint}>
+          <div>Vers : {e.place}</div>
+          <MapsButton destination={e.place} />
+        </div>
+      )}
 
       {consent && !active && !declined && <LocationConsentExplainer consent={consent} onGranted={setGranted} onCancel={() => setDeclined(true)} />}
       {consent && !active && declined && (
