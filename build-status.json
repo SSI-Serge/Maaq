@@ -3,7 +3,7 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-06T20:27:35.936Z",
+  "updated": "2026-11-06T20:54:03.324Z",
   "deploys": [
     {
       "at": "2026-11-06T16:43:37.270Z",
@@ -2814,7 +2814,7 @@
       "name": "Courses et repas : agent natif, étapes C0 à C6 (branche courses-repas)",
       "desc": "Le menu de la semaine, la liste de courses avec comparatif et scénarios, les tickets et le budget, calculés par MAAQ ; remplace l agent Digitorn qui fonctionne mal.",
       "building": true,
-      "currentAction": "Écrans du menu faits ; liste de courses en cours",
+      "currentAction": "Écrans liste, Ma liste et accueil faits ; ajout de plat, budget et tickets à suivre",
       "stories": [
         {
           "id": "f21c0",
@@ -2849,21 +2849,23 @@
         {
           "id": "f21c3",
           "title": "C3 · Foyer : réglages, enseignes, partage des prix, écrans Menu et Liste de courses (US-153, 154, 156, 157)",
-          "state": "building",
+          "state": "testing",
           "env": null,
-          "at": "2026-11-06T20:27:35.936Z",
-          "note": "Réglages du foyer, partage des prix et Menu de la semaine faits et vus dans le navigateur local (choix de 1 ou 2 plats, 7 dîners, express, remplacements, validation). Liste de courses : à faire.",
+          "at": "2026-11-06T20:54:03.324Z",
+          "note": "Réglages, menu de la semaine, liste de courses (comparatif, trois scénarios, validation) et accueil faits, testés (11 tests liste, 9 menu) et vus dans le navigateur local. Pas encore en ligne.",
           "unsure": [
             "La durée de la séance ne se recalcule pas quand on remplace un plat (comme la maquette) ; à confirmer avec le PO.",
-            "À l écran final, le texte dit que les ingrédients sont dans la liste : la liste n est pas encore créée à la validation."
+            "Les choix du comparatif et les quantités ne sont gardés qu au moment de valider la liste.",
+            "Les noms d ingrédients libres viennent des données d origine (ex. 500g viande hachée) : travail de console."
           ]
         },
         {
           "id": "f21c4",
           "title": "C4 · Au quotidien : parcours du tchat, ajout de produit et de plat, Ma liste de courses (US-155, 158, 159, 162)",
-          "state": "idea",
+          "state": "building",
           "env": null,
-          "at": "2026-11-06T16:44:47.574Z"
+          "at": "2026-11-06T20:54:03.324Z",
+          "note": "Ma liste de courses (cases à cocher avec annulation, ajouts tardifs, impression) et accueil faits en local. Restent : ajout de plat, parcours du tchat."
         },
         {
           "id": "f21c5",
