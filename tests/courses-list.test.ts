@@ -3,6 +3,7 @@ import type { Ctx } from "@/server/auth/service";
 import { nameKey } from "@/server/courses/catalog/seed";
 import { comparatif, computeScenarios, currentItems, scenarioLines } from "@/server/courses/engine";
 import { fromDto } from "@/server/courses/list/dto";
+import { courseHome } from "@/server/courses/home";
 import { myList, setBought } from "@/server/courses/list/mine";
 import { addProduct, prepareList, removeProduct, saveLightChoices, validateList } from "@/server/courses/list/service";
 import { getSettings, saveSettings, setSharing } from "@/server/courses/household/settings";
@@ -232,5 +233,36 @@ describe("US-158 : Ma liste de courses", () => {
     expect((await myList(at(), f.sophie)).late).toEqual([]);
     await setBought(at(), f.sophie, { key: "oeufs x6", bought: false, late: true });
     expect((await myList(at(), f.sophie)).late.map((l) => l.name)).toEqual(["Œufs x6"]);
+  });
+});
+
+describe("Accueil de l'agent", () => {
+  it("résume la liste validée, signale ce que l'autre parent a ajouté, et ne montre au secondaire que sa part", async () => {
+    await ensureCatalog(db);
+    const fresh = await coupleFamily(db);
+    const first = await courseHome(at(), fresh.sophie);
+    expect(first.list).toBeNull();
+    expect(first.missing.length).toBeGreaterThan(0);
+
+    const { f } = await readyWithMenu();
+    const list = await prepareList(at(), f.sophie);
+    const model = fromDto(list.model!);
+    const lines = scenarioLines(model, {}, computeScenarios(model, {}, list.stores.map((s) => s.chain))[0]).map((l) => ({ name: l.name, qty: l.qty, store: l.store, ref: l.ref, price: l.price, source: "menu" as const }));
+    await validateList(at(), f.sophie, { scenario: 1, lines });
+    await addProduct(at(), f.marc, { name: "Liquide vaisselle" });
+    const home = await courseHome(at(), f.sophie);
+    expect(home.access).toBe("couple");
+    expect(home.missing).toEqual([]);
+    expect(home.list).toMatchObject({ products: lines.length });
+    expect(home.addedByOthers).toEqual({ by: "Marc", names: ["Liquide vaisselle"] });
+    expect((await courseHome(at(), f.marc)).addedByOthers).toBeNull();
+    const guest = await courseHome(at(), f.elodie);
+    expect(guest.access).toBe("list");
+    expect(guest.missing).toEqual([]);
+    expect(guest.budgetDay).toBe(false);
+    // le jour du budget (1 par défaut) : la bulle s'affiche pour le couple seulement
+    const budget = await courseHome({ db, now: new Date(2026, 10, 1) }, f.sophie);
+    expect(budget.budgetDay).toBe(true);
+    expect((await courseHome({ db, now: new Date(2026, 10, 1) }, f.elodie)).budgetDay).toBe(false);
   });
 });
