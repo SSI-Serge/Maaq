@@ -12,6 +12,7 @@ CREATE TYPE grocery_item_state    AS ENUM ('preparing', 'validated', 'added_afte
 CREATE TYPE grocery_unreferenced_kind   AS ENUM ('unknown', 'no_reference');
 CREATE TYPE grocery_unreferenced_source AS ENUM ('list', 'menu', 'ticket');
 CREATE TYPE grocery_unreferenced_state  AS ENUM ('to_reference', 'referenced', 'rejected');
+CREATE TYPE grocery_reference_status    AS ENUM ('compliant', 'to_check', 'none_found', 'not_applicable');
 
 -- ---------------------------------------------------------------------
 -- Fonctions appelées par les contraintes des tables ci-dessous
@@ -79,13 +80,19 @@ CREATE TABLE grocery_product_references (
   -- Enseigne : texte normalisé, pas une liste de la console (CR-25)
   store_chain     varchar(80) NOT NULL CHECK (store_chain <> '' AND store_chain = grocery_norm(store_chain)),
   reference_name  varchar(160) NOT NULL CHECK (btrim(reference_name) <> ''),
-  unit_price      numeric(8,2) NOT NULL CHECK (unit_price > 0),
-  price_date      date NOT NULL,
-  -- Additifs de la référence (codes ou noms normalisés) : la conformité se déduit des critères actifs, elle n'est pas stockée
+  -- Prix et date facultatifs, les deux ou aucun : une référence peut exister sans prix connu (« N/A »), rien n'est jamais inventé (US-157 RF8, CR-36)
+  unit_price      numeric(8,2) CHECK (unit_price > 0),
+  price_date      date,
+  -- Additifs de la référence (codes ou noms normalisés) : un critère actif qui y correspond rend la référence non conforme, quel que soit son statut
   additives       text[] NOT NULL DEFAULT '{}',
+  -- Statut déclaré par le catalogue d'origine (CR-37) ; la conformité finale est calculée par v_grocery_product_references
+  compliance_status grocery_reference_status NOT NULL DEFAULT 'compliant',
+  -- Résumé de composition en texte libre, facultatif
+  composition_text text CHECK (composition_text IS NULL OR length(composition_text) <= 2000),
   created_at      timestamptz NOT NULL DEFAULT now(),
   updated_at      timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (product_id, store_chain, reference_name)
+  UNIQUE (product_id, store_chain, reference_name),
+  CONSTRAINT ck_grocery_product_references_price CHECK ((unit_price IS NULL) = (price_date IS NULL))
 );
 CREATE TABLE grocery_additive_criteria (
   id          integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -708,10 +715,15 @@ END $$;
 CREATE VIEW v_grocery_product_references AS
 SELECT r.id AS reference_id, r.product_id, r.store_chain, r.reference_name, r.unit_price, r.price_date,
        grocery_price_age(r.price_date) AS price_age,
-       NOT EXISTS (SELECT 1 FROM grocery_additive_criteria c WHERE c.is_active
-                    AND grocery_norm(c.label) IN (SELECT grocery_norm(a) FROM unnest(r.additives) a)) AS is_compliant,
+       (r.compliance_status <> 'none_found' AND NOT EXISTS (SELECT 1 FROM grocery_additive_criteria c WHERE c.is_active
+                    AND grocery_norm(c.label) IN (SELECT grocery_norm(a) FROM unnest(r.additives) a))) AS is_compliant,
        ARRAY(SELECT c.label FROM grocery_additive_criteria c WHERE c.is_active
-              AND grocery_norm(c.label) IN (SELECT grocery_norm(a) FROM unnest(r.additives) a) ORDER BY c.label) AS excluded_because
+              AND grocery_norm(c.label) IN (SELECT grocery_norm(a) FROM unnest(r.additives) a) ORDER BY c.label) AS excluded_because,
+       r.unit_price IS NOT NULL AS has_price,
+       r.compliance_status,
+       (r.compliance_status = 'to_check' AND NOT EXISTS (SELECT 1 FROM grocery_additive_criteria c WHERE c.is_active
+                    AND grocery_norm(c.label) IN (SELECT grocery_norm(a) FROM unnest(r.additives) a))) AS needs_label_check,
+       r.composition_text
   FROM grocery_product_references r;
 CREATE VIEW v_meal_batch_week_days AS
 SELECT d.week_id, d.weekday, d.planning_dish_name, d.dish_id, d.suggested_dish_id, d.match_pct, d.needs_catalog_addition,
@@ -974,7 +986,7 @@ END $$;
 -- Données de référence
 -- ---------------------------------------------------------------------
 INSERT INTO grocery_aisles (name, sort_order) VALUES
-  ('Féculents', 1), ('Fruits et légumes', 2), ('Crèmerie', 3), ('Épicerie du monde', 4), ('Épices et aromates', 5), ('Huiles et condiments', 6),
+  ('Féculents', 1), ('Fruits et légumes', 2), ('Crémerie', 3), ('Épicerie du monde', 4), ('Épices et aromates', 5), ('Huiles et condiments', 6),
   ('Légumineuses', 7), ('Charcuterie', 8), ('Conserves et surgelés', 9), ('Épicerie sucrée', 10), ('Boucherie', 11), ('Poissonnerie', 12),
   ('Volaille', 13), ('Sauces tomate', 14), ('Boissons', 15), ('Entretien', 16), ('Soins du corps', 17), ('Petit-déjeuner', 18), ('Autres', 19);
 INSERT INTO legal_document_versions (document_type, version_label, content, published_at) VALUES
@@ -1019,7 +1031,10 @@ COMMENT ON COLUMN meal_dish_tags.kind IS $$diet = régime que le plat respecte ;
 COMMENT ON TABLE grocery_aisles IS $$Rayons de magasin, communs à tous les foyers : tickets, liste de courses et budget sont rangés de la même façon. Un rayon utilisé ne se supprime pas : il se renomme ou se fusionne avec un autre (merge_grocery_aisles). [US-169]$$;
 COMMENT ON TABLE grocery_products IS $$Produit du catalogue commun (lait, riz basmati…) : nom, clé normalisée unique, rayon. Les ingrédients des plats, les références par enseigne, les prix partagés et le calendrier de saison s'y rattachent. [US-166 RF1]$$;
 COMMENT ON COLUMN grocery_products.name_key IS $$Nom normalisé du produit (minuscules, espaces simples) : clé d'unicité, calculée par l'application. Un produit sans ligne ici est « inconnu » (produits à référencer). [CR-25, US-173 RF1]$$;
-COMMENT ON TABLE grocery_product_references IS $$Référence d'un produit dans une enseigne : nom, prix unitaire (paquet, boîte), date du prix, additifs contenus. Le prix perd son affichage après 12 mois. La conformité aux critères d'additifs se calcule (v_grocery_product_references), elle n'est pas stockée : une modification des critères la recalcule d'elle-même. [US-166 RF1, RF3, US-167 RF2]$$;
+COMMENT ON TABLE grocery_product_references IS $$Référence d'un produit dans une enseigne : nom, prix unitaire (paquet, boîte) et date du prix facultatifs (les deux ou aucun : sans prix connu, « N/A »), additifs contenus, statut de conformité déclaré, résumé de composition. Le prix perd son affichage après 12 mois. La conformité finale se calcule (v_grocery_product_references), elle n'est pas stockée : une modification des critères la recalcule d'elle-même. [US-157 RF8, US-166 RF1, RF3, US-167 RF2, CR-36, CR-37]$$;
+COMMENT ON COLUMN grocery_product_references.unit_price IS $$Prix unitaire de la référence ; vide = prix inconnu (« N/A », jamais un prix inventé). Vide en même temps que la date du prix. [US-157 RF8, CR-36]$$;
+COMMENT ON COLUMN grocery_product_references.compliance_status IS $$Statut du catalogue d'origine : compliant = conforme, not_applicable = sans objet (produit frais), to_check = à vérifier (ingrédients non publiés : proposée avec « Composition à vérifier sur l'étiquette »), none_found = aucun conforme trouvé (jamais proposée, listée dans « Ingrédients exclus des références proposées »). Une liste d'additifs qui correspond à un critère actif rend la référence non conforme quel que soit ce statut. [US-166, US-167, CR-37]$$;
+COMMENT ON COLUMN grocery_product_references.composition_text IS $$Résumé de la composition en texte libre (2 000 caractères au plus), tel que donné par le catalogue d'origine ; facultatif. [CR-37]$$;
 COMMENT ON COLUMN grocery_product_references.additives IS $$Additifs de la référence (codes comme E250 ou noms), normalisés par l'application ; comparés aux critères actifs de grocery_additive_criteria$$;
 COMMENT ON TABLE grocery_additive_criteria IS $$Additifs à éviter (code ou nom, raison courte). Affichés aux foyers dans « Critères additifs appliqués » ; une référence qui en contient un actif n'est pas proposée et figure dans « Ingrédients exclus des références proposées ». [US-167 RF1, RF2]$$;
 COMMENT ON TABLE grocery_product_seasons IS $$Mois de saison d'un fruit ou d'un légume. Avec l'objectif « saison », les plats dont les ingrédients sont de saison passent devant. [US-168 RF1, RF2]$$;
@@ -1074,7 +1089,7 @@ COMMENT ON FUNCTION grocery_reference_marks_referenced() IS $$À l'ajout d'une r
 COMMENT ON FUNCTION grocery_monthly_spend_for(uuid) IS $$Dépenses d'un foyer par rayon et par mois, d'après ses tickets enregistrés seulement (sans ticket, aucun prix : le budget n'en tient pas compte). Aucune ligne pour un invité secondaire : il n'a pas accès au budget. [US-163 RF1, RF2, RF4, CR-10]$$;
 COMMENT ON FUNCTION merge_grocery_aisles(integer, integer) IS $$Fusionne le premier rayon dans le second : produits, lignes de tickets (donc budget passé), produits de liste et produits à référencer sont rangés dans le rayon conservé, puis le premier rayon est supprimé. Exécutée avec les droits du propriétaire (touche les données de tous les foyers). [US-169 RF2, CA 2.1]$$;
 COMMENT ON FUNCTION profile_agent_not_retired() IS $$Refuse l'ajout (ou le ré-ajout) d'un agent retiré à un dashboard. Un agent retiré est réversible et invisible du catalogue et des tableaux de bord. [CR-34]$$;
-COMMENT ON VIEW v_grocery_product_references IS $$Références par enseigne avec leur ancienneté (fresh / aging / NULL au-delà de 12 mois) et leur conformité aux critères d'additifs actifs, recalculée à chaque lecture. Une référence non conforme n'est pas proposée et sert à la rubrique « Ingrédients exclus des références proposées ». [US-166 RF3, US-167 RF2, CA 1.1]$$;
+COMMENT ON VIEW v_grocery_product_references IS $$Références par enseigne avec leur ancienneté (fresh / aging / NULL au-delà de 12 mois ou sans prix ; has_price les distingue : sans prix, « N/A ») et leur conformité, recalculée à chaque lecture : non conforme si le statut déclaré est « aucun conforme trouvé » (none_found) ou si un additif correspond à un critère actif, quel que soit le statut (excluded_because liste alors les critères). Une référence non conforme n'est jamais proposée et sert à la rubrique « Ingrédients exclus des références proposées ». needs_label_check : référence proposée avec la mention « Composition à vérifier sur l'étiquette » (statut « à vérifier »). [US-157 RF1, RF8, US-166 RF3, US-167 RF2, CA 1.1, CR-36, CR-37]$$;
 COMMENT ON VIEW v_meal_batch_week_days IS $$Plats de planning avec leur statut de correspondance (sure / to_confirm / absent, d'après les seuils de la console), le plat du catalogue effectivement utilisé (le plat confirmé, sinon le plat suggéré tant que la correspondance est sûre par son pourcentage ou à confirmer) et s'ils bloquent leur semaine (« absent »). Alimente la liste des correspondances à corriger. [US-171 RF1, RF2, CA 1.1]$$;
 COMMENT ON VIEW v_meal_batch_weeks IS $$Semaines types avec leur durée, le nombre de plats reliés au catalogue et si elles sont utilisables : cinq jours renseignés et aucun plat « absent » du catalogue. Une semaine bloquée n'est pas proposée aux foyers. [US-170 RF4, US-171 CA 1.1]$$;
 COMMENT ON VIEW v_meal_dishes_console IS $$Plats du catalogue pour la console : plat express (15 minutes au plus), retiré ou non, présence dans une semaine type et d'une version allégée. Permet de signaler les plats sans semaine type et de compter les plats express. [US-164 RF2, RF4]$$;

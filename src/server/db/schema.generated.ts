@@ -87,6 +87,8 @@ export type GraceOrigin = "billing_unsubscribe" | "in_app_request";
 
 export type GroceryItemState = "added_after_validation" | "bought" | "preparing" | "validated";
 
+export type GroceryReferenceStatus = "compliant" | "none_found" | "not_applicable" | "to_check";
+
 export type GroceryUnreferencedKind = "no_reference" | "unknown";
 
 export type GroceryUnreferencedSource = "list" | "menu" | "ticket";
@@ -1603,13 +1605,24 @@ export interface GroceryProductReferences {
    * Additifs de la référence (codes comme E250 ou noms), normalisés par l'application ; comparés aux critères actifs de grocery_additive_criteria
    */
   additives: Generated<string[]>;
+  /**
+   * Statut du catalogue d'origine : compliant = conforme, not_applicable = sans objet (produit frais), to_check = à vérifier (ingrédients non publiés : proposée avec « Composition à vérifier sur l'étiquette »), none_found = aucun conforme trouvé (jamais proposée, listée dans « Ingrédients exclus des références proposées »). Une liste d'additifs qui correspond à un critère actif rend la référence non conforme quel que soit ce statut. [US-166, US-167, CR-37]
+   */
+  compliance_status: Generated<GroceryReferenceStatus>;
+  /**
+   * Résumé de la composition en texte libre (2 000 caractères au plus), tel que donné par le catalogue d'origine ; facultatif. [CR-37]
+   */
+  composition_text: string | null;
   created_at: Generated<Timestamp>;
   id: Generated<Int8>;
-  price_date: Timestamp;
+  price_date: Timestamp | null;
   product_id: Int8;
   reference_name: string;
   store_chain: string;
-  unit_price: Numeric;
+  /**
+   * Prix unitaire de la référence ; vide = prix inconnu (« N/A », jamais un prix inventé). Vide en même temps que la date du prix. [US-157 RF8, CR-36]
+   */
+  unit_price: Numeric | null;
   updated_at: Generated<Timestamp>;
 }
 
@@ -2496,8 +2509,12 @@ export interface VFamilyTasks {
 }
 
 export interface VGroceryProductReferences {
+  compliance_status: GroceryReferenceStatus | null;
+  composition_text: string | null;
   excluded_because: string[] | null;
+  has_price: boolean | null;
   is_compliant: boolean | null;
+  needs_label_check: boolean | null;
   price_age: string | null;
   price_date: Timestamp | null;
   product_id: Int8 | null;

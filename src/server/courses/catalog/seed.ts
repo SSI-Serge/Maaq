@@ -26,9 +26,17 @@ export interface SeedDish {
 export interface SeedData {
   dishes: SeedDish[];
   plans: Plan[];
-  refs: (Pick<ReferenceRow, "product" | "rayon" | "used" | "store" | "ref" | "price" | "conform"> & { /** Colonne « Statut » du classeur : Conforme, Sans objet, À vérifier, Aucun conforme trouvé, Non trouvé. */ status?: string })[];
+  refs: (Pick<ReferenceRow, "product" | "rayon" | "used" | "store" | "ref" | "price" | "conform"> & { /** Colonne « Statut » du classeur : Conforme, Sans objet, À vérifier, Aucun conforme trouvé, Non trouvé. */ status?: string; priceDate?: string | null; composition?: string })[];
   allege: { id: string; plat: string; remove: string[]; add: string[]; text: string }[];
 }
+
+/** Statut du classeur → statut de conformité déclaré en base (CR-37). */
+const COMPLIANCE: Record<string, "compliant" | "to_check" | "none_found" | "not_applicable" | undefined> = {
+  Conforme: "compliant",
+  "Sans objet": "not_applicable",
+  "À vérifier": "to_check",
+  "Aucun conforme trouvé": "none_found",
+};
 
 export interface SeedReport {
   skipped: boolean;
@@ -38,7 +46,8 @@ export interface SeedReport {
   products: number;
   references: number;
   referencesWithoutPrice: number;
-  nonCompliantReferences: number;
+  /** Références « Non trouvé » du classeur, non chargées. */
+  notLoadedReferences: number;
   dishes: number;
   ingredientLinks: number;
   batchWeeks: number;
@@ -80,7 +89,7 @@ const capital = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
 /** Charge le catalogue dans une transaction déjà ouverte (utile aux tests, qui prennent un verrou avant). */
 export async function seedWithin(trx: Transaction<DB>, data: SeedData, options: { priceDate: string }): Promise<SeedReport> {
-  const report: SeedReport = { skipped: false, aisles: 0, cuisines: 0, tags: 0, products: 0, references: 0, referencesWithoutPrice: 0, nonCompliantReferences: 0, dishes: 0, ingredientLinks: 0, batchWeeks: 0, lightVersions: 0, seasonLinks: 0 };
+  const report: SeedReport = { skipped: false, aisles: 0, cuisines: 0, tags: 0, products: 0, references: 0, referencesWithoutPrice: 0, notLoadedReferences: 0, dishes: 0, ingredientLinks: 0, batchWeeks: 0, lightVersions: 0, seasonLinks: 0 };
   {
     const existing = await trx.selectFrom("meal_dishes").select("id").limit(1).executeTakeFirst();
     if (existing) return { ...report, skipped: true };
@@ -134,23 +143,33 @@ export async function seedWithin(trx: Transaction<DB>, data: SeedData, options: 
     };
     for (const p of refProducts.values()) await ensureProduct(p.name, p.rayon);
 
-    // références conformes avec un prix (prix > 0 et date obligatoires en base : les références sans prix ne sont pas chargées)
-    for (const r of data.refs) {
-      if (!r.conform) {
-        report.nonCompliantReferences += 1;
+    // références du classeur (CR-37) : « Conforme », « Sans objet » et « À vérifier » sont proposées (la dernière avec la mention « Composition à vérifier sur l'étiquette »),
+    // « Aucun conforme trouvé » n'est jamais proposée (rangée dans les ingrédients exclus), « Non trouvé » n'est pas chargée. Sans prix connu, le prix et sa date restent vides (« N/A »).
+    for (const ref of data.refs) {
+      const status = ref.status ?? (ref.conform ? "Conforme" : "Non trouvé");
+      const compliance = COMPLIANCE[status];
+      if (!compliance) {
+        report.notLoadedReferences += 1;
         continue;
       }
-      if (r.price === null || !(r.price > 0)) {
-        report.referencesWithoutPrice += 1;
-        continue;
-      }
+      const priced = ref.price !== null && ref.price > 0;
       const inserted = await trx
         .insertInto("grocery_product_references")
-        .values({ product_id: productId.get(nameKey(r.product))!, store_chain: placeKey(r.store).slice(0, 80), reference_name: r.ref.slice(0, 160), unit_price: r.price.toFixed(2), price_date: options.priceDate })
+        .values({
+          product_id: productId.get(nameKey(ref.product))!,
+          store_chain: placeKey(ref.store).slice(0, 80),
+          reference_name: (ref.ref || "(aucune référence conforme trouvée)").slice(0, 160),
+          unit_price: priced ? ref.price!.toFixed(2) : null,
+          price_date: priced ? (ref.priceDate ?? options.priceDate) : null,
+          compliance_status: compliance,
+          composition_text: ref.composition ? ref.composition.slice(0, 2000) : null,
+        })
         .onConflict((oc) => oc.columns(["product_id", "store_chain", "reference_name"]).doNothing())
         .returning("id")
         .executeTakeFirst();
-      if (inserted) report.references += 1;
+      if (!inserted) continue;
+      report.references += 1;
+      if (!priced) report.referencesWithoutPrice += 1;
     }
 
     // plats
