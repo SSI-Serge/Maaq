@@ -26,7 +26,7 @@ export interface SeedDish {
 export interface SeedData {
   dishes: SeedDish[];
   plans: Plan[];
-  refs: Pick<ReferenceRow, "product" | "rayon" | "used" | "store" | "ref" | "price" | "conform">[];
+  refs: (Pick<ReferenceRow, "product" | "rayon" | "used" | "store" | "ref" | "price" | "conform"> & { /** Colonne « Statut » du classeur : Conforme, Sans objet, À vérifier, Aucun conforme trouvé, Non trouvé. */ status?: string })[];
   allege: { id: string; plat: string; remove: string[]; add: string[]; text: string }[];
 }
 
