@@ -361,3 +361,40 @@
   text-decoration: underline;
   cursor: pointer;
 }
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 10px 0;
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-size: 13px;
+}
+.table th,
+.table td {
+  padding: 8px 6px;
+  text-align: right;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
+.table th:first-child {
+  text-align: left;
+  white-space: normal;
+}
+.table thead th {
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.table tbody th {
+  font-weight: 400;
+}
+.totalLine th,
+.totalLine td {
+  font-weight: 700;
+  border-bottom: 0;
+}
+.soft {
+  color: var(--ink-soft);
+}

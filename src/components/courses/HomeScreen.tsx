@@ -18,7 +18,7 @@ const PATHS: { label: string; href: string; ready: boolean; couple: boolean }[] 
   { label: "Menu à partir d'un ticket", href: "/courses/ticket", ready: false, couple: true },
   { label: "Enregistrer un ticket", href: "/courses/ticket", ready: false, couple: true },
   { label: "Mettre à jour la liste après un achat", href: "/courses/ma-liste", ready: true, couple: true },
-  { label: "Budget par rayon", href: "/courses/budget", ready: false, couple: true },
+  { label: "Budget par rayon", href: "/courses/budget", ready: true, couple: true },
 ];
 
 /** Accueil de l'agent « Courses et repas » : ma liste, ce que l'autre parent a ajouté, les parcours (CR-Tchat). */
