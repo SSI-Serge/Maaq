@@ -5,11 +5,17 @@ import styles from "./family.module.css";
 
 export const FALLBACK_COLOR = "#6b7280";
 
+/** Chaque membre une seule fois (un même membre peut concerner plusieurs rendez-vous d'une journée), dans l'ordre d'apparition. */
+export function uniqueMembers(members: MemberChip[]): MemberChip[] {
+  const seen = new Set<string>();
+  return members.filter((m) => (seen.has(m.id) ? false : (seen.add(m.id), true)));
+}
+
 /** Une pastille par membre concerné ; un rendez-vous provisoire garde sa pastille de membre, la bordure pointillée porte l'état. */
 export function Dots({ members }: { members: MemberChip[] }) {
   return (
     <span className={styles.dots} aria-hidden>
-      {members.map((m) => (
+      {uniqueMembers(members).map((m) => (
         <span key={m.id} className={styles.dot} style={{ background: m.color || FALLBACK_COLOR }} />
       ))}
     </span>

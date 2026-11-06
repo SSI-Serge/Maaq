@@ -8,7 +8,7 @@ import { Loading, Notice, RetryNotice } from "@/components/ui";
 import type { DigestDay, DigestView } from "@/server/assistant/digest";
 import type { TaskView } from "@/server/assistant/tasks";
 import { clock, longDate, shortDate } from "./format";
-import { Dots } from "./parts";
+import { Dots, uniqueMembers } from "./parts";
 import { QuestionCard } from "./QuestionCards";
 import { ReviewSteps } from "./ReviewScreen";
 import { TaskRow } from "./TaskRow";
@@ -94,7 +94,7 @@ export function DigestScreen() {
                   <button key={day.date} type="button" role="listitem" className={styles.weekDay} aria-pressed={open === day.date} onClick={() => { setOpen(day.date); setTab("detail"); }}>
                     <span className={styles.hint}>{shortDate(day.date).slice(0, 3)}</span>
                     <strong>{Number(day.date.slice(8, 10))}</strong>
-                    <Dots members={day.events.flatMap((e) => e.members).slice(0, 3)} />
+                    <Dots members={uniqueMembers(day.events.flatMap((e) => e.members)).slice(0, 3)} />
                     <span className={styles.hint}>{day.events.length + day.tasks.length || "·"}</span>
                     {day.conflict && <span className={styles.conflictMark} aria-label="Jour en conflit">!</span>}
                   </button>
