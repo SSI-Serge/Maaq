@@ -6,7 +6,8 @@ import { applyTicket, buildBudget, buildListModel, buildRefProducts, dishItems, 
 /** Parité avec courses.py, cas 1 (menu F4, F14, F17, F5, F9, F19, F10 validé : données du rapport de courses) et cas 9 (ticket fictif puis budget). */
 const dir = path.join(process.cwd(), "tests", "fixtures", "courses");
 const read = <T>(file: string) => JSON.parse(readFileSync(path.join(dir, file), "utf8")) as T;
-const catalog = read<{ dishes: (Omit<Dish, "tags"> & { tags: string[] })[]; refs: ReferenceRow[]; allege: { id: string; plat: string; remove: string[]; add: string[]; text: string }[] }>("catalog.json");
+const readSeed = <T>() => JSON.parse(readFileSync(path.join(process.cwd(), "db", "seed", "courses", "catalog.json"), "utf8")) as T;
+const catalog = readSeed<{ dishes: (Omit<Dish, "tags"> & { tags: string[] })[]; refs: ReferenceRow[]; allege: { id: string; plat: string; remove: string[]; add: string[]; text: string }[] }>();
 const report = read<{
   items: { name: string; rayon: string; group: string; pour: string[]; stores: Record<string, { ref: string; prix: number | null }>; opts: { prop: { ref: string; prix: number | null; store: string } | null } }[];
   dishes: { id: string; name: string; text: string; rem: number[]; add: number[]; has: boolean; retn: string[]; addn: string[] }[];

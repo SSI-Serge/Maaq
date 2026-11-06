@@ -11,7 +11,7 @@ import { parseCsv } from "@/server/courses/imports/table";
 const dir = path.join(process.cwd(), "tests", "fixtures", "courses");
 interface CatalogDish { id: string; cuisine: string; name: string; ing: string; recipe: string; health: string; batch: string; time: string; minutes: number; tags: string[] }
 interface RefCase { n: number; picks: string[]; profile: Record<string, string>; expected: { batch: { source: string; id?: string; total: number; confirm?: number }; menu: { day: string; id: string; alts: string[]; batch: boolean; confirm: string }[]; express: string[] } }
-const catalog = JSON.parse(readFileSync(path.join(dir, "catalog.json"), "utf8")) as { dishes: CatalogDish[]; plans: Plan[]; allege: { id: string; remove: string[]; add: string[] }[] };
+const catalog = JSON.parse(readFileSync(path.join(process.cwd(), "db", "seed", "courses", "catalog.json"), "utf8")) as { dishes: CatalogDish[]; plans: Plan[]; allege: { id: string; remove: string[]; add: string[] }[] };
 const cases = JSON.parse(readFileSync(path.join(dir, "cases.json"), "utf8")) as RefCase[];
 
 const dishes: Dish[] = catalog.dishes.map((d) => ({ ...d, tags: new Set(d.tags) }));
