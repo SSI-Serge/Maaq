@@ -1,0 +1,1276 @@
+{
+ "stores": [],
+ "items": [
+  {
+   "name": "Aubergines",
+   "rayon": "Fruits et légumes",
+   "opts": {
+    "prop": null,
+    "user": null,
+    "common": null
+   },
+   "stores": {},
+   "group": "menu",
+   "pour": [
+    "Lasagnes aux légumes du soleil"
+   ],
+   "by": "menu",
+   "checked": true,
+   "qty": 1,
+   "id": 0
+  },
+  {
+   "name": "Béchamel prête à l’emploi",
+   "rayon": "Crèmerie",
+   "opts": {
+    "prop": {
+     "ref": "AUCHAN Sauce béchamel",
+     "prix": null,
+     "store": "Auchan"
+    },
+    "user": null,
+    "common": null
+   },
+   "stores": {},
+   "group": "menu",
+   "pour": [
+    "Lasagnes aux légumes du soleil"
+   ],
+   "by": "menu",
+   "checked": true,
+   "qty": 1,
+   "id": 1
+  },
+  {
+   "name": "Coulis / passata de tomate",
+   "rayon": "Sauces tomate",
+   "opts": {
+    "prop": {
+     "ref": "AUCHAN Coulis de tomates nature en brique",
+     "prix": 0.48,
+     "store": "Auchan"
+    },
+    "user": null,
+    "common": null
+   },
+   "stores": {
+    "Intermarché": {
+     "ref": "Coulis de tomates Saint Eloi, une marque Intermarché",
+     "prix": 1.23
+    },
+    "Auchan": {
+     "ref": "AUCHAN Coulis de tomates nature en brique",
+     "prix": 0.48
+    }
+   },
+   "group": "menu",
+   "pour": [
+    "Boulettes de bœuf à l'italienne",
+    "Lasagnes aux légumes du soleil"
+   ],
+   "by": "menu",
+   "checked": true,
+   "qty": 1,
+   "id": 2
+  },
+  {
+   "name": "Courge butternut / potiron",
+   "rayon": "Fruits et légumes",
+   "opts": {
+    "prop": null,
+    "user": null,
+    "common": null
+   },
+   "stores": {},
+   "group": "menu",
+   "pour": [
+    "Lasagnes aux légumes du soleil"
+   ],
+   "by": "menu",
+   "checked": true,
+   "qty": 1,
+   "id": 3
+  },
+  {
+   "name": "Courgettes",
+   "rayon": "Fruits et légumes",
+   "opts": {
+    "prop": null,
+    "user": null,
+    "common": null
+   },
+   "stores": {},
+   "group": "menu",
+   "pour": [
+    "Lasagnes aux légumes du soleil",
+    "One Pan de poulet aux légumes rôtis"
+   ],
+   "by": "menu",
+   "checked": true,
+   "qty": 1,
+   "id": 4
+  },
+  {
+   "name": "Fromage râpé (emmental)",
+   "rayon": "Crèmerie",
+   "opts": {
+    "prop": {
+     "ref": "Emmental râpé fondant CARREFOUR CLASSIC'",
+     "prix": 3.99,
+     "store": "Carrefour"
+    },
+    "user": null,
+    "common": null
+   },
+   "stores": {
+    "Carrefour": {
+     "ref": "Emmental râpé fondant CARREFOUR CLASSIC'",
+     "prix": 3.99
+    }
+   },
+   "group": "menu",
+   "pour": [
+    "Lasagnes aux légumes du soleil"
+   ],
+   "by": "menu",
+   "checked": true,
+   "qty": 1,
+   "id": 5
+  },
+  {
+   "name": "Mozzarella",
+   "rayon": "Crèmerie",
+   "opts": {
+    "prop": {
+     "ref": "Galbani Mozzarella fior di latte",
+     "prix": null,
+     "store": "Intermarché"
+    },
+    "user": null,
+    "common": null
+   },
+   "stores": {},
+   "group": "menu",
+   "pour": [
+    "Lasagnes aux légumes du soleil",
+    "One Pan de poulet aux légumes rôtis"
+   ],
+   "by": "menu",
+   "checked": true,
+   "qty": 1,
+   "id": 6
+  },
+  {
+   "name": "Plaques de lasagnes",
+   "rayon": "Féculents",
+   "opts": {
+    "prop": {
+     "ref": "Pâtes fraîches feuilles de lasagnes fraîches x6 Rana",
+     "prix": null,
+     "store": "Intermarché"
+    },
+    "user": null,
+    "common": null
+   },
+   "stores": {},
+   "group": "menu",
+   "pour": [
+    "Lasagnes aux légumes du soleil"
+   ],
+   "by": "menu",
+   "checked": true,
+   "qty": 1,
+   "id": 7
+  },
+  {
+   "name": "Poivrons",
+   "rayon": "Fruits et légumes",
+   "opts": {
+    "prop": null,
+    "user": null,
+    "common": null
+   },
+   "stores": {},
+   "group": "menu",
+   "pour": [
+    "Chakchouka aux légumes du soleil",
+    "Lasagnes aux légumes du soleil",
+    "One Pan de poulet aux légumes rôtis"
+   ],
+   "by": "menu",
+   "checked": true,
+   "qty": 1,
+   "id": 8
+  },
+  {
+   "name": "Ricotta",
+   "rayon": "Crèmerie",
+   "opts": {
+    "prop": {
+     "ref": "Ricotta riche en protéines -60% MG CASA AZZURRA",
+     "prix": 1.89,
+     "store": "Carrefour"
+    },
+    "user": null,
+    "common": null
+   },
+   "stores": {
+    "Carrefour": {
+     "ref": "Ricotta riche en protéines -60% MG CASA AZZURRA",
+     "prix": 1.89
+    }
+   },
+   "group": "menu",
+   "pour": [
+    "Lasagnes aux légumes du soleil"
+   ],
+   "by": "menu",
+   "checked": true,
+   "qty": 1,
+   "id": 9
+  },
+  {
+   "name": "sauce tomate",
+   "rayon": "Autres",
+   "opts": {
+    "prop": null,
+    "user": null,
+    "common": null
+   },
+   "stores": {},
+   "group": "menu",
+   "pour": [
+    "Chili con carne (ou sin carne)",
+    "Lasagnes aux légumes du soleil"
+   ],
+   "by": "menu",
+   "checked": true,
+   "qty": 1,
+   "id": 10
+  },
+  {
+   "name": "Ail",
+   "rayon": "Fruits et légumes",
+   "opts": {
+    "prop": null,
+    "user": null,
+    "common": null
+   },
+   "stores": {},
+   "group": "menu",
+   "pour": [
+    "Boulettes de bœuf à l'italienne"
+   ],
+   "by": "menu",
+   "checked": true,
+   "qty": 1,
+   "id": 11
+  },
+  {
+   "name": "Bœuf haché 5 % MG",
+   "rayon": "Boucherie",
+   "opts": {
+    "prop": {
+     "ref": "Charal Steak hachés façon bouchère pur bœuf 5% MG - L'Authentique",
+     "prix": null,
+     "store": "Intermarché"
+    },
+    "user": null,
+    "common": null
+   },
+   "stores": {},
+   "group": "menu",
+   "pour": [
+    "Boulettes de bœuf à l'italienne",
+    "Chili con carne (ou sin carne)"
+   ],
+   "by": "menu",
+   "checked": true,
+   "qty": 1,
+   "id": 12
+  },
+  {
+   "name": "Bœuf à braiser (paleron)",
+   "rayon": "Boucherie",
+   "opts": {
+    "prop": null,
+    "user": null,
+    "common": null
+   },
+   "stores": {},
+   "group": "menu",
+   "pour": [
+    "Boulettes de bœuf à l'italienne",
+    "Chili con carne (ou sin carne)"
+   ],
+   "by": "menu",
+   "checked": true,
+   "qty": 1,
+   "id": 13
+  },
+  {
+   "name": "Persil",
+   "rayon": "Fruits et légumes",
+   "opts": {
+    "prop": null,
+    "user": null,
+    "common": null
+   },
+   "stores": {},
+   "group": "menu",
+   "pour": [
+    "Boulettes de bœuf à l'italienne"
+   ],
+   "by": "menu",
+   "checked": true,
+   "qty": 1,
+   "id": 14
+  },
+  {
+   "name": "Petits pois",
+   "rayon": "Conserves et surgelés",
+   "opts": {
+    "prop": {
+     "ref": "Petits Pois Très Fin A L'Etuvée - 560G - ECO +",
+     "prix": 1.15,
+     "store": "E.Leclerc"
+    },
+    "user": null,
+    "common": null
+   },
+   "stores": {
+    "E.Leclerc": {
+     "ref": "Petits Pois Très Fin A L'Etuvée - 560G - ECO +",
+     "prix": 1.15
+    },
+    "Auchan": {
+     "ref": "AUCHAN Petits pois à l’étuvée extra-fins",
+     "prix": 1.34
+    }
+   },
+   "group": "menu",
+   "pour": [
+    "Boulettes de bœuf à l'italienne",
+    "Riz sauté cantonais au jambon & petits pois"
+   ],
+   "by": "menu",
+   "checked": true,
+   "qty": 1,
+   "id": 15
+  },
+  {
+   "name": "1 œuf",
+   "rayon": "Autres",
+   "opts": {
+    "prop": null,
+    "user": null,
+    "common": null
+   },
+   "stores": {},
+   "group": "menu",
+   "pour": [
+    "Boulettes de bœuf à l'italienne"
+   ],
+   "by": "menu",
+   "checked": true,
+   "qty": 1,
+   "id": 16
+  },
+  {
+   "name": "500g sauce tomate",
+   "rayon": "Autres",
+   "opts": {
+    "prop": null,
+    "user": null,
+    "common": null
+   },
+   "stores": {},
+   "group": "menu",
+   "pour": [
+    "Boulettes de bœuf à l'italienne"
+   ],
+   "by": "menu",
+   "checked": true,
+   "qty": 1,
+   "id": 17
+  },
+  {
+   "name": "Filets / blancs de poulet",
+   "rayon": "Volaille",
+   "opts": {
+    "prop": null,
+    "user": null,
+    "common": null
+   },
+   "stores": {},
+   "group": "menu",
+   "pour": [
+    "One Pan de poulet aux légumes rôtis"
+   ],
+   "by": "menu",
+   "checked": true,
+   "qty": 1,
+   "id": 18
+  },
+  {
+   "name": "Huile d’olive",
+   "rayon": "Huiles et condiments",
+   "opts": {
+    "prop": {
+     "ref": "Huile d'olive vierge extra - 1L - ECO +",
+     "prix": 6.43,
+     "store": "E.Leclerc"
+    },
+    "user": null,
+    "common": null
+   },
+   "stores": {
+    "Carrefour": {
+     "ref": "Huile d'olive vierge extra CARREFOUR EXTRA",
+     "prix": 9.49
+    },
+    "E.Leclerc": {
+     "ref": "Huile d'olive vierge extra - 1L - ECO +",
+     "prix": 6.43
+    }
+   },
+   "group": "menu",
+   "pour": [
+    "One Pan de poulet aux légumes rôtis"
+   ],
+   "by": "menu",
+   "checked": true,
+   "qty": 1,
+   "id": 19
+  },
+  {
+   "name": "Oignons",
+   "rayon": "Fruits et légumes",
+   "opts": {
+    "prop": null,
+    "user": null,
+    "common": null
+   },
+   "stores": {},
+   "group": "menu",
+   "pour": [
+    "Chakchouka aux légumes du soleil",
+    "One Pan de poulet aux légumes rôtis"
+   ],
+   "by": "menu",
+   "checked": true,
+   "qty": 1,
+   "id": 20
+  },
+  {
+   "name": "Poulet entier / cuisses",
+   "rayon": "Volaille",
+   "opts": {
+    "prop": null,
+    "user": null,
+    "common": null
+   },
+   "stores": {},
+   "group": "menu",
+   "pour": [
+    "One Pan de poulet aux légumes rôtis"
+   ],
+   "by": "menu",
+   "checked": true,
+   "qty": 1,
+   "id": 21
+  },
+  {
+   "name": "Thym / herbes de Provence",
+   "rayon": "Épices et aromates",
+   "opts": {
+    "prop": {
+     "ref": "Mélange d'aromates herbes de Provence — Bouton d’Or, une marque Intermarché",
+     "prix": 0.42,
+     "store": "Intermarché"
+    },
+    "user": null,
+    "common": null
+   },
+   "stores": {
+    "Carrefour": {
+     "ref": "Herbes de Provence Label Rouge REFLETS DE FRANCE",
+     "prix": 1.25
+    },
+    "Intermarché": {
+     "ref": "Mélange d'aromates herbes de Provence — Bouton d’Or, une marque Intermarché",
+     "prix": 0.42
+    }
+   },
+   "group": "menu",
+   "pour": [
+    "One Pan de poulet aux légumes rôtis"
+   ],
+   "by": "menu",
+   "checked": true,
+   "qty": 1,
+   "id": 22
+  },
+  {
+   "name": "Tomates cerises",
+   "rayon": "Fruits et légumes",
+   "opts": {
+    "prop": null,
+    "user": null,
+    "common": null
+   },
+   "stores": {},
+   "group": "menu",
+   "pour": [
+    "One Pan de poulet aux légumes rôtis"
+   ],
+   "by": "menu",
+   "checked": true,
+   "qty": 1,
+   "id": 23
+  },
+  {
+   "name": "Cumin moulu",
+   "rayon": "Épices et aromates",
+   "opts": {
+    "prop": {
+     "ref": "Cumin Moulu — marque non indiquée",
+     "prix": 2.02,
+     "store": "Carrefour"
+    },
+    "user": null,
+    "common": null
+   },
+   "stores": {
+    "Carrefour": {
+     "ref": "Cumin Moulu — marque non indiquée",
+     "prix": 2.02
+    }
+   },
+   "group": "menu",
+   "pour": [
+    "Chili con carne (ou sin carne)"
+   ],
+   "by": "menu",
+   "checked": true,
+   "qty": 1,
+   "id": 24
+  },
+  {
+   "name": "Haricots blancs (conserve)",
+   "rayon": "Légumineuses",
+   "opts": {
+    "prop": {
+     "ref": "Haricots blancs blancs CARREFOUR CLASSIC'",
+     "prix": 1.39,
+     "store": "Carrefour"
+    },
+    "user": null,
+    "common": null
+   },
+   "stores": {
+    "Carrefour": {
+     "ref": "Haricots blancs blancs CARREFOUR CLASSIC'",
+     "prix": 1.39
+    }
+   },
+   "group": "menu",
+   "pour": [
+    "Chili con carne (ou sin carne)"
+   ],
+   "by": "menu",
+   "checked": true,
+   "qty": 1,
+   "id": 25
+  },
+  {
+   "name": "Haricots rouges (conserve)",
+   "rayon": "Légumineuses",
+   "opts": {
+    "prop": {
+     "ref": "Haricots rouges CARREFOUR CLASSIC'",
+     "prix": 1.99,
+     "store": "Carrefour"
+    },
+    "user": null,
+    "common": null
+   },
+   "stores": {
+    "Carrefour": {
+     "ref": "Haricots rouges CARREFOUR CLASSIC'",
+     "prix": 1.99
+    }
+   },
+   "group": "menu",
+   "pour": [
+    "Chili con carne (ou sin carne)"
+   ],
+   "by": "menu",
+   "checked": true,
+   "qty": 1,
+   "id": 26
+  },
+  {
+   "name": "Lentilles corail",
+   "rayon": "Légumineuses",
+   "opts": {
+    "prop": {
+     "ref": "Lentilles Corail-500G - NOTRE JARDIN",
+     "prix": 1.72,
+     "store": "E.Leclerc"
+    },
+    "user": null,
+    "common": null
+   },
+   "stores": {
+    "Carrefour": {
+     "ref": "Lentilles Corail Bio LE BIO DE MANON",
+     "prix": 4.25
+    },
+    "E.Leclerc": {
+     "ref": "Lentilles Corail-500G - NOTRE JARDIN",
+     "prix": 1.72
+    },
+    "Intermarché": {
+     "ref": "Saint Eloi Bio, une marque Intermarché — Lentilles corail BIO",
+     "prix": 2.59
+    }
+   },
+   "group": "menu",
+   "pour": [
+    "Chili con carne (ou sin carne)"
+   ],
+   "by": "menu",
+   "checked": true,
+   "qty": 1,
+   "id": 27
+  },
+  {
+   "name": "Lentilles vertes",
+   "rayon": "Légumineuses",
+   "opts": {
+    "prop": {
+     "ref": "Lentilles Vertes - Sachet 1kg - NOTRE JARDIN",
+     "prix": 2.87,
+     "store": "E.Leclerc"
+    },
+    "user": null,
+    "common": null
+   },
+   "stores": {
+    "Carrefour": {
+     "ref": "Lentilles Vertes AOP VIVIEN PAILLE",
+     "prix": 4.45
+    },
+    "E.Leclerc": {
+     "ref": "Lentilles Vertes - Sachet 1kg - NOTRE JARDIN",
+     "prix": 2.87
+    }
+   },
+   "group": "menu",
+   "pour": [
+    "Chili con carne (ou sin carne)"
+   ],
+   "by": "menu",
+   "checked": true,
+   "qty": 1,
+   "id": 28
+  },
+  {
+   "name": "Maïs doux (conserve)",
+   "rayon": "Conserves et surgelés",
+   "opts": {
+    "prop": {
+     "ref": "AUCHAN BIO Maïs doux en grains sans sucres ajoutés",
+     "prix": null,
+     "store": "Auchan"
+    },
+    "user": null,
+    "common": null
+   },
+   "stores": {},
+   "group": "menu",
+   "pour": [
+    "Chili con carne (ou sin carne)",
+    "Salade fraîche thon, maïs & citron"
+   ],
+   "by": "menu",
+   "checked": true,
+   "qty": 1,
+   "id": 29
+  },
+  {
+   "name": "Dés de jambon",
+   "rayon": "Charcuterie",
+   "opts": {
+    "prop": null,
+    "user": null,
+    "common": null
+   },
+   "stores": {},
+   "group": "menu",
+   "pour": [
+    "Riz sauté cantonais au jambon & petits pois"
+   ],
+   "by": "menu",
+   "checked": true,
+   "qty": 1,
+   "id": 30
+  },
+  {
+   "name": "Jambon blanc (tranches)",
+   "rayon": "Charcuterie",
+   "opts": {
+    "prop": {
+     "ref": "Jambon entier Le Savoureux — Aoste",
+     "prix": null,
+     "store": "Intermarché"
+    },
+    "user": null,
+    "common": null
+   },
+   "stores": {},
+   "group": "menu",
+   "pour": [
+    "Riz sauté cantonais au jambon & petits pois"
+   ],
+   "by": "menu",
+   "checked": true,
+   "qty": 1,
+   "id": 31
+  },
+  {
+   "name": "Pois chiches (conserve)",
+   "rayon": "Légumineuses",
+   "opts": {
+    "prop": {
+     "ref": "AUCHAN Pois chiches",
+     "prix": null,
+     "store": "Auchan"
+    },
+    "user": null,
+    "common": null
+   },
+   "stores": {},
+   "group": "menu",
+   "pour": [
+    "Riz sauté cantonais au jambon & petits pois"
+   ],
+   "by": "menu",
+   "checked": true,
+   "qty": 1,
+   "id": 32
+  },
+  {
+   "name": "Sauce soja",
+   "rayon": "Épicerie du monde",
+   "opts": {
+    "prop": {
+     "ref": "KIKKOMAN Sauce soja",
+     "prix": 4.77,
+     "store": "Auchan"
+    },
+    "user": null,
+    "common": null
+   },
+   "stores": {
+    "Auchan": {
+     "ref": "KIKKOMAN Sauce soja",
+     "prix": 4.77
+    }
+   },
+   "group": "menu",
+   "pour": [
+    "Riz sauté cantonais au jambon & petits pois"
+   ],
+   "by": "menu",
+   "checked": true,
+   "qty": 1,
+   "id": 33
+  },
+  {
+   "name": "Œufs",
+   "rayon": "Crèmerie",
+   "opts": {
+    "prop": null,
+    "user": null,
+    "common": null
+   },
+   "stores": {},
+   "group": "menu",
+   "pour": [
+    "Chakchouka aux légumes du soleil",
+    "Riz sauté cantonais au jambon & petits pois"
+   ],
+   "by": "menu",
+   "checked": true,
+   "qty": 1,
+   "id": 34
+  },
+  {
+   "name": "300g riz cuit",
+   "rayon": "Autres",
+   "opts": {
+    "prop": null,
+    "user": null,
+    "common": null
+   },
+   "stores": {},
+   "group": "menu",
+   "pour": [
+    "Riz sauté cantonais au jambon & petits pois"
+   ],
+   "by": "menu",
+   "checked": true,
+   "qty": 1,
+   "id": 35
+  },
+  {
+   "name": "Paprika",
+   "rayon": "Épices et aromates",
+   "opts": {
+    "prop": {
+     "ref": "Paprika doux DUCROS",
+     "prix": 3.09,
+     "store": "Carrefour"
+    },
+    "user": null,
+    "common": null
+   },
+   "stores": {
+    "Carrefour": {
+     "ref": "Paprika doux DUCROS",
+     "prix": 3.09
+    }
+   },
+   "group": "menu",
+   "pour": [
+    "Chakchouka aux légumes du soleil"
+   ],
+   "by": "menu",
+   "checked": true,
+   "qty": 1,
+   "id": 36
+  },
+  {
+   "name": "Tomates",
+   "rayon": "Fruits et légumes",
+   "opts": {
+    "prop": null,
+    "user": null,
+    "common": null
+   },
+   "stores": {},
+   "group": "menu",
+   "pour": [
+    "Chakchouka aux légumes du soleil"
+   ],
+   "by": "menu",
+   "checked": true,
+   "qty": 1,
+   "id": 37
+  },
+  {
+   "name": "Tomates concassées / pelées",
+   "rayon": "Sauces tomate",
+   "opts": {
+    "prop": {
+     "ref": "Tomates Entières Pelées Au Jus 4/4 480G Pne Ppx - ECO +",
+     "prix": 1.03,
+     "store": "E.Leclerc"
+    },
+    "user": null,
+    "common": null
+   },
+   "stores": {
+    "Carrefour": {
+     "ref": "Tomates Concassées Bio ALRO",
+     "prix": 1.65
+    },
+    "E.Leclerc": {
+     "ref": "Tomates Entières Pelées Au Jus 4/4 480G Pne Ppx - ECO +",
+     "prix": 1.03
+    },
+    "Auchan": {
+     "ref": "AUCHAN Pulpe de tomates concassées",
+     "prix": 1.33
+    }
+   },
+   "group": "menu",
+   "pour": [
+    "Chakchouka aux légumes du soleil"
+   ],
+   "by": "menu",
+   "checked": true,
+   "qty": 1,
+   "id": 38
+  },
+  {
+   "name": "Pâtes (spaghetti, penne)",
+   "rayon": "Féculents",
+   "opts": {
+    "prop": {
+     "ref": "Spaghetti - 500G - TURINI",
+     "prix": 0.69,
+     "store": "E.Leclerc"
+    },
+    "user": null,
+    "common": null
+   },
+   "stores": {
+    "Carrefour": {
+     "ref": "Pâtes spaghetti CARREFOUR",
+     "prix": 1.35
+    },
+    "E.Leclerc": {
+     "ref": "Spaghetti - 500G - TURINI",
+     "prix": 0.69
+    },
+    "Lidl": {
+     "ref": "Panzani Spaghetti x3",
+     "prix": 2.99
+    }
+   },
+   "group": "menu",
+   "pour": [
+    "Salade fraîche thon, maïs & citron"
+   ],
+   "by": "menu",
+   "checked": true,
+   "qty": 1,
+   "id": 39
+  },
+  {
+   "name": "Pâtes orzo (orseau)",
+   "rayon": "Féculents",
+   "opts": {
+    "prop": {
+     "ref": "Spaghetti - 500G - TURINI",
+     "prix": 0.69,
+     "store": "E.Leclerc"
+    },
+    "user": null,
+    "common": null
+   },
+   "stores": {
+    "Carrefour": {
+     "ref": "Pâtes spaghetti CARREFOUR",
+     "prix": 1.35
+    },
+    "E.Leclerc": {
+     "ref": "Spaghetti - 500G - TURINI",
+     "prix": 0.69
+    },
+    "Lidl": {
+     "ref": "Panzani Spaghetti x3",
+     "prix": 2.99
+    }
+   },
+   "group": "menu",
+   "pour": [
+    "Salade fraîche thon, maïs & citron"
+   ],
+   "by": "menu",
+   "checked": true,
+   "qty": 1,
+   "id": 40
+  },
+  {
+   "name": "Salade verte",
+   "rayon": "Fruits et légumes",
+   "opts": {
+    "prop": null,
+    "user": null,
+    "common": null
+   },
+   "stores": {},
+   "group": "menu",
+   "pour": [
+    "Salade fraîche thon, maïs & citron"
+   ],
+   "by": "menu",
+   "checked": true,
+   "qty": 1,
+   "id": 41
+  },
+  {
+   "name": "Thon au naturel (boîte)",
+   "rayon": "Poissons",
+   "opts": {
+    "prop": {
+     "ref": "Thon Entier Listao Au Naturel -140G PNE - ECO +",
+     "prix": 1.28,
+     "store": "E.Leclerc"
+    },
+    "user": null,
+    "common": null
+   },
+   "stores": {
+    "Carrefour": {
+     "ref": "Thon au naturel — marque non indiquée",
+     "prix": 5.5
+    },
+    "E.Leclerc": {
+     "ref": "Thon Entier Listao Au Naturel -140G PNE - ECO +",
+     "prix": 1.28
+    }
+   },
+   "group": "menu",
+   "pour": [
+    "Salade fraîche thon, maïs & citron"
+   ],
+   "by": "menu",
+   "checked": true,
+   "qty": 1,
+   "id": 42
+  },
+  {
+   "name": "jus de citron",
+   "rayon": "Autres",
+   "opts": {
+    "prop": null,
+    "user": null,
+    "common": null
+   },
+   "stores": {},
+   "group": "menu",
+   "pour": [
+    "Salade fraîche thon, maïs & citron"
+   ],
+   "by": "menu",
+   "checked": true,
+   "qty": 1,
+   "id": 43
+  },
+  {
+   "name": "Plaques de lasagnes intégrales",
+   "rayon": "Féculents",
+   "opts": {
+    "prop": {
+     "ref": "Pâtes fraîches feuilles de lasagnes fraîches x6 Rana",
+     "prix": null,
+     "store": "Intermarché"
+    },
+    "user": null,
+    "common": null
+   },
+   "stores": {},
+   "group": "sante",
+   "pour": [],
+   "by": "",
+   "checked": true,
+   "id": 44,
+   "ind": true
+  },
+  {
+   "name": "Lentilles brunes",
+   "rayon": "Autres",
+   "opts": {
+    "prop": null,
+    "user": null,
+    "common": null
+   },
+   "stores": {},
+   "group": "sante",
+   "pour": [],
+   "by": "",
+   "checked": true,
+   "id": 45,
+   "ind": false
+  },
+  {
+   "name": "Riz complet",
+   "rayon": "Autres",
+   "opts": {
+    "prop": null,
+    "user": null,
+    "common": null
+   },
+   "stores": {},
+   "group": "sante",
+   "pour": [],
+   "by": "",
+   "checked": true,
+   "id": 46,
+   "ind": false
+  },
+  {
+   "name": "Jambon découenné dégraissé",
+   "rayon": "Autres",
+   "opts": {
+    "prop": null,
+    "user": null,
+    "common": null
+   },
+   "stores": {},
+   "group": "sante",
+   "pour": [],
+   "by": "",
+   "checked": true,
+   "id": 47,
+   "ind": false
+  },
+  {
+   "name": "Sauce soja pauvre en sel",
+   "rayon": "Épicerie du monde",
+   "opts": {
+    "prop": {
+     "ref": "KIKKOMAN Sauce soja",
+     "prix": 4.77,
+     "store": "Auchan"
+    },
+    "user": null,
+    "common": null
+   },
+   "stores": {
+    "Auchan": {
+     "ref": "KIKKOMAN Sauce soja",
+     "prix": 4.77
+    }
+   },
+   "group": "sante",
+   "pour": [],
+   "by": "",
+   "checked": true,
+   "id": 48,
+   "ind": true
+  },
+  {
+   "name": "Concombre",
+   "rayon": "Autres",
+   "opts": {
+    "prop": null,
+    "user": null,
+    "common": null
+   },
+   "stores": {},
+   "group": "sante",
+   "pour": [],
+   "by": "",
+   "checked": true,
+   "id": 49,
+   "ind": false
+  }
+ ],
+ "dishes": [
+  {
+   "id": "F4",
+   "name": "Lasagnes aux légumes du soleil",
+   "text": "Utiliser de la ricotta (plus légère) à la place de la béchamel et des plaques de lasagnes intégrales à la farine complète.",
+   "rem": [
+    1,
+    7
+   ],
+   "add": [
+    9,
+    44
+   ],
+   "has": true,
+   "retn": [
+    "Béchamel prête à l’emploi",
+    "Plaques de lasagnes"
+   ],
+   "addn": [
+    "Ricotta",
+    "Plaques de lasagnes intégrales"
+   ],
+   "mode": "standard"
+  },
+  {
+   "id": "F14",
+   "name": "Boulettes de bœuf à l'italienne",
+   "text": "Saisir les boulettes au four sur papier cuisson plutôt qu'à la poêle pour éviter d'ajouter de la matière grasse.",
+   "rem": [],
+   "add": [],
+   "has": false,
+   "retn": [],
+   "addn": [],
+   "mode": "standard"
+  },
+  {
+   "id": "F17",
+   "name": "One Pan de poulet aux légumes rôtis",
+   "text": "Cuisson complète 'tout-en-un' sur plaque. Les légumes rôtis conservent leurs minéraux sans dilution dans l'eau.",
+   "rem": [],
+   "add": [],
+   "has": false,
+   "retn": [],
+   "addn": [],
+   "mode": "standard"
+  },
+  {
+   "id": "F5",
+   "name": "Chili con carne (ou sin carne)",
+   "text": "Version 'sin carne' aux lentilles brunes pour diviser les graisses saturées par 5 et doubler l'apport en fibres.",
+   "rem": [
+    12
+   ],
+   "add": [
+    45
+   ],
+   "has": true,
+   "retn": [
+    "Bœuf haché 5 % MG"
+   ],
+   "addn": [
+    "Lentilles brunes"
+   ],
+   "mode": "standard"
+  },
+  {
+   "id": "F9",
+   "name": "Riz sauté cantonais au jambon & petits pois",
+   "text": "Utiliser du riz Basmati ou thaï complet cuit la veille. Choisir du jambon découenné dégraissé et de la sauce soja pauvre en sel.",
+   "rem": [
+    31,
+    30,
+    33
+   ],
+   "add": [
+    46,
+    47,
+    48
+   ],
+   "has": true,
+   "retn": [
+    "Riz long / basmati",
+    "Jambon blanc (tranches)",
+    "Dés de jambon",
+    "Sauce soja"
+   ],
+   "addn": [
+    "Riz complet",
+    "Jambon découenné dégraissé",
+    "Sauce soja pauvre en sel"
+   ],
+   "mode": "standard"
+  },
+  {
+   "id": "F19",
+   "name": "Chakchouka aux légumes du soleil",
+   "text": "Plat méditerranéen très pauvre en calories et riche en lycopène (antioxydant puissant de la tomate cuite).",
+   "rem": [],
+   "add": [],
+   "has": false,
+   "retn": [],
+   "addn": [],
+   "mode": "standard"
+  },
+  {
+   "id": "F10",
+   "name": "Salade fraîche thon, maïs & citron",
+   "text": "Source excellente de bons lipides (Oméga-3 du thon et huile d'olive). Ajouter des dés de concombre pour l'hydratation.",
+   "rem": [],
+   "add": [
+    49
+   ],
+   "has": true,
+   "retn": [],
+   "addn": [
+    "Concombre"
+   ],
+   "mode": "standard"
+  }
+ ],
+ "nb": "4"
+}

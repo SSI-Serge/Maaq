@@ -3,7 +3,7 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-06T16:44:47.574Z",
+  "updated": "2026-11-06T17:14:41.169Z",
   "deploys": [
     {
       "at": "2026-11-06T16:43:37.270Z",
@@ -2838,12 +2838,12 @@
         {
           "id": "f21c2",
           "title": "C2 · Moteur : menu, comparatif, trois scénarios, budget calculés par MAAQ",
-          "state": "building",
+          "state": "testing",
           "env": null,
-          "at": "2026-11-06T16:44:47.574Z",
-          "note": "Calcul porté en TypeScript (49 tests). Comparaison avec les cas de référence du script Digitorn en cours.",
+          "at": "2026-11-06T17:14:41.169Z",
+          "note": "Calcul porté en TypeScript et comparé aux cas de référence du script Digitorn : mêmes menus, remplacements, séances, correspondances, listes et prix, ticket et budget (22 + 5 tests de parité).",
           "unsure": [
-            "Pas encore comparé à de vraies sorties du script."
+            "Pas encore branché à la base ni aux écrans : rien n est visible par un utilisateur."
           ]
         },
         {
@@ -2867,7 +2867,7 @@
           "env": null,
           "at": "2026-11-06T16:44:47.574Z",
           "unsure": [
-            "La lecture des tickets de supermarché n est pas testée : réglage en cours avec 2 vrais tickets, en local seulement."
+            "Essai sur 2 vrais tickets (06/11) : la lecture par Tesseract ne reconnaît que la moitié des montants et ne masque pas toujours la carte de fidélité. Un autre moteur de lecture est à étudier (décision du PO)."
           ]
         },
         {
@@ -2890,6 +2890,14 @@
         {
           "at": "2026-11-06T16:43:37.270Z",
           "text": "Le remplacement des consignes de l agent depuis la console (US-176) est reporté après le pilote."
+        },
+        {
+          "at": "2026-11-06T17:14:41.169Z",
+          "text": "Cas de référence du script Digitorn reçus et rejoués : le port du moteur donne les mêmes résultats."
+        },
+        {
+          "at": "2026-11-06T17:14:41.169Z",
+          "text": "Lecture des tickets : Tesseract seul ne suffit pas sur des photos de téléphone ; pistes à arbitrer (autre moteur hébergé chez nous, service cloud avec avis du DPO)."
         }
       ],
       "unsure": [

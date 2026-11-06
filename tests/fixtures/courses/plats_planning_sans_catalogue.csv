@@ -1,0 +1,16 @@
+﻿semaine,jour,cuisine,theme,plat_planning,statut,id_catalogue_suggere,plat_catalogue_suggere,pourcentage_correspondance,duree_semaine_min,bloque_la_semaine
+AS1,Mardi,Afro,Sauce Tomate & Volaille,Haricots rouges sauce tomate & peau de bœuf,correspondance_a_confirmer,A3,Haricots sauce rouge / sauce huile,57,120,non
+AS2,Mercredi,Afro,"Poisson, Arachide & Santé",Ragoût style DG (Dinde & plantains rôtis au four),correspondance_a_confirmer,A7,Ragoût style DG (Volaille & plantains),61,120,non
+AS2,Jeudi,Afro,"Poisson, Arachide & Santé",Spaghettis complets sautés à la viande hachée & légumes,absent_du_catalogue,,,0,120,oui
+AS2,Vendredi,Afro,"Poisson, Arachide & Santé","Poisson grillé, Alloco au four & sauce oignon-tomate",correspondance_a_confirmer,A19,Alloco & poisson/œufs (sauce oignon-tomate),73,120,non
+AS3,Lundi,Afro,Mijotés Traditionnels & Viandes,Yassa au poulet & fondue d'oignons au citron,correspondance_a_confirmer,A14,Yassa au poulet,59,135,non
+AS3,Mardi,Afro,Mijotés Traditionnels & Viandes,Boulettes de bœuf mijotées à la sauce tomate,correspondance_a_confirmer,F14,Boulettes de bœuf à l'italienne,48,135,non
+AS3,Jeudi,Afro,Mijotés Traditionnels & Viandes,Soupe / Mijoté de veau aux carottes & poireaux,correspondance_a_confirmer,A16,Soupe / Mijoté de veau ou queue de bœuf,62,135,non
+AS4,Lundi,Afro,Noix de Palme & Plantains,Sauce Graine / Kock au poisson & viande,correspondance_a_confirmer,A10,Sauce Graine (ou Poulet Moambe),42,110,non
+AS4,Mercredi,Afro,Noix de Palme & Plantains,Omelette africaine aux légumes & plantains rôties,correspondance_a_confirmer,A4,Omelette africaine aux légumes,74,110,non
+AS4,Jeudi,Afro,Noix de Palme & Plantains,Ailes de poulet au four & chou sauté à la tomate,absent_du_catalogue,A12,Ailes de poulet aux petits pois & carottes,36,110,oui
+AS4,Vendredi,Afro,Noix de Palme & Plantains,Pâtes à la sauce tomate express & sardines,correspondance_a_confirmer,A2,Pâtes à la sauce africaine express,63,110,non
+FS1,Mercredi,Français,Légumes du Soleil & Méditerranée,Chakchouka aux poivrons & œufs pochés minute,absent_du_catalogue,,,0,90,oui
+FS2,Lundi,Français,Automnale & Réconfortante,"Velouté de courge, carottes & graines de courge",correspondance_a_confirmer,I9,Velouté de carottes au St Morêt,53,100,non
+FS2,Vendredi,Français,Automnale & Réconfortante,Hachis Parmentier potimarron & bœuf haché,correspondance_a_confirmer,F13,Hachis Parmentier (Bœuf ou Végétarien),63,100,non
+FS3,Vendredi,Français,Végétarienne & Épices Douces,Boulettes végétales au riz basmati,absent_du_catalogue,,,0,80,oui
