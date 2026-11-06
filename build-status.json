@@ -3,8 +3,22 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-03T13:50:00Z",
+  "updated": "2026-11-06T16:43:37.270Z",
   "deploys": [
+    {
+      "at": "2026-11-06T16:43:37.270Z",
+      "env": "preview",
+      "what": "Zone de test : correctif des pastilles du point de la semaine (une pastille par membre)",
+      "storyIds": []
+    },
+    {
+      "at": "2026-11-05T12:00:00Z",
+      "env": "preview",
+      "what": "Zone de test : bouton Ouvrir dans Plans/Maps ; purge du lot 13 mise à niveau (aucun historique des bilans)",
+      "storyIds": [
+        "f22s1"
+      ]
+    },
     {
       "at": "2026-11-03T13:50:00Z",
       "env": "preview",
@@ -2762,6 +2776,108 @@
           "text": "Au retrait de l'invité 1, cœurs, bilans, mots et envies du couple sont supprimés ; la confirmation le dit."
         }
       ]
+    },
+    {
+      "id": "f21",
+      "name": "Courses et repas : agent natif (US-152 à US-176)",
+      "desc": "Le menu de la semaine, la liste de courses avec comparatif et scénarios, les tickets et le budget, calculés par MAAQ ; remplace l agent Digitorn qui fonctionne mal.",
+      "building": true,
+      "currentAction": "Moteur de calcul porté en TypeScript et cadre d import faits ; en attente du schéma du lot 14",
+      "stories": [
+        {
+          "id": "f21s1",
+          "title": "Voir et régler la fiche et les réglages du foyer (ville, enseignes, cuisines, partage des prix)",
+          "state": "planning",
+          "env": null,
+          "at": "2026-11-06T16:43:37.270Z"
+        },
+        {
+          "id": "f21s2",
+          "title": "Préparer le menu de la semaine : 7 dîners, 4 plats express, séance de batch",
+          "state": "building",
+          "env": null,
+          "at": "2026-11-06T16:43:37.270Z",
+          "note": "Le calcul est écrit et testé sur des cas inventés ; écrans non commencés.",
+          "unsure": [
+            "Pas encore comparé à de vraies sorties du script Digitorn (cas de référence promis)."
+          ]
+        },
+        {
+          "id": "f21s3",
+          "title": "Comparer les prix et choisir un scénario d achat, puis valider ma liste",
+          "state": "building",
+          "env": null,
+          "at": "2026-11-06T16:43:37.270Z",
+          "note": "Calcul écrit et testé ; écrans non commencés."
+        },
+        {
+          "id": "f21s4",
+          "title": "Ajouter un produit ou un plat, cocher mes achats dans Ma liste de courses",
+          "state": "planning",
+          "env": null,
+          "at": "2026-11-06T16:43:37.270Z"
+        },
+        {
+          "id": "f21s5",
+          "title": "Enregistrer un ticket de caisse en photo, voir mon budget par rayon",
+          "state": "planning",
+          "env": null,
+          "at": "2026-11-06T16:43:37.270Z",
+          "unsure": [
+            "La lecture des tickets de supermarché n est pas testée : il faudra de vrais tickets, en local seulement."
+          ]
+        },
+        {
+          "id": "f21s6",
+          "title": "Partager anonymement mes prix et voir ceux des autres foyers",
+          "state": "planning",
+          "env": null,
+          "at": "2026-11-06T16:43:37.270Z"
+        },
+        {
+          "id": "f21s7",
+          "title": "Administrer le catalogue par fichiers CSV ou xlsx (plats, références, plannings, versions allégées)",
+          "state": "building",
+          "env": null,
+          "at": "2026-11-06T16:43:37.270Z",
+          "note": "Le cadre d import (vérification de tout le fichier) est fait ; les écrans de la console attendent le schéma."
+        }
+      ],
+      "decisions": [
+        {
+          "at": "2026-11-06T16:43:37.270Z",
+          "text": "Accord du PO du 06/11/2026 : Courses et repas passe avant la suite de Contrats V2, branche courses-repas."
+        },
+        {
+          "at": "2026-11-06T16:43:37.270Z",
+          "text": "Les calculs sont faits par MAAQ ; l agent ne sert qu au dialogue, à la mise en forme des tickets et aux suggestions."
+        },
+        {
+          "at": "2026-11-06T16:43:37.270Z",
+          "text": "Le remplacement des consignes de l agent depuis la console (US-176) est reporté après le pilote."
+        }
+      ],
+      "unsure": [
+        "Rien n est encore en ligne : le schéma du lot 14 de la base de données n est pas livré."
+      ]
+    },
+    {
+      "id": "f22",
+      "name": "Ouvrir dans Plans/Maps",
+      "desc": "Un bouton sous chaque adresse de Sur place et sur le suivi du trajet ouvre l itinéraire dans l application de cartes du téléphone.",
+      "building": false,
+      "stories": [
+        {
+          "id": "f22s1",
+          "title": "Ouvrir l itinéraire vers un lieu dans Plans (iPhone) ou Google Maps",
+          "state": "testing",
+          "env": "preview",
+          "at": "2026-11-06T16:43:37.270Z",
+          "unsure": [
+            "Jamais ouvert sur un vrai iPhone ni un vrai Android."
+          ]
+        }
+      ]
     }
   ],
   "parkingLot": [
@@ -2874,6 +2990,11 @@
       "name": "Lot 9 : rôle de base limité avec app.user_id effectif (condition d'ouverture du pilote)",
       "tag": "Proposed, not built",
       "note": "Décidé par le PO le 30/10 : la sécurité par ligne des 5 tables privées des Sorties n'agit qu'avec un rôle limité et SET LOCAL app.user_id. Le lot 10 s'appuie sur le code ; ce passage reste à faire avant le pilote."
+    },
+    {
+      "title": "Remplacer les consignes de l agent Courses et repas depuis la console (US-176)",
+      "tag": "Proposed, not built",
+      "note": "Reporté après le pilote par le PO. Rien n est perdu : les consignes sont déjà séparées en un socle fixe et une partie remplaçable."
     }
   ]
 }
