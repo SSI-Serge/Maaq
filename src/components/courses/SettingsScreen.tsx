@@ -230,6 +230,7 @@ function SettingsForm({ initial }: { initial: SettingsView }) {
                   </button>
                 ))}
               </div>
+              {form.diets.length > 0 && <span className={family.hint}>Les plats proposés tiennent compte des régimes choisis.</span>}
             </div>
             <div className={family.field} role="group" aria-label="Allergies">
               <span className={family.label}>Allergies</span>
