@@ -3,7 +3,7 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-06T17:45:54.077Z",
+  "updated": "2026-11-06T19:04:39.008Z",
   "deploys": [
     {
       "at": "2026-11-06T16:43:37.270Z",
@@ -2822,7 +2822,7 @@
           "state": "building",
           "env": null,
           "at": "2026-11-06T17:45:54.077Z",
-          "note": "Consignes de l agent faites. Schéma du lot 14 appliqué à la base de test le 06/11 (36 tables) et copié dans le dépôt ; types régénérés ; catalogue sans agents retirés.",
+          "note": "Consignes de l agent faites. Schéma du lot 14 (avec correctif) et catalogue de départ chargés dans la base de test ; types régénérés ; catalogue sans agents retirés. Écran Réglages du foyer fait (local).",
           "unsure": [
             "Fiche, tuile et tchat du deuxième agent natif pas encore faits."
           ]
@@ -2849,9 +2849,10 @@
         {
           "id": "f21c3",
           "title": "C3 · Foyer : réglages, enseignes, partage des prix, écrans Menu et Liste de courses (US-153, 154, 156, 157)",
-          "state": "idea",
+          "state": "building",
           "env": null,
-          "at": "2026-11-06T16:44:47.574Z"
+          "at": "2026-11-06T19:04:39.008Z",
+          "note": "Réglages du foyer et partage anonyme des prix : faits et vus dans le navigateur local. Menu et liste de courses : à faire."
         },
         {
           "id": "f21c4",
@@ -2902,6 +2903,10 @@
         {
           "at": "2026-11-06T17:45:54.077Z",
           "text": "Lot 14 (version finale, 36 tables) appliqué à la base de test avec l accord direct du PO, après sauvegarde et contrôle des empreintes."
+        },
+        {
+          "at": "2026-11-06T19:04:39.008Z",
+          "text": "Correctif du lot 14 (prix facultatif, statut de conformité, rayon Crémerie) et catalogue de départ (60 plats, 145 produits, 322 références, 12 semaines types) chargés dans la base de test avec l accord direct du PO ; rien n est déployé."
         }
       ],
       "unsure": [
