@@ -3,7 +3,7 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-06T16:43:37.270Z",
+  "updated": "2026-11-06T16:44:47.574Z",
   "deploys": [
     {
       "at": "2026-11-06T16:43:37.270Z",
@@ -2624,6 +2624,38 @@
           "state": "testing",
           "env": "preview",
           "at": "2026-11-02T01:30:00Z"
+        },
+        {
+          "id": "f18e3",
+          "title": "E3 · Contrats V2 : étape à venir",
+          "state": "idea",
+          "env": null,
+          "at": "2026-11-06T16:44:47.574Z",
+          "note": "En pause : le PO attend le consultant pour terminer Contrats V2 (Courses et repas passe avant, CR-29). Rien n est perdu : E0 à E2 sont en test sur la zone de test, branche contrats-v2."
+        },
+        {
+          "id": "f18e4",
+          "title": "E4 · Contrats V2 : étape à venir",
+          "state": "idea",
+          "env": null,
+          "at": "2026-11-06T16:44:47.574Z",
+          "note": "En pause : le PO attend le consultant pour terminer Contrats V2 (Courses et repas passe avant, CR-29). Rien n est perdu : E0 à E2 sont en test sur la zone de test, branche contrats-v2."
+        },
+        {
+          "id": "f18e5",
+          "title": "E5 · Contrats V2 : étape à venir",
+          "state": "idea",
+          "env": null,
+          "at": "2026-11-06T16:44:47.574Z",
+          "note": "En pause : le PO attend le consultant pour terminer Contrats V2 (Courses et repas passe avant, CR-29). Rien n est perdu : E0 à E2 sont en test sur la zone de test, branche contrats-v2."
+        },
+        {
+          "id": "f18e6",
+          "title": "E6 · Contrats V2 : étape à venir",
+          "state": "idea",
+          "env": null,
+          "at": "2026-11-06T16:44:47.574Z",
+          "note": "En pause : le PO attend le consultant pour terminer Contrats V2 (Courses et repas passe avant, CR-29). Rien n est perdu : E0 à E2 sont en test sur la zone de test, branche contrats-v2."
         }
       ],
       "decisions": [
@@ -2779,68 +2811,71 @@
     },
     {
       "id": "f21",
-      "name": "Courses et repas : agent natif (US-152 à US-176)",
+      "name": "Courses et repas : agent natif, étapes C0 à C6 (branche courses-repas)",
       "desc": "Le menu de la semaine, la liste de courses avec comparatif et scénarios, les tickets et le budget, calculés par MAAQ ; remplace l agent Digitorn qui fonctionne mal.",
       "building": true,
-      "currentAction": "Moteur de calcul porté en TypeScript et cadre d import faits ; en attente du schéma du lot 14",
+      "currentAction": "Moteur et cadre d import faits ; cas de référence et tickets en cours d essai ; attente du schéma du lot 14",
       "stories": [
         {
-          "id": "f21s1",
-          "title": "Voir et régler la fiche et les réglages du foyer (ville, enseignes, cuisines, partage des prix)",
-          "state": "planning",
-          "env": null,
-          "at": "2026-11-06T16:43:37.270Z"
-        },
-        {
-          "id": "f21s2",
-          "title": "Préparer le menu de la semaine : 7 dîners, 4 plats express, séance de batch",
+          "id": "f21c0",
+          "title": "C0 · Socle : consignes de l agent en deux fichiers, deuxième agent natif, fiche et entrée au catalogue (US-152)",
           "state": "building",
           "env": null,
-          "at": "2026-11-06T16:43:37.270Z",
-          "note": "Le calcul est écrit et testé sur des cas inventés ; écrans non commencés.",
+          "at": "2026-11-06T16:44:47.574Z",
+          "note": "Consignes faites et testées. Le reste attend le schéma du lot 14.",
           "unsure": [
-            "Pas encore comparé à de vraies sorties du script Digitorn (cas de référence promis)."
+            "Rien en ligne : le schéma du lot 14 n est pas livré."
           ]
         },
         {
-          "id": "f21s3",
-          "title": "Comparer les prix et choisir un scénario d achat, puis valider ma liste",
+          "id": "f21c1",
+          "title": "C1 · Console : catalogue, références, plannings, versions allégées par fichiers CSV ou xlsx (US-164 à 170, 172)",
           "state": "building",
           "env": null,
-          "at": "2026-11-06T16:43:37.270Z",
-          "note": "Calcul écrit et testé ; écrans non commencés."
+          "at": "2026-11-06T16:44:47.574Z",
+          "note": "Cadre d import fait (vérification de tout le fichier, 13 tests). Écrans de console non commencés."
         },
         {
-          "id": "f21s4",
-          "title": "Ajouter un produit ou un plat, cocher mes achats dans Ma liste de courses",
-          "state": "planning",
+          "id": "f21c2",
+          "title": "C2 · Moteur : menu, comparatif, trois scénarios, budget calculés par MAAQ",
+          "state": "building",
           "env": null,
-          "at": "2026-11-06T16:43:37.270Z"
-        },
-        {
-          "id": "f21s5",
-          "title": "Enregistrer un ticket de caisse en photo, voir mon budget par rayon",
-          "state": "planning",
-          "env": null,
-          "at": "2026-11-06T16:43:37.270Z",
+          "at": "2026-11-06T16:44:47.574Z",
+          "note": "Calcul porté en TypeScript (49 tests). Comparaison avec les cas de référence du script Digitorn en cours.",
           "unsure": [
-            "La lecture des tickets de supermarché n est pas testée : il faudra de vrais tickets, en local seulement."
+            "Pas encore comparé à de vraies sorties du script."
           ]
         },
         {
-          "id": "f21s6",
-          "title": "Partager anonymement mes prix et voir ceux des autres foyers",
-          "state": "planning",
+          "id": "f21c3",
+          "title": "C3 · Foyer : réglages, enseignes, partage des prix, écrans Menu et Liste de courses (US-153, 154, 156, 157)",
+          "state": "idea",
           "env": null,
-          "at": "2026-11-06T16:43:37.270Z"
+          "at": "2026-11-06T16:44:47.574Z"
         },
         {
-          "id": "f21s7",
-          "title": "Administrer le catalogue par fichiers CSV ou xlsx (plats, références, plannings, versions allégées)",
-          "state": "building",
+          "id": "f21c4",
+          "title": "C4 · Au quotidien : parcours du tchat, ajout de produit et de plat, Ma liste de courses (US-155, 158, 159, 162)",
+          "state": "idea",
           "env": null,
-          "at": "2026-11-06T16:43:37.270Z",
-          "note": "Le cadre d import (vérification de tout le fichier) est fait ; les écrans de la console attendent le schéma."
+          "at": "2026-11-06T16:44:47.574Z"
+        },
+        {
+          "id": "f21c5",
+          "title": "C5 · Tickets de caisse, budget par rayon, base commune des prix, modération (US-160, 161, 163, 175)",
+          "state": "planning",
+          "env": null,
+          "at": "2026-11-06T16:44:47.574Z",
+          "unsure": [
+            "La lecture des tickets de supermarché n est pas testée : réglage en cours avec 2 vrais tickets, en local seulement."
+          ]
+        },
+        {
+          "id": "f21c6",
+          "title": "C6 · Fin de console, retrait de l agent Digitorn, conservation et mise en service (US-171, 173, 174, CR-19)",
+          "state": "idea",
+          "env": null,
+          "at": "2026-11-06T16:44:47.574Z"
         }
       ],
       "decisions": [
@@ -2876,6 +2911,30 @@
           "unsure": [
             "Jamais ouvert sur un vrai iPhone ni un vrai Android."
           ]
+        }
+      ]
+    },
+    {
+      "id": "f23",
+      "name": "Lot 9 : export, effacement et rôle de base limité",
+      "desc": "Permettre à chaque foyer d exporter et d effacer ses données, y compris celles de Courses et repas, et limiter les droits de l application sur la base.",
+      "building": false,
+      "stories": [
+        {
+          "id": "f23s1",
+          "title": "Exporter et effacer toutes mes données, y compris celles de Courses et repas",
+          "state": "idea",
+          "env": null,
+          "at": "2026-11-06T16:44:47.574Z",
+          "note": "Passe après Courses et repas et Contrats V2 (ordre du PO)."
+        },
+        {
+          "id": "f23s2",
+          "title": "Pilote : prérequis du lot 9 avant d inviter des familles",
+          "state": "idea",
+          "env": null,
+          "at": "2026-11-06T16:44:47.574Z",
+          "note": "Le pilote reste soumis à l accord du PO."
         }
       ]
     }
@@ -2995,6 +3054,31 @@
       "title": "Remplacer les consignes de l agent Courses et repas depuis la console (US-176)",
       "tag": "Proposed, not built",
       "note": "Reporté après le pilote par le PO. Rien n est perdu : les consignes sont déjà séparées en un socle fixe et une partie remplaçable."
+    },
+    {
+      "title": "Suggestions de l historique (US-108)",
+      "tag": "Proposed, not built",
+      "note": "Reportée au MVP2 : les fichiers de la base ne sont pas appliqués. Rien n est perdu."
+    },
+    {
+      "title": "Console de suivi de l anticipation (US-111, version complète)",
+      "tag": "Proposed, not built",
+      "note": "Seule la version réduite est faite ; la console complète est reportée."
+    },
+    {
+      "title": "Avis du DPO sur le bilan, les mots libres, la durée de 4 semaines (E-10, E-22, E-23) et sur les durées de Courses et repas (CR-26)",
+      "tag": "Started, paused",
+      "note": "En attente de l avis du DPO ; les durées sont des réglages, ils peuvent changer sans refaire le code."
+    },
+    {
+      "title": "Script de sécurité de la zone de test (sécurité par ligne sur toutes les tables, droits anon retirés)",
+      "tag": "Started, paused",
+      "note": "Prêt (deploy/supabase-securiser.sql) mais non rejoué : le PO a répondu « pas maintenant » le 05/11/2026."
+    },
+    {
+      "title": "Essai du lot 13 et des boutons Plans/Maps sur un vrai téléphone",
+      "tag": "Proposed, not built",
+      "note": "Tout a été vu dans un navigateur local à 375 px seulement."
     }
   ]
 }
