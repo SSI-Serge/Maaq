@@ -78,7 +78,8 @@ export interface BuyRow {
 export interface HistoryPrice {
   product: string;
   ref: string;
-  unitPrice: number;
+  /** Prix d'une unité au ticket ; vide quand le produit a seulement été coché « acheté » en magasin. */
+  unitPrice: number | null;
   store: string;
   /** « AAAA-MM-JJ » */
   date: string;
@@ -180,7 +181,7 @@ function buildChoices(name: string, input: ListInput): { choices: Choice[]; stor
   }
 
   const bought = input.history
-    .filter((r) => kws.some((k) => has(k, norm(r.product))))
+    .filter((r) => r.unitPrice !== null && kws.some((k) => has(k, norm(r.product))))
     .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
   if (bought.length) {
     const last = bought[bought.length - 1];

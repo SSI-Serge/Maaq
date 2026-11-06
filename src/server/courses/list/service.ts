@@ -72,7 +72,7 @@ async function currentMenu(db: Kysely<DB>, accountId: string, now: Date) {
     .executeTakeFirst();
 }
 
-async function addedLines(db: Kysely<DB>, accountId: string, userId: string): Promise<AddedLine[]> {
+export async function addedLinesOf(db: Kysely<DB>, accountId: string, userId: string): Promise<AddedLine[]> {
   const rows = await db
     .selectFrom("grocery_list_items as i")
     .leftJoin("users as u", "u.id", "i.added_by_user_id")
@@ -96,7 +96,7 @@ async function addedLines(db: Kysely<DB>, accountId: string, userId: string): Pr
 /** L'écran de préparation de la liste. */
 export async function prepareList(ctx: Ctx, session: SessionContext): Promise<ListPrepared> {
   const who = await requireAccess(ctx, session, "list");
-  const added = await addedLines(ctx.db, who.accountId, who.userId);
+  const added = await addedLinesOf(ctx.db, who.accountId, who.userId);
   if (who.access === "list") {
     return { access: "list", menu: null, validated: false, model: null, modes: {}, stores: [], sharing: false, householdSize: null, added, excluded: [], criteria: [], now: ctx.now.toISOString() };
   }
@@ -123,6 +123,16 @@ export async function prepareList(ctx: Ctx, session: SessionContext): Promise<Li
     ctx.db.selectFrom("grocery_lists").select("id").where("account_id", "=", who.accountId).where("menu_id", "=", menu.id).executeTakeFirst(),
   ]);
   const common = settings.sharePrices ? await loadCommonPrices(ctx.db, who.userId) : [];
+  // les produits cochés « acheté » en magasin rejoignent l'historique, sans prix tant qu'aucun ticket ne l'a donné (CR-28)
+  const boughtItems = await ctx.db
+    .selectFrom("grocery_list_items")
+    .select(["label", "bought_at"])
+    .where("account_id", "=", who.accountId)
+    .where("state", "=", "bought")
+    .where("bought_at", ">=", new Date(ctx.now.getFullYear(), ctx.now.getMonth() - 3, ctx.now.getDate()))
+    .execute();
+  const pricedNames = new Set(history.map((h) => norm(h.product)));
+  for (const b of boughtItems) if (b.bought_at && !pricedNames.has(norm(b.label))) history.push({ product: b.label, ref: b.label, unitPrice: null, store: "", date: isoDay(b.bought_at) });
 
   const byId = new Map(data.dishes.map((d) => [d.id, d]));
   const codeOf = (e: { dish_id: string | null; household_dish_id: string | null }) => {
@@ -257,7 +267,7 @@ export async function addProduct(ctx: Ctx, session: SessionContext, input: { nam
   } catch (error) {
     throw translateCourseError(error);
   }
-  return { duplicate, added: await addedLines(ctx.db, who.accountId, who.userId) };
+  return { duplicate, added: await addedLinesOf(ctx.db, who.accountId, who.userId) };
 }
 
 /** Retire un produit ajouté : un invité secondaire retire les siens, le couple retire ceux qu'il veut. Les ingrédients du menu ne se retirent pas ici. */
@@ -268,7 +278,7 @@ export async function removeProduct(ctx: Ctx, session: SessionContext, key: stri
     if (who.access === "list") q = q.where("added_by_user_id", "=", who.userId);
     await q.execute();
   });
-  return addedLines(ctx.db, who.accountId, who.userId);
+  return addedLinesOf(ctx.db, who.accountId, who.userId);
 }
 
 /** Retient la version standard ou allégée de chaque plat, reprise au menu suivant (US-157 RF9). `modes` : nom du plat → version. */

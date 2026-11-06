@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { Ctx } from "@/server/auth/service";
+import { nameKey } from "@/server/courses/catalog/seed";
 import { comparatif, computeScenarios, currentItems, scenarioLines } from "@/server/courses/engine";
 import { fromDto } from "@/server/courses/list/dto";
+import { myList, setBought } from "@/server/courses/list/mine";
 import { addProduct, prepareList, removeProduct, saveLightChoices, validateList } from "@/server/courses/list/service";
 import { getSettings, saveSettings, setSharing } from "@/server/courses/household/settings";
 import { menuPropose, menuStart, menuValidate } from "@/server/courses/menu/service";
@@ -164,5 +166,71 @@ describe("US-156/157 : liste de courses issue du menu", () => {
     const shared = await prepareList(at(), f.sophie);
     expect(shared.sharing).toBe(true);
     expect(shared.model!.items.every((i) => i.choices.every((c) => c.kind !== "common"))).toBe(true);
+  });
+});
+
+describe("US-158 : Ma liste de courses", () => {
+  async function validated() {
+    const { f } = await readyWithMenu();
+    expect(await myList(at(), f.sophie)).toMatchObject({ empty: true, hasMenu: true });
+    const list = await prepareList(at(), f.sophie);
+    const model = fromDto(list.model!);
+    const scenario = computeScenarios(model, {}, list.stores.map((s) => s.chain))[0];
+    const lines = scenarioLines(model, {}, scenario).map((l) => ({ name: l.name, qty: l.qty, store: l.store, ref: l.ref, price: l.price, source: "menu" as const }));
+    await validateList(at(), f.sophie, { scenario: 1, lines });
+    return { f, lines };
+  }
+
+  it("avant la validation, la liste est vide ; après, elle est rangée par magasin puis par rayon avec un reste à acheter", async () => {
+    const { f, lines } = await validated();
+    const mine = await myList(at(), f.sophie);
+    expect(mine.empty).toBe(false);
+    expect(mine.hasMenu).toBe(true);
+    const count = mine.stores.flatMap((s) => s.aisles.flatMap((a) => a.lines)).length;
+    expect(count).toBe(lines.length);
+    expect(mine.stores.at(-1)!.name).toBe("À trouver sur place");
+    expect(mine.stores.at(-1)!.subtotal).toBeNull();
+    const priced = mine.stores.filter((s) => s.subtotal !== null);
+    expect(priced.length).toBeGreaterThan(0);
+    expect(mine.remaining).toBeCloseTo(priced.reduce((n, s) => n + s.subtotal!, 0), 2);
+  });
+
+  it("cocher « acheté » fait sortir le produit et le fait rejoindre l'historique ; annuler le remet ; tout acheté = message", async () => {
+    const { f, lines } = await validated();
+    const first = lines[0];
+    const key = nameKey(first.name);
+    await setBought(at(), f.sophie, { key, bought: true, late: false });
+    const after = await myList(at(), f.sophie);
+    expect(after.stores.flatMap((s) => s.aisles.flatMap((a) => a.lines)).some((l) => l.key === key)).toBe(false);
+    const row = await db.selectFrom("grocery_list_items").select(["state", "bought_by_user_id"]).where("account_id", "=", f.accountId).where("name_key", "=", key).executeTakeFirstOrThrow();
+    expect(row).toMatchObject({ state: "bought", bought_by_user_id: f.userIds.sophie });
+    // il apparaît dans le pense-bête « produits de mon historique » de la préparation suivante
+    const prep = await prepareList(at(), f.sophie);
+    expect(prep.model!.items.some((i) => i.group === "habituel" && i.name === first.name)).toBe(true);
+    await setBought(at(), f.sophie, { key, bought: false, late: false });
+    expect((await myList(at(), f.sophie)).stores.flatMap((s) => s.aisles.flatMap((a) => a.lines)).some((l) => l.key === key)).toBe(true);
+    expect((await rejection(setBought(at(), f.sophie, { key, bought: false, late: false }))).code).toBe("not_bought");
+    for (const l of lines) {
+      const k = nameKey(l.name);
+      await setBought(at(), f.sophie, { key: k, bought: true, late: false });
+    }
+    expect((await myList(at(), f.sophie)).allBought).toBe(true);
+  });
+
+  it("les produits ajoutés depuis la validation sont en tête, sans prix ; l'invité secondaire voit la liste sans prix ni total et ne coche rien", async () => {
+    const { f } = await validated();
+    await addProduct(at(), f.elodie, { name: "Œufs x6" });
+    const couple = await myList(at(), f.sophie);
+    expect(couple.late.map((l) => l.name)).toEqual(["Œufs x6"]);
+    const guest = await myList(at(), f.elodie);
+    expect(guest.access).toBe("list");
+    expect(guest.remaining).toBeNull();
+    expect(guest.stores.every((s) => s.subtotal === null && s.aisles.every((a) => a.lines.every((l) => l.price === null)))).toBe(true);
+    expect(guest.late.map((l) => l.mine)).toEqual([true]);
+    expect((await rejection(setBought(at(), f.elodie, { key: "oeufs x6", bought: true, late: true }))).status).toBe(403);
+    await setBought(at(), f.sophie, { key: "oeufs x6", bought: true, late: true });
+    expect((await myList(at(), f.sophie)).late).toEqual([]);
+    await setBought(at(), f.sophie, { key: "oeufs x6", bought: false, late: true });
+    expect((await myList(at(), f.sophie)).late.map((l) => l.name)).toEqual(["Œufs x6"]);
   });
 });
