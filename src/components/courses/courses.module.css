@@ -181,3 +181,157 @@
   font-size: 22px;
   font-weight: 700;
 }
+
+/* ---- Liste de courses ---- */
+.tools {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 0 8px;
+}
+.line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.line:last-child {
+  border-bottom: 0;
+}
+.lineMain {
+  flex: 1;
+  min-width: 0;
+}
+.lineName {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+.lineSub {
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+.struck {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+.pillWarn {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--warning-bg);
+  color: var(--warning);
+  font-size: 11px;
+  font-weight: 700;
+}
+.link {
+  border: 0;
+  background: none;
+  padding: 6px 0;
+  font-size: 13px;
+  color: var(--primary);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.addRow {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.addRow > input {
+  flex: 1;
+  min-width: 0;
+}
+.note {
+  margin: 8px 0;
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  background: var(--secondary-soft);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-height: 44px;
+  padding: 6px 0;
+  font-size: 13px;
+  cursor: pointer;
+}
+.choice input {
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  accent-color: var(--primary);
+}
+.scenarioCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-height: 64px;
+  margin: 0 0 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  text-align: left;
+  color: var(--ink);
+  cursor: pointer;
+}
+.scenarioTotal {
+  font-family: var(--font-serif);
+  font-size: 19px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.storeHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 14px 0 4px;
+  font-family: var(--font-serif);
+  font-size: 17px;
+  font-weight: 700;
+}
+.stepper {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.stepper button {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-raised);
+  font-size: 16px;
+  cursor: pointer;
+}
+.linePrice {
+  min-width: 56px;
+  text-align: right;
+  font-size: 13px;
+  font-weight: 700;
+}
+.totalRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: 14px;
+  font-family: var(--font-serif);
+  font-size: 22px;
+  font-weight: 700;
+}
+.toggleBox {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border: 1px solid var(--ink-soft);
+  border-radius: 6px;
+  background: var(--bg-raised);
+  color: var(--primary);
+  font-weight: 700;
+  cursor: pointer;
+}
