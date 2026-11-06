@@ -11,7 +11,7 @@ export type ActivationLinkKind = "account_activation" | "guest_invitation";
 
 export type AgentPlatform = "anthropic" | "digitorn" | "vertex";
 
-export type AgentStatus = "available" | "blocked";
+export type AgentStatus = "available" | "blocked" | "retired";
 
 export type AnonymizationStatus = "done" | "none" | "pending";
 
@@ -23,7 +23,7 @@ export type ArrayTypeImpl<T> = T extends ColumnType<infer S, infer I, infer U>
   ? ColumnType<S[], I[], U[]>
   : T[];
 
-export type AuditAction = "account_created" | "account_updated" | "activation_link_resent" | "agent_blocked" | "agent_published" | "agent_reactivated" | "contract_analysis_decided" | "contract_archived" | "contract_created" | "contract_document_field_changed" | "contract_field_changed" | "contract_review_viewed" | "presentation_updated" | "contract_updated" | "device_revoked_by_admin";
+export type AuditAction = "account_created" | "account_updated" | "activation_link_resent" | "agent_blocked" | "agent_published" | "agent_reactivated" | "agent_restored" | "agent_retired" | "contract_analysis_decided" | "contract_archived" | "contract_created" | "contract_document_field_changed" | "contract_field_changed" | "contract_review_viewed" | "contract_updated" | "device_revoked_by_admin" | "grocery_catalog_changed" | "grocery_price_moderated" | "meal_catalog_changed" | "meal_planning_changed" | "presentation_updated";
 
 export type ChangeScope = "all" | "following" | "this";
 
@@ -85,6 +85,14 @@ export type Generated<T> = T extends ColumnType<infer S, infer I, infer U>
 
 export type GraceOrigin = "billing_unsubscribe" | "in_app_request";
 
+export type GroceryItemState = "added_after_validation" | "bought" | "preparing" | "validated";
+
+export type GroceryUnreferencedKind = "no_reference" | "unknown";
+
+export type GroceryUnreferencedSource = "list" | "menu" | "ticket";
+
+export type GroceryUnreferencedState = "referenced" | "rejected" | "to_reference";
+
 export type GuestRank = "core" | "secondary";
 
 export type HomeworkActivityCategory = "art" | "games_projects" | "imagination" | "nature" | "philosophy" | "stem";
@@ -111,13 +119,17 @@ export type JsonPrimitive = boolean | number | string | null;
 
 export type JsonValue = JsonArray | JsonObject | JsonPrimitive;
 
-export type LegalDocumentType = "contract_analysis_consent" | "contract_challenge_consent" | "forwarded_mail_consent" | "privacy_policy" | "terms_of_use";
+export type LegalDocumentType = "contract_analysis_consent" | "contract_challenge_consent" | "forwarded_mail_consent" | "grocery_price_sharing_consent" | "privacy_policy" | "terms_of_use";
 
 export type LocationConsentCause = "device_deleted" | "device_revoked" | "user_action";
 
 export type LogbookEntryType = "action_done" | "action_refused" | "action_validated" | "request";
 
 export type MailClassification = "appointment" | "cancellation" | "deadline" | "irrelevant" | "report";
+
+export type MealEntryKind = "dinner" | "express" | "pleasure";
+
+export type MealTagKind = "allergen" | "diet" | "meat";
 
 export type MemberRole = "child" | "other" | "parent";
 
@@ -249,54 +261,6 @@ export interface AccountContracts {
   updated_at: Generated<Timestamp>;
 }
 
-export interface CoupleWishes {
-  account_id: string;
-  created_at: Generated<Timestamp>;
-  created_by_user_id: string | null;
-  /**
-   * Description chiffrée par l'application (200 caractères au plus)
-   */
-  description: Buffer | null;
-  horizon: "someday" | "soon" | "this_year" | null;
-  id: Generated<string>;
-  /**
-   * Retirée le : l'envie n'est plus affichée ni comptée ; supprimée définitivement par le planificateur peu après
-   */
-  removed_at: Timestamp | null;
-  title: Buffer;
-  updated_at: Generated<Timestamp>;
-}
-
-export interface PartnerNotes {
-  account_id: string;
-  author_user_id: string;
-  /**
-   * Texte chiffré par l'application (500 caractères au plus)
-   */
-  body: Buffer;
-  created_at: Generated<Timestamp>;
-  id: Generated<string>;
-  recipient_user_id: string;
-  updated_at: Generated<Timestamp>;
-  /**
-   * Bilan du destinataire auquel le mot est rattaché, posé par la base à la première ouverture de ce bilan ; vide = pas encore lu
-   */
-  weekly_review_id: string | null;
-}
-
-export interface WeeklyReviews {
-  account_id: string;
-  created_at: Generated<Timestamp>;
-  generated_at: Generated<Timestamp>;
-  id: Generated<string>;
-  /**
-   * Première ouverture du bilan par son destinataire ; rattache et fige ses mots, posée une seule fois
-   */
-  opened_at: Timestamp | null;
-  user_id: string;
-  week_start: Timestamp;
-}
-
 export interface Accounts {
   created_at: Generated<Timestamp>;
   /**
@@ -334,15 +298,6 @@ export interface Accounts {
    */
   subscription_ended_at: Timestamp | null;
   updated_at: Generated<Timestamp>;
-}
-
-export interface AppreciationHearts {
-  account_id: string;
-  author_user_id: string;
-  created_at: Generated<Timestamp>;
-  event_id: string | null;
-  id: Generated<Int8>;
-  task_id: string | null;
 }
 
 export interface ActionDecisions {
@@ -519,9 +474,14 @@ export interface Agents {
   platform_agent_ref: string;
   published_at: Generated<Timestamp>;
   published_by_user_id: string | null;
+  /**
+   * Date du retrait de l'agent du catalogue ; renseignée si et seulement si le statut est « retired ». Un agent retiré est invisible du catalogue et des tableaux de bord, et se rétablit sans perte. [CR-34]
+   */
+  retired_at: Timestamp | null;
+  retired_by_user_id: string | null;
   short_description: string;
   /**
-   * available = utilisable ; blocked = maintenance, MAAQ refuse toute nouvelle demande vers cet agent (US-42 RT1)
+   * available = utilisable ; blocked = maintenance, MAAQ refuse toute nouvelle demande vers cet agent (US-42 RT1) ; retired = retiré du catalogue et des tableaux de bord, réversible (CR-34)
    */
   status: Generated<AgentStatus>;
   updated_at: Generated<Timestamp>;
@@ -615,6 +575,15 @@ export interface AnticipationQuestions {
   updated_at: Generated<Timestamp>;
 }
 
+export interface AppreciationHearts {
+  account_id: string;
+  author_user_id: string;
+  created_at: Generated<Timestamp>;
+  event_id: string | null;
+  id: Generated<Int8>;
+  task_id: string | null;
+}
+
 export interface AssistantRequests {
   conversation_id: string;
   created_at: Generated<Timestamp>;
@@ -651,6 +620,9 @@ export interface ChatErasureRequests {
 
 export interface ChatRequests {
   agent_id: Int8;
+  /**
+   * Jour calendaire dans le fuseau de la famille (accounts.family_timezone) sur lequel la demande a été comptée (hypothèse H35 remplacée, US-70 RF5)
+   */
   counted_date: Timestamp;
   created_at: Generated<Timestamp>;
   request_id: string;
@@ -895,13 +867,31 @@ export interface ConversationAttachments {
   storage_key: string | null;
 }
 
+export interface CoupleWishes {
+  account_id: string;
+  created_at: Generated<Timestamp>;
+  created_by_user_id: string | null;
+  description: Buffer | null;
+  /**
+   * Horizon flou facultatif : soon (« Bientôt »), this_year (« Cette année »), someday (« Un jour ») ; ne rien choisir suffit. [US-148 RF2, E-24]
+   */
+  horizon: string | null;
+  id: Generated<string>;
+  /**
+   * Retirée le : posée par « Retirer », remise à vide par « Annuler » (10 secondes) ; une envie retirée n'est plus affichée ni comptée dans les 50, et purge_removed_wishes() la supprime définitivement. [US-150 RF2]
+   */
+  removed_at: Timestamp | null;
+  title: Buffer;
+  updated_at: Generated<Timestamp>;
+}
+
 export interface DailyRequestCounters {
   /**
    * Nombre de demandes déjà acceptées ce jour-là ; borné par accounts.daily_request_limit via register_agent_request()
    */
   request_count: Generated<number>;
   /**
-   * Jour calendaire dans le fuseau de l'appareil au moment de la demande (hypothèse H35)
+   * Jour calendaire dans le fuseau de la famille (accounts.family_timezone) au moment de la demande, pour le tchat des agents comme pour l'assistant (hypothèse H35 remplacée, US-70 RF5)
    */
   request_date: Timestamp;
   user_id: string;
@@ -1477,6 +1467,236 @@ export interface ForwardingMailboxes {
   revoked_by_user_id: string | null;
 }
 
+export interface GroceryAdditiveCriteria {
+  created_at: Generated<Timestamp>;
+  id: Generated<number>;
+  is_active: Generated<boolean>;
+  label: string;
+  reason: string;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface GroceryAisles {
+  created_at: Generated<Timestamp>;
+  id: Generated<number>;
+  is_hidden: Generated<boolean>;
+  name: string;
+  sort_order: Generated<number>;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface GroceryCitySharing {
+  city_key: string;
+  household_count: number;
+}
+
+export interface GroceryHouseholdCitySharing {
+  account_id: string;
+  city_key: string;
+  created_at: Generated<Timestamp>;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface GroceryHouseholdCuisines {
+  account_id: string;
+  cuisine_id: number;
+}
+
+export interface GroceryHouseholdDietary {
+  account_id: string;
+  allergies_encrypted: Buffer | null;
+  created_at: Generated<Timestamp>;
+  diets_encrypted: Buffer | null;
+  updated_at: Generated<Timestamp>;
+  updated_by_user_id: string | null;
+}
+
+export interface GroceryHouseholdSettings {
+  account_id: string;
+  budget_day: Generated<number>;
+  city: string | null;
+  created_at: Generated<Timestamp>;
+  goal_own_dishes: Generated<boolean>;
+  goal_season: Generated<boolean>;
+  goal_time: Generated<boolean>;
+  household_size: number | null;
+  /**
+   * Un plat n'est pas servi avant N semaines (1 à 4) ; vide = valeur par défaut de la console (meal_repeat_weeks_default, 2). [US-153 RF2, US-156 RF9, RT3]
+   */
+  repeat_weeks: number | null;
+  replacement_cuisine_id: number | null;
+  replacement_source: Generated<string>;
+  /**
+   * Partage anonyme des prix de nos tickets avec les autres foyers (réciproque) ; désactivé par défaut. Ne passe à vrai qu'après l'inscription de la preuve de consentement, avec une ville renseignée. Le désactiver arrête les envois suivants sans retirer les lignes déjà partagées. [US-154 RF1 à RF5, CR-12, CR-24]
+   */
+  share_prices: Generated<boolean>;
+  /**
+   * Jours de courses (jours ISO, 1 = lundi), au moins un, sans doublon
+   */
+  shopping_days: number[] | null;
+  updated_at: Generated<Timestamp>;
+  updated_by_user_id: string | null;
+}
+
+export interface GroceryHouseholdStores {
+  account_id: string;
+  created_at: Generated<Timestamp>;
+  id: Generated<Int8>;
+  store_chain: string;
+  store_city: string;
+}
+
+export interface GroceryListItems {
+  account_id: string;
+  added_by_user_id: string | null;
+  aisle_id: number | null;
+  bought_at: Timestamp | null;
+  bought_by_user_id: string | null;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  label: string;
+  list_id: string | null;
+  name_key: string;
+  not_bought_last_time: Generated<boolean>;
+  product_id: Int8 | null;
+  quantity: Generated<number>;
+  reference_name: string | null;
+  source: Generated<string>;
+  /**
+   * preparing = en préparation (aucun magasin, aucun prix) ; validated = dans la liste validée, avec son magasin, sa référence et son prix estimé ; added_after_validation = ajouté depuis la validation, sans magasin ni prix ; bought = acheté (date et profil). [US-157 RF9, US-158 RF3bis, CR-28]
+   */
+  state: Generated<GroceryItemState>;
+  store_chain: string | null;
+  unit_price: Numeric | null;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface GroceryLists {
+  account_id: string;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  menu_id: string | null;
+  scenario: number;
+  validated_at: Generated<Timestamp>;
+  validated_by_user_id: string | null;
+}
+
+export interface GroceryPriceSharingEvents {
+  /**
+   * Identifiant du compte, SANS clé étrangère : référence conservée après suppression du compte
+   */
+  account_id: string;
+  action_type: ConsentAction;
+  /**
+   * Empreinte HMAC-SHA256 de l'email de la personne qui a activé ou désactivé le partage (clé hors base) : preuve nominative sans conserver l'email
+   */
+  actor_email_hash: Buffer;
+  actor_user_id: string | null;
+  id: Generated<Int8>;
+  legal_version_id: Int8;
+  occurred_at: Generated<Timestamp>;
+  retain_until: Timestamp | null;
+}
+
+export interface GroceryProductReferences {
+  /**
+   * Additifs de la référence (codes comme E250 ou noms), normalisés par l'application ; comparés aux critères actifs de grocery_additive_criteria
+   */
+  additives: Generated<string[]>;
+  created_at: Generated<Timestamp>;
+  id: Generated<Int8>;
+  price_date: Timestamp;
+  product_id: Int8;
+  reference_name: string;
+  store_chain: string;
+  unit_price: Numeric;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface GroceryProducts {
+  aisle_id: number;
+  created_at: Generated<Timestamp>;
+  id: Generated<Int8>;
+  name: string;
+  /**
+   * Nom normalisé du produit (minuscules, espaces simples) : clé d'unicité, calculée par l'application. Un produit sans ligne ici est « inconnu » (produits à référencer). [CR-25, US-173 RF1]
+   */
+  name_key: string;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface GroceryProductSeasons {
+  product_id: Int8;
+  season_month: number;
+}
+
+export interface GroceryReceiptLines {
+  account_id: string;
+  aisle_id: number;
+  id: Generated<Int8>;
+  label: string;
+  line_total: Numeric;
+  name_key: string;
+  position: Generated<number>;
+  product_id: Int8 | null;
+  quantity: Generated<Numeric>;
+  receipt_id: string;
+  reference_name: string | null;
+}
+
+export interface GroceryReceipts {
+  account_id: string;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  purchased_on: Timestamp;
+  recorded_by_user_id: string | null;
+  store_chain: string;
+  store_city: string | null;
+  total_amount: Numeric;
+}
+
+export interface GrocerySharedPrices {
+  city: string;
+  created_at: Generated<Timestamp>;
+  id: Generated<Int8>;
+  product_id: Int8;
+  reference_name: string;
+  /**
+   * Retirée par l'administrateur (prix erroné) : la ligne n'est plus utilisée dans les comparatifs ni dans la médiane de contrôle. [US-175 RF3]
+   */
+  removed_at: Timestamp | null;
+  removed_by_user_id: string | null;
+  store_chain: string;
+  unit_price: Numeric;
+  /**
+   * Lundi de la semaine du relevé (jamais le jour du ticket) ; remis à la semaine la plus récente quand une ligne identique est partagée de nouveau. [CR-17, US-154 RT1]
+   */
+  week_start: Timestamp;
+}
+
+export interface GroceryUnreferencedEvents {
+  aisle_id: number | null;
+  id: Generated<Int8>;
+  /**
+   * unknown = absent du catalogue ; no_reference = présent mais sans référence conforme. [US-173 RF1]
+   */
+  kind: GroceryUnreferencedKind;
+  name_key: string;
+  occurred_at: Generated<Timestamp>;
+  seen_city: string | null;
+  seen_reference: string | null;
+  seen_store_chain: string | null;
+  seen_unit_price: Numeric | null;
+  source: GroceryUnreferencedSource;
+}
+
+export interface GroceryUnreferencedStatus {
+  changed_at: Generated<Timestamp>;
+  changed_by_user_id: string | null;
+  name_key: string;
+  state: Generated<GroceryUnreferencedState>;
+}
+
 export interface HomeworkActivities {
   age: number;
   card_ref: string | null;
@@ -1676,6 +1896,179 @@ export interface LogbookSyncRuns {
   status: Generated<SyncStatus>;
 }
 
+export interface MealBatchWeekDays {
+  created_at: Generated<Timestamp>;
+  dish_id: Int8 | null;
+  /**
+   * Pourcentage de correspondance avec le catalogue, calculé par l'application à l'import (100 si l'identifiant du plat est renseigné ou confirmé). Le statut se déduit des seuils de la console : 80 % et plus sûr, 40 % à moins de 80 % à confirmer, en dessous absent (bloque la semaine). [US-171 RF1]
+   */
+  match_pct: Generated<number>;
+  needs_catalog_addition: Generated<boolean>;
+  planning_dish_name: string;
+  suggested_dish_id: Int8 | null;
+  updated_at: Generated<Timestamp>;
+  week_id: Int8;
+  weekday: number;
+}
+
+export interface MealBatchWeeks {
+  code: string;
+  created_at: Generated<Timestamp>;
+  cuisine_id: number;
+  id: Generated<Int8>;
+  session_minutes: number;
+  session_text: string;
+  shared_ingredients_pct: number | null;
+  theme: string | null;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface MealCuisines {
+  created_at: Generated<Timestamp>;
+  id: Generated<number>;
+  is_hidden: Generated<boolean>;
+  name: string;
+  sort_order: Generated<number>;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface MealDishCategories {
+  created_at: Generated<Timestamp>;
+  id: Generated<number>;
+  is_hidden: Generated<boolean>;
+  name: string;
+  sort_order: Generated<number>;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface MealDishCategoryLinks {
+  category_id: number;
+  dish_id: Int8;
+}
+
+export interface MealDishes {
+  batch_active_minutes: number | null;
+  code: string;
+  created_at: Generated<Timestamp>;
+  cuisine_id: number;
+  duration_minutes: number;
+  id: Generated<Int8>;
+  /**
+   * Calculé : durée de 15 minutes au plus (plat express). La console en donne le nombre. [US-156 RF4, US-164 RF4]
+   */
+  is_express: Generated<boolean | null>;
+  name: string;
+  recipe: string | null;
+  /**
+   * Date de retrait : le plat n'est plus proposé aux foyers ; les menus déjà validés le gardent (nom conservé). NULL = proposé. [US-164 RF3, CR-25]
+   */
+  retired_at: Timestamp | null;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface MealDishIngredients {
+  dish_id: Int8;
+  position: Generated<number>;
+  product_id: Int8;
+}
+
+export interface MealDishTagLinks {
+  dish_id: Int8;
+  tag_id: number;
+}
+
+export interface MealDishTags {
+  created_at: Generated<Timestamp>;
+  id: Generated<number>;
+  is_hidden: Generated<boolean>;
+  /**
+   * diet = régime que le plat respecte ; meat = viande ou poisson que le plat contient ; allergen = allergène que le plat contient. [CR-30]
+   */
+  kind: MealTagKind;
+  name: string;
+  sort_order: Generated<number>;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface MealHouseholdDishes {
+  account_id: string;
+  created_at: Generated<Timestamp>;
+  created_by_user_id: string | null;
+  cuisine_id: number;
+  duration_minutes: number | null;
+  id: Generated<string>;
+  name: string;
+  recipe: string | null;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface MealHouseholdDishIngredients {
+  account_id: string;
+  household_dish_id: string;
+  id: Generated<Int8>;
+  label: string;
+  name_key: string;
+  position: Generated<number>;
+  product_id: Int8 | null;
+}
+
+export interface MealHouseholdDishTags {
+  account_id: string;
+  household_dish_id: string;
+  tag_id: number;
+}
+
+export interface MealLightChoices {
+  account_id: string;
+  choice: string;
+  dish_id: Int8;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface MealLightVersionItems {
+  dish_id: Int8;
+  id: Generated<Int8>;
+  kind: string;
+  name_key: string;
+  product_id: Int8 | null;
+}
+
+export interface MealLightVersions {
+  created_at: Generated<Timestamp>;
+  dish_id: Int8;
+  display_text: string;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface MealMenuEntries {
+  account_id: string;
+  dish_id: Int8 | null;
+  dish_name: string;
+  household_dish_id: string | null;
+  id: Generated<Int8>;
+  is_off_batch: Generated<boolean>;
+  kind: MealEntryKind;
+  menu_id: string;
+  planning_match_to_confirm: Generated<boolean>;
+  slot: number;
+}
+
+export interface MealMenus {
+  account_id: string;
+  batch_week_id: Int8 | null;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  /**
+   * Vrai si aucune semaine type n'était adaptée : la durée est estimée (le plat le plus long, plus 40 % des autres) et signalée comme telle. [US-156 RF6]
+   */
+  session_is_estimated: Generated<boolean>;
+  session_minutes: number | null;
+  session_over_cap: Generated<boolean>;
+  validated_at: Generated<Timestamp>;
+  validated_by_user_id: string | null;
+  week_start: Timestamp;
+}
+
 export interface OutingCriteria {
   account_id: string;
   budget_eur: number | null;
@@ -1776,6 +2169,23 @@ export interface OutingThemes {
    */
   theme_group: string | null;
   theme_key: string;
+}
+
+export interface PartnerNotes {
+  account_id: string;
+  author_user_id: string;
+  /**
+   * Texte chiffré par l'application (500 caractères au plus, vérifiés par l'application) ; la base borne seulement la taille du chiffré
+   */
+  body: Buffer;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  recipient_user_id: string;
+  updated_at: Generated<Timestamp>;
+  /**
+   * Bilan du destinataire auquel le mot est rattaché, posé par la base à la première ouverture de ce bilan (jamais directement) ; vide = pas encore lu, l'auteur peut encore le modifier ou le retirer. [US-143 RF4, RF8]
+   */
+  weekly_review_id: string | null;
 }
 
 export interface PlatformSettingChanges {
@@ -2085,6 +2495,42 @@ export interface VFamilyTasks {
   version: number | null;
 }
 
+export interface VGroceryProductReferences {
+  excluded_because: string[] | null;
+  is_compliant: boolean | null;
+  price_age: string | null;
+  price_date: Timestamp | null;
+  product_id: Int8 | null;
+  reference_id: Int8 | null;
+  reference_name: string | null;
+  store_chain: string | null;
+  unit_price: Numeric | null;
+}
+
+export interface VGrocerySharedPricesModeration {
+  baseline: Numeric | null;
+  basis: string | null;
+  city: string | null;
+  needs_check: boolean | null;
+  price_id: Int8 | null;
+  product_id: Int8 | null;
+  reference_name: string | null;
+  removed_at: Timestamp | null;
+  store_chain: string | null;
+  unit_price: Numeric | null;
+  week_start: Timestamp | null;
+}
+
+export interface VGroceryUnreferenced {
+  aisle_id: number | null;
+  first_seen_at: Timestamp | null;
+  kind: string | null;
+  last_seen_at: Timestamp | null;
+  name_key: string | null;
+  occurrences: Int8 | null;
+  state: GroceryUnreferencedState | null;
+}
+
 export interface VGuestDisplayStatus {
   account_id: string | null;
   display_status: string | null;
@@ -2099,6 +2545,42 @@ export interface VInfoPrefillSuggestions {
   source_field_id: Int8 | null;
   user_id: string | null;
   value_encrypted: Buffer | null;
+}
+
+export interface VMealBatchWeekDays {
+  blocks_week: boolean | null;
+  dish_id: Int8 | null;
+  effective_dish_id: Int8 | null;
+  match_pct: number | null;
+  match_status: string | null;
+  needs_catalog_addition: boolean | null;
+  planning_dish_name: string | null;
+  suggested_dish_id: Int8 | null;
+  week_id: Int8 | null;
+  weekday: number | null;
+}
+
+export interface VMealBatchWeeks {
+  code: string | null;
+  cuisine_id: number | null;
+  day_count: Int8 | null;
+  is_usable: boolean | null;
+  linked_count: Int8 | null;
+  session_minutes: number | null;
+  theme: string | null;
+  week_id: Int8 | null;
+}
+
+export interface VMealDishesConsole {
+  code: string | null;
+  cuisine_id: number | null;
+  dish_id: Int8 | null;
+  duration_minutes: number | null;
+  has_light_version: boolean | null;
+  in_batch_week: boolean | null;
+  is_express: boolean | null;
+  name: string | null;
+  retired_at: Timestamp | null;
 }
 
 export interface VNeverActivatedPurgeCandidates {
@@ -2128,6 +2610,19 @@ export interface WeeklyDigests {
   week_start: Timestamp;
 }
 
+export interface WeeklyReviews {
+  account_id: string;
+  created_at: Generated<Timestamp>;
+  generated_at: Generated<Timestamp>;
+  id: Generated<string>;
+  /**
+   * Première ouverture du bilan par son destinataire ; à cet instant, les mots écrits pour lui lui sont rattachés et figés (un mot écrit après l'envoi mais avant l'ouverture entre dans ce bilan). Posée une seule fois. [US-143 RF8]
+   */
+  opened_at: Timestamp | null;
+  user_id: string;
+  week_start: Timestamp;
+}
+
 export interface DB {
   account_connections: AccountConnections;
   account_contracts: AccountContracts;
@@ -2145,13 +2640,10 @@ export interface DB {
   agent_sample_prompts: AgentSamplePrompts;
   agent_validated_actions: AgentValidatedActions;
   agents: Agents;
-  appreciation_hearts: AppreciationHearts;
-  couple_wishes: CoupleWishes;
-  partner_notes: PartnerNotes;
-  weekly_reviews: WeeklyReviews;
   anticipation_answers: AnticipationAnswers;
   anticipation_catalog_items: AnticipationCatalogItems;
   anticipation_questions: AnticipationQuestions;
+  appreciation_hearts: AppreciationHearts;
   assistant_requests: AssistantRequests;
   cc_addresses: CcAddresses;
   chat_erasure_requests: ChatErasureRequests;
@@ -2172,6 +2664,7 @@ export interface DB {
   contract_transmission_relaunches: ContractTransmissionRelaunches;
   contract_transmissions: ContractTransmissions;
   conversation_attachments: ConversationAttachments;
+  couple_wishes: CoupleWishes;
   daily_request_counters: DailyRequestCounters;
   data_exports: DataExports;
   device_last_positions: DeviceLastPositions;
@@ -2201,6 +2694,25 @@ export interface DB {
   forwarding_authorized_senders: ForwardingAuthorizedSenders;
   forwarding_consent_events: ForwardingConsentEvents;
   forwarding_mailboxes: ForwardingMailboxes;
+  grocery_additive_criteria: GroceryAdditiveCriteria;
+  grocery_aisles: GroceryAisles;
+  grocery_city_sharing: GroceryCitySharing;
+  grocery_household_city_sharing: GroceryHouseholdCitySharing;
+  grocery_household_cuisines: GroceryHouseholdCuisines;
+  grocery_household_dietary: GroceryHouseholdDietary;
+  grocery_household_settings: GroceryHouseholdSettings;
+  grocery_household_stores: GroceryHouseholdStores;
+  grocery_list_items: GroceryListItems;
+  grocery_lists: GroceryLists;
+  grocery_price_sharing_events: GroceryPriceSharingEvents;
+  grocery_product_references: GroceryProductReferences;
+  grocery_product_seasons: GroceryProductSeasons;
+  grocery_products: GroceryProducts;
+  grocery_receipt_lines: GroceryReceiptLines;
+  grocery_receipts: GroceryReceipts;
+  grocery_shared_prices: GrocerySharedPrices;
+  grocery_unreferenced_events: GroceryUnreferencedEvents;
+  grocery_unreferenced_status: GroceryUnreferencedStatus;
   homework_activities: HomeworkActivities;
   homework_children: HomeworkChildren;
   homework_exercise_validations: HomeworkExerciseValidations;
@@ -2217,12 +2729,30 @@ export interface DB {
   logbook_entries: LogbookEntries;
   logbook_entry_participants: LogbookEntryParticipants;
   logbook_sync_runs: LogbookSyncRuns;
+  meal_batch_week_days: MealBatchWeekDays;
+  meal_batch_weeks: MealBatchWeeks;
+  meal_cuisines: MealCuisines;
+  meal_dish_categories: MealDishCategories;
+  meal_dish_category_links: MealDishCategoryLinks;
+  meal_dish_ingredients: MealDishIngredients;
+  meal_dish_tag_links: MealDishTagLinks;
+  meal_dish_tags: MealDishTags;
+  meal_dishes: MealDishes;
+  meal_household_dish_ingredients: MealHouseholdDishIngredients;
+  meal_household_dish_tags: MealHouseholdDishTags;
+  meal_household_dishes: MealHouseholdDishes;
+  meal_light_choices: MealLightChoices;
+  meal_light_version_items: MealLightVersionItems;
+  meal_light_versions: MealLightVersions;
+  meal_menu_entries: MealMenuEntries;
+  meal_menus: MealMenus;
   outing_criteria: OutingCriteria;
   outing_criteria_themes: OutingCriteriaThemes;
   outing_offer_memory: OutingOfferMemory;
   outing_proposal_ideas: OutingProposalIdeas;
   outing_proposals: OutingProposals;
   outing_themes: OutingThemes;
+  partner_notes: PartnerNotes;
   platform_setting_changes: PlatformSettingChanges;
   platform_settings: PlatformSettings;
   profile_agents: ProfileAgents;
@@ -2242,10 +2772,17 @@ export interface DB {
   v_dashboard_agents: VDashboardAgents;
   v_family_logbook: VFamilyLogbook;
   v_family_tasks: VFamilyTasks;
+  v_grocery_product_references: VGroceryProductReferences;
+  v_grocery_shared_prices_moderation: VGrocerySharedPricesModeration;
+  v_grocery_unreferenced: VGroceryUnreferenced;
   v_guest_display_status: VGuestDisplayStatus;
   v_info_prefill_suggestions: VInfoPrefillSuggestions;
+  v_meal_batch_week_days: VMealBatchWeekDays;
+  v_meal_batch_weeks: VMealBatchWeeks;
+  v_meal_dishes_console: VMealDishesConsole;
   v_never_activated_purge_candidates: VNeverActivatedPurgeCandidates;
   v_profile_agent_missing_items: VProfileAgentMissingItems;
   verification_codes: VerificationCodes;
   weekly_digests: WeeklyDigests;
+  weekly_reviews: WeeklyReviews;
 }

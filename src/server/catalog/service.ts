@@ -76,6 +76,8 @@ export async function listCatalog(
     .innerJoin("agent_categories as c", "c.id", "a.category_id")
     .select(["a.id", "a.name", "a.short_description", "a.full_description", "a.status", "c.code", "c.label"])
     // Le catalogue ne présente que les agents de Digitorn tant que les autres plateformes n'y sont pas ouvertes (US-106).
+    // Un agent retiré (lot 14, CR-19) n'apparaît plus au catalogue : il reste en base, réversible.
+    .where("a.status", "<>", "retired")
     .where("a.platform", "=", "digitorn")
     .where("c.code", "in", categories)
     .execute();
@@ -148,6 +150,8 @@ export async function getAgentSheet(ctx: Ctx, session: SessionContext, agentId: 
     .innerJoin("agent_categories as c", "c.id", "a.category_id")
     .select(["a.id", "a.name", "a.short_description", "a.full_description", "a.status", "c.code", "c.label", "c.id as category_id"])
     .where("a.id", "=", agentId)
+    // Un agent retiré (lot 14, CR-19) n'apparaît plus au catalogue : il reste en base, réversible.
+    .where("a.status", "<>", "retired")
     .where("a.platform", "=", "digitorn")
     .where("c.code", "in", visibleCategories(session))
     .executeTakeFirst();

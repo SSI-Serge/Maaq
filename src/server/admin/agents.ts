@@ -22,7 +22,7 @@ export interface AgentRow {
   category: CategoryCode;
   categoryLabel: string;
   shortDescription: string;
-  status: "available" | "blocked";
+  status: "available" | "blocked" | "retired";
   maintenanceMessage: string | null;
   blockedAt: string | null;
   blockedBy: string | null;

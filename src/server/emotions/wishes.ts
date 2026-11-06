@@ -63,7 +63,8 @@ interface WishRow {
   id: string;
   title: Buffer;
   description: Buffer | null;
-  horizon: Horizon | null;
+  /** Valeur lue en base (texte) : l'application ne l'écrit que parmi les horizons connus. */
+  horizon: string | null;
   created_by_user_id: string | null;
   created_at: Date;
 }
@@ -84,8 +85,9 @@ export async function listWishes(ctx: Ctx, session: SessionContext): Promise<Wis
 }
 
 function toView(r: WishRow, userId: string, names: Map<string, string>): WishView {
+  const horizon = r.horizon !== null && r.horizon in HORIZONS ? (r.horizon as Horizon) : null;
   return {
-    id: r.id, title: open(r.title), description: openOptional(r.description), horizon: r.horizon, horizonLabel: r.horizon ? HORIZONS[r.horizon] : null,
+    id: r.id, title: open(r.title), description: openOptional(r.description), horizon, horizonLabel: horizon ? HORIZONS[horizon] : null,
     by: r.created_by_user_id ? (names.get(r.created_by_user_id) ?? null) : null, mine: r.created_by_user_id === userId, createdAt: r.created_at.toISOString(),
   };
 }
