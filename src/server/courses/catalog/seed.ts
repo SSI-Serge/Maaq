@@ -61,10 +61,10 @@ export const DEFAULT_AISLES = [
   "Conserves et surgelés", "Épicerie sucrée", "Boucherie", "Poissonnerie", "Volaille", "Sauces tomate", "Boissons", "Entretien", "Soins du corps", "Petit-déjeuner", "Autres",
 ];
 
-const MEAT_LABEL: Record<string, string> = { poulet: "Poulet", boeuf: "Bœuf", porc: "Porc", poisson: "Poisson", veau: "Veau", agneau: "Agneau" };
-const DIET_LABEL: Record<string, string> = { vegetarien: "Végétarien", "sans gluten": "Sans gluten" };
+export const MEAT_LABEL: Record<string, string> = { poulet: "Poulet", boeuf: "Bœuf", porc: "Porc", poisson: "Poisson", veau: "Veau", agneau: "Agneau" };
+export const DIET_LABEL: Record<string, string> = { vegetarien: "Végétarien", "sans gluten": "Sans gluten" };
 /** Allergènes de départ, déduits des mots du plat (indicatif, modifiables en console) : étiquette → mots. */
-const ALLERGENS: Record<string, string[]> = {
+export const ALLERGENS: Record<string, string[]> = {
   Arachide: ["arachide", "cacahuete"],
   "Fruits à coque": ["noix", "amande", "noisette", "pistache", "cajou"],
   Œuf: ["oeuf"],

@@ -1,3 +1,4 @@
+import { norm } from "../engine/text";
 import type { CellResult, ImportSpec } from "./spec";
 
 const text = (raw: string): CellResult<string> => ({ ok: true, value: raw });
@@ -63,3 +64,31 @@ export const VERSIONS_SPEC: ImportSpec<VersionsContext> = {
 
 export const PLANNINGS_TEMPLATE_HEADERS = ["id_semaine", "cuisine", "theme", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "ids", "etapes", "temps_total_min", "mutualisation_pct"];
 export const VERSIONS_TEMPLATE_HEADERS = ["id_plat", "plat", "retirer", "ajouter", "texte_source"];
+
+export interface HouseholdDishesContext {
+  /** Cuisines connues (minuscules, sans accent) : une cuisine inconnue refuse tout l'import. */
+  cuisines: Set<string>;
+}
+
+/** Plats du foyer (US-159) : « plat, cuisine, ingrédients » ; plusieurs ingrédients séparés par | ou par une virgule. Modèle : `mes_plats.csv`. */
+export const HOUSEHOLD_DISHES_SPEC: ImportSpec<HouseholdDishesContext> = {
+  title: "Mes plats",
+  templateFile: "mes_plats.csv",
+  idColumn: "plat",
+  columns: [
+    { key: "plat", required: true, parse: (raw) => (raw.length <= 80 ? { ok: true, value: raw } : { ok: false, message: "80 caractères au plus." }) },
+    { key: "cuisine", required: true },
+    {
+      key: "ingredients",
+      required: true,
+      parse: (raw) => {
+        const list = [...new Set(raw.split(/[|,]/).map((x) => x.trim()).filter((x) => x))];
+        if (!list.length) return { ok: false, message: "au moins un ingrédient." };
+        return list.length <= 40 && list.every((x) => x.length <= 120) ? { ok: true, value: list } : { ok: false, message: "40 ingrédients au plus, 120 caractères chacun." };
+      },
+    },
+  ],
+  checkRow: (values, ctx) => (ctx.cuisines.has(norm(String(values.cuisine))) ? [] : [{ column: "cuisine", message: `cuisine « ${values.cuisine} » inconnue.` }]),
+};
+
+export const HOUSEHOLD_DISHES_TEMPLATE_HEADERS = ["plat", "cuisine", "ingredients"];
