@@ -63,7 +63,7 @@ const ALLERGENS: Record<string, string[]> = {
 };
 
 /** Rayons du classeur qui doublonnent un rayon de départ : rangés dans celui-ci (anomalies de données du classeur, signalées au BA). */
-const AISLE_ALIAS: Record<string, string> = { poissons: "Poissonnerie", "boissons (cuisine)": "Boissons" };
+const AISLE_ALIAS: Record<string, string> = { poissons: "Conserves et surgelés", "boissons (cuisine)": "Boissons" };
 export const canonicalAisle = (rayon: string): string => AISLE_ALIAS[norm(rayon)] ?? rayon;
 
 /** Clé normalisée d'un nom : minuscules, accents retirés, espaces simples (CR-25). */

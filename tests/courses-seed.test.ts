@@ -11,7 +11,7 @@ describe("Chargement initial du catalogue Courses et repas", () => {
     await withFreshCatalog(db, async (trx, report) => {
       expect(report.skipped).toBe(false);
       expect(report).toMatchObject({ cuisines: 3, dishes: 60, batchWeeks: 12, tags: 12 });
-      expect(report.aisles).toBe(19); // les 19 rayons de départ ; « Poissons » et « Boissons (cuisine) » du classeur sont rangés dans « Poissonnerie » et « Boissons »
+      expect(report.aisles).toBe(19); // les 19 rayons de départ ; « Poissons » (thon et sardines en boîte) et « Boissons (cuisine) » du classeur sont rangés dans « Conserves et surgelés » et « Boissons »
       expect(report.lightVersions).toBeGreaterThanOrEqual(34);
       expect(report.references).toBeGreaterThan(50); // seules les références conformes avec un prix sont chargées (prix obligatoire en base)
       expect(report.referencesWithoutPrice + report.nonCompliantReferences + report.references).toBeGreaterThanOrEqual(600);
