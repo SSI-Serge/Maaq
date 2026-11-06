@@ -81,15 +81,17 @@ export async function seedWithin(trx: Transaction<DB>, data: SeedData, options: 
     const existing = await trx.selectFrom("meal_dishes").select("id").limit(1).executeTakeFirst();
     if (existing) return { ...report, skipped: true };
 
-    // rayons
+    // rayons : les 19 de départ existent déjà (données de référence du schéma) ; on ajoute ceux que le classeur utilise en plus
+    const aisleId = new Map<string, number>();
+    for (const a of await trx.selectFrom("grocery_aisles").select(["id", "name"]).execute()) aisleId.set(norm(a.name), a.id);
     const aisleNames = [...DEFAULT_AISLES];
     for (const r of data.refs) if (r.rayon && !aisleNames.some((a) => norm(a) === norm(r.rayon))) aisleNames.push(r.rayon);
-    const aisleId = new Map<string, number>();
     for (const [i, name] of aisleNames.entries()) {
+      if (aisleId.has(norm(name))) continue;
       const row = await trx.insertInto("grocery_aisles").values({ name, sort_order: (i + 1) * 10 }).returning("id").executeTakeFirstOrThrow();
       aisleId.set(norm(name), row.id);
-      report.aisles += 1;
     }
+    report.aisles = aisleId.size;
     const otherAisle = aisleId.get(norm("Autres"))!;
     const aisleOf = (rayon: string | undefined) => aisleId.get(norm(rayon ?? "")) ?? otherAisle;
 
