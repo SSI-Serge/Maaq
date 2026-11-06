@@ -1,0 +1,183 @@
+/* Courses et repas : éléments propres aux écrans de l'agent (menu, liste, budget). Les champs et les pastilles viennent de family.module.css. */
+.lead {
+  margin: 0 0 12px;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.count {
+  margin: 8px 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--primary);
+}
+.group {
+  margin: 14px 0 0;
+}
+.kick {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.more {
+  margin-top: 8px;
+  padding: 6px 0;
+  border: 0;
+  background: none;
+  font-size: 13px;
+  color: var(--primary);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.empty {
+  margin: 12px 0;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+.footer {
+  position: sticky;
+  bottom: 0;
+  margin: 16px -16px 0;
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+  background: var(--bg);
+  border-top: 1px solid var(--line);
+}
+.session {
+  margin: 0 0 12px;
+  padding: 12px;
+  border-radius: var(--radius);
+  background: var(--success-bg);
+}
+.sessionOver {
+  background: var(--warning-bg);
+}
+.sessionTitle {
+  font-size: 15px;
+  font-weight: 700;
+}
+.sessionText {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.sessionFlag {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--warning);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+.banner {
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  background: var(--secondary-soft);
+  font-size: 13px;
+  font-weight: 700;
+}
+.dayCard {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+}
+.dayHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.dayName {
+  font-family: var(--font-serif);
+  font-size: 15px;
+  font-weight: 700;
+}
+.pill {
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--bg-sunken);
+  color: var(--ink-soft);
+}
+.pillSession {
+  background: var(--success-bg);
+  color: var(--success);
+}
+.pillOff {
+  background: var(--warning-bg);
+  color: var(--warning);
+}
+.meta {
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+.confirm {
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--secondary-soft);
+  font-size: 11px;
+}
+.rub {
+  margin: 0 0 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+}
+.rub > summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.rubBody {
+  padding: 0 12px 12px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.rubBody ol,
+.rubBody ul {
+  margin: 0;
+  padding-left: 18px;
+}
+.recipe + .recipe {
+  margin-top: 10px;
+}
+.recipeName {
+  font-weight: 700;
+}
+.done {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 32px 0;
+  text-align: center;
+}
+.tick {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--success);
+  color: #fff;
+  font-size: 28px;
+}
+.doneTitle {
+  font-family: var(--font-serif);
+  font-size: 22px;
+  font-weight: 700;
+}
