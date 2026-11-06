@@ -3,7 +3,7 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-06T17:14:41.169Z",
+  "updated": "2026-11-06T17:45:54.077Z",
   "deploys": [
     {
       "at": "2026-11-06T16:43:37.270Z",
@@ -2821,10 +2821,10 @@
           "title": "C0 · Socle : consignes de l agent en deux fichiers, deuxième agent natif, fiche et entrée au catalogue (US-152)",
           "state": "building",
           "env": null,
-          "at": "2026-11-06T16:44:47.574Z",
-          "note": "Consignes faites et testées. Le reste attend le schéma du lot 14.",
+          "at": "2026-11-06T17:45:54.077Z",
+          "note": "Consignes de l agent faites. Schéma du lot 14 appliqué à la base de test le 06/11 (36 tables) et copié dans le dépôt ; types régénérés ; catalogue sans agents retirés.",
           "unsure": [
-            "Rien en ligne : le schéma du lot 14 n est pas livré."
+            "Fiche, tuile et tchat du deuxième agent natif pas encore faits."
           ]
         },
         {
@@ -2898,10 +2898,14 @@
         {
           "at": "2026-11-06T17:14:41.169Z",
           "text": "Lecture des tickets : Tesseract seul ne suffit pas sur des photos de téléphone ; pistes à arbitrer (autre moteur hébergé chez nous, service cloud avec avis du DPO)."
+        },
+        {
+          "at": "2026-11-06T17:45:54.077Z",
+          "text": "Lot 14 (version finale, 36 tables) appliqué à la base de test avec l accord direct du PO, après sauvegarde et contrôle des empreintes."
         }
       ],
       "unsure": [
-        "Rien n est encore en ligne : le schéma du lot 14 de la base de données n est pas livré."
+        "Seule la base de test a reçu le schéma ; aucun écran de Courses et repas n est en ligne."
       ]
     },
     {
