@@ -62,6 +62,10 @@ const ALLERGENS: Record<string, string[]> = {
   Lait: ["lait", "creme", "fromage", "beurre", "yaourt", "mozzarella", "parmesan", "feta", "ricotta", "bechamel"],
 };
 
+/** Rayons du classeur qui doublonnent un rayon de départ : rangés dans celui-ci (anomalies de données du classeur, signalées au BA). */
+const AISLE_ALIAS: Record<string, string> = { poissons: "Poissonnerie", "boissons (cuisine)": "Boissons" };
+export const canonicalAisle = (rayon: string): string => AISLE_ALIAS[norm(rayon)] ?? rayon;
+
 /** Clé normalisée d'un nom : minuscules, accents retirés, espaces simples (CR-25). */
 export function nameKey(name: string): string {
   return norm(name).replace(/[\s-]+/g, " ").trim();
@@ -85,7 +89,7 @@ export async function seedWithin(trx: Transaction<DB>, data: SeedData, options: 
     const aisleId = new Map<string, number>();
     for (const a of await trx.selectFrom("grocery_aisles").select(["id", "name"]).execute()) aisleId.set(norm(a.name), a.id);
     const aisleNames = [...DEFAULT_AISLES];
-    for (const r of data.refs) if (r.rayon && !aisleNames.some((a) => norm(a) === norm(r.rayon))) aisleNames.push(r.rayon);
+    for (const r of data.refs) if (r.rayon && !aisleNames.some((a) => norm(a) === norm(canonicalAisle(r.rayon)))) aisleNames.push(canonicalAisle(r.rayon));
     for (const [i, name] of aisleNames.entries()) {
       if (aisleId.has(norm(name))) continue;
       const row = await trx.insertInto("grocery_aisles").values({ name, sort_order: (i + 1) * 10 }).returning("id").executeTakeFirstOrThrow();
@@ -93,7 +97,7 @@ export async function seedWithin(trx: Transaction<DB>, data: SeedData, options: 
     }
     report.aisles = aisleId.size;
     const otherAisle = aisleId.get(norm("Autres"))!;
-    const aisleOf = (rayon: string | undefined) => aisleId.get(norm(rayon ?? "")) ?? otherAisle;
+    const aisleOf = (rayon: string | undefined) => aisleId.get(norm(canonicalAisle(rayon ?? ""))) ?? otherAisle;
 
     // cuisines
     const cuisineId = new Map<string, number>();
