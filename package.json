@@ -24,6 +24,7 @@
     "check:release": "tsx scripts/check-release.ts",
     "check:contracts": "tsx scripts/check-contracts-v2.ts",
     "bench:ocr": "tsx scripts/contract-ocr-bench.ts",
+    "courses:seed": "tsx scripts/seed-courses.ts",
     "db:types": "kysely-codegen --dialect postgres --out-file src/server/db/schema.generated.ts"
   },
   "dependencies": {

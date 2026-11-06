@@ -58,6 +58,8 @@ export interface SettingsView {
   allergyText: string;
   /** Réglages demandés au premier lancement qui manquent (US-153 RF1). */
   missing: string[];
+  /** Prénoms des deux parents du couple (« Communs à Camille et Julien »). */
+  couple: string[];
   options: SettingsOptions;
   consentText: string;
 }
@@ -114,12 +116,13 @@ export async function getSettings(ctx: Ctx, session: SessionContext): Promise<Se
 }
 
 export async function loadSettings(db: Kysely<DB>, accountId: string): Promise<SettingsView> {
-  const [row, cuisines, stores, dietary, options] = await Promise.all([
+  const [row, cuisines, stores, dietary, options, parents] = await Promise.all([
     db.selectFrom("grocery_household_settings").selectAll().where("account_id", "=", accountId).executeTakeFirst(),
     db.selectFrom("grocery_household_cuisines").select("cuisine_id").where("account_id", "=", accountId).execute(),
     db.selectFrom("grocery_household_stores").select(["store_chain", "store_city"]).where("account_id", "=", accountId).orderBy("id").execute(),
     db.selectFrom("grocery_household_dietary").select(["diets_encrypted", "allergies_encrypted"]).where("account_id", "=", accountId).executeTakeFirst(),
     loadOptions(db),
+    db.selectFrom("users").select(["first_name", "role", "guest_rank"]).where("account_id", "=", accountId).where("status", "in", ["active", "grace_period"]).orderBy("created_at").execute(),
   ]);
   const diet = readDietary(dietary?.diets_encrypted ?? null, dietary?.allergies_encrypted ?? null);
   const goals = { time: row?.goal_time ?? false, ownDishes: row?.goal_own_dishes ?? false, season: row?.goal_season ?? false };
@@ -145,6 +148,7 @@ export async function loadSettings(db: Kysely<DB>, accountId: string): Promise<S
     allergens: diet.allergens,
     allergyText: diet.text,
     missing,
+    couple: parents.filter((u) => u.role === "primary_user" || (u.role === "guest" && u.guest_rank === "core")).map((u) => u.first_name),
     options,
     consentText: CONSENT_TEXT,
   };
