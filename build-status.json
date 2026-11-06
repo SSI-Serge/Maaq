@@ -3,8 +3,17 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-06T20:54:03.324Z",
+  "updated": "2026-11-06T21:14:12.670Z",
   "deploys": [
+    {
+      "at": "2026-11-06T21:14:12.670Z",
+      "env": "preview",
+      "what": "Courses et repas : réglages, menu, liste, Ma liste, Nouveau plat, budget et accueil (accès par /courses, pas encore dans le catalogue)",
+      "storyIds": [
+        "f21c3",
+        "f21c4"
+      ]
+    },
     {
       "at": "2026-11-06T16:43:37.270Z",
       "env": "preview",
@@ -2813,8 +2822,8 @@
       "id": "f21",
       "name": "Courses et repas : agent natif, étapes C0 à C6 (branche courses-repas)",
       "desc": "Le menu de la semaine, la liste de courses avec comparatif et scénarios, les tickets et le budget, calculés par MAAQ ; remplace l agent Digitorn qui fonctionne mal.",
-      "building": true,
-      "currentAction": "Écrans liste, Ma liste et accueil faits ; ajout de plat, budget et tickets à suivre",
+      "building": false,
+      "currentAction": "",
       "stories": [
         {
           "id": "f21c0",
@@ -2849,9 +2858,9 @@
         {
           "id": "f21c3",
           "title": "C3 · Foyer : réglages, enseignes, partage des prix, écrans Menu et Liste de courses (US-153, 154, 156, 157)",
-          "state": "testing",
-          "env": null,
-          "at": "2026-11-06T20:54:03.324Z",
+          "state": "done",
+          "env": "preview",
+          "at": "2026-11-06T21:14:12.670Z",
           "note": "Réglages, menu de la semaine, liste de courses (comparatif, trois scénarios, validation) et accueil faits, testés (11 tests liste, 9 menu) et vus dans le navigateur local. Pas encore en ligne.",
           "unsure": [
             "La durée de la séance ne se recalcule pas quand on remplace un plat (comme la maquette) ; à confirmer avec le PO.",
@@ -2862,10 +2871,10 @@
         {
           "id": "f21c4",
           "title": "C4 · Au quotidien : parcours du tchat, ajout de produit et de plat, Ma liste de courses (US-155, 158, 159, 162)",
-          "state": "building",
-          "env": null,
-          "at": "2026-11-06T20:54:03.324Z",
-          "note": "Ma liste de courses (cases à cocher avec annulation, ajouts tardifs, impression) et accueil faits en local. Restent : ajout de plat, parcours du tchat."
+          "state": "testing",
+          "env": "preview",
+          "at": "2026-11-06T21:14:12.670Z",
+          "note": "Ma liste, Nouveau plat (import CSV/xlsx), Budget et accueil en ligne sur la zone de test (rév. 00073), sans lien depuis le catalogue : accès par l adresse /courses. Restent : parcours du tchat, tickets."
         },
         {
           "id": "f21c5",
