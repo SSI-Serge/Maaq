@@ -3,7 +3,7 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-06T19:04:39.008Z",
+  "updated": "2026-11-06T20:27:35.936Z",
   "deploys": [
     {
       "at": "2026-11-06T16:43:37.270Z",
@@ -2814,7 +2814,7 @@
       "name": "Courses et repas : agent natif, étapes C0 à C6 (branche courses-repas)",
       "desc": "Le menu de la semaine, la liste de courses avec comparatif et scénarios, les tickets et le budget, calculés par MAAQ ; remplace l agent Digitorn qui fonctionne mal.",
       "building": true,
-      "currentAction": "Moteur et cadre d import faits ; cas de référence et tickets en cours d essai ; attente du schéma du lot 14",
+      "currentAction": "Écrans du menu faits ; liste de courses en cours",
       "stories": [
         {
           "id": "f21c0",
@@ -2851,8 +2851,12 @@
           "title": "C3 · Foyer : réglages, enseignes, partage des prix, écrans Menu et Liste de courses (US-153, 154, 156, 157)",
           "state": "building",
           "env": null,
-          "at": "2026-11-06T19:04:39.008Z",
-          "note": "Réglages du foyer et partage anonyme des prix : faits et vus dans le navigateur local. Menu et liste de courses : à faire."
+          "at": "2026-11-06T20:27:35.936Z",
+          "note": "Réglages du foyer, partage des prix et Menu de la semaine faits et vus dans le navigateur local (choix de 1 ou 2 plats, 7 dîners, express, remplacements, validation). Liste de courses : à faire.",
+          "unsure": [
+            "La durée de la séance ne se recalcule pas quand on remplace un plat (comme la maquette) ; à confirmer avec le PO.",
+            "À l écran final, le texte dit que les ingrédients sont dans la liste : la liste n est pas encore créée à la validation."
+          ]
         },
         {
           "id": "f21c4",

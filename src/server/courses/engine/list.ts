@@ -39,6 +39,8 @@ export interface Choice {
   store: string | null;
   city: string | null;
   age: PriceAge;
+  /** « Composition à vérifier sur l'étiquette » (référence au statut « à vérifier », CR-37). */
+  labelCheck?: boolean;
 }
 
 export type ItemGroup = "menu" | "ajout" | "habituel" | "sante";
@@ -167,13 +169,13 @@ function buildChoices(name: string, input: ListInput): { choices: Choice[]; stor
       .map(([store, v]) => ({ store, v, age: v.price !== null ? priceAge(v.priceDate, now) : "unknown" as PriceAge | null }))
       .filter((x) => x.v.price !== null && x.age !== null);
     for (const x of priced) {
-      choices.push({ kind: "reference", ref: x.v.ref, price: x.v.price, store: x.store, city: null, age: x.age as PriceAge });
+      choices.push({ kind: "reference", ref: x.v.ref, price: x.v.price, store: x.store, city: null, age: x.age as PriceAge, labelCheck: x.v.labelCheck });
       storePrices.set(x.store, { ref: x.v.ref, price: x.v.price });
     }
     if (!priced.length && refs.length) {
       // références sans prix connu : on garde la première, le prix sera « N/A »
       const [store, v] = refs[0];
-      choices.push({ kind: "reference", ref: v.ref, price: null, store, city: null, age: "unknown" });
+      choices.push({ kind: "reference", ref: v.ref, price: null, store, city: null, age: "unknown", labelCheck: v.labelCheck });
     }
   }
 
@@ -385,6 +387,7 @@ export interface ScenarioLine {
   city: string | null;
   price: number | null;
   age: PriceAge | null;
+  labelCheck: boolean;
 }
 
 function round2(n: number): number {
@@ -426,11 +429,11 @@ export function computeScenarios(model: ListModel, sel: ListSelection, stores: s
 /** Les produits du scénario choisi (US-157 RF7), regroupés par magasin puis par rayon par l'écran. */
 export function scenarioLines(model: ListModel, sel: ListSelection, scenario: Scenario): ScenarioLine[] {
   return currentItems(model, sel).map((i) => {
-    let choice: { ref: string; price: number | null; store: string | null; city: string | null; age: PriceAge | null } | null;
+    let choice: { ref: string; price: number | null; store: string | null; city: string | null; age: PriceAge | null; labelCheck?: boolean } | null;
     if (scenario.id === 1) {
       const p = scenario.store ? i.storePrices.get(scenario.store) : undefined;
       const src = i.choices.find((c) => c.store === scenario.store && c.price !== null);
-      choice = p ? { ref: p.ref, price: p.price, store: scenario.store, city: src?.city ?? null, age: src?.age ?? null } : null;
+      choice = p ? { ref: p.ref, price: p.price, store: scenario.store, city: src?.city ?? null, age: src?.age ?? null, labelCheck: src?.labelCheck } : null;
     } else if (scenario.id === 2) {
       choice = selectedChoice(i, sel);
     } else {
@@ -446,6 +449,7 @@ export function scenarioLines(model: ListModel, sel: ListSelection, scenario: Sc
       city: choice?.city ?? null,
       price: choice?.price ?? null,
       age: choice?.age ?? null,
+      labelCheck: !!choice?.labelCheck,
     };
   });
 }

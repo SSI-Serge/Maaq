@@ -13,12 +13,15 @@ export interface ReferenceRow {
   /** « AAAA-MM-JJ » ou null quand la date est inconnue. */
   priceDate: string | null;
   conform: boolean;
+  /** Référence proposée avec la mention « Composition à vérifier sur l'étiquette » (statut « à vérifier », CR-37). */
+  labelCheck?: boolean;
 }
 
 export interface StorePrice {
   ref: string;
   price: number | null;
   priceDate: string | null;
+  labelCheck: boolean;
 }
 
 export interface RefProduct {
@@ -42,7 +45,7 @@ export function buildRefProducts(rows: ReferenceRow[]): Map<string, RefProduct> 
       p = { name: r.product, rayon: r.rayon, used: r.used ?? "", stores: new Map(), kw: [], kwFull: [] };
       prods.set(r.product, p);
     }
-    if (r.conform) p.stores.set(r.store, { ref: r.ref, price: r.price, priceDate: r.priceDate });
+    if (r.conform) p.stores.set(r.store, { ref: r.ref, price: r.price, priceDate: r.priceDate, labelCheck: !!r.labelCheck });
   }
   for (const [name, p] of prods) {
     const alts = name

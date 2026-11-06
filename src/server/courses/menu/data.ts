@@ -47,11 +47,12 @@ export function profileOf(settings: SettingsView, cuisineNames: Map<number, stri
 
 const isoDay = (value: Date | string) => (typeof value === "string" ? value.slice(0, 10) : value.toISOString().slice(0, 10));
 
-export async function loadEngineData(db: Kysely<DB>, accountId: string, settings: SettingsView): Promise<EngineData> {
+/** `all` : aussi les plats retirés du catalogue et ceux que le foyer écarte (pour relire un menu déjà validé, qui garde ses plats). */
+export async function loadEngineData(db: Kysely<DB>, accountId: string, settings: SettingsView, options: { all?: boolean } = {}): Promise<EngineData> {
   const [cuisines, tags, dishRows, ingredientRows, tagLinks, own, ownIngredients, ownTags, weeks, days, history, repeat, cap] = await Promise.all([
     db.selectFrom("meal_cuisines").select(["id", "name"]).execute(),
     db.selectFrom("meal_dish_tags").select(["id", "kind", "name"]).execute(),
-    db.selectFrom("meal_dishes").select(["id", "code", "name", "cuisine_id", "duration_minutes", "recipe"]).where("retired_at", "is", null).orderBy("id").execute(),
+    db.selectFrom("meal_dishes").select(["id", "code", "name", "cuisine_id", "duration_minutes", "recipe"]).$if(!options.all, (q) => q.where("retired_at", "is", null)).orderBy("id").execute(),
     db
       .selectFrom("meal_dish_ingredients as i")
       .innerJoin("grocery_products as p", "p.id", "i.product_id")
@@ -89,7 +90,7 @@ export async function loadEngineData(db: Kysely<DB>, accountId: string, settings
   const tagsByDish = group(tagLinks, (r) => String(r.dish_id));
   const ownIngByDish = group(ownIngredients, (r) => r.household_dish_id);
   const ownTagsByDish = group(ownTags, (r) => r.household_dish_id);
-  const forbidden = new Set(settings.allergens.map(norm));
+  const forbidden = new Set(options.all ? [] : settings.allergens.map(norm));
 
   const dishes: Dish[] = [];
   const refs: EngineData["refs"] = new Map();

@@ -2,7 +2,9 @@ import type { Ctx, SessionContext } from "@/server/auth/service";
 import { asProfile } from "@/server/assistant/outings/profile";
 import { DAYS, estimateMinutes, fmtMin, isoDate, nextMonday, proposeMenu, type Dish, type MenuState } from "../engine";
 import { courseError, loadSettings, requireAccess, translateCourseError, type SettingsView } from "../household/settings";
+import { seedListFromMenu } from "../list/service";
 import { loadEngineData, type EngineData } from "./data";
+import { weekLabel } from "./weeks";
 
 /**
  * Menu de la semaine (US-155, US-156) : choix de 1 ou 2 plats plaisir, proposition de 7 dîners appuyés sur une semaine type de batch, plats express de secours,
@@ -63,12 +65,7 @@ export interface MenuProposal {
   servingsNote: string | null;
 }
 
-const MONTHS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
-
-export function weekLabel(week: string): string {
-  const [, m, d] = week.split("-").map(Number);
-  return `${d === 1 ? "1er" : d} ${MONTHS[m - 1]}`;
-}
+export { weekLabel };
 
 /** Séance au format de l'écran : « 1 h 50 » ; durée estimée : « environ 1 h 45 ». */
 export function sessionLabel(minutes: number, estimated: boolean): string {
@@ -223,6 +220,7 @@ export async function menuValidate(ctx: Ctx, session: SessionContext, input: Val
 
   try {
     await asProfile(ctx.db, userId, async (trx) => {
+      const repeat = !!(await trx.selectFrom("meal_menus").select("id").where("account_id", "=", accountId).where("week_start", "=", week as never).executeTakeFirst());
       await trx.deleteFrom("meal_menus").where("account_id", "=", accountId).where("week_start", "=", week as never).execute();
       const menu = await trx
         .insertInto("meal_menus")
@@ -244,6 +242,8 @@ export async function menuValidate(ctx: Ctx, session: SessionContext, input: Val
         ...input.express.map((id, i) => entry("express", i + 1, id)),
       ];
       await trx.insertInto("meal_menu_entries").values(rows.map((r) => ({ ...r, menu_id: menu.id, account_id: accountId }))).execute();
+      // les ingrédients du menu entrent dans la liste de courses (US-156 RF12)
+      await seedListFromMenu(trx, accountId, userId, [...new Map(finalDishes.map((d) => [d.id, d])).values()], { repeat });
     });
   } catch (error) {
     throw translateCourseError(error);
