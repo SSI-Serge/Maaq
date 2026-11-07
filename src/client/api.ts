@@ -82,7 +82,9 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
   const signal = options.signal ? AbortSignal.any([options.signal, deadline.signal]) : deadline.signal;
 
   const headers: Record<string, string> = { Accept: "application/json" };
-  if (options.body !== undefined) headers["Content-Type"] = "application/json";
+  // Photos et fichiers : le navigateur fixe lui-même le type multipart et sa frontière ; il ne faut ni le forcer ni convertir le corps en JSON.
+  const isForm = typeof FormData !== "undefined" && options.body instanceof FormData;
+  if (options.body !== undefined && !isForm) headers["Content-Type"] = "application/json";
   if (options.idempotencyKey) headers["Idempotency-Key"] = options.idempotencyKey;
 
   try {
@@ -96,7 +98,7 @@ export async function apiRequest<T>(path: string, options: ApiRequestOptions = {
         const response = await fetchImpl(path, {
           method,
           headers,
-          body: options.body === undefined ? undefined : JSON.stringify(options.body),
+          body: options.body === undefined ? undefined : isForm ? (options.body as FormData) : JSON.stringify(options.body),
           signal,
           credentials: "same-origin",
         });

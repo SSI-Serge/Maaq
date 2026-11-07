@@ -3,8 +3,16 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-07T15:03:32.074Z",
+  "updated": "2026-11-07T16:25:00.000Z",
   "deploys": [
+    {
+      "at": "2026-11-07T16:25:00.000Z",
+      "env": "preview",
+      "what": "Courses et repas : tchat de l agent, prix au kilo (poids des produits pesés, articles au kilo non totalisés, comparatif au kilo), courge butternut Lidl sans prix (carte Lidl Plus) — rév. 00080",
+      "storyIds": [
+        "f21c5"
+      ]
+    },
     {
       "at": "2026-11-07T15:03:32.074Z",
       "env": "preview",

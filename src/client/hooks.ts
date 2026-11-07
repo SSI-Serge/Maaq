@@ -141,11 +141,19 @@ export function useDebounced<T>(value: T, delayMs = 300): T {
 }
 
 export interface MutationState {
-  run: <TResult>(path: string, options: { method: "POST" | "PUT" | "PATCH" | "DELETE"; body?: unknown }) => Promise<TResult | undefined>;
+  run: <TResult>(path: string, options: { method: "POST" | "PUT" | "PATCH" | "DELETE"; body?: unknown; timeoutMs?: number }) => Promise<TResult | undefined>;
   pending: boolean;
   slow: boolean;
   error: ApiError | undefined;
   reset: () => void;
+}
+
+/** Empreinte d'un corps d'envoi : pour des fichiers, leurs noms, tailles et dates (JSON.stringify d'un FormData donnerait toujours « {} »). */
+export function bodySignature(body: unknown): string {
+  if (typeof FormData !== "undefined" && body instanceof FormData) {
+    return `form:${[...body.entries()].map(([key, value]) => (typeof value === "string" ? `${key}=${value}` : `${key}=${value.name}/${value.size}/${value.lastModified}`)).join("|")}`;
+  }
+  return JSON.stringify(body ?? null);
 }
 
 /**
@@ -159,10 +167,10 @@ export function useApiMutation(): MutationState {
   const attempt = useRef<{ signature: string; key: string } | null>(null);
   const inFlight = useRef(false);
 
-  const run = useCallback(async <TResult,>(path: string, options: { method: "POST" | "PUT" | "PATCH" | "DELETE"; body?: unknown }) => {
+  const run = useCallback(async <TResult,>(path: string, options: { method: "POST" | "PUT" | "PATCH" | "DELETE"; body?: unknown; timeoutMs?: number }) => {
     if (inFlight.current) return undefined;
     inFlight.current = true;
-    const signature = `${options.method} ${path} ${JSON.stringify(options.body ?? null)}`;
+    const signature = `${options.method} ${path} ${bodySignature(options.body)}`;
     if (attempt.current?.signature !== signature) attempt.current = { signature, key: newIdempotencyKey() };
     setPending(true);
     setSlow(false);
@@ -173,6 +181,7 @@ export function useApiMutation(): MutationState {
         body: options.body,
         idempotencyKey: attempt.current.key,
         onSlow: () => setSlow(true),
+        timeoutMs: options.timeoutMs,
       });
       attempt.current = null;
       return result;

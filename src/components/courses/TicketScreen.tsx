@@ -10,6 +10,7 @@ import { Button, Loading, Notice, RetryNotice } from "@/components/ui";
 import type { TicketConfirmation, TicketMenuIdea, TicketReadResult } from "@/server/courses/tickets/service";
 import { euro } from "./ListScreen";
 import styles from "./courses.module.css";
+import { DUPLICATE_MESSAGE, EMPTY_PHOTO_MESSAGE, READING_MESSAGE, READ_TIMEOUT_MS, SAVING_MESSAGE, UNREADABLE_MESSAGE, failureOf, savedMessage } from "./ticket-messages";
 
 const BACK = { href: "/courses", label: "Courses et repas" };
 const MAX_PHOTOS = 3;
@@ -52,13 +53,27 @@ function Flow() {
   const [editing, setEditing] = useState<number | null>(null);
   const [result, setResult] = useState<TicketConfirmation | null>(null);
   const [shared, setShared] = useState(false);
+  const [summary, setSummary] = useState<{ store: string; date: string } | null>(null);
+  const [photoError, setPhotoError] = useState(false);
+  // Les photos choisies restent en mémoire le temps de la lecture : « Réessayer » les renvoie sans en reprendre une.
+  const photos = useRef<File[]>([]);
 
-  async function onFiles(files: FileList | null) {
+  function onFiles(files: FileList | null) {
     if (!files?.length) return;
-    const body = new FormData();
-    Array.from(files).slice(0, MAX_PHOTOS).forEach((f) => body.append("files", f));
-    const response = await read.run<{ ticket: TicketReadResult }>("/api/courses/tickets/read", { method: "POST", body });
+    photos.current = Array.from(files).slice(0, MAX_PHOTOS);
     if (input.current) input.current.value = "";
+    void readPhotos();
+  }
+
+  async function readPhotos() {
+    setPhotoError(false);
+    if (!photos.current.length || photos.current.every((f) => f.size === 0)) {
+      setPhotoError(true);
+      return;
+    }
+    const body = new FormData();
+    photos.current.forEach((f) => body.append("files", f));
+    const response = await read.run<{ ticket: TicketReadResult }>("/api/courses/tickets/read", { method: "POST", body, timeoutMs: READ_TIMEOUT_MS });
     if (!response) return;
     const t = response.ticket;
     setTicket(t);
@@ -79,12 +94,17 @@ function Flow() {
       body: { store: store.trim(), city: city.trim() || null, date, lines: lines.map((l) => ({ product: l.product.trim(), reference: l.reference.trim() || null, total: toNumber(l.total), qty: toNumber(l.qty), aisle: l.aisle, measured: l.measureUnit && toNumber(l.measured) > 0 ? toNumber(l.measured) : null, measureUnit: l.measureUnit && toNumber(l.measured) > 0 ? l.measureUnit : null, pricePerMeasure: l.measureUnit && toNumber(l.perMeasure) > 0 ? toNumber(l.perMeasure) : null })) },
     });
     if (response) {
+      setSummary({ store: store.trim(), date });
       setResult(response.result);
       setShared(response.result.shared > 0);
     }
   }
 
   function reset() {
+    photos.current = [];
+    read.reset();
+    confirm.reset();
+    setPhotoError(false);
     setTicket(null);
     setResult(null);
     setLines([]);
@@ -92,7 +112,7 @@ function Flow() {
 
   if (read.error?.body?.code === "forbidden") return <Notice tone="info">L&apos;enregistrement des tickets est réservé aux deux parents du couple.</Notice>;
 
-  if (result) return <Done result={result} shared={shared} wantMenu={wantMenu} onAnother={reset} />;
+  if (result) return <Done result={result} summary={summary} shared={shared} wantMenu={wantMenu} onAnother={reset} />;
 
   if (!ticket) {
     return (
@@ -102,11 +122,16 @@ function Flow() {
           {wantMenu ? " Vous pourrez ensuite obtenir un menu avec ce que vous venez d'acheter." : ""}
         </p>
         <p className={family.hint}>La photo de votre ticket est supprimée une fois lue. Le nom et la carte de fidélité sont masqués avant la lecture.</p>
-        <input ref={input} type="file" accept="image/*" capture="environment" multiple hidden aria-label="Photo du ticket" onChange={(e) => void onFiles(e.target.files)} />
-        <Button block onClick={() => input.current?.click()} loading={read.pending}>
-          {read.pending ? "Lecture du ticket…" : "Photographier un ticket"}
-        </Button>
-        {read.error && <Notice tone="error">{read.error.message}</Notice>}
+        <input ref={input} type="file" accept="image/*" capture="environment" multiple hidden aria-label="Photo du ticket" onChange={(e) => onFiles(e.target.files)} />
+        {read.pending ? (
+          <Loading slow={read.slow} label={READING_MESSAGE} />
+        ) : (
+          <Button block onClick={() => input.current?.click()}>
+            Photographier un ticket
+          </Button>
+        )}
+        {photoError && <Notice tone="error">{EMPTY_PHOTO_MESSAGE}</Notice>}
+        {read.error && !read.pending && (failureOf(read.error).retry ? <RetryNotice message={read.error.message} onRetry={() => void readPhotos()} /> : <Notice tone="error">{read.error.message}</Notice>)}
       </>
     );
   }
@@ -114,7 +139,7 @@ function Flow() {
   if (!ticket.draft.readable) {
     return (
       <>
-        <Notice tone="warning">Ticket illisible : reprenez une photo plus nette.</Notice>
+        <Notice tone="warning">{UNREADABLE_MESSAGE}</Notice>
         <Button block onClick={reset}>
           Reprendre une photo
         </Button>
@@ -124,7 +149,7 @@ function Flow() {
 
   return (
     <>
-      {ticket.duplicate && <Notice tone="info">Ce ticket est déjà enregistré (même magasin, même date, même total) : il n&apos;est pas compté deux fois.</Notice>}
+      {ticket.duplicate && <Notice tone="info">{DUPLICATE_MESSAGE}</Notice>}
       <p className={styles.lead}>
         Ticket lu : <strong>{store || "enseigne à indiquer"}</strong>
         {city ? `, ${city}` : ""} · {date.split("-").reverse().join("/")}. Vérifiez les lignes, corrigez si besoin.
@@ -198,7 +223,8 @@ function Flow() {
         <span>{euro(total)}</span>
       </div>
       <p className={family.hint}>La photo de votre ticket est supprimée une fois lue. Le nom et la carte de fidélité sont masqués avant la lecture.</p>
-      {confirm.error && <Notice tone="error">{confirm.error.message}</Notice>}
+      {confirm.pending && <Loading slow={confirm.slow} label={SAVING_MESSAGE} />}
+      {confirm.error && !confirm.pending && (failureOf(confirm.error).retry ? <RetryNotice message={confirm.error.message} onRetry={() => void submit()} /> : <Notice tone="error">{confirm.error.message}</Notice>)}
       <div className={styles.footer}>
         <div className={family.actionsRow}>
           <Button variant="ghost" onClick={reset}>
@@ -213,12 +239,12 @@ function Flow() {
   );
 }
 
-function Done({ result, shared, wantMenu, onAnother }: { result: TicketConfirmation; shared: boolean; wantMenu: boolean; onAnother: () => void }) {
+function Done({ result, summary, shared, wantMenu, onAnother }: { result: TicketConfirmation; summary: { store: string; date: string } | null; shared: boolean; wantMenu: boolean; onAnother: () => void }) {
   const [showMenu, setShowMenu] = useState(wantMenu);
   if (result.duplicate) {
     return (
       <>
-        <Notice tone="info">Ce ticket est déjà enregistré (même magasin, même date, même total) : il n&apos;est pas compté deux fois.</Notice>
+        <Notice tone="info">{DUPLICATE_MESSAGE}</Notice>
         <Button block onClick={onAnother}>
           Enregistrer un autre ticket
         </Button>
@@ -228,8 +254,8 @@ function Done({ result, shared, wantMenu, onAnother }: { result: TicketConfirmat
   return (
     <>
       <div className={styles.session} role="status">
-        ✓ Ticket enregistré.
-        {result.removed.length > 0 ? ` ${result.removed.join(" et ")} ${result.removed.length > 1 ? "sortent" : "sort"} de la liste.` : ""} Budget mis à jour : {result.aisles.join(", ")}.
+        ✓ {savedMessage({ store: summary?.store ?? "", date: summary?.date ?? "", lines: result.recorded, total: result.total, ticked: result.removed.length })}
+        {result.removed.length > 0 ? ` Cochés : ${result.removed.join(", ")}.` : ""} Budget mis à jour : {result.aisles.join(", ")}.
         {shared ? " Les prix sont ajoutés, sans votre nom, à la base commune." : ""}
       </div>
       <p className={family.hint}>La photo a été supprimée.</p>

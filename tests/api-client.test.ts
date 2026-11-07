@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError, MESSAGES, RETRY_DELAYS_MS, apiRequest } from "@/client/api";
+import { bodySignature } from "@/client/hooks";
 
 const noSleep = vi.fn(async () => {});
 
@@ -90,5 +91,36 @@ describe("client réseau commun", () => {
     await vi.advanceTimersByTimeAsync(10_000);
     const error = await pending;
     expect(error).toMatchObject({ kind: "timeout", message: MESSAGES.timeout });
+  });
+});
+
+describe("envoi de fichiers (photos de ticket)", () => {
+  it("envoie un FormData tel quel : multipart, sans type JSON forcé, le fichier arrive entier au serveur", async () => {
+    const body = new FormData();
+    body.append("files", new File([new Uint8Array([1, 2, 3, 4, 5])], "ticket.jpg", { type: "image/jpeg" }));
+    let seen: { headers: Record<string, string>; sent: unknown } | undefined;
+    const fetchImpl = (async (_path: string, init: RequestInit) => {
+      seen = { headers: init.headers as Record<string, string>, sent: init.body };
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    }) as unknown as typeof fetch;
+    await apiRequest("/x", { method: "POST", body, fetchImpl });
+    expect(seen!.headers["Content-Type"]).toBeUndefined();
+    expect(seen!.sent).toBe(body);
+    // ce que le serveur de l'application reçoit : le fichier, avec son type et son contenu
+    const received = await new Request("http://test/api/courses/tickets/read", { method: "POST", body: seen!.sent as FormData }).formData();
+    const file = received.getAll("files")[0] as File;
+    expect(file.name).toBe("ticket.jpg");
+    expect(file.type).toBe("image/jpeg");
+    expect(file.size).toBe(5);
+  });
+
+  it("l'empreinte d'un envoi de fichiers distingue deux photos différentes (un FormData n'est jamais « {} »)", () => {
+    const one = new FormData();
+    one.append("files", new File(["a"], "a.jpg", { type: "image/jpeg", lastModified: 1 }));
+    const two = new FormData();
+    two.append("files", new File(["abc"], "b.jpg", { type: "image/jpeg", lastModified: 2 }));
+    expect(bodySignature(one)).not.toBe(bodySignature(two));
+    expect(bodySignature(one)).not.toBe("{}");
+    expect(bodySignature({ a: 1 })).toBe('{"a":1}');
   });
 });
