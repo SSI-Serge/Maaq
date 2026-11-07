@@ -3,8 +3,18 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-07T12:30:30.868Z",
+  "updated": "2026-11-07T13:05:40.072Z",
   "deploys": [
+    {
+      "at": "2026-11-07T13:05:40.072Z",
+      "env": "preview",
+      "what": "Courses et repas : console du catalogue, agent natif au catalogue (rubrique Perso), invité secondaire qui coche acheté, durée de séance recalculée (rév. 00075)",
+      "storyIds": [
+        "f21c1",
+        "f21c3",
+        "f21c4"
+      ]
+    },
     {
       "at": "2026-11-06T21:14:12.670Z",
       "env": "preview",
@@ -2822,8 +2832,8 @@
       "id": "f21",
       "name": "Courses et repas : agent natif, étapes C0 à C6 (branche courses-repas)",
       "desc": "Le menu de la semaine, la liste de courses avec comparatif et scénarios, les tickets et le budget, calculés par MAAQ ; remplace l agent Digitorn qui fonctionne mal.",
-      "building": true,
-      "currentAction": "Console faite ; déploiement sur la zone de test puis tickets",
+      "building": false,
+      "currentAction": "",
       "stories": [
         {
           "id": "f21c0",
@@ -2840,8 +2850,8 @@
           "id": "f21c1",
           "title": "C1 · Console : catalogue, références, plannings, versions allégées par fichiers CSV ou xlsx (US-164 à 170, 172)",
           "state": "testing",
-          "env": null,
-          "at": "2026-11-07T12:30:30.868Z",
+          "env": "preview",
+          "at": "2026-11-07T13:05:40.072Z",
           "note": "Console du catalogue faite : plats, cuisines et catégories, références (import/export), additifs, saisons, rayons, plannings (import), correspondances (calcul, confirmation), versions allégées (import), produits à référencer, base commune des prix, réglages du module. Reste : skill de l agent (reporté après le pilote, CR-32), modification complète d un plat (ingrédients, étiquettes).",
           "unsure": [
             "Le format du fichier des références (colonnes produit, rayon, enseigne, reference, prix, date_prix, statut, additifs, composition) est choisi par moi : à faire confirmer par le BA.",
@@ -2864,7 +2874,7 @@
           "title": "C3 · Foyer : réglages, enseignes, partage des prix, écrans Menu et Liste de courses (US-153, 154, 156, 157)",
           "state": "done",
           "env": "preview",
-          "at": "2026-11-06T21:14:12.670Z",
+          "at": "2026-11-07T13:05:40.072Z",
           "note": "Réglages, menu de la semaine, liste de courses (comparatif, trois scénarios, validation) et accueil faits, testés (11 tests liste, 9 menu) et vus dans le navigateur local. Pas encore en ligne. Durée de séance recalculée au remplacement (CR-38) : fait en local, pas encore en ligne.",
           "unsure": [
             "Les choix du comparatif et les quantités ne sont gardés qu au moment de valider la liste.",
@@ -2876,7 +2886,7 @@
           "title": "C4 · Au quotidien : parcours du tchat, ajout de produit et de plat, Ma liste de courses (US-155, 158, 159, 162)",
           "state": "testing",
           "env": "preview",
-          "at": "2026-11-06T21:14:12.670Z",
+          "at": "2026-11-07T13:05:40.072Z",
           "note": "Ma liste, Nouveau plat (import CSV/xlsx), Budget et accueil en ligne sur la zone de test (rév. 00073), sans lien depuis le catalogue : accès par l adresse /courses. Restent : parcours du tchat, tickets."
         },
         {
@@ -2898,6 +2908,10 @@
         }
       ],
       "decisions": [
+        {
+          "at": "2026-11-07T13:05:40.072Z",
+          "text": "Agent natif déclaré par une ligne agents (anthropic, courses-repas) ; le catalogue filtre sur listed_in_catalog. Rattrapage 9e3600f1 appliqué sur la base de test avec l accord direct du PO."
+        },
         {
           "at": "2026-11-07T11:55:29.816Z",
           "text": "CR-38 (PO) : la durée de la séance se recalcule quand un plat la quitte par un remplacement, affichée comme estimée. L invité secondaire pourra cocher acheté (changement de droit demandé à la BDD, en attente)."
