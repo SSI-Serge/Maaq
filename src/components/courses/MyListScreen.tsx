@@ -54,7 +54,6 @@ function Content({ list, reload, onPrint, printing }: { list: MyList; reload: ()
   const couple = list.access === "couple";
 
   async function tick(key: string, name: string, late: boolean) {
-    if (!couple) return;
     setHidden((h) => new Set(h).add(key));
     const ok = await bought.run("/api/courses/list/bought", { method: "POST", body: { key, bought: true, late } });
     if (!ok) {
@@ -137,8 +136,7 @@ function Content({ list, reload, onPrint, printing }: { list: MyList; reload: ()
         )}
       </section>
 
-      {!printing && couple && <p className={family.hint}>Cochez au fur et à mesure : un produit acheté sort de la liste et rejoint votre historique.</p>}
-      {!couple && !printing && <p className={family.hint}>Vous voyez la liste du foyer. Seuls les deux parents la cochent.</p>}
+      {!printing && <p className={family.hint}>Cochez au fur et à mesure : un produit acheté sort de la liste et rejoint votre historique.</p>}
       {stores.map((s) => (
         <StoreBlock key={s.name} store={s} couple={couple} printing={printing} onTick={(key, name) => void tick(key, name, false)} />
       ))}
@@ -171,7 +169,7 @@ function Content({ list, reload, onPrint, printing }: { list: MyList; reload: ()
 function LateRow({ line, couple, printing, onTick, onRemove }: { line: AddedLine; couple: boolean; printing: boolean; onTick: () => void; onRemove: () => void }) {
   return (
     <div className={styles.line}>
-      {couple && !printing && <button type="button" className={styles.toggleBox} aria-label={`Marquer « ${line.name} » comme acheté`} onClick={onTick} />}
+      {!printing && <button type="button" className={styles.toggleBox} aria-label={`Marquer « ${line.name} » comme acheté`} onClick={onTick} />}
       <div className={styles.lineMain}>
         <div className={styles.lineName}>{line.name}</div>
         <div className={styles.lineSub}>{line.by ? `ajouté par ${line.by}` : "ajouté"}</div>
@@ -202,7 +200,7 @@ function StoreBlock({ store, couple, printing, onTick }: { store: MyStore; coupl
           <h3 className={styles.kick}>{a.name}</h3>
           {a.lines.map((l) => (
             <div key={l.key} className={styles.line}>
-              {couple && !printing && <button type="button" className={styles.toggleBox} aria-label={`Marquer « ${l.name} » comme acheté`} onClick={() => onTick(l.key, l.name)} />}
+              {!printing && <button type="button" className={styles.toggleBox} aria-label={`Marquer « ${l.name} » comme acheté`} onClick={() => onTick(l.key, l.name)} />}
               {printing && <span aria-hidden="true">☐</span>}
               <div className={styles.lineMain}>
                 <div className={styles.lineName}>{l.name}</div>

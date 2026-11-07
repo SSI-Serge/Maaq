@@ -1,3 +1,4 @@
+import { sql } from "kysely";
 import { asProfile } from "@/server/assistant/outings/profile";
 import type { Ctx, SessionContext } from "@/server/auth/service";
 import { courseError, displayPlace, loadSettings, requireAccess, translateCourseError, type CourseAccess } from "../household/settings";
@@ -7,8 +8,8 @@ import type { AddedLine } from "./service";
 
 /**
  * « Ma liste de courses » (US-158) : la liste validée par magasin et par rayon, que l'on coche en magasin. Un produit acheté sort de la liste et rejoint l'historique ; un
- * produit ajouté depuis la validation reste sans magasin ni prix (CR-28). L'invité secondaire voit la liste sans prix ni total et n'a pas de case à cocher : la base ne lui
- * permet que d'ajouter un produit ou d'augmenter une quantité (CR-10).
+ * produit ajouté depuis la validation reste sans magasin ni prix (CR-28). L'invité secondaire voit la liste sans prix ni total, la coche comme le couple et ne retire que
+ * ses propres ajouts (CR-38) ; la lecture passe par grocery_list_for, qui lui rend un prix vide.
  */
 
 export interface MyLine {
@@ -54,14 +55,12 @@ export async function myList(ctx: Ctx, session: SessionContext): Promise<MyList>
   if (!list) return { ...base, empty: true, late: [], stores: [], remaining: null, allBought: false };
 
   const [rows, added, aisles] = await Promise.all([
-    ctx.db
-      .selectFrom("grocery_list_items")
-      .select(["name_key", "label", "quantity", "state", "store_chain", "reference_name", "unit_price", "aisle_id", "created_at"])
-      .where("account_id", "=", who.accountId)
-      .where("list_id", "=", list.id)
-      .where("state", "=", "validated")
-      .orderBy("created_at")
-      .execute(),
+    // lecture par grocery_list_for : le prix estimé n'est rendu qu'au couple (CR-38), le magasin et la référence restent visibles pour l'invité secondaire
+    sql<{ name_key: string; label: string; quantity: number; state: string; store_chain: string | null; reference_name: string | null; unit_price: string | null; aisle_id: number | null; created_at: Date }>`
+      select name_key, label, quantity, state, store_chain, reference_name, unit_price, aisle_id, bought_at as created_at
+        from grocery_list_for(${who.userId}::uuid)
+       where list_id = ${list.id}::uuid and state = 'validated'
+       order by label`.execute(ctx.db).then((r) => r.rows),
     addedLinesOf(ctx.db, who.accountId, who.userId),
     ctx.db.selectFrom("grocery_aisles").select(["id", "name", "sort_order"]).execute(),
   ]);
@@ -98,11 +97,11 @@ export async function myList(ctx: Ctx, session: SessionContext): Promise<MyList>
 }
 
 /**
- * Coche un produit « acheté » (il sort de la liste et rejoint l'historique) ou annule. Réservé au couple. `late` : le produit venait de « Ajoutés depuis la validation »,
+ * Coche un produit « acheté » (il sort de la liste et rejoint l'historique) ou annule. Le couple et l'invité secondaire (CR-38) ; l'invité ne décoche que ses propres coches (la base le garantit). `late` : le produit venait de « Ajoutés depuis la validation »,
  * pour le remettre au bon endroit à l'annulation.
  */
 export async function setBought(ctx: Ctx, session: SessionContext, input: { key: string; bought: boolean; late: boolean }): Promise<void> {
-  const who = await requireAccess(ctx, session, "couple");
+  const who = await requireAccess(ctx, session, "list");
   try {
     await asProfile(ctx.db, who.userId, async (trx) => {
       if (input.bought) {
@@ -126,6 +125,7 @@ export async function setBought(ctx: Ctx, session: SessionContext, input: { key:
       }
     });
   } catch (error) {
+    if (/seulement augmenter une quantité ou cocher/.test((error as Error).message ?? "")) throw courseError("not_yours", "Vous ne pouvez annuler que vos propres coches.", 403);
     if ((error as { code?: string }).code === "23505") throw courseError("already_in_list", "Ce produit est déjà revenu dans la liste.", 409);
     throw translateCourseError(error);
   }

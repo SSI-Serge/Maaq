@@ -26,7 +26,12 @@ export interface DashboardAgent {
   shortDescription: string;
   status: DisplayStatus;
   maintenanceMessage: string | null;
+  /** Agent natif : adresse de son accueil dans l'application (au lieu du tchat Digitorn). */
+  nativePath: string | null;
 }
+
+/** Accueil des agents natifs du catalogue, par référence de plateforme. */
+const NATIVE_PATH: Record<string, string> = { "courses-repas": "/courses" };
 
 export interface Dashboard {
   max: number;
@@ -75,10 +80,10 @@ export async function listCatalog(
     .selectFrom("agents as a")
     .innerJoin("agent_categories as c", "c.id", "a.category_id")
     .select(["a.id", "a.name", "a.short_description", "a.full_description", "a.status", "c.code", "c.label"])
-    // Le catalogue ne présente que les agents de Digitorn tant que les autres plateformes n'y sont pas ouvertes (US-106).
+    // Le catalogue présente les agents marqués « listés » (agents.listed_in_catalog) : ceux de Digitorn et l'agent natif Courses et repas ; l'Assistant Famille a sa tuile fixe.
     // Un agent retiré (lot 14, CR-19) n'apparaît plus au catalogue : il reste en base, réversible.
     .where("a.status", "<>", "retired")
-    .where("a.platform", "=", "digitorn")
+    .where("a.listed_in_catalog", "=", true)
     .where("c.code", "in", categories)
     .execute();
 
@@ -152,7 +157,7 @@ export async function getAgentSheet(ctx: Ctx, session: SessionContext, agentId: 
     .where("a.id", "=", agentId)
     // Un agent retiré (lot 14, CR-19) n'apparaît plus au catalogue : il reste en base, réversible.
     .where("a.status", "<>", "retired")
-    .where("a.platform", "=", "digitorn")
+    .where("a.listed_in_catalog", "=", true)
     .where("c.code", "in", visibleCategories(session))
     .executeTakeFirst();
   if (!agent) throw new Rejection("not_found", "Cet agent n'existe pas ou n'est plus disponible.", 404);
@@ -201,7 +206,7 @@ export async function getDashboard(ctx: Ctx, session: SessionContext): Promise<D
   const rows = await ctx.db
     .selectFrom("v_dashboard_agents as d")
     .innerJoin("agents as a", "a.id", "d.agent_id")
-    .select(["d.agent_id", "d.name", "d.short_description", "d.category_code", "d.display_status", "a.maintenance_message"])
+    .select(["d.agent_id", "d.name", "d.short_description", "d.category_code", "d.display_status", "a.maintenance_message", "a.platform", "a.platform_agent_ref"])
     .where("d.user_id", "=", session.user.id)
     .where("d.category_code", "in", ["pro", "perso", "contracts"])
     .orderBy("d.added_at")
@@ -216,6 +221,7 @@ export async function getDashboard(ctx: Ctx, session: SessionContext): Promise<D
       shortDescription: row.short_description!,
       status: row.display_status as DisplayStatus,
       maintenanceMessage: row.maintenance_message,
+      nativePath: row.platform === "anthropic" ? (NATIVE_PATH[row.platform_agent_ref] ?? null) : null,
     });
   }
   return { max: await integerSetting(ctx.db, "max_agents_per_category", 10), tabs };

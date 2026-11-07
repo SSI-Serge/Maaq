@@ -462,6 +462,10 @@ export interface Agents {
   full_description: string;
   id: Generated<Int8>;
   /**
+   * Vrai = l'agent est proposé dans le catalogue (rubriques Pro et Perso) ; faux = agent à tuile fixe, jamais listé (Assistant Famille). [US-22, 23, 106]
+   */
+  listed_in_catalog: Generated<boolean>;
+  /**
    * Message affiché dans la bannière de blocage, 200 caractères max, obligatoire au blocage
    */
   maintenance_message: string | null;

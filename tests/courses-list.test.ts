@@ -228,11 +228,19 @@ describe("US-158 : Ma liste de courses", () => {
     expect(guest.remaining).toBeNull();
     expect(guest.stores.every((s) => s.subtotal === null && s.aisles.every((a) => a.lines.every((l) => l.price === null)))).toBe(true);
     expect(guest.late.map((l) => l.mine)).toEqual([true]);
-    expect((await rejection(setBought(at(), f.elodie, { key: "oeufs x6", bought: true, late: true }))).status).toBe(403);
+    // CR-38 : l'invité secondaire coche « acheté » n'importe quel article, mais ne décoche que ses propres coches
     await setBought(at(), f.sophie, { key: "oeufs x6", bought: true, late: true });
     expect((await myList(at(), f.sophie)).late).toEqual([]);
+    expect((await rejection(setBought(at(), f.elodie, { key: "oeufs x6", bought: false, late: true }))).code).toBe("not_yours");
     await setBought(at(), f.sophie, { key: "oeufs x6", bought: false, late: true });
     expect((await myList(at(), f.sophie)).late.map((l) => l.name)).toEqual(["Œufs x6"]);
+    const guestTick = (await myList(at(), f.elodie)).stores.flatMap((s) => s.aisles.flatMap((a) => a.lines))[0];
+    await setBought(at(), f.elodie, { key: guestTick.key, bought: true, late: false });
+    await setBought(at(), f.elodie, { key: guestTick.key, bought: false, late: false });
+    expect((await myList(at(), f.elodie)).stores.flatMap((s) => s.aisles.flatMap((a) => a.lines)).some((l) => l.key === guestTick.key)).toBe(true);
+    // ce que le couple a coché, elle ne peut pas le décocher
+    await setBought(at(), f.sophie, { key: guestTick.key, bought: true, late: false });
+    expect((await rejection(setBought(at(), f.elodie, { key: guestTick.key, bought: false, late: false }))).code).toBe("not_yours");
   });
 });
 

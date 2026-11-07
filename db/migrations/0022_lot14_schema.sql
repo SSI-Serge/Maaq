@@ -483,6 +483,9 @@ ALTER TABLE agents
   ADD COLUMN retired_at              timestamptz;
 ALTER TABLE agents
   ADD COLUMN retired_by_user_id      uuid REFERENCES users (id) ON DELETE SET NULL;
+-- Présent dans le catalogue (rubriques Pro et Perso) : faux pour un agent à tuile fixe comme l'Assistant Famille (lot 14, décision du PO du 07/11/2026) ; la plateforme ne sert plus de critère de liste
+ALTER TABLE agents
+  ADD COLUMN listed_in_catalog       boolean NOT NULL DEFAULT true;
 -- Un agent retiré porte sa date de retrait ; un agent qui ne l'est pas n'en porte pas
 ALTER TABLE agents
   ADD CONSTRAINT ck_agents_retired CHECK ((status = 'retired') = (retired_at IS NOT NULL));
@@ -561,18 +564,37 @@ BEGIN
   IF TG_OP = 'UPDATE' AND NEW.account_id IS DISTINCT FROM OLD.account_id THEN
     RAISE EXCEPTION 'Un produit de la liste ne change pas de foyer' USING ERRCODE = 'check_violation';
   END IF;
-  -- Invité secondaire : il ajoute un produit (ou augmente sa quantité), rien d'autre (CR-10)
+  -- Invité secondaire (CR-10, CR-38) : il ajoute un produit en son nom, augmente sa quantité en le rajoutant, ou coche « acheté » un article de la liste validée ; rien d'autre
   IF v_user IS NOT NULL AND grocery_access(v_user) = 'list' THEN
     IF TG_OP = 'INSERT' THEN
       IF NEW.state NOT IN ('preparing', 'added_after_validation') OR NEW.added_by_user_id IS DISTINCT FROM v_user THEN
         RAISE EXCEPTION 'Un invité secondaire ajoute un produit en son nom, sans autre changement' USING ERRCODE = 'check_violation';
       END IF;
-    ELSIF (to_jsonb(NEW) - 'quantity' - 'updated_at') IS DISTINCT FROM (to_jsonb(OLD) - 'quantity' - 'updated_at') OR NEW.quantity <= OLD.quantity THEN
-      RAISE EXCEPTION 'Un invité secondaire peut seulement augmenter la quantité d''un produit' USING ERRCODE = 'check_violation';
+    ELSIF (to_jsonb(NEW) - 'quantity' - 'updated_at') IS NOT DISTINCT FROM (to_jsonb(OLD) - 'quantity' - 'updated_at') AND NEW.quantity > OLD.quantity THEN
+      NULL;                                              -- quantité qui augmente seule
+    ELSIF (to_jsonb(NEW) - 'state' - 'bought_at' - 'bought_by_user_id' - 'updated_at') IS NOT DISTINCT FROM (to_jsonb(OLD) - 'state' - 'bought_at' - 'bought_by_user_id' - 'updated_at')
+          AND ((OLD.state IN ('validated', 'added_after_validation') AND NEW.state = 'bought' AND NEW.bought_at IS NOT NULL AND NEW.bought_by_user_id = v_user)
+            OR (OLD.state = 'bought' AND OLD.bought_by_user_id = v_user AND NEW.state IN ('validated', 'added_after_validation')
+                AND NEW.bought_at IS NULL AND NEW.bought_by_user_id IS NULL)) THEN
+      NULL;                                              -- coche « acheté » (n'importe quel article validé) ou décoche de sa propre coche
+    ELSE
+      RAISE EXCEPTION 'Un invité secondaire peut seulement augmenter une quantité ou cocher « acheté » un article de la liste validée' USING ERRCODE = 'check_violation';
     END IF;
   END IF;
   RETURN NEW;
 END $$;
+-- Lecture de la liste sans prix pour l'invité secondaire (CR-38) : le prix estimé est vide pour lui, intact pour le couple ; magasin et référence restent visibles
+CREATE FUNCTION grocery_list_for(p_viewer uuid)
+RETURNS TABLE (id uuid, list_id uuid, state grocery_item_state, source text, label varchar, name_key text, product_id bigint, aisle_id integer, quantity smallint,
+               added_by_user_id uuid, not_bought_last_time boolean, store_chain varchar, reference_name varchar, unit_price numeric, bought_at timestamptz,
+               bought_by_user_id uuid)
+LANGUAGE sql STABLE AS $$
+  SELECT i.id, i.list_id, i.state, i.source, i.label, i.name_key, i.product_id, i.aisle_id, i.quantity, i.added_by_user_id, i.not_bought_last_time,
+         i.store_chain, i.reference_name, CASE WHEN grocery_access(p_viewer) = 'couple' THEN i.unit_price END, i.bought_at, i.bought_by_user_id
+    FROM users v
+    JOIN grocery_list_items i ON i.account_id = v.account_id
+   WHERE v.id = p_viewer AND grocery_access(p_viewer) IS NOT NULL
+$$;
 -- À la préparation de la liste suivante, les produits non achetés (liste validée et « ajoutés depuis la validation ») reviennent en préparation
 CREATE FUNCTION grocery_carry_over_unbought(p_account uuid) RETURNS integer LANGUAGE plpgsql AS $$
 DECLARE v_n integer;
@@ -991,6 +1013,26 @@ INSERT INTO grocery_aisles (name, sort_order) VALUES
   ('Volaille', 13), ('Sauces tomate', 14), ('Boissons', 15), ('Entretien', 16), ('Soins du corps', 17), ('Petit-déjeuner', 18), ('Autres', 19);
 INSERT INTO legal_document_versions (document_type, version_label, content, published_at) VALUES
   ('grocery_price_sharing_consent', '1.0', 'Les prix de vos tickets sont ajoutés, sans votre nom, à une base commune. En échange, vous voyez les prix relevés par les autres foyers.', now());
+-- L'Assistant Famille a une tuile fixe : il n'est jamais listé dans le catalogue
+UPDATE agents SET listed_in_catalog = false WHERE platform = 'anthropic' AND platform_agent_ref = 'assistant-famille';
+-- Agent natif « Courses et repas » (US-152, décision du PO du 07/11/2026) : appelé par l'API Anthropic directe comme l'Assistant Famille, rubrique Perso, listé dans le catalogue ; sa ligne est une donnée
+-- de référence (les données du foyer se rattachent au compte, pas à l'agent). Les exemples de demandes se saisissent dans la console.
+INSERT INTO agents (platform, platform_agent_ref, name, category_id, short_description, full_description, status) VALUES
+  ('anthropic', 'courses-repas', 'Courses et repas', (SELECT id FROM agent_categories WHERE code = 'perso'),
+   'Le menu de la semaine en 5 minutes, des courses sans oubli, une séance de batch cooking de 2 h au plus et vos prix comparés.',
+   '1. Penser aux courses une seule fois par semaine.
+2. Utiliser vos propres recettes, ou en recevoir d''autres.
+3. Établir le menu de la semaine et les recettes en 5 minutes.
+4. Faire les courses sans oubli grâce à l''historique, en 5 minutes.
+5. Préparer les repas de la semaine en 2 heures au plus.
+6. Réduire les achats à emporter et en livraison.
+7. Des références et des substituts sans ingrédients nocifs.
+8. Comparer les prix aux prix de référence et à ceux des foyers proches.
+9. Suivre l''évolution du budget courses et repas.
+10. Comparer votre stratégie d''achat.
+
+Réglages, listes et menus partagés par le foyer.
+Partagez vos prix pour voir ceux des foyers proches.', 'available');
 -- Réglages de la console (US-65) : plafond de séance, répétition, seuils de correspondance, ancienneté des prix, ville affichée, seuils « à vérifier »
 -- (en centimes pour les bornes absolues), durées de conservation
 INSERT INTO platform_settings (setting_key, value_type, value_text, min_value, max_value, description) VALUES
@@ -1016,6 +1058,7 @@ INSERT INTO platform_settings (setting_key, value_type, value_text, min_value, m
 -- Commentaires
 -- ---------------------------------------------------------------------
 COMMENT ON COLUMN agents.status IS $$available = utilisable ; blocked = maintenance, MAAQ refuse toute nouvelle demande vers cet agent (US-42 RT1) ; retired = retiré du catalogue et des tableaux de bord, réversible (CR-34)$$;
+COMMENT ON COLUMN agents.listed_in_catalog IS $$Vrai = l'agent est proposé dans le catalogue (rubriques Pro et Perso) ; faux = agent à tuile fixe, jamais listé (Assistant Famille). Remplace le filtre sur la plateforme, qui ne distingue pas un agent natif à tuile fixe d'un agent natif du catalogue (Courses et repas). Vrai par défaut. [US-22, 23, 106, décision du PO du 07/11/2026]$$;
 COMMENT ON COLUMN agents.retired_at IS $$Date du retrait de l'agent du catalogue ; renseignée si et seulement si le statut est « retired ». Un agent retiré est invisible du catalogue et des tableaux de bord, et se rétablit sans perte. [CR-34]$$;
 COMMENT ON FUNCTION grocery_norm(text) IS $$Clé normalisée d'un texte : minuscules, espaces de début et de fin retirés, espaces multiples réduits à un. Sert de clé d'unicité aux produits, enseignes, villes et références ; la normalisation fine (accents, pluriels) est celle de l'application. [CR-25]$$;
 COMMENT ON FUNCTION grocery_setting_int(text, integer) IS $$Valeur entière d'un réglage de la console (platform_settings), ou la valeur par défaut donnée si le réglage n'existe pas. Sert aux règles de Courses et repas. [US-153, US-175]$$;
@@ -1075,8 +1118,10 @@ COMMENT ON COLUMN meal_menus.session_is_estimated IS $$Vrai si aucune semaine ty
 COMMENT ON TABLE meal_menu_entries IS $$Plats d'un menu validé : plats plaisir choisis, 7 dîners, plats express. Chaque ligne garde le nom du plat tel qu'il était, avec son lien vers le catalogue ou vers un plat personnel : un plat retiré ou supprimé ensuite reste lisible dans les menus déjà validés. Les remplacements proposés ne sont pas gardés : le plat choisi remplace la ligne et porte « hors séance batch ». [US-156 RF3, RF4, RF7, RF8, CR-25]$$;
 COMMENT ON TABLE meal_light_choices IS $$Choix du foyer, plat par plat, entre la version standard et la version allégée : enregistré à « Valider ma liste » et repris au menu suivant. Un retour à la version standard rétablit la liste. [US-157 RF5, RF9]$$;
 COMMENT ON TABLE grocery_lists IS $$Liste de courses validée (« Valider ma liste ») : scénario d'achat choisi, menu d'origine, date, profil. La dernière liste validée est « Ma liste de courses », consultée en magasin par magasin puis par rayon. La liste vide de tout produit est supprimée par la purge. [US-157 RF7, RF9]$$;
-COMMENT ON TABLE grocery_list_items IS $$Produit de la liste de courses du foyer, avec son état : en préparation, validé, ajouté depuis la validation (sans magasin ni prix, en tête de « Ma liste de courses »), acheté. Un produit n'est qu'une fois dans la liste ouverte (la quantité augmente). Les produits non achetés reviennent en préparation avec « pas acheté la dernière fois » (grocery_carry_over_unbought). Les produits achetés forment l'historique du foyer, conservé 3 mois (réglable). Le couple retire tout ; un invité secondaire ne retire que ses propres ajouts et n'augmente que les quantités. [US-157 RF3, RF9, US-158, US-162, CR-10, CR-27, CR-28]$$;
+COMMENT ON TABLE grocery_list_items IS $$Produit de la liste de courses du foyer, avec son état : en préparation, validé, ajouté depuis la validation (sans magasin ni prix, en tête de « Ma liste de courses »), acheté. Un produit n'est qu'une fois dans la liste ouverte (la quantité augmente). Les produits non achetés reviennent en préparation avec « pas acheté la dernière fois » (grocery_carry_over_unbought). Les produits achetés forment l'historique du foyer, conservé 3 mois (réglable). Le couple retire tout ; un invité secondaire ne retire que ses propres ajouts, n'augmente que les quantités et peut cocher « acheté » (CR-38), sans voir aucun prix (grocery_list_for). [US-157 RF3, RF9, US-158, US-162, CR-10, CR-27, CR-28]$$;
 COMMENT ON COLUMN grocery_list_items.state IS $$preparing = en préparation (aucun magasin, aucun prix) ; validated = dans la liste validée, avec son magasin, sa référence et son prix estimé ; added_after_validation = ajouté depuis la validation, sans magasin ni prix ; bought = acheté (date et profil). [US-157 RF9, US-158 RF3bis, CR-28]$$;
+COMMENT ON FUNCTION grocery_list_item_before_write() IS $$Garde-fou de la liste de courses : un invité secondaire (profil indiqué dans app.user_id) peut ajouter un produit en son nom, augmenter une quantité, cocher « acheté » n'importe quel article de la liste validée (état validé ou ajouté depuis la validation, à son nom) et décocher ce qu'il a lui-même coché ; il ne change jamais un magasin, une référence, un prix, une quantité en même temps ni le libellé. Sans profil indiqué, le garde-fou ne s'applique pas (H144). [US-158 RF2, RF3, US-162, CR-10, CR-38]$$;
+COMMENT ON FUNCTION grocery_list_for(uuid) IS $$Articles de la liste de courses de la famille d'un profil, pour l'affichage : le prix estimé n'est rendu qu'au couple, l'invité secondaire ne voit aucun prix (il voit le magasin et la référence). L'application l'utilise pour lire la liste ; tant qu'elle se connecte avec un seul rôle, la protection effective des colonnes est cette fonction et le code (H150). [US-157 RF8, US-158, CR-10, CR-38]$$;
 COMMENT ON FUNCTION grocery_carry_over_unbought(uuid) IS $$Reprend dans la préparation suivante les produits non achetés de la liste validée et du bloc « Ajoutés depuis la validation » : ils redeviennent « en préparation », sans magasin ni prix, avec la mention « pas acheté la dernière fois ». Retourne le nombre de produits repris. À appeler à l'ouverture de la préparation de la liste. [US-162 RF4, CR-28]$$;
 COMMENT ON TABLE grocery_receipts IS $$Ticket de caisse enregistré : magasin, ville, date, total, profil. Aucune photo ni image (supprimée dès la lecture, confirmée ou non), le nom et la carte de fidélité sont masqués avant que l'agent ne reçoive le texte. Un doublon (même magasin, date et total) est refusé. Source du budget par rayon. Conservé 3 ans (année en cours et deux précédentes, réglable). [US-161, US-163, CR-05, CR-08, CR-23]$$;
 COMMENT ON TABLE grocery_receipt_lines IS $$Ligne d'un ticket : produit, référence, prix total de la ligne, quantité, rayon (choisi dans la liste des rayons). Les lignes alimentent le budget par rayon, les prix du foyer et les produits de son historique. [US-161 RF2 à RF5, US-163]$$;
