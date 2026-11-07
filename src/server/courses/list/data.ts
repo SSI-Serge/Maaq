@@ -1,11 +1,13 @@
 import { sql, type Kysely } from "kysely";
 import type { DB } from "@/server/db/schema.generated";
-import type { CommonPrice, HistoryPrice, LightVersion, ReferenceRow } from "../engine";
+import type { CommonPrice, HistoryPrice, LightVersion, PriceUnit, ReferenceRow } from "../engine";
 import { displayPlace } from "../household/settings";
 
 /** Lectures de base de la liste de courses : références du catalogue, historique des tickets, prix partagés, versions allégées. Le moteur n'en voit que des lignes simples. */
 
 const isoDay = (value: Date | string) => (typeof value === "string" ? value.slice(0, 10) : `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`);
+
+const asPriceUnit = (value: string | null | undefined): PriceUnit => (value === "kg" || value === "l" ? value : "unit");
 
 export interface ExcludedReference {
   product: string;
@@ -28,7 +30,7 @@ export async function loadReferences(db: Kysely<DB>): Promise<References> {
     .selectFrom("v_grocery_product_references as r")
     .innerJoin("grocery_products as p", "p.id", "r.product_id")
     .innerJoin("grocery_aisles as a", "a.id", "p.aisle_id")
-    .select(["p.name as product", "a.name as rayon", "r.store_chain", "r.reference_name", "r.unit_price", "r.price_date", "r.is_compliant", "r.needs_label_check", "r.excluded_because", "r.compliance_status", "r.package_format"])
+    .select(["p.name as product", "a.name as rayon", "r.store_chain", "r.reference_name", "r.unit_price", "r.price_date", "r.is_compliant", "r.needs_label_check", "r.excluded_because", "r.compliance_status", "r.package_format", "r.price_unit", "r.measure_unit", "r.price_per_measure"])
     .orderBy("p.name")
     .orderBy("r.store_chain")
     .execute();
@@ -53,6 +55,8 @@ export async function loadReferences(db: Kysely<DB>): Promise<References> {
       conform: true,
       labelCheck: !!r.needs_label_check,
       format: r.package_format,
+      priceUnit: asPriceUnit(r.price_unit),
+      perMeasure: r.price_per_measure !== null && (r.measure_unit === "kg" || r.measure_unit === "l") ? { value: Number(r.price_per_measure), unit: r.measure_unit } : null,
     });
   }
   return { rows: refs, excluded, aisles };
@@ -63,7 +67,7 @@ export async function loadHistory(db: Kysely<DB>, accountId: string): Promise<Hi
   const rows = await db
     .selectFrom("grocery_receipt_lines as l")
     .innerJoin("grocery_receipts as r", (j) => j.onRef("r.id", "=", "l.receipt_id").onRef("r.account_id", "=", "l.account_id"))
-    .select(["l.label", "l.reference_name", "l.line_total", "l.quantity", "r.store_chain", "r.store_city", "r.purchased_on"])
+    .select(["l.label", "l.reference_name", "l.line_total", "l.quantity", "l.measure_unit", "l.price_per_measure", "r.store_chain", "r.store_city", "r.purchased_on"])
     .where("l.account_id", "=", accountId)
     .where("l.line_total", ">", "0")
     .orderBy("r.purchased_on")
@@ -71,7 +75,9 @@ export async function loadHistory(db: Kysely<DB>, accountId: string): Promise<Hi
   return rows.map((r) => ({
     product: r.label,
     ref: r.reference_name ?? r.label,
-    unitPrice: Number((Number(r.line_total) / Number(r.quantity)).toFixed(2)),
+    // ligne pesée : le prix au kilo ou au litre, jamais le poids ; sinon le prix d'un article
+    unitPrice: r.measure_unit && r.price_per_measure !== null ? Number(r.price_per_measure) : Number((Number(r.line_total) / Number(r.quantity)).toFixed(2)),
+    priceUnit: r.measure_unit && r.price_per_measure !== null ? asPriceUnit(r.measure_unit) : ("unit" as PriceUnit),
     store: displayPlace(r.store_chain),
     date: isoDay(r.purchased_on as Date | string),
     city: r.store_city ? displayPlace(r.store_city) : null,
@@ -80,8 +86,8 @@ export async function loadHistory(db: Kysely<DB>, accountId: string): Promise<Hi
 
 /** Prix relevés par les autres foyers, lisibles seulement si le foyer partage les siens (réciprocité gérée par la base). */
 export async function loadCommonPrices(db: Kysely<DB>, userId: string): Promise<CommonPrice[]> {
-  const rows = await sql<{ name: string; reference_name: string; unit_price: string; store_chain: string; city: string; week_start: Date | string }>`
-    select p.name, s.reference_name, s.unit_price, s.store_chain, s.city, s.week_start
+  const rows = await sql<{ name: string; reference_name: string; unit_price: string; store_chain: string; city: string; week_start: Date | string; price_unit: string; measure_unit: string | null; price_per_measure: string | null }>`
+    select p.name, s.reference_name, s.unit_price, s.store_chain, s.city, s.week_start, s.price_unit, s.measure_unit, s.price_per_measure
       from grocery_shared_prices_for(${userId}::uuid) s join grocery_products p on p.id = s.product_id`.execute(db);
   return rows.rows.map((r) => ({
     product: r.name,
@@ -90,6 +96,8 @@ export async function loadCommonPrices(db: Kysely<DB>, userId: string): Promise<
     store: displayPlace(r.store_chain),
     city: displayPlace(r.city),
     week: isoDay(r.week_start),
+    priceUnit: asPriceUnit(r.price_unit),
+    perMeasure: r.price_per_measure !== null && (r.measure_unit === "kg" || r.measure_unit === "l") ? { value: Number(r.price_per_measure), unit: r.measure_unit } : null,
   }));
 }
 

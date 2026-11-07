@@ -21,6 +21,7 @@ Règles :
 - `store` : l'enseigne telle qu'imprimée en tête du ticket (« Lidl », « E.Leclerc »…). `city` : la ville du magasin si elle est imprimée, sinon null. Jamais une adresse de rue.
 - `date` : la date d'achat au format AAAA-MM-JJ ; null si elle est illisible.
 - Une ligne par produit acheté. `product` : le nom du produit en clair, sans quantité ni code. `reference` : la marque ou le libellé précis imprimé, sinon null. `total` : le prix TOTAL de la ligne en euros (quantité déjà multipliée), avec un point décimal ; une remise est négative. `qty` : la quantité (nombre, 1 par défaut). Pour un produit au poids, `qty` vaut 1.
+- Produit vendu au poids ou au volume (« 1,234 kg x 1,49 €/kg ») : `weight` = le poids ou le volume imprimé (nombre), `weight_unit` = son unité ("kg", "g", "l", "cl" ou "ml") et `price_per_unit` = le prix au kilo ou au litre imprimé, s'il l'est. Dans ce cas `qty` vaut 1 et `total` reste le prix de la ligne. N'invente jamais un poids : sans poids imprimé, laisse ces trois champs de côté.
 - `aisle` : EXACTEMENT un rayon de la liste fournie avec le texte ; « Autres » si aucun ne convient.
 - N'ajoute aucune ligne pour le total, la TVA, le paiement, la monnaie rendue, la carte de fidélité ni les remises globales sans produit.
 - Un montant illisible : ne devine pas, laisse la ligne de côté.

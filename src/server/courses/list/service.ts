@@ -306,6 +306,8 @@ export interface ValidateLine {
   store: string | null;
   ref: string | null;
   price: number | null;
+  /** Unité du prix : par article (défaut), au kilo ou au litre ; un article au kilo n'entre pas dans le total (CR-40). */
+  priceUnit?: "unit" | "kg" | "l";
   /** D'où vient le produit : menu, ajouté, historique (pour une ligne qui n'existe pas encore en base). */
   source: "menu" | "added" | "habit";
 }
@@ -333,7 +335,7 @@ export async function validateList(ctx: Ctx, session: SessionContext, input: { s
         done.add(key);
         const store = line.store && line.price !== null ? placeKey(line.store).slice(0, 80) : null;
         const price = store && line.price !== null && line.price > 0 && line.price <= 10000 ? Number(line.price.toFixed(2)) : null;
-        const fields = { state: "validated" as const, list_id: list.id, quantity: Math.min(Math.max(Math.round(line.qty) || 1, 1), 99), store_chain: price === null ? null : store, reference_name: price === null ? null : (line.ref ?? "").slice(0, 160) || null, unit_price: price === null ? null : String(price), updated_at: ctx.now };
+        const fields = { state: "validated" as const, list_id: list.id, quantity: Math.min(Math.max(Math.round(line.qty) || 1, 1), 99), store_chain: price === null ? null : store, reference_name: price === null ? null : (line.ref ?? "").slice(0, 160) || null, unit_price: price === null ? null : String(price), price_unit: price === null ? null : (line.priceUnit ?? "unit"), updated_at: ctx.now };
         const id = openId.get(key);
         if (id) {
           await trx.updateTable("grocery_list_items").set(fields).where("id", "=", id).execute();

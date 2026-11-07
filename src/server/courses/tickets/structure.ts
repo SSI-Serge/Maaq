@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { createModel, type AssistantModel, type TextBlock } from "@/server/assistant/model";
 import { env } from "@/server/env";
-import { norm } from "../engine";
+import { norm, pricePerMeasure, toMeasure, type MeasureUnit } from "../engine";
 
 /**
  * Mise en forme du texte d'un ticket (US-161 RF2) : un appel du modèle, sans outil, sur le seul texte masqué, qui répond par un objet JSON. Le résultat est vérifié ici ligne par
@@ -16,6 +16,10 @@ export interface TicketLineDraft {
   total: number;
   qty: number;
   aisle: string;
+  /** Produit pesé : poids ou volume en kilos ou en litres (les grammes et centilitres sont convertis), prix au kilo ou au litre lu ou calculé (CR-39). */
+  measured: number | null;
+  measureUnit: MeasureUnit | null;
+  pricePerMeasure: number | null;
 }
 
 export interface TicketDraft {
@@ -97,7 +101,19 @@ export function normalizeDraft(raw: unknown, aisles: string[], today: string): T
     if (!product || total === null) continue;
     const qtyRaw = Number(String(l.qty ?? 1).replace(",", "."));
     const qty = Number.isFinite(qtyRaw) && qtyRaw > 0 && qtyRaw <= 999 ? Math.round(qtyRaw * 1000) / 1000 : 1;
-    lines.push({ product, reference: clean(l.reference, 160) || null, total, qty, aisle: aisleByKey.get(norm(clean(l.aisle, 60))) ?? aisleByKey.get(norm(OTHER)) ?? aisles[0] ?? OTHER });
+    const weight = Number(String(l.weight ?? "").replace(",", "."));
+    const measure = l.weight !== undefined && l.weight !== null && Number.isFinite(weight) ? toMeasure(weight, clean(l.weight_unit, 4)) : null;
+    const read = Number(String(l.price_per_unit ?? "").replace(/\s/g, "").replace("€", "").replace(",", "."));
+    lines.push({
+      product,
+      reference: clean(l.reference, 160) || null,
+      total,
+      qty: measure ? 1 : qty,
+      aisle: aisleByKey.get(norm(clean(l.aisle, 60))) ?? aisleByKey.get(norm(OTHER)) ?? aisles[0] ?? OTHER,
+      measured: measure?.amount ?? null,
+      measureUnit: measure?.unit ?? null,
+      pricePerMeasure: measure ? pricePerMeasure(Number.isFinite(read) && read > 0 ? read : null, total, measure.amount) : null,
+    });
     if (lines.length >= MAX_LINES) break;
   }
   const dateText = clean(data.date, 10);

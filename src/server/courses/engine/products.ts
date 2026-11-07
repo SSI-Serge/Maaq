@@ -1,5 +1,6 @@
 import { GENERIC, has, ingPhrases, norm, plist, SINGLE_DENY, STOP_ING } from "./text";
 import type { Dish } from "./types";
+import type { PerUnitPrice, PriceUnit } from "./unitprice";
 
 /** Une ligne du catalogue des références (US-166) : un produit, une enseigne, une référence conforme ou non, son prix et la date du prix. */
 export interface ReferenceRow {
@@ -17,6 +18,10 @@ export interface ReferenceRow {
   labelCheck?: boolean;
   /** Format du conditionnement (« 1 kg », « sachet de 250 g »). */
   format?: string | null;
+  /** Unité du prix : par article (défaut), au kilo ou au litre (produit vendu au poids). */
+  priceUnit?: PriceUnit;
+  /** Prix au kilo ou au litre déduit par la base du format (vide si le format n'est pas compris). */
+  perMeasure?: PerUnitPrice | null;
 }
 
 export interface StorePrice {
@@ -25,6 +30,8 @@ export interface StorePrice {
   priceDate: string | null;
   labelCheck: boolean;
   format: string | null;
+  priceUnit: PriceUnit;
+  perMeasure: PerUnitPrice | null;
 }
 
 export interface RefProduct {
@@ -48,7 +55,7 @@ export function buildRefProducts(rows: ReferenceRow[]): Map<string, RefProduct> 
       p = { name: r.product, rayon: r.rayon, used: r.used ?? "", stores: new Map(), kw: [], kwFull: [] };
       prods.set(r.product, p);
     }
-    if (r.conform) p.stores.set(r.store, { ref: r.ref, price: r.price, priceDate: r.priceDate, labelCheck: !!r.labelCheck, format: r.format ?? null });
+    if (r.conform) p.stores.set(r.store, { ref: r.ref, price: r.price, priceDate: r.priceDate, labelCheck: !!r.labelCheck, format: r.format ?? null, priceUnit: r.priceUnit ?? "unit", perMeasure: r.perMeasure ?? null });
   }
   for (const [name, p] of prods) {
     const alts = name

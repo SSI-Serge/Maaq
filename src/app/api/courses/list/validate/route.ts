@@ -12,6 +12,7 @@ const line = z.object({
   store: z.string().max(80).nullable(),
   ref: z.string().max(160).nullable(),
   price: z.number().min(0).max(10000).nullable(),
+  priceUnit: z.enum(["unit", "kg", "l"]).optional(),
   source: z.enum(["menu", "added", "habit"]),
 });
 

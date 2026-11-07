@@ -19,8 +19,10 @@ export interface MyLine {
   /** Format du conditionnement de la référence retenue (visible aussi de l'invité secondaire). */
   format: string | null;
   qty: number;
-  /** Prix de la ligne (prix d'une unité × quantité) ; vide pour l'invité secondaire ou sans prix connu. */
+  /** Prix de la ligne (prix d'un article × quantité) ; vide pour l'invité secondaire, sans prix connu ou pour un article au kilo. */
   price: number | null;
+  /** Article vendu au kilo ou au litre : prix au kilo ou au litre, non totalisé (CR-40). Vide pour l'invité secondaire. */
+  perMeasure: { value: number; unit: "kg" | "l" } | null;
 }
 
 export interface MyStore {
@@ -58,8 +60,8 @@ export async function myList(ctx: Ctx, session: SessionContext): Promise<MyList>
 
   const [rows, added, aisles] = await Promise.all([
     // lecture par grocery_list_for : le prix estimé n'est rendu qu'au couple (CR-38), le magasin et la référence restent visibles pour l'invité secondaire
-    sql<{ name_key: string; label: string; quantity: number; state: string; store_chain: string | null; reference_name: string | null; unit_price: string | null; aisle_id: number | null; created_at: Date; package_format: string | null }>`
-      select name_key, label, quantity, state, store_chain, reference_name, unit_price, aisle_id, bought_at as created_at, package_format
+    sql<{ name_key: string; label: string; quantity: number; state: string; store_chain: string | null; reference_name: string | null; unit_price: string | null; aisle_id: number | null; created_at: Date; package_format: string | null; price_unit: string | null }>`
+      select name_key, label, quantity, state, store_chain, reference_name, unit_price, aisle_id, bought_at as created_at, package_format, price_unit
         from grocery_list_for(${who.userId}::uuid)
        where list_id = ${list.id}::uuid and state = 'validated'
        order by label`.execute(ctx.db).then((r) => r.rows),
@@ -88,13 +90,14 @@ export async function myList(ctx: Ctx, session: SessionContext): Promise<MyList>
             reference: r.reference_name,
             format: r.package_format,
             qty: r.quantity,
-            price: showPrices && r.unit_price !== null ? round2(Number(r.unit_price) * r.quantity) : null,
+            price: showPrices && r.unit_price !== null && (!r.price_unit || r.price_unit === "unit") ? round2(Number(r.unit_price) * r.quantity) : null,
+            perMeasure: showPrices && r.unit_price !== null && (r.price_unit === "kg" || r.price_unit === "l") ? { value: Number(r.unit_price), unit: r.price_unit === "kg" ? ("kg" as const) : ("l" as const) } : null,
           })),
         }));
-      const sum = items.reduce((s, r) => s + (r.unit_price !== null ? Number(r.unit_price) * r.quantity : 0), 0);
+      const sum = items.reduce((s, r) => s + (r.unit_price !== null && (!r.price_unit || r.price_unit === "unit") ? Number(r.unit_price) * r.quantity : 0), 0);
       return { name: chain ? displayPlace(chain) : "À trouver sur place", city: chain ? cityOf(chain) : null, subtotal: showPrices && chain ? round2(sum) : null, aisles: aisleList };
     });
-  const remaining = showPrices ? round2(rows.reduce((s, r) => s + (r.unit_price !== null ? Number(r.unit_price) * r.quantity : 0), 0)) : null;
+  const remaining = showPrices ? round2(rows.reduce((s, r) => s + (r.unit_price !== null && (!r.price_unit || r.price_unit === "unit") ? Number(r.unit_price) * r.quantity : 0), 0)) : null;
   const late = added.filter((a) => a.late);
   return { ...base, empty: false, late, stores, remaining, allBought: rows.length === 0 && late.length === 0 };
 }

@@ -14,6 +14,8 @@ import styles from "./courses.module.css";
 const BACK = { href: "/courses", label: "Courses et repas" };
 
 export const euro = (value: number) => `${value.toFixed(2).replace(".", ",")} €`;
+/** « 1,49 €/kg » : prix au kilo ou au litre. */
+export const euroPer = (value: number, unit: "kg" | "l" | "unit") => `${euro(value)}${unit === "unit" ? "" : unit === "kg" ? "/kg" : "/L"}`;
 const priceText = (value: number | null) => (value === null ? "N/A" : euro(value));
 
 /** « Liste de courses » (US-157, US-158) : préparation après la validation du menu, comparatif des prix, trois scénarios d'achat, validation. */
@@ -332,7 +334,7 @@ function Preparation({ list, reload }: { list: ListPrepared; reload: () => void 
                     <label key={`${c.kind}-${k}`} className={styles.choice}>
                       <input type="checkbox" role="checkbox" checked={on} onChange={() => patch({ selected: { ...picks.selected, [norm(i.name)]: on ? null : k } })} />
                       <span>
-                        {label} · {c.ref}{c.format ? ` (${c.format})` : ""} · {priceText(c.price)}{c.perUnit ? ` (${c.perUnit.value.toFixed(2).replace(".", ",")} €/${c.perUnit.unit === "kg" ? "kg" : "L"})` : ""} — {c.store}
+                        {label} · {c.ref}{c.format ? ` (${c.format})` : ""} · {c.price !== null && c.priceUnit && c.priceUnit !== "unit" ? euroPer(c.price, c.priceUnit) : priceText(c.price)}{c.perUnit && (!c.priceUnit || c.priceUnit === "unit") ? ` (${euroPer(c.perUnit.value, c.perUnit.unit)})` : ""} — {c.store}
                         {c.city ? `, ${c.city}` : ""}
                         {AGE_LABEL[c.age] ? ` — ${AGE_LABEL[c.age]}` : ""}
                         {c.labelCheck && <span className={styles.meta}> · Composition à vérifier sur l&apos;étiquette</span>}
@@ -354,7 +356,10 @@ function Preparation({ list, reload }: { list: ListPrepared; reload: () => void 
             <button key={s.id} type="button" className={styles.scenarioCard} onClick={() => setView(s.id)}>
               <span>
                 <div className={styles.lineName}>{scenarioTitle(s)}</div>
-                <div className={styles.lineSub}>{s.withoutPrice === 0 ? "Tous les produits ont un prix" : `${s.withoutPrice} produit${s.withoutPrice > 1 ? "s" : ""} sans prix`}</div>
+                <div className={styles.lineSub}>
+                  {s.withoutPrice === 0 ? "Tous les produits ont un prix" : `${s.withoutPrice} produit${s.withoutPrice > 1 ? "s" : ""} sans prix`}
+                  {s.notTotaled > 0 ? ` · ${s.notTotaled} au kilo, non totalisé${s.notTotaled > 1 ? "s" : ""}` : ""}
+                </div>
               </span>
               <span className={styles.scenarioTotal}>{euro(s.total)} ›</span>
             </button>
@@ -404,8 +409,10 @@ function ScenarioView({
   for (const l of lines) groups.set(l.store ?? "", [...(groups.get(l.store ?? "") ?? []), l]);
   const ordered = [...groups].sort(([a], [b]) => (a === "" ? 1 : b === "" ? -1 : a.localeCompare(b, "fr")));
   const kept = lines.filter((l) => !picks.removed[norm(l.name)]);
-  const total = kept.reduce((s, l) => s + (l.price ?? 0) * l.qty, 0);
+  // un article vendu au kilo ou au litre n'entre pas dans le total estimé (CR-40)
+  const total = kept.reduce((s, l) => s + (l.priceUnit === "unit" ? (l.price ?? 0) * l.qty : 0), 0);
   const without = kept.filter((l) => l.price === null).length;
+  const loose = kept.filter((l) => l.price !== null && l.priceUnit !== "unit").length;
 
   return (
     <>
@@ -436,7 +443,7 @@ function ScenarioView({
                       <div className={styles.lineMain}>
                         <div className={styles.lineName}>{l.name}</div>
                         <div className={styles.lineSub}>
-                          {l.price === null ? "Prix inconnu (N/A)" : `${l.ref ?? ""}${l.format ? ` (${l.format})` : ""}${l.age && AGE_LABEL[l.age] ? ` · ${AGE_LABEL[l.age]}` : ""}`}
+                          {l.price === null ? "Prix inconnu (N/A)" : l.priceUnit !== "unit" ? `${l.ref ?? ""} · prix au ${l.priceUnit === "kg" ? "kilo" : "litre"}, non totalisé` : `${l.ref ?? ""}${l.format ? ` (${l.format})` : ""}${l.age && AGE_LABEL[l.age] ? ` · ${AGE_LABEL[l.age]}` : ""}`}
                           {l.labelCheck && " · Composition à vérifier sur l'étiquette"}
                         </div>
                       </div>
@@ -449,7 +456,7 @@ function ScenarioView({
                           +
                         </button>
                       </span>
-                      <span className={styles.linePrice}>{l.price === null ? "N/A" : euro(l.price * l.qty)}</span>
+                      <span className={styles.linePrice}>{l.price === null ? "N/A" : l.priceUnit !== "unit" ? euroPer(l.price, l.priceUnit) : euro(l.price * l.qty)}</span>
                     </div>
                   );
                 })}
@@ -462,7 +469,10 @@ function ScenarioView({
         <span>Total estimé</span>
         <span>{euro(total)}</span>
       </div>
-      <p className={family.hint}>{without === 0 ? "Montants estimés." : `${without} produit${without > 1 ? "s" : ""} sans prix : à payer en plus sur place.`}</p>
+      <p className={family.hint}>
+        {without === 0 ? "Montants estimés." : `${without} produit${without > 1 ? "s" : ""} sans prix : à payer en plus sur place.`}
+        {loose > 0 ? ` ${loose} produit${loose > 1 ? "s" : ""} vendu${loose > 1 ? "s" : ""} au kilo ou au litre : prix au kilo affiché, non totalisé.` : ""}
+      </p>
       {error && <Notice tone="error">{error}</Notice>}
       <div className={styles.footer}>
         <Button
@@ -477,6 +487,7 @@ function ScenarioView({
                 store: l.store,
                 ref: l.ref,
                 price: l.price,
+                priceUnit: l.priceUnit,
                 source: ({ menu: "menu", sante: "menu", ajout: "added", habituel: "habit" } as const)[itemsByName.get(norm(l.name))?.group ?? "menu"],
               })),
             )

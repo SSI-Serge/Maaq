@@ -1,6 +1,6 @@
 import { dishItems, findProd, type RefProduct } from "./products";
 import { has, norm } from "./text";
-import { perUnitPrice, type PerUnitPrice } from "./unitprice";
+import { isTotaled, perUnitOf, type PerUnitPrice, type PriceUnit } from "./unitprice";
 import type { Dish } from "./types";
 
 /** Ancienneté d'un prix affichée aux foyers (CR-20, US-166 RF3). */
@@ -44,8 +44,10 @@ export interface Choice {
   labelCheck?: boolean;
   /** Format du conditionnement de la référence. */
   format?: string | null;
-  /** Prix au kilo ou au litre, quand le format de la référence le donne (CR-39). */
+  /** Prix au kilo ou au litre, quand il existe (CR-39). */
   perUnit?: PerUnitPrice | null;
+  /** Unité du prix : par article (défaut), au kilo ou au litre. Un prix au kilo n'entre pas dans le total de la liste (CR-40). */
+  priceUnit?: PriceUnit;
 }
 
 export type ItemGroup = "menu" | "ajout" | "habituel" | "sante";
@@ -64,7 +66,7 @@ export interface ListItem {
   /** Choix du comparatif (références conformes, dernier équivalent acheté, base commune). */
   choices: Choice[];
   /** Prix de référence par enseigne : sert au scénario « tout dans un magasin ». */
-  storePrices: Map<string, { ref: string; price: number | null }>;
+  storePrices: Map<string, { ref: string; price: number | null; priceUnit?: PriceUnit }>;
   /** Produit issu d'une version allégée absent du catalogue : références de la version standard, à vérifier. */
   approx: boolean;
   /** « pas acheté la dernière fois » (CR-28). */
@@ -83,8 +85,10 @@ export interface BuyRow {
 export interface HistoryPrice {
   product: string;
   ref: string;
-  /** Prix d'une unité au ticket ; vide quand le produit a seulement été coché « acheté » en magasin. */
+  /** Prix d'une unité au ticket (ou au kilo, au litre, selon `priceUnit`) ; vide quand le produit a seulement été coché « acheté » en magasin. */
   unitPrice: number | null;
+  /** Une ligne pesée au ticket donne un prix au kilo ou au litre (jamais le poids). */
+  priceUnit?: PriceUnit;
   store: string;
   /** « AAAA-MM-JJ » */
   date: string;
@@ -99,6 +103,8 @@ export interface CommonPrice {
   city: string;
   /** Lundi de la semaine du relevé. */
   week: string;
+  priceUnit?: PriceUnit;
+  perMeasure?: PerUnitPrice | null;
 }
 
 /** Version allégée d'un plat (US-172) : produits à retirer et à ajouter. */
@@ -161,13 +167,13 @@ function inProximity(store: string, stores: string[]): boolean {
 }
 
 /** Construit les choix d'un produit (US-157 RF4) : références conformes, dernier équivalent acheté, moins cher de la base commune. */
-function buildChoices(name: string, input: ListInput): { choices: Choice[]; storePrices: Map<string, { ref: string; price: number | null }>; rayon: string | null } {
+function buildChoices(name: string, input: ListInput): { choices: Choice[]; storePrices: Map<string, { ref: string; price: number | null; priceUnit?: PriceUnit }>; rayon: string | null } {
   const { prods, stores, now } = input;
   const productName = findProd(prods, name);
   const product = productName ? prods.get(productName)! : null;
   const kws = keywordsOf(name, prods);
   const choices: Choice[] = [];
-  const storePrices = new Map<string, { ref: string; price: number | null }>();
+  const storePrices = new Map<string, { ref: string; price: number | null; priceUnit?: PriceUnit }>();
 
   if (product) {
     const refs = [...product.stores].filter(([store]) => inProximity(store, stores));
@@ -175,13 +181,13 @@ function buildChoices(name: string, input: ListInput): { choices: Choice[]; stor
       .map(([store, v]) => ({ store, v, age: v.price !== null ? priceAge(v.priceDate, now) : "unknown" as PriceAge | null }))
       .filter((x) => x.v.price !== null && x.age !== null);
     for (const x of priced) {
-      choices.push({ kind: "reference", ref: x.v.ref, price: x.v.price, store: x.store, city: null, age: x.age as PriceAge, labelCheck: x.v.labelCheck, format: x.v.format, perUnit: perUnitPrice(x.v.price, x.v.format) });
-      storePrices.set(x.store, { ref: x.v.ref, price: x.v.price });
+      choices.push({ kind: "reference", ref: x.v.ref, price: x.v.price, store: x.store, city: null, age: x.age as PriceAge, labelCheck: x.v.labelCheck, format: x.v.format, priceUnit: x.v.priceUnit, perUnit: perUnitOf(x.v.price, x.v.priceUnit, x.v.perMeasure) });
+      storePrices.set(x.store, { ref: x.v.ref, price: x.v.price, priceUnit: x.v.priceUnit });
     }
     if (!priced.length && refs.length) {
       // références sans prix connu : on garde la première, le prix sera « N/A »
       const [store, v] = refs[0];
-      choices.push({ kind: "reference", ref: v.ref, price: null, store, city: null, age: "unknown", labelCheck: v.labelCheck, format: v.format });
+      choices.push({ kind: "reference", ref: v.ref, price: null, store, city: null, age: "unknown", labelCheck: v.labelCheck, format: v.format, priceUnit: v.priceUnit });
     }
   }
 
@@ -194,9 +200,9 @@ function buildChoices(name: string, input: ListInput): { choices: Choice[]; stor
     for (const r of bought) latest.set(norm(r.store), r); // trié par date croissante : le dernier écrase les précédents
     const perStore = [...latest.values()].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
     for (const r of perStore) {
-      choices.push({ kind: "history", ref: r.ref || r.product, price: r.unitPrice, store: r.store, city: r.city ?? null, age: priceAge(r.date, now) ?? "lt12" });
+      choices.push({ kind: "history", ref: r.ref || r.product, price: r.unitPrice, store: r.store, city: r.city ?? null, age: priceAge(r.date, now) ?? "lt12", priceUnit: r.priceUnit, perUnit: perUnitOf(r.unitPrice, r.priceUnit, null) });
       // prix du scénario « tout dans un magasin » : l'achat le plus récent de l'enseigne, sauf si une référence conforme y a déjà un prix
-      if (!storePrices.has(r.store)) storePrices.set(r.store, { ref: r.ref || r.product, price: r.unitPrice });
+      if (!storePrices.has(r.store)) storePrices.set(r.store, { ref: r.ref || r.product, price: r.unitPrice, priceUnit: r.priceUnit });
     }
   }
 
@@ -207,7 +213,7 @@ function buildChoices(name: string, input: ListInput): { choices: Choice[]; stor
       .filter((x) => x.age !== null);
     if (rows.length) {
       const cheapest = rows.reduce((m, x) => (x.r.price < m.r.price ? x : m));
-      choices.push({ kind: "common", ref: cheapest.r.ref || cheapest.r.product, price: cheapest.r.price, store: cheapest.r.store, city: cheapest.r.city, age: cheapest.age as PriceAge });
+      choices.push({ kind: "common", ref: cheapest.r.ref || cheapest.r.product, price: cheapest.r.price, store: cheapest.r.store, city: cheapest.r.city, age: cheapest.age as PriceAge, priceUnit: cheapest.r.priceUnit, perUnit: perUnitOf(cheapest.r.price, cheapest.r.priceUnit, cheapest.r.perMeasure) });
     }
   }
   return { choices, storePrices, rayon: product?.rayon ?? null };
@@ -392,6 +398,8 @@ export interface Scenario {
   total: number;
   /** Nombre de produits sans prix. */
   withoutPrice: number;
+  /** Produits au kilo ou au litre : un prix, mais hors du total (CR-40). */
+  notTotaled: number;
 }
 
 export interface ScenarioLine {
@@ -406,6 +414,8 @@ export interface ScenarioLine {
   age: PriceAge | null;
   labelCheck: boolean;
   format: string | null;
+  /** Unité du prix de la ligne : « kg » ou « l » = prix au kilo, non totalisé. */
+  priceUnit: PriceUnit;
 }
 
 function round2(n: number): number {
@@ -417,29 +427,32 @@ export function computeScenarios(model: ListModel, sel: ListSelection, stores: s
   const list = currentItems(model, sel);
   const q = (i: ListItem) => quantityOf(i, sel);
   const names = stores.length ? stores : [...new Set(list.flatMap((i) => [...i.storePrices.keys()]))];
-  let best: { store: string; n: number; total: number } | null = null;
+  let best: { store: string; n: number; total: number; loose: number } | null = null;
   for (const store of names) {
     const priced = list.filter((i) => i.storePrices.get(store)?.price != null);
-    const total = priced.reduce((s, i) => s + (i.storePrices.get(store)!.price as number) * q(i), 0);
-    if (!best || priced.length > best.n) best = { store, n: priced.length, total };
+    const totaled = priced.filter((i) => isTotaled(i.storePrices.get(store)!.priceUnit));
+    const total = totaled.reduce((s, i) => s + (i.storePrices.get(store)!.price as number) * q(i), 0);
+    if (!best || priced.length > best.n) best = { store, n: priced.length, total, loose: priced.length - totaled.length };
   }
   const out: Scenario[] = [];
-  if (best) out.push({ id: 1, label: `Tout dans ${best.store}`, store: best.store, total: round2(best.total), withoutPrice: list.length - best.n });
+  if (best) out.push({ id: 1, label: `Tout dans ${best.store}`, store: best.store, total: round2(best.total), withoutPrice: list.length - best.n, notTotaled: best.loose });
   const chosen = list.map((i) => selectedChoice(i, sel));
   out.push({
     id: 2,
     label: "Chaque référence choisie dans son magasin",
     store: null,
-    total: round2(chosen.reduce((s, c, k) => s + (c?.price ?? 0) * q(list[k]), 0)),
+    total: round2(chosen.reduce((s, c, k) => s + (c && isTotaled(c.priceUnit) ? (c.price ?? 0) * q(list[k]) : 0), 0)),
     withoutPrice: chosen.filter((c) => c?.price == null).length,
+    notTotaled: chosen.filter((c) => c?.price != null && !isTotaled(c.priceUnit)).length,
   });
   const habitual = list.map((i) => i.choices.find((c) => c.kind === "history") ?? null);
   out.push({
     id: 3,
     label: "Mes produits habituels dans mes magasins",
     store: null,
-    total: round2(habitual.reduce((s, c, k) => s + (c?.price ?? 0) * q(list[k]), 0)),
+    total: round2(habitual.reduce((s, c, k) => s + (c && isTotaled(c.priceUnit) ? (c.price ?? 0) * q(list[k]) : 0), 0)),
     withoutPrice: habitual.filter((c) => c?.price == null).length,
+    notTotaled: habitual.filter((c) => c?.price != null && !isTotaled(c.priceUnit)).length,
   });
   return out;
 }
@@ -447,11 +460,11 @@ export function computeScenarios(model: ListModel, sel: ListSelection, stores: s
 /** Les produits du scénario choisi (US-157 RF7), regroupés par magasin puis par rayon par l'écran. */
 export function scenarioLines(model: ListModel, sel: ListSelection, scenario: Scenario): ScenarioLine[] {
   return currentItems(model, sel).map((i) => {
-    let choice: { ref: string; price: number | null; store: string | null; city: string | null; age: PriceAge | null; labelCheck?: boolean; format?: string | null } | null;
+    let choice: { ref: string; price: number | null; store: string | null; city: string | null; age: PriceAge | null; labelCheck?: boolean; format?: string | null; priceUnit?: PriceUnit } | null;
     if (scenario.id === 1) {
       const p = scenario.store ? i.storePrices.get(scenario.store) : undefined;
       const src = i.choices.find((c) => c.store === scenario.store && c.price !== null);
-      choice = p ? { ref: p.ref, price: p.price, store: scenario.store, city: src?.city ?? null, age: src?.age ?? null, labelCheck: src?.labelCheck, format: src?.format } : null;
+      choice = p ? { ref: p.ref, price: p.price, store: scenario.store, city: src?.city ?? null, age: src?.age ?? null, labelCheck: src?.labelCheck, format: src?.format, priceUnit: p.priceUnit } : null;
     } else if (scenario.id === 2) {
       choice = selectedChoice(i, sel);
     } else {
@@ -469,6 +482,7 @@ export function scenarioLines(model: ListModel, sel: ListSelection, scenario: Sc
       age: choice?.age ?? null,
       labelCheck: !!choice?.labelCheck,
       format: choice?.format ?? null,
+      priceUnit: choice?.priceUnit ?? "unit",
     };
   });
 }

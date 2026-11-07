@@ -1565,6 +1565,8 @@ export interface GroceryListItems {
   name_key: string;
   not_bought_last_time: Generated<boolean>;
   product_id: Int8 | null;
+  /** Unité de unit_price copiée de la référence à la validation : unit, kg ou l. */
+  price_unit: string | null;
   quantity: Generated<number>;
   reference_name: string | null;
   source: Generated<string>;
@@ -1620,9 +1622,18 @@ export interface GroceryProductReferences {
   created_at: Generated<Timestamp>;
   id: Generated<Int8>;
   /**
+   * Quantité du format en kg ou en litres, déduite de package_format ou fournie par l'import.
+   */
+  package_amount: Numeric | null;
+  /**
    * Format du conditionnement (« 1 kg », « sachet de 250 g »), 80 caractères au plus, facultatif ; colonne « format » de l'import des références.
    */
   package_format: string | null;
+  package_unit: string | null;
+  /**
+   * Unité de unit_price : unit (par article), kg ou l (produit vendu au poids).
+   */
+  price_unit: Generated<string>;
   price_date: Timestamp | null;
   product_id: Int8;
   reference_name: string;
@@ -1657,6 +1668,11 @@ export interface GroceryReceiptLines {
   id: Generated<Int8>;
   label: string;
   line_total: Numeric;
+  /** Poids ou volume mesuré à la caisse, en kg ou en litres ; vide pour une ligne à la pièce. */
+  measured_quantity: Numeric | null;
+  measure_unit: string | null;
+  /** Prix au kilo ou au litre lu sur le ticket, sinon calculé par la base. */
+  price_per_measure: Numeric | null;
   name_key: string;
   position: Generated<number>;
   product_id: Int8 | null;
@@ -1680,6 +1696,8 @@ export interface GrocerySharedPrices {
   city: string;
   created_at: Generated<Timestamp>;
   id: Generated<Int8>;
+  /** Unité de unit_price : unit (par article), kg ou l. */
+  price_unit: Generated<string>;
   product_id: Int8;
   reference_name: string;
   /**
@@ -2522,10 +2540,15 @@ export interface VGroceryProductReferences {
   excluded_because: string[] | null;
   has_price: boolean | null;
   is_compliant: boolean | null;
+  measure_unit: string | null;
   needs_label_check: boolean | null;
+  package_amount: Numeric | null;
   package_format: string | null;
+  package_unit: string | null;
   price_age: string | null;
   price_date: Timestamp | null;
+  price_per_measure: Numeric | null;
+  price_unit: string | null;
   product_id: Int8 | null;
   reference_id: Int8 | null;
   reference_name: string | null;
@@ -2539,6 +2562,7 @@ export interface VGrocerySharedPricesModeration {
   city: string | null;
   needs_check: boolean | null;
   price_id: Int8 | null;
+  price_unit: string | null;
   product_id: Int8 | null;
   reference_name: string | null;
   removed_at: Timestamp | null;

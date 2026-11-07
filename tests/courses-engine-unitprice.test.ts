@@ -1,42 +1,59 @@
 import { describe, expect, it } from "vitest";
-import { buildListModel, buildRefProducts, defaultChoice, packageContent, perKiloFromWeight, perUnitPrice, type Choice, type Dish } from "@/server/courses/engine";
+import { buildListModel, buildRefProducts, computeScenarios, defaultChoice, isTotaled, perUnitOf, pricePerMeasure, scenarioLines, toMeasure, type Choice, type Dish } from "@/server/courses/engine";
 
-describe("Prix au kilo (CR-39)", () => {
-  it("lit le contenu d'un format : kilos, grammes, litres, multipacks ; rien d'inventé quand le format n'est pas compris", () => {
-    expect(packageContent("1 kg")).toEqual({ amount: 1, unit: "kg" });
-    expect(packageContent("500 g")?.amount).toBeCloseTo(0.5);
-    expect(packageContent("sachet de 250g")?.amount).toBeCloseTo(0.25);
-    expect(packageContent("3 x 600 g")?.amount).toBeCloseTo(1.8);
-    expect(packageContent("1,5 kg")).toEqual({ amount: 1.5, unit: "kg" });
-    expect(packageContent("500 g, 8 personnes")?.amount).toBeCloseTo(0.5);
-    expect(packageContent("1 L")).toEqual({ amount: 1, unit: "l" });
-    expect(packageContent("25 cl")?.amount).toBeCloseTo(0.25);
-    for (const unknown of ["la pièce", "barquette", "pack de bouteilles (contenance non indiquée)", "à la pièce (poids non indiqué)", "", null, undefined]) expect(packageContent(unknown)).toBeNull();
+describe("Prix au kilo ou au litre (CR-39, CR-40)", () => {
+  it("convertit un poids ou un volume saisi en kilos ou en litres ; rien d'inventé quand l'unité n'est pas comprise", () => {
+    expect(toMeasure(1.234, "kg")).toEqual({ amount: 1.234, unit: "kg" });
+    expect(toMeasure(1234, "g")).toEqual({ amount: 1.234, unit: "kg" });
+    expect(toMeasure(33, "cl")).toEqual({ amount: 0.33, unit: "l" });
+    expect(toMeasure(500, "ml")).toEqual({ amount: 0.5, unit: "l" });
+    expect(toMeasure(2, "pièce")).toBeNull();
+    expect(toMeasure(0, "kg")).toBeNull();
+    expect(toMeasure(-1, "kg")).toBeNull();
   });
 
-  it("calcule le prix au kilo ou au litre, ou rien sans prix ni format", () => {
-    expect(perUnitPrice(2.55, "1 kg")).toEqual({ value: 2.55, unit: "kg" });
-    expect(perUnitPrice(1.79, "250 g")).toEqual({ value: 7.16, unit: "kg" });
-    expect(perUnitPrice(0.95, "1 L")).toEqual({ value: 0.95, unit: "l" });
-    expect(perUnitPrice(null, "1 kg")).toBeNull();
-    expect(perUnitPrice(3, "la pièce")).toBeNull();
-    expect(perKiloFromWeight(1.84, 1.234)).toEqual({ value: 1.49, unit: "kg" });
-    expect(perKiloFromWeight(1.84, 0)).toBeNull();
+  it("le prix au kilo lu sur le ticket l'emporte ; sinon prix de la ligne ÷ poids, arrondi à 2 décimales ; rien sans poids", () => {
+    expect(pricePerMeasure(1.49, 1.84, 1.234)).toBe(1.49);
+    expect(pricePerMeasure(null, 1.84, 1.234)).toBe(1.49);
+    expect(pricePerMeasure(null, 1.84, null)).toBeNull();
+    expect(pricePerMeasure(null, -0.5, 1)).toBeNull();
   });
 
-  it("le choix coché par défaut compare les prix au kilo quand tous les choix à prix en ont un, sinon les prix à l'unité", () => {
-    const choice = (price: number, format: string | null): Choice => ({ kind: "reference", ref: "r", price, store: "x", city: null, age: "lt6", format, perUnit: perUnitPrice(price, format) });
-    // 1,40 € le sachet de 250 g (5,60 €/kg) contre 2,50 € le kilo : le kilo gagne alors que son prix à l'unité est plus haut
-    expect(defaultChoice([choice(1.4, "250 g"), choice(2.5, "1 kg")])).toBe(1);
-    // un choix sans format : on compare les prix à l'unité
-    expect(defaultChoice([choice(1.4, "250 g"), choice(2.5, null)])).toBe(0);
+  it("un prix déjà au kilo est son propre prix au kilo ; un prix par article prend celui que la base a déduit du format", () => {
+    expect(perUnitOf(3.29, "kg", null)).toEqual({ value: 3.29, unit: "kg" });
+    expect(perUnitOf(2.55, "unit", { value: 2.55, unit: "kg" })).toEqual({ value: 2.55, unit: "kg" });
+    expect(perUnitOf(2.55, "unit", null)).toBeNull();
+    expect(perUnitOf(null, "kg", null)).toBeNull();
+    expect(isTotaled("unit")).toBe(true);
+    expect(isTotaled(undefined)).toBe(true);
+    expect(isTotaled("kg")).toBe(false);
+    expect(isTotaled("l")).toBe(false);
+  });
+
+  it("le choix coché par défaut compare les prix au kilo quand tous les choix à prix en ont un, sinon les prix à l'article", () => {
+    const choice = (price: number, perMeasure: number | null, priceUnit: "unit" | "kg" = "unit"): Choice => ({ kind: "reference", ref: "r", price, store: "x", city: null, age: "lt6", priceUnit, perUnit: perMeasure === null ? null : { value: perMeasure, unit: "kg" } });
+    // 1,40 € le sachet de 250 g (5,60 €/kg) contre 2,50 € le kilo : le kilo gagne alors que son prix par article est plus haut
+    expect(defaultChoice([choice(1.4, 5.6), choice(2.5, 2.5)])).toBe(1);
+    // un choix sans prix au kilo : on compare les prix par article
+    expect(defaultChoice([choice(1.4, 5.6), choice(2.5, null)])).toBe(0);
+    expect(defaultChoice([choice(3.29, 3.29, "kg"), choice(1.8, 7.2)])).toBe(0);
     expect(defaultChoice([])).toBeNull();
   });
 
-  it("la référence du comparatif porte son prix au kilo", () => {
-    const dish: Dish = { id: "T1", cuisine: "Français", name: "Riz", ing: "Riz", recipe: "", health: "", batch: "", time: "", minutes: 10, tags: new Set() };
-    const prods = buildRefProducts([{ product: "Riz", rayon: "Féculents", used: "", store: "Lidl", ref: "Riz long", price: 2.55, priceDate: "2026-10-23", conform: true, format: "1 kg" }]);
-    const item = buildListModel({ dishes: [dish], prods, buy: [{ name: "Riz", qty: 1, by: "", source: "menu", status: "à acheter" }], history: [], light: new Map(), stores: [], sharing: false, now: new Date(2026, 10, 6) }).items[0];
-    expect(item.choices[0]).toMatchObject({ format: "1 kg", perUnit: { value: 2.55, unit: "kg" } });
+  it("un article vendu au kilo n'entre pas dans le total estimé ; il est compté à part, avec son unité", () => {
+    const dish: Dish = { id: "T1", cuisine: "Français", name: "Plat", ing: "Riz, Bananes plantains", recipe: "", health: "", batch: "", time: "", minutes: 10, tags: new Set() };
+    const prods = buildRefProducts([
+      { product: "Riz", rayon: "Féculents", used: "", store: "Lidl", ref: "Riz long", price: 2.55, priceDate: "2026-10-23", conform: true, format: "1 kg", priceUnit: "unit", perMeasure: { value: 2.55, unit: "kg" } },
+      { product: "Bananes plantains", rayon: "Fruits et légumes", used: "", store: "Lidl", ref: "Vrac", price: 3.29, priceDate: "2026-10-23", conform: true, priceUnit: "kg" },
+    ]);
+    const rows = ["Riz", "Bananes plantains"].map((name) => ({ name, qty: 1, by: "", source: "menu" as const, status: "à acheter" as const }));
+    const model = buildListModel({ dishes: [dish], prods, buy: rows, history: [], light: new Map(), stores: ["Lidl"], sharing: false, now: new Date(2026, 10, 6) });
+    const plantain = model.items.find((i) => i.name === "Bananes plantains")!;
+    expect(plantain.choices[0]).toMatchObject({ priceUnit: "kg", perUnit: { value: 3.29, unit: "kg" } });
+    const [one, two] = computeScenarios(model, {}, ["Lidl"]);
+    expect(one).toMatchObject({ total: 2.55, withoutPrice: 0, notTotaled: 1 });
+    expect(two).toMatchObject({ total: 2.55, withoutPrice: 0, notTotaled: 1 });
+    expect(scenarioLines(model, {}, one).find((l) => l.name === "Bananes plantains")).toMatchObject({ price: 3.29, priceUnit: "kg" });
+    expect(scenarioLines(model, {}, one).find((l) => l.name === "Riz")).toMatchObject({ price: 2.55, priceUnit: "unit" });
   });
 });

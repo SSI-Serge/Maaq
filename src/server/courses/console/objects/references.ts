@@ -21,13 +21,18 @@ const STATUS: Record<ReferenceStatusLabel, "compliant" | "not_applicable" | "to_
 };
 const STATUS_TEXT = { compliant: "Conforme", not_applicable: "Sans objet", to_check: "À vérifier", none_found: "Aucun conforme trouvé" } as const;
 
+const oneOfPriceUnit = (value: string | undefined): "unit" | "kg" | "l" => {
+  if (value === "unit" || value === "kg" || value === "l") return value;
+  throw courseError("invalid_choice", "Unité du prix non valide.", 422);
+};
+
 async function list(c: ConsoleContext, query: ConsoleQuery) {
   const { db } = c.ctx;
   let q = db
     .selectFrom("v_grocery_product_references as r")
     .innerJoin("grocery_products as p", "p.id", "r.product_id")
     .innerJoin("grocery_aisles as a", "a.id", "p.aisle_id")
-    .select(["r.reference_id", "p.name as product", "a.name as aisle", "p.aisle_id", "r.store_chain", "r.reference_name", "r.unit_price", "r.price_date", "r.is_compliant", "r.excluded_because", "r.compliance_status", "r.composition_text", "r.package_format"])
+    .select(["r.reference_id", "p.name as product", "a.name as aisle", "p.aisle_id", "r.store_chain", "r.reference_name", "r.unit_price", "r.price_date", "r.is_compliant", "r.excluded_because", "r.compliance_status", "r.composition_text", "r.package_format", "r.package_amount", "r.package_unit", "r.price_unit", "r.price_per_measure", "r.measure_unit"])
     .select((eb) => eb.selectFrom("grocery_product_references as x").select("x.additives").whereRef("x.id", "=", "r.reference_id").as("additives"))
     .orderBy("p.name")
     .orderBy("r.store_chain");
@@ -58,6 +63,7 @@ export const references: ConsoleObject = {
         { key: "ref", label: "Référence" },
         { key: "format", label: "Format" },
         { key: "price", label: "Prix", align: "right" },
+        { key: "perMeasure", label: "Au kilo / au litre", align: "right" },
         { key: "date", label: "Date du prix" },
         { key: "compliant", label: "Conforme" },
       ],
@@ -70,7 +76,8 @@ export const references: ConsoleObject = {
           store: displayPlace(r.store_chain ?? ""),
           ref: r.reference_name ?? "",
           format: r.package_format ?? "—",
-          price: euro(r.unit_price),
+          price: r.unit_price !== null && r.price_unit !== "unit" ? `${euro(r.unit_price)}/${r.price_unit === "kg" ? "kg" : "L"}` : euro(r.unit_price),
+          perMeasure: r.price_per_measure !== null && r.measure_unit ? `${euro(r.price_per_measure)}/${r.measure_unit === "kg" ? "kg" : "L"}` : "—",
           date: dateFr(r.price_date as Date | string | null) || "—",
           compliant: r.is_compliant ? (r.compliance_status === "to_check" ? "À vérifier" : r.compliance_status === "not_applicable" ? "Sans objet" : "Oui") : r.excluded_because?.length ? r.excluded_because.join(", ") : "Aucun conforme trouvé",
         },
@@ -81,6 +88,7 @@ export const references: ConsoleObject = {
             fields: [
               { key: "ref", label: "Référence", type: "text" as const, value: r.reference_name, required: true },
               { key: "format", label: "Format (« 1 kg », vide si inconnu)", type: "text" as const, value: r.package_format ?? "" },
+              { key: "unitPrice", label: "Le prix est exprimé", type: "select" as const, value: r.price_unit, options: [{ value: "unit", label: "Par article (paquet, boîte…)" }, { value: "kg", label: "Au kilo (produit vendu au poids)" }, { value: "l", label: "Au litre" }] },
               { key: "price", label: "Prix unitaire (€, vide = N/A)", type: "text" as const, value: r.unit_price === null ? "" : String(r.unit_price) },
               { key: "date", label: "Date du prix (AAAA-MM-JJ, vide si pas de prix)", type: "text" as const, value: r.price_date ? isoDate(r.price_date as Date | string) : "" },
               { key: "status", label: "Statut", type: "select" as const, value: r.compliance_status, options: (Object.keys(STATUS_TEXT) as (keyof typeof STATUS_TEXT)[]).map((k) => ({ value: k, label: STATUS_TEXT[k] })) },
@@ -113,7 +121,7 @@ export const references: ConsoleObject = {
     if (!(status in STATUS_TEXT)) throw courseError("invalid_choice", "Statut non valide.", 422);
     await db
       .updateTable("grocery_product_references")
-      .set({ reference_name: reference, package_format: (values.format ?? "").trim().slice(0, 80) || null, unit_price: price === null ? null : price.toFixed(2), price_date: price === null ? null : (date as never), compliance_status: status, updated_at: now })
+      .set({ reference_name: reference, ...(values.unitPrice ? { price_unit: oneOfPriceUnit(values.unitPrice) } : {}), package_format: (values.format ?? "").trim().slice(0, 80) || null, unit_price: price === null ? null : price.toFixed(2), price_date: price === null ? null : (date as never), compliance_status: status, updated_at: now })
       .where("id", "=", id)
       .execute();
     await logAdminAction(db, { adminId: c.adminId, action: "grocery_catalog_changed", entityType: "grocery_reference", entityId: id, details: { action }, now });
@@ -128,7 +136,7 @@ export const references: ConsoleObject = {
       file: "references.csv",
       content: csv(
         REFERENCES_TEMPLATE_HEADERS,
-        rows.map((r) => [r.product, r.aisle, displayPlace(r.store_chain ?? ""), r.reference_name, r.package_format ?? "", r.unit_price === null ? "" : String(r.unit_price).replace(".", ","), r.price_date ? isoDate(r.price_date as Date | string) : "", STATUS_TEXT[r.compliance_status as keyof typeof STATUS_TEXT], ((r.additives as string[] | null) ?? []).join("|"), r.composition_text ?? ""]),
+        rows.map((r) => [r.product, r.aisle, displayPlace(r.store_chain ?? ""), r.reference_name, r.package_format ?? "", r.unit_price === null ? "" : String(r.unit_price).replace(".", ","), r.price_date ? isoDate(r.price_date as Date | string) : "", STATUS_TEXT[r.compliance_status as keyof typeof STATUS_TEXT], ((r.additives as string[] | null) ?? []).join("|"), r.composition_text ?? "", r.package_amount === null ? "" : String(r.package_amount).replace(".", ","), r.package_unit ?? "", r.price_unit]),
       ),
     };
   },
@@ -174,6 +182,9 @@ export const references: ConsoleObject = {
           compliance_status: STATUS[norm(String(it.v.statut ?? "Conforme")) as ReferenceStatusLabel],
           additives: (it.v.additifs as string[] | null) ?? [],
           composition_text: (it.v.composition as string | null) || null,
+          // fournis, la quantité du format et l'unité du prix priment ; sinon la base déduit la quantité du format et garde l'unité du prix
+          ...(it.v.package_amount !== null && it.v.package_amount !== undefined ? { package_amount: (it.v.package_amount as number).toFixed(3), package_unit: it.v.package_unit as string } : {}),
+          ...(it.v.unite_prix ? { price_unit: it.v.unite_prix as string } : {}),
           updated_at: now,
         };
         await trx

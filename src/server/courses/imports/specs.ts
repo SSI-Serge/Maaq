@@ -130,13 +130,18 @@ export const REFERENCES_SPEC: ImportSpec = {
     { key: "statut", parse: referenceStatus },
     { key: "additifs", parse: (raw) => ({ ok: true, value: [...new Set(raw.split("|").map((x) => norm(x).trim()).filter((x) => x))] }) },
     { key: "composition", parse: (raw) => (raw.length <= 2000 ? { ok: true, value: raw } : { ok: false, message: "2 000 caractères au plus." }) },
+    // facultatifs : la quantité du format en kg ou en litres (la base la déduit du format quand elle n'est pas fournie) et l'unité du prix (CR-39, CR-40)
+    { key: "package_amount", parse: (raw) => { const n = Number(raw.replace(",", ".")); return Number.isFinite(n) && n > 0 && n < 10_000_000 ? { ok: true, value: Math.round(n * 1000) / 1000 } : { ok: false, message: "doit être une quantité positive (en kg ou en litres)." }; } },
+    { key: "package_unit", parse: (raw) => (["kg", "l"].includes(raw.toLowerCase()) ? { ok: true, value: raw.toLowerCase() } : { ok: false, message: "attendu : kg ou l." }) },
+    { key: "unite_prix", parse: (raw) => (["unit", "kg", "l"].includes(raw.toLowerCase()) ? { ok: true, value: raw.toLowerCase() } : { ok: false, message: "attendu : unit (par article), kg ou l." }) },
   ],
   checkRow: (v) => {
     const out: { column: string | null; message: string }[] = [];
+    if ((v.package_amount === null) !== (v.package_unit === null)) out.push({ column: "package_unit", message: "la quantité du format et son unité vont ensemble." });
     if (v.prix !== null && !v.date_prix) out.push({ column: "date_prix", message: "la date du prix est obligatoire quand il y a un prix." });
     if (v.prix === null && v.date_prix) out.push({ column: "prix", message: "un prix est obligatoire quand il y a une date (sinon laissez les deux vides)." });
     return out;
   },
 };
 
-export const REFERENCES_TEMPLATE_HEADERS = ["produit", "rayon", "enseigne", "reference", "format", "prix", "date_prix", "statut", "additifs", "composition"];
+export const REFERENCES_TEMPLATE_HEADERS = ["produit", "rayon", "enseigne", "reference", "format", "prix", "date_prix", "statut", "additifs", "composition", "package_amount", "package_unit", "unite_prix"];

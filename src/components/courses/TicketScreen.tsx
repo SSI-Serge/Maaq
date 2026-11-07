@@ -20,6 +20,10 @@ interface Line {
   total: string;
   qty: string;
   aisle: string;
+  /** Produit pesé : poids ou volume saisi, son unité, prix au kilo ou au litre lu sur le ticket (CR-39). */
+  measured: string;
+  measureUnit: "" | "kg" | "g" | "l" | "cl" | "ml";
+  perMeasure: string;
 }
 
 const toNumber = (text: string) => Number(text.replace(/\s/g, "").replace("€", "").replace(",", "."));
@@ -61,7 +65,7 @@ function Flow() {
     setStore(t.draft.store);
     setCity(t.draft.city ?? "");
     setDate(t.draft.date);
-    setLines(t.draft.lines.map((l) => ({ product: l.product, reference: l.reference ?? "", total: String(l.total).replace(".", ","), qty: String(l.qty).replace(".", ","), aisle: l.aisle })));
+    setLines(t.draft.lines.map((l) => ({ product: l.product, reference: l.reference ?? "", total: String(l.total).replace(".", ","), qty: String(l.qty).replace(".", ","), aisle: l.aisle, measured: l.measured ? String(l.measured).replace(".", ",") : "", measureUnit: l.measureUnit ?? "", perMeasure: l.pricePerMeasure ? String(l.pricePerMeasure).replace(".", ",") : "" })));
     setEditing(null);
     setResult(null);
   }
@@ -72,7 +76,7 @@ function Flow() {
   async function submit() {
     const response = await confirm.run<{ result: TicketConfirmation }>("/api/courses/tickets/confirm", {
       method: "POST",
-      body: { store: store.trim(), city: city.trim() || null, date, lines: lines.map((l) => ({ product: l.product.trim(), reference: l.reference.trim() || null, total: toNumber(l.total), qty: toNumber(l.qty), aisle: l.aisle })) },
+      body: { store: store.trim(), city: city.trim() || null, date, lines: lines.map((l) => ({ product: l.product.trim(), reference: l.reference.trim() || null, total: toNumber(l.total), qty: toNumber(l.qty), aisle: l.aisle, measured: l.measureUnit && toNumber(l.measured) > 0 ? toNumber(l.measured) : null, measureUnit: l.measureUnit && toNumber(l.measured) > 0 ? l.measureUnit : null, pricePerMeasure: l.measureUnit && toNumber(l.perMeasure) > 0 ? toNumber(l.perMeasure) : null })) },
     });
     if (response) {
       setResult(response.result);
@@ -148,7 +152,7 @@ function Flow() {
             <span className={styles.lineName}>{euro(toNumber(l.total) || 0)}</span>
           </div>
           <span className={styles.meta}>
-            {l.reference ? `${l.reference} · ` : ""}qté {l.qty} · {l.aisle}
+            {l.reference ? `${l.reference} · ` : ""}{l.measureUnit && toNumber(l.measured) > 0 ? `${l.measured} ${l.measureUnit}${toNumber(l.perMeasure) > 0 ? ` à ${l.perMeasure} €/${l.measureUnit === "g" ? "kg" : l.measureUnit === "kg" ? "kg" : "L"}` : ""}` : `qté ${l.qty}`} · {l.aisle}
           </span>
           {editing === i ? (
             <div className={family.form}>
@@ -156,6 +160,17 @@ function Flow() {
               <div className={family.two}>
                 <input className={family.input} aria-label="Prix de la ligne" inputMode="decimal" value={l.total} onChange={(e) => setLines(lines.map((x, k) => (k === i ? { ...x, total: e.target.value } : x)))} />
                 <input className={family.input} aria-label="Quantité" inputMode="decimal" value={l.qty} onChange={(e) => setLines(lines.map((x, k) => (k === i ? { ...x, qty: e.target.value } : x)))} />
+              </div>
+              <div className={family.two}>
+                <input className={family.input} aria-label="Poids ou volume (produit pesé)" placeholder="Poids ou volume (facultatif)" inputMode="decimal" value={l.measured} onChange={(e) => setLines(lines.map((x, k) => (k === i ? { ...x, measured: e.target.value } : x)))} />
+                <select className={family.select} aria-label="Unité du poids ou du volume" value={l.measureUnit} onChange={(e) => setLines(lines.map((x, k) => (k === i ? { ...x, measureUnit: e.target.value as Line["measureUnit"] } : x)))}>
+                  <option value="">À la pièce</option>
+                  <option value="kg">kg</option>
+                  <option value="g">g</option>
+                  <option value="l">L</option>
+                  <option value="cl">cl</option>
+                  <option value="ml">ml</option>
+                </select>
               </div>
               <select className={family.select} aria-label="Rayon" value={l.aisle} onChange={(e) => setLines(lines.map((x, k) => (k === i ? { ...x, aisle: e.target.value } : x)))}>
                 {ticket.aisles.map((a) => (

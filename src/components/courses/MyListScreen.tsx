@@ -9,7 +9,7 @@ import family from "@/components/family/family.module.css";
 import { Button, Loading, Notice, RetryNotice } from "@/components/ui";
 import type { MyList, MyStore } from "@/server/courses/list/mine";
 import type { AddedLine } from "@/server/courses/list/service";
-import { euro } from "./ListScreen";
+import { euro, euroPer } from "./ListScreen";
 import styles from "./courses.module.css";
 
 const BACK = { href: "/courses", label: "Courses et repas" };
@@ -208,6 +208,11 @@ function StoreBlock({ store, couple, printing, onTick }: { store: MyStore; coupl
               </div>
               <span className={styles.meta}>×{l.qty}</span>
               {couple && l.price !== null && <span className={styles.linePrice}>{euro(l.price)}</span>}
+              {couple && l.perMeasure && (
+                <span className={styles.linePrice} title="Prix au kilo, non totalisé">
+                  {euroPer(l.perMeasure.value, l.perMeasure.unit)}
+                </span>
+              )}
             </div>
           ))}
         </div>

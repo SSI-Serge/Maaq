@@ -2,7 +2,7 @@ import { sql } from "kysely";
 import { asProfile } from "@/server/assistant/outings/profile";
 import type { Ctx, SessionContext } from "@/server/auth/service";
 import { nameKey, placeKey } from "../catalog/seed";
-import { allowed, applyTicket, intersect, ingPhrases, round2, tokens, ticketTotal, type Ticket } from "../engine";
+import { allowed, applyTicket, pricePerMeasure, toMeasure, intersect, ingPhrases, round2, tokens, ticketTotal, type Ticket } from "../engine";
 import { courseError, displayPlace, loadSettings, requireAccess, translateCourseError } from "../household/settings";
 import { loadEngineData } from "../menu/data";
 import { maskTicketText } from "./mask";
@@ -90,7 +90,7 @@ export interface TicketInput {
   store: string;
   city: string | null;
   date: string;
-  lines: { product: string; reference: string | null; total: number; qty: number; aisle: string }[];
+  lines: { product: string; reference: string | null; total: number; qty: number; aisle: string; measured?: number | null; measureUnit?: "kg" | "g" | "l" | "cl" | "ml" | null; pricePerMeasure?: number | null }[];
 }
 
 export interface TicketConfirmation {
@@ -125,7 +125,11 @@ export async function confirmTicket(ctx: Ctx, session: SessionContext, input: Ti
     if (!Number.isFinite(l.total) || l.total === 0 || Math.abs(l.total) > 10_000) throw courseError("invalid_line", `Ligne ${i + 1} : le prix doit être un montant non nul.`, 422);
     if (!Number.isFinite(l.qty) || l.qty <= 0 || l.qty > 999) throw courseError("invalid_line", `Ligne ${i + 1} : la quantité doit être supérieure à 0.`, 422);
     if (!id) throw courseError("invalid_line", `Ligne ${i + 1} : rayon inconnu.`, 422);
-    return { product, reference: l.reference?.trim().slice(0, 160) || null, total: round2(l.total), qty: l.qty, aisle: l.aisle, aisleId: id };
+    // produit pesé : le poids va dans measured_quantity, jamais dans quantity (nombre d'articles) ; g et cl sont convertis en kg et l avant l'écriture
+    const measure = l.measured ? toMeasure(l.measured, l.measureUnit ?? "") : null;
+    if (l.measured && !measure) throw courseError("invalid_line", `Ligne ${i + 1} : le poids ou le volume n'est pas valable.`, 422);
+    const perMeasure = measure ? pricePerMeasure(l.pricePerMeasure && l.pricePerMeasure > 0 ? l.pricePerMeasure : null, l.total, measure.amount) : null;
+    return { product, reference: l.reference?.trim().slice(0, 160) || null, total: round2(l.total), qty: measure ? 1 : l.qty, aisle: l.aisle, aisleId: id, measure, perMeasure, readPerMeasure: !!(measure && l.pricePerMeasure && l.pricePerMeasure > 0) };
   });
   const total = round2(lines.reduce((s, l) => s + l.total, 0));
   if (await isKnown(ctx, who.accountId, { store, date: input.date, total })) return { duplicate: true, recorded: 0, total, removed: [], aisles: [], shared: 0, receiptId: null };
@@ -155,16 +159,19 @@ export async function confirmTicket(ctx: Ctx, session: SessionContext, input: Ti
       const byKey = new Map(products.map((p) => [p.name_key, p.id]));
       await trx
         .insertInto("grocery_receipt_lines")
-        .values(lines.map((l, i) => ({ receipt_id: receipt.id, account_id: who.accountId, position: i + 1, label: l.product, name_key: keys[i], reference_name: l.reference, line_total: l.total.toFixed(2), quantity: l.qty.toFixed(3), aisle_id: l.aisleId, product_id: byKey.get(keys[i]) ?? null })))
+        .values(lines.map((l, i) => ({ receipt_id: receipt.id, account_id: who.accountId, position: i + 1, label: l.product, name_key: keys[i], reference_name: l.reference, line_total: l.total.toFixed(2), quantity: l.qty.toFixed(3), measured_quantity: l.measure ? l.measure.amount.toFixed(3) : null, measure_unit: l.measure?.unit ?? null, price_per_measure: l.readPerMeasure && l.perMeasure ? l.perMeasure.toFixed(2) : null, aisle_id: l.aisleId, product_id: byKey.get(keys[i]) ?? null })))
         .execute();
       // produits de la liste trouvés sur le ticket : cochés « acheté » (ils sortent de la liste et rejoignent l'historique)
       const ids = open.filter((o) => removedLabels.has(o.label)).map((o) => o.id);
       if (ids.length) await trx.updateTable("grocery_list_items").set({ state: "bought", bought_at: ctx.now, bought_by_user_id: who.userId, updated_at: ctx.now }).where("id", "in", ids).execute();
       for (const [i, l] of lines.entries()) {
-        const unit = l.total / l.qty;
+        // ligne pesée : seul le prix au kilo ou au litre est partagé, jamais le poids (CR-40)
+        const weighed = !!(l.measure && l.perMeasure);
+        const unit = weighed ? (l.perMeasure as number) : l.total / l.qty;
+        const priceUnit = weighed ? (l.measure!.unit as string) : "unit";
         const productId = byKey.get(keys[i]);
         if (productId && l.total > 0 && city && l.reference) {
-          const done = await sql<{ id: string | null }>`select share_grocery_price(${who.accountId}::uuid, ${productId}::bigint, ${l.reference}, ${unit.toFixed(2)}::numeric, ${store}, ${city}, ${input.date}::date) as id`.execute(trx);
+          const done = await sql<{ id: string | null }>`select share_grocery_price(${who.accountId}::uuid, ${productId}::bigint, ${l.reference}, ${unit.toFixed(2)}::numeric, ${store}, ${city}, ${input.date}::date, ${priceUnit}) as id`.execute(trx);
           if (done.rows[0]?.id) shared += 1;
         }
         if (!productId) {
