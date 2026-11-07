@@ -55,6 +55,7 @@ export interface MenuProposal {
     percentShared: number | null;
     overCap: boolean;
     capLabel: string;
+    capMinutes: number;
     steps: string[];
   };
   days: ProposedDay[];
@@ -161,6 +162,7 @@ export async function menuPropose(ctx: Ctx, session: SessionContext, input: { pi
       percentShared: state.batch.pct ?? null,
       overCap: state.batch.total > state.batch.cap,
       capLabel: fmtMin(state.batch.cap),
+      capMinutes: state.batch.cap,
       steps: state.batch.steps,
     },
     days,
@@ -199,12 +201,17 @@ export async function menuValidate(ctx: Ctx, session: SessionContext, input: Val
   const all = [...input.picks, ...input.dinners, ...input.express];
   if (all.some((id) => !byId.has(id))) throw courseError("dish_not_found", "Un des plats n'existe plus.", 422);
 
-  const estimated = state.batch.source === "estimation";
+  const planned = state.batch.source === "planning";
   const sameAsProposed = input.dinners.map((id, i) => i < 5 && id === state.menu[i]?.id);
   const finalDishes = input.dinners.map((id) => byId.get(id)!);
-  const minutes = estimated ? Math.max(1, Math.round(estimateMinutes(finalDishes.slice(0, 5)))) : state.batch.total;
+  // Un plat qui sort de la séance par un remplacement la raccourcit : la durée est alors recalculée comme une durée estimée (CR-38, US-156 RF8)
+  const wasInSession = (i: number) => i < 5 && (!planned || !!state.menu[i]?.batch);
+  const replacedOut = input.dinners.some((_, i) => wasInSession(i) && !sameAsProposed[i]);
+  const estimated = !planned || replacedOut;
+  const remaining = finalDishes.filter((_, i) => wasInSession(i) && sameAsProposed[i]);
+  const minutes = estimated ? Math.round(estimateMinutes(remaining)) : state.batch.total;
   const overCap = minutes > state.batch.cap;
-  const batchWeekId = !estimated && state.batch.id ? (data.weekIds.get(state.batch.id) ?? null) : null;
+  const batchWeekId = planned && !replacedOut && state.batch.id ? (data.weekIds.get(state.batch.id) ?? null) : null;
   const ref = (id: string) => {
     const r = data.refs.get(id)!;
     return r.kind === "catalog" ? { dish_id: r.dishId, household_dish_id: null } : { dish_id: null, household_dish_id: r.dishId };
@@ -230,7 +237,7 @@ export async function menuValidate(ctx: Ctx, session: SessionContext, input: Val
           validated_at: ctx.now,
           validated_by_user_id: userId,
           batch_week_id: batchWeekId as never,
-          session_minutes: Math.min(minutes, 1000),
+          session_minutes: minutes >= 1 ? Math.min(minutes, 1000) : null,
           session_is_estimated: estimated,
           session_over_cap: overCap,
         })
@@ -238,7 +245,7 @@ export async function menuValidate(ctx: Ctx, session: SessionContext, input: Val
         .executeTakeFirstOrThrow();
       const rows = [
         ...input.picks.map((id, i) => entry("pleasure", i + 1, id)),
-        ...input.dinners.map((id, i) => entry("dinner", i + 1, id, { offBatch: !sameAsProposed[i] || (!estimated && !state.menu[i]?.batch), confirm: sameAsProposed[i] && !!state.menu[i]?.confirm })),
+        ...input.dinners.map((id, i) => entry("dinner", i + 1, id, { offBatch: !sameAsProposed[i] || !wasInSession(i), confirm: sameAsProposed[i] && !!state.menu[i]?.confirm })),
         ...input.express.map((id, i) => entry("express", i + 1, id)),
       ];
       await trx.insertInto("meal_menu_entries").values(rows.map((r) => ({ ...r, menu_id: menu.id, account_id: accountId }))).execute();

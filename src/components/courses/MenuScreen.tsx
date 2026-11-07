@@ -6,6 +6,7 @@ import { useApiMutation, useApiQuery } from "@/client/hooks";
 import { AppShell } from "@/components/app/AppShell";
 import family from "@/components/family/family.module.css";
 import { Button, ButtonLink, Loading, Notice, RetryNotice } from "@/components/ui";
+import { estimateMinutes, fmtMin } from "@/server/courses/engine";
 import type { MenuProposal, MenuStart, ValidatedMenu } from "@/server/courses/menu/service";
 import styles from "./courses.module.css";
 
@@ -115,7 +116,12 @@ function MenuStep({ menu, onDone }: { menu: MenuProposal; onDone: (v: ValidatedM
   const validate = useApiMutation();
   const [chosen, setChosen] = useState<string[]>(() => menu.days.map((d) => d.dish.id));
   const s = menu.session;
-  const estimated = s.source === "estimation";
+  // un plat remplacé sort de la séance : la durée est recalculée, et signalée comme estimée (CR-38)
+  const replacedOut = menu.days.some((d, i) => d.inSession && chosen[i] !== d.dish.id);
+  const estimated = s.source === "estimation" || replacedOut;
+  const minutes = replacedOut ? Math.round(estimateMinutes(menu.days.filter((d, i) => d.inSession && chosen[i] === d.dish.id).map((d) => d.dish))) : s.minutes;
+  const label = estimated ? `environ ${fmtMin(minutes)}` : s.label;
+  const overCap = minutes > s.capMinutes;
 
   async function submit() {
     const result = await validate.run<{ validated: ValidatedMenu }>("/api/courses/menu/validate", {
@@ -127,14 +133,16 @@ function MenuStep({ menu, onDone }: { menu: MenuProposal; onDone: (v: ValidatedM
 
   return (
     <>
-      <div className={`${styles.session} ${s.overCap ? styles.sessionOver : ""}`}>
-        <div className={styles.sessionTitle}>Séance batch du dimanche : {s.label}{estimated ? " (durée estimée)" : ""}</div>
+      <div className={`${styles.session} ${overCap ? styles.sessionOver : ""}`}>
+        <div className={styles.sessionTitle}>Séance batch du dimanche : {label}{estimated ? " (durée estimée)" : ""}</div>
         <p className={styles.sessionText}>
-          {estimated
+          {s.source === "planning" && replacedOut
+            ? "Un plat remplacé sort de la séance : durée estimée, le plat le plus long plus 40 % des autres."
+            : estimated
             ? "Aucune semaine type ne convient : menu composé par ingrédients. Estimation : le plat le plus long, plus 40 % des autres."
             : `Semaine type « ${s.theme || "du catalogue"} »${s.percentShared != null ? `, ${s.percentShared} % d'ingrédients en commun` : ""}, du lundi au vendredi. Remplacer un plat change la durée.`}
         </p>
-        {s.overCap && <span className={styles.sessionFlag}>Séance au-dessus de {s.capLabel}</span>}
+        {overCap && <span className={styles.sessionFlag}>Séance au-dessus de {s.capLabel}</span>}
       </div>
       {menu.servingsNote && <p className={styles.banner}>{menu.servingsNote}</p>}
       <h2 className={styles.kick}>7 dîners · changez un plat avec la liste</h2>

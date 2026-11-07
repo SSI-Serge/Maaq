@@ -3,7 +3,7 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-06T21:14:12.670Z",
+  "updated": "2026-11-07T11:55:29.816Z",
   "deploys": [
     {
       "at": "2026-11-06T21:14:12.670Z",
@@ -2822,8 +2822,8 @@
       "id": "f21",
       "name": "Courses et repas : agent natif, étapes C0 à C6 (branche courses-repas)",
       "desc": "Le menu de la semaine, la liste de courses avec comparatif et scénarios, les tickets et le budget, calculés par MAAQ ; remplace l agent Digitorn qui fonctionne mal.",
-      "building": false,
-      "currentAction": "",
+      "building": true,
+      "currentAction": "Recalcul de la durée de séance fait ; console Admin-Courses à suivre",
       "stories": [
         {
           "id": "f21c0",
@@ -2861,9 +2861,8 @@
           "state": "done",
           "env": "preview",
           "at": "2026-11-06T21:14:12.670Z",
-          "note": "Réglages, menu de la semaine, liste de courses (comparatif, trois scénarios, validation) et accueil faits, testés (11 tests liste, 9 menu) et vus dans le navigateur local. Pas encore en ligne.",
+          "note": "Réglages, menu de la semaine, liste de courses (comparatif, trois scénarios, validation) et accueil faits, testés (11 tests liste, 9 menu) et vus dans le navigateur local. Pas encore en ligne. Durée de séance recalculée au remplacement (CR-38) : fait en local, pas encore en ligne.",
           "unsure": [
-            "La durée de la séance ne se recalcule pas quand on remplace un plat (comme la maquette) ; à confirmer avec le PO.",
             "Les choix du comparatif et les quantités ne sont gardés qu au moment de valider la liste.",
             "Les noms d ingrédients libres viennent des données d origine (ex. 500g viande hachée) : travail de console."
           ]
@@ -2895,6 +2894,10 @@
         }
       ],
       "decisions": [
+        {
+          "at": "2026-11-07T11:55:29.816Z",
+          "text": "CR-38 (PO) : la durée de la séance se recalcule quand un plat la quitte par un remplacement, affichée comme estimée. L invité secondaire pourra cocher acheté (changement de droit demandé à la BDD, en attente)."
+        },
         {
           "at": "2026-11-06T16:43:37.270Z",
           "text": "Accord du PO du 06/11/2026 : Courses et repas passe avant la suite de Contrats V2, branche courses-repas."

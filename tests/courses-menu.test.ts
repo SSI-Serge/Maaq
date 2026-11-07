@@ -159,4 +159,31 @@ describe("US-155/156 : menu de la semaine", () => {
     expect((await rejection(menuValidate(at(), f.elodie, { picks: [pick.id], dinners, express: [] }))).status).toBe(403);
     expect(await db.selectFrom("meal_menus").select("id").where("account_id", "=", f.accountId).execute()).toHaveLength(0);
   });
+
+  it("CR-38 : un plat remplacé sort de la séance, la durée est recalculée et devient estimée", async () => {
+    const f = await ready();
+    const all = (await menuStart(at(), f.sophie)).groups.flatMap((g) => g.dishes);
+    let found: { pick: string; menu: Awaited<ReturnType<typeof menuPropose>> } | null = null;
+    for (const d of all) {
+      const menu = await menuPropose(at(), f.sophie, { picks: [d.id] });
+      if (menu.session.source === "planning" && menu.days.slice(0, 5).some((x) => x.alternatives.length)) {
+        found = { pick: d.id, menu };
+        break;
+      }
+    }
+    expect(found).not.toBeNull();
+    if (!found) return;
+    const { pick, menu } = found;
+    const dinners = menu.days.map((d) => d.dish.id);
+    const same = await menuValidate(at(), f.sophie, { picks: [pick], dinners, express: [] });
+    expect(same.estimated).toBe(false);
+    expect(same.sessionMinutes).toBe(menu.session.minutes);
+    const i = menu.days.findIndex((d, k) => k < 5 && d.inSession && d.alternatives.length);
+    const swapped = [...dinners];
+    swapped[i] = menu.days[i].alternatives[0].id;
+    const changed = await menuValidate(at(), f.sophie, { picks: [pick], dinners: swapped, express: [] });
+    expect(changed.estimated).toBe(true);
+    const row = await db.selectFrom("meal_menus").select(["session_is_estimated", "batch_week_id"]).where("account_id", "=", f.accountId).executeTakeFirstOrThrow();
+    expect(row).toMatchObject({ session_is_estimated: true, batch_week_id: null });
+  });
 });
