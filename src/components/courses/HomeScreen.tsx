@@ -6,6 +6,7 @@ import { AppShell } from "@/components/app/AppShell";
 import family from "@/components/family/family.module.css";
 import { Loading, Notice, RetryNotice } from "@/components/ui";
 import type { CourseHome } from "@/server/courses/home";
+import { ChatPanel } from "./ChatPanel";
 import styles from "./courses.module.css";
 
 const BACK = { href: "/accueil", label: "Agents" };
@@ -94,6 +95,7 @@ function Home({ home }: { home: CourseHome }) {
           </Link>
         ))}
       </nav>
+      <ChatPanel couple={couple} />
     </>
   );
 }
