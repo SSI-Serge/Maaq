@@ -98,7 +98,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
           </div>
         </div>
         {NAV.map((item) => {
-          const active = pathname.startsWith(item.href);
+          const active = pathname.startsWith(item.href) || (item.href === "/admin/agents" && pathname.startsWith("/admin/courses"));
           return (
             <Link key={item.href} href={item.href} className={`${styles.navLink} ${active ? styles.navActive : ""}`} aria-current={active ? "page" : undefined}>
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>

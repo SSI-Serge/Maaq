@@ -1,0 +1,252 @@
+"use client";
+
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useState } from "react";
+import { useApiMutation, useApiQuery } from "@/client/hooks";
+import { Button, Loading, Notice, RetryNotice } from "@/components/ui";
+import type { ConsoleRow, ConsoleSummary, ConsoleTable, FormField, ObjectKey, RowAction } from "@/server/courses/console/types";
+import { PageHead } from "./AdminShell";
+import styles from "./admin.module.css";
+
+interface Nav {
+  nav: { key: ObjectKey; label: string }[];
+  summary: ConsoleSummary;
+}
+
+const TONE: Record<NonNullable<ConsoleRow["tone"]>, string> = { ok: styles.badgeOk, info: styles.badgeNeutral, warn: styles.badgeWarn, muted: styles.badgeNeutral };
+
+/** Console du catalogue commun de « Courses et repas » (maquette Admin-Courses) : la liste des objets, puis un tableau, des filtres et des actions par ligne. */
+export function CoursesConsole() {
+  const params = useSearchParams();
+  const router = useRouter();
+  const object = (params.get("objet") ?? "plats") as ObjectKey;
+  const nav = useApiQuery<Nav>("/api/admin/courses/summary");
+  return (
+    <>
+      <nav aria-label="Courses et repas" style={{ display: "flex", gap: 24, alignItems: "flex-start" }}>
+        <div style={{ width: 250, flex: "none" }}>
+          <div className={`${styles.small} ${styles.muted}`} style={{ margin: "0 0 8px", fontWeight: 700 }}>
+            Agent natif · Courses et repas
+          </div>
+          {nav.data?.nav.map((item) => {
+            const available = nav.data!.summary.available.includes(item.key);
+            const count = nav.data!.summary.counts[item.key];
+            return (
+              <button
+                key={item.key}
+                type="button"
+                disabled={!available}
+                aria-current={item.key === object ? "page" : undefined}
+                className={`${styles.navLink} ${item.key === object ? styles.navActive : ""}`}
+                style={{ width: "100%", textAlign: "left", color: "inherit", opacity: available ? 1 : 0.45 }}
+                onClick={() => router.replace(`/admin/courses?objet=${item.key}`)}
+              >
+                <span style={{ flex: 1 }}>{item.label}</span>
+                {!available && <span className={`${styles.small}`}>bientôt</span>}
+                {available && count && (
+                  <span className={`${styles.badge} ${count.todo ? styles.badgeWarn : styles.badgeNeutral}`} aria-label={count.todo ? `${count.n} à traiter` : `${count.n}`}>
+                    {count.n}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p className={styles.small} style={{ margin: "0 0 6px" }}>
+            <Link href="/admin/agents">Agents</Link> › Courses et repas
+          </p>
+          <ObjectView key={object} object={object} onChanged={nav.reload} />
+        </div>
+      </nav>
+    </>
+  );
+}
+
+function ObjectView({ object, onChanged }: { object: ObjectKey; onChanged: () => void }) {
+  const [q, setQ] = useState("");
+  const [filters, setFilters] = useState<Record<string, string>>({});
+  const qs = new URLSearchParams();
+  if (q.trim()) qs.set("q", q.trim());
+  for (const [k, v] of Object.entries(filters)) if (v) qs.set(`f_${k}`, v);
+  const suffix = qs.toString() ? `?${qs}` : "";
+  const query = useApiQuery<{ table: ConsoleTable }>(`/api/admin/courses/${object}${suffix}`);
+  const act = useApiMutation();
+  const [done, setDone] = useState<string | null>(null);
+  const [dialog, setDialog] = useState<{ row: ConsoleRow | null; action: RowAction } | null>(null);
+  const [adding, setAdding] = useState(false);
+
+  const table = query.data?.table;
+
+  async function run(action: string, id: string, values: Record<string, string>) {
+    const ok = await act.run("/api/admin/courses/" + object, { method: "POST", body: { action, id, values } });
+    if (ok) {
+      setDone("✓ Fait. Inscrit au journal d'administration.");
+      setDialog(null);
+      setAdding(false);
+      query.reload();
+      onChanged();
+    }
+  }
+
+  function start(row: ConsoleRow, action: RowAction) {
+    setDone(null);
+    if (action.fields || action.confirm) setDialog({ row, action });
+    else void run(action.key, row.id, {});
+  }
+
+  if (query.loading && !table) return <Loading slow={query.slow} />;
+  if (query.error && !table) {
+    const unavailable = query.error.body?.code === "not_available";
+    return unavailable ? <Notice tone="info">Cet écran de la console n&apos;est pas encore disponible.</Notice> : <RetryNotice message={query.error.message} onRetry={query.reload} />;
+  }
+  if (!table) return null;
+
+  const downloadUrl = (file: string) => `/api/admin/courses/${object}/download?file=${file}${qs.toString() ? `&${qs}` : ""}`;
+
+  return (
+    <>
+      <PageHead title={table.title} lead={table.intro} />
+      {(table.tools.downloads?.length || table.tools.add) && (
+        <div className={styles.row} style={{ marginBottom: 12 }}>
+          {table.tools.downloads?.map((d) => (
+            <a key={d.key} className={styles.linkButton} href={downloadUrl(d.key)} download>
+              {d.label}
+            </a>
+          ))}
+          {table.tools.add && (
+            <Button variant="ghost" onClick={() => { setDone(null); setAdding(true); }}>
+              + {table.tools.add.label}
+            </Button>
+          )}
+        </div>
+      )}
+      {done && (
+        <p role="status" className={`${styles.badge} ${styles.badgeOk}`} style={{ marginBottom: 10 }}>
+          {done}
+        </p>
+      )}
+      {act.error && !dialog && !adding && <Notice tone="error">{act.error.message}</Notice>}
+      {table.info && <p className={`${styles.small} ${styles.muted}`}>{table.info}</p>}
+      {(table.search || table.filters.length > 0) && (
+        <div className={styles.row} style={{ marginBottom: 12 }}>
+          {table.search && <input className={styles.search} type="search" aria-label="Rechercher" placeholder="Rechercher" value={q} onChange={(e) => setQ(e.target.value)} style={{ maxWidth: 260 }} />}
+          {table.filters.map((f) => (
+            <select key={f.key} aria-label={f.label} value={filters[f.key] ?? f.value} onChange={(e) => setFilters({ ...filters, [f.key]: e.target.value })} style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--line)", background: "var(--bg-raised)" }}>
+              {f.options.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          ))}
+        </div>
+      )}
+      <table className={styles.table}>
+        <thead>
+          <tr>
+            {table.columns.map((c) => (
+              <th key={c.key} scope="col" className={c.align === "right" ? styles.cellRight : undefined}>
+                {c.label}
+              </th>
+            ))}
+            <th scope="col">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {table.rows.length === 0 && (
+            <tr>
+              <td colSpan={table.columns.length + 1} className={styles.empty}>
+                Aucune ligne.
+              </td>
+            </tr>
+          )}
+          {table.rows.map((r) => (
+            <tr key={r.id} style={r.tone === "muted" ? { opacity: 0.6 } : undefined}>
+              {table.columns.map((c) => (
+                <td key={c.key} className={c.align === "right" ? styles.cellRight : undefined}>
+                  {r.cells[c.key] === null || r.cells[c.key] === "" ? "—" : String(r.cells[c.key])}
+                </td>
+              ))}
+              <td>
+                {r.tone && r.tone !== "muted" && <span className={`${styles.badge} ${TONE[r.tone]}`} style={{ marginRight: 6 }} aria-hidden="true">●</span>}
+                {r.actions.map((a) => (
+                  <button key={a.key} type="button" className={`${styles.linkButton} ${a.confirm ? styles.dangerLink : ""}`} disabled={act.pending} onClick={() => start(r, a)}>
+                    {a.label}
+                  </button>
+                ))}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className={`${styles.small} ${styles.muted}`}>
+        {table.total > table.rows.length ? `Les ${table.rows.length} premières lignes sur ${table.total}. Affinez avec la recherche ou les filtres.` : `${table.total} ligne${table.total > 1 ? "s" : ""}.`} {table.footer}
+      </p>
+
+      {dialog && (
+        <FormDialog
+          title={dialog.action.label}
+          confirm={dialog.action.confirm}
+          fields={dialog.action.fields ?? []}
+          pending={act.pending}
+          error={act.error?.message}
+          onCancel={() => setDialog(null)}
+          onSubmit={(values) => void run(dialog.action.key, dialog.row?.id ?? "", values)}
+        />
+      )}
+      {adding && table.tools.add && (
+        <FormDialog title={table.tools.add.label} fields={table.tools.add.fields} pending={act.pending} error={act.error?.message} onCancel={() => setAdding(false)} onSubmit={(values) => void run("add", "", values)} />
+      )}
+    </>
+  );
+}
+
+function FormDialog({ title, confirm, fields, pending, error, onCancel, onSubmit }: { title: string; confirm?: string; fields: FormField[]; pending: boolean; error?: string; onCancel: () => void; onSubmit: (values: Record<string, string>) => void }) {
+  const [values, setValues] = useState<Record<string, string>>(() => Object.fromEntries(fields.map((f) => [f.key, f.value === null || f.value === undefined ? (f.options?.[0]?.value ?? "") : String(f.value)])));
+  return (
+    <div className={styles.backdrop}>
+      <form
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        className={styles.dialog}
+        onSubmit={(e) => {
+          e.preventDefault();
+          onSubmit(values);
+        }}
+      >
+        <h2 className={styles.dialogTitle}>{title}</h2>
+        {confirm && <p style={{ margin: 0 }}>{confirm}</p>}
+        {fields.map((f) => (
+          <label key={f.key} className={styles.label}>
+            {f.label}
+            {f.type === "select" ? (
+              <select value={values[f.key]} onChange={(e) => setValues({ ...values, [f.key]: e.target.value })} style={{ width: "100%", padding: 8 }}>
+                {f.options?.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            ) : f.type === "textarea" ? (
+              <textarea className={styles.textarea} value={values[f.key]} onChange={(e) => setValues({ ...values, [f.key]: e.target.value })} />
+            ) : (
+              <input type={f.type === "number" ? "number" : "text"} value={values[f.key]} required={f.required} onChange={(e) => setValues({ ...values, [f.key]: e.target.value })} style={{ width: "100%", padding: 8 }} />
+            )}
+          </label>
+        ))}
+        {error && <Notice tone="error">{error}</Notice>}
+        <div className={styles.actions}>
+          <Button variant="ghost" type="button" onClick={onCancel}>
+            Annuler
+          </Button>
+          <Button type="submit" loading={pending}>
+            {fields.length || !confirm ? "Enregistrer" : "Confirmer"}
+          </Button>
+        </div>
+      </form>
+    </div>
+  );
+}
