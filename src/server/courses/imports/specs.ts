@@ -92,3 +92,50 @@ export const HOUSEHOLD_DISHES_SPEC: ImportSpec<HouseholdDishesContext> = {
 };
 
 export const HOUSEHOLD_DISHES_TEMPLATE_HEADERS = ["plat", "cuisine", "ingredients"];
+
+export type ReferenceStatusLabel = "conforme" | "sans objet" | "a verifier" | "aucun conforme trouve";
+
+function decimalPrice(raw: string): CellResult<number> {
+  const n = Number(raw.replace(/\s/g, "").replace("€", "").replace(",", "."));
+  return Number.isFinite(n) && n > 0 && n <= 10000 ? { ok: true, value: Math.round(n * 100) / 100 } : { ok: false, message: "doit être un prix supérieur à 0 (ou vide : N/A)." };
+}
+
+function isoDate(raw: string): CellResult<string> {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw) ?? /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(raw);
+  if (!m) return { ok: false, message: "date attendue au format AAAA-MM-JJ (ou JJ/MM/AAAA)." };
+  const [y, mo, d] = raw.includes("/") ? [m[3], m[2], m[1]] : [m[1], m[2], m[3]];
+  const date = new Date(`${y}-${mo}-${d}T12:00:00Z`);
+  return Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== `${y}-${mo}-${d}` ? { ok: false, message: "date inexistante." } : { ok: true, value: `${y}-${mo}-${d}` };
+}
+
+function referenceStatus(raw: string): CellResult<string> {
+  const key = norm(raw).trim();
+  return ["conforme", "sans objet", "a verifier", "aucun conforme trouve"].includes(key) ? { ok: true, value: raw } : { ok: false, message: "attendu : Conforme, Sans objet, À vérifier ou Aucun conforme trouvé." };
+}
+
+/** Références par enseigne (US-166, US-174). Modèle : `references.csv`. Le prix et sa date vont ensemble ; sans prix, la référence s'affiche « N/A ». */
+export const REFERENCES_SPEC: ImportSpec = {
+  title: "Références par enseigne",
+  templateFile: "references.csv",
+  idColumn: "produit",
+  rowKey: (v) => `${norm(String(v.produit))}|${norm(String(v.enseigne))}|${norm(String(v.reference))}`,
+  columns: [
+    { key: "produit", required: true },
+    { key: "rayon" },
+    { key: "enseigne", required: true },
+    { key: "reference", required: true },
+    { key: "prix", parse: decimalPrice },
+    { key: "date_prix", parse: isoDate },
+    { key: "statut", parse: referenceStatus },
+    { key: "additifs", parse: (raw) => ({ ok: true, value: [...new Set(raw.split("|").map((x) => norm(x).trim()).filter((x) => x))] }) },
+    { key: "composition", parse: (raw) => (raw.length <= 2000 ? { ok: true, value: raw } : { ok: false, message: "2 000 caractères au plus." }) },
+  ],
+  checkRow: (v) => {
+    const out: { column: string | null; message: string }[] = [];
+    if (v.prix !== null && !v.date_prix) out.push({ column: "date_prix", message: "la date du prix est obligatoire quand il y a un prix." });
+    if (v.prix === null && v.date_prix) out.push({ column: "prix", message: "un prix est obligatoire quand il y a une date (sinon laissez les deux vides)." });
+    return out;
+  },
+};
+
+export const REFERENCES_TEMPLATE_HEADERS = ["produit", "rayon", "enseigne", "reference", "prix", "date_prix", "statut", "additifs", "composition"];

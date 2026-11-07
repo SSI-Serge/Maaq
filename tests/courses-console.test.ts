@@ -141,7 +141,7 @@ describe("Console du catalogue : produits à référencer, base commune, réglag
   });
 
   it("un objet pas encore livré répond « non disponible »", async () => {
-    expect((await rejection(loadObject(c, "references", q()))).code).toBe("not_available");
+
     expect((await rejection(loadObject(c, "nimporte", q()))).code).toBe("not_found");
   });
 });

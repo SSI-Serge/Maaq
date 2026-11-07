@@ -50,7 +50,10 @@ export interface ConsoleFilter {
 export interface ConsoleTools {
   /** Nom des fichiers que l'on peut télécharger : modèle, export, listes de contrôle. */
   downloads?: { key: string; label: string }[];
-  import?: boolean;
+  /** Import par fichier CSV ou xlsx ; `replaceAll` ajoute la case « Tout remplacer ». */
+  import?: { replaceAll: boolean; check?: boolean; checkOnly?: boolean };
+  /** Calcul à la demande sur un texte saisi (pourcentage de correspondance d'un nom de plat). */
+  lookup?: { label: string; placeholder: string };
   /** Formulaire d'ajout d'une ligne. */
   add?: { label: string; fields: FormField[] };
 }
@@ -84,6 +87,9 @@ export interface ConsoleObject {
   /** Action d'une ligne (`id` est celui de la ligne) ou d'ajout (`action` = « add », `id` vide). */
   act?(c: ConsoleContext, action: string, id: string, values: Record<string, string>): Promise<void>;
   download?(c: ConsoleContext, key: string, query: ConsoleQuery): Promise<{ file: string; content: string }>;
+  /** Importe un fichier : tout est vérifié avant l'écriture ; `dryRun` contrôle sans rien écrire. */
+  import?(c: ConsoleContext, file: { name: string; content: Buffer }, options: { replaceAll: boolean; dryRun: boolean }): Promise<{ count: number; lines: string[] }>;
+  lookup?(c: ConsoleContext, value: string): Promise<string[]>;
 }
 
 export const ROW_LIMIT = 200;

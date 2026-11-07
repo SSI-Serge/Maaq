@@ -3,9 +3,13 @@ import { additives } from "./objects/additives";
 import { aisles } from "./objects/aisles";
 import { dishes } from "./objects/dishes";
 import { moduleSettings } from "./objects/module-settings";
+import { matches, plannings } from "./objects/plannings";
 import { prices } from "./objects/prices";
+import { references } from "./objects/references";
 import { taxonomy } from "./objects/taxonomy";
+import { seasons } from "./objects/seasons";
 import { unreferenced } from "./objects/unreferenced";
+import { versions } from "./objects/versions";
 import { OBJECT_KEYS, type ConsoleContext, type ConsoleSummary, type ConsoleObject, type ConsoleQuery, type ObjectKey } from "./types";
 
 export * from "./types";
@@ -15,6 +19,11 @@ export { readQuery } from "./util";
 const OBJECTS: Partial<Record<ObjectKey, ConsoleObject>> = {
   plats: dishes,
   cuisines: taxonomy,
+  references,
+  saisons: seasons,
+  versions,
+  plannings,
+  correspondances: matches,
   additifs: additives,
   rayons: aisles,
   "a-referencer": unreferenced,
@@ -83,4 +92,16 @@ export async function downloadFile(c: ConsoleContext, key: string, file: string,
   const { impl } = consoleObject(key);
   if (!impl.download) throw courseError("not_found", "Ce fichier n'existe pas.", 404);
   return impl.download(c, file, query);
+}
+
+export async function importFile(c: ConsoleContext, key: string, file: { name: string; content: Buffer }, options: { replaceAll: boolean; dryRun: boolean }) {
+  const { impl } = consoleObject(key);
+  if (!impl.import) throw courseError("not_found", "Cet objet n'a pas d'import.", 404);
+  return impl.import(c, file, options);
+}
+
+export async function lookupValue(c: ConsoleContext, key: string, value: string): Promise<string[]> {
+  const { impl } = consoleObject(key);
+  if (!impl.lookup) throw courseError("not_found", "Cet objet n'a pas de calcul.", 404);
+  return impl.lookup(c, value.trim().slice(0, 160));
 }

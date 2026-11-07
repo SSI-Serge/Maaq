@@ -26,6 +26,8 @@ export interface ImportSpec<Ctx = undefined> {
   columns: ColumnSpec[];
   /** Colonne dont la valeur identifie la ligne : deux lignes du fichier ne peuvent pas la partager. */
   idColumn: string;
+  /** Identifiant composé (produit + enseigne + référence) quand une seule colonne ne suffit pas. */
+  rowKey?: (values: Record<string, unknown>) => string;
   /** Contrôle de toute la ligne une fois les colonnes lues. */
   checkRow?: (values: Record<string, unknown>, ctx: Ctx) => { column: string | null; message: string }[];
 }
@@ -86,7 +88,7 @@ export function validateTable<Ctx>(spec: ImportSpec<Ctx>, table: Table, ctx: Ctx
       }
     }
     if (bad) return;
-    const id = String(values[spec.idColumn] ?? "");
+    const id = spec.rowKey ? spec.rowKey(values) : String(values[spec.idColumn] ?? "");
     if (id) {
       const first = seen.get(id);
       if (first !== undefined) {

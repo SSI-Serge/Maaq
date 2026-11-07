@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useApiMutation, useApiQuery } from "@/client/hooks";
 import { Button, Loading, Notice, RetryNotice } from "@/components/ui";
 import type { ConsoleRow, ConsoleSummary, ConsoleTable, FormField, ObjectKey, RowAction } from "@/server/courses/console/types";
@@ -122,6 +122,8 @@ function ObjectView({ object, onChanged }: { object: ObjectKey; onChanged: () =>
           )}
         </div>
       )}
+      {table.tools.import && <ImportTool object={object} replaceAll={table.tools.import.replaceAll} check={!!table.tools.import.check} checkOnly={!!table.tools.import.checkOnly} onDone={(msg) => { setDone(msg); query.reload(); onChanged(); }} />}
+      {table.tools.lookup && <LookupTool object={object} label={table.tools.lookup.label} placeholder={table.tools.lookup.placeholder} />}
       {done && (
         <p role="status" className={`${styles.badge} ${styles.badgeOk}`} style={{ marginBottom: 10 }}>
           {done}
@@ -247,6 +249,96 @@ function FormDialog({ title, confirm, fields, pending, error, onCancel, onSubmit
           </Button>
         </div>
       </form>
+    </div>
+  );
+}
+
+function ImportTool({ object, replaceAll, check, checkOnly, onDone }: { object: ObjectKey; replaceAll: boolean; check: boolean; checkOnly: boolean; onDone: (message: string) => void }) {
+  const send = useApiMutation();
+  const input = useRef<HTMLInputElement>(null);
+  const [replace, setReplace] = useState(false);
+  const [dryChoice, setDry] = useState(false);
+  const dry = dryChoice || checkOnly;
+  const [lines, setLines] = useState<string[]>([]);
+  const [issues, setIssues] = useState<string[]>([]);
+
+  async function pick(file: File | undefined) {
+    if (!file) return;
+    setLines([]);
+    setIssues([]);
+    const body = new FormData();
+    body.append("file", file);
+    if (replace) body.append("replace", "1");
+    if (dry) body.append("dry", "1");
+    const result = await send.run<{ count: number; lines: string[] }>(`/api/admin/courses/${object}/import`, { method: "POST", body });
+    if (input.current) input.current.value = "";
+    if (result) {
+      setLines(result.lines);
+      if (!dry) onDone(`✓ Fichier vérifié et importé : ${result.count} ligne${result.count > 1 ? "s" : ""} ${replace ? "remplacée" : "ajoutée ou mise à jour"}${result.count > 1 ? "s" : ""}. Inscrit au journal d'administration.`);
+    } else {
+      setIssues(((send.error?.body?.details as { issues?: string[] } | undefined)?.issues) ?? []);
+    }
+  }
+
+  return (
+    <div className={styles.panel} style={{ marginBottom: 12 }}>
+      <div className={styles.row}>
+        {replaceAll && !dry && (
+          <label className={styles.row} style={{ gap: 6 }}>
+            <input type="checkbox" checked={replace} onChange={(e) => setReplace(e.target.checked)} /> Tout remplacer
+          </label>
+        )}
+        {check && !checkOnly && (
+          <label className={styles.row} style={{ gap: 6 }}>
+            <input type="checkbox" checked={dry} onChange={(e) => setDry(e.target.checked)} /> Contrôler sans importer
+          </label>
+        )}
+        <Button variant="ghost" onClick={() => input.current?.click()} loading={send.pending}>
+          {dry ? "Contrôler un fichier" : "Importer un fichier"}
+        </Button>
+        <input ref={input} type="file" hidden accept=".csv,.xlsx,text/csv" onChange={(e) => void pick(e.target.files?.[0])} />
+      </div>
+      {send.error && (
+        <Notice tone="error">
+          <strong>{send.error.message}</strong>
+          {issues.map((i) => (
+            <div key={i}>{i}</div>
+          ))}
+        </Notice>
+      )}
+      {lines.length > 0 && (
+        <div className={`${styles.small}`} role="status" style={{ marginTop: 8 }}>
+          {lines.map((l) => (
+            <div key={l}>{l}</div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LookupTool({ object, label, placeholder }: { object: ObjectKey; label: string; placeholder: string }) {
+  const run = useApiMutation();
+  const [value, setValue] = useState("");
+  const [lines, setLines] = useState<string[]>([]);
+  async function go() {
+    const result = await run.run<{ lines: string[] }>(`/api/admin/courses/${object}/lookup`, { method: "POST", body: { value } });
+    if (result) setLines(result.lines);
+  }
+  return (
+    <div className={styles.panel} style={{ marginBottom: 12 }}>
+      <div className={styles.row}>
+        <input className={styles.search} aria-label={placeholder} placeholder={placeholder} value={value} onChange={(e) => setValue(e.target.value)} style={{ maxWidth: 280 }} />
+        <Button variant="ghost" onClick={() => void go()} loading={run.pending} disabled={!value.trim()}>
+          {label}
+        </Button>
+      </div>
+      {run.error && <Notice tone="error">{run.error.message}</Notice>}
+      {lines.length > 0 && (
+        <p role="status" className={styles.small} style={{ margin: "8px 0 0" }}>
+          Plus proches du catalogue : {lines.join(" · ")}
+        </p>
+      )}
     </div>
   );
 }
