@@ -3,7 +3,7 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-07T14:20:40.063Z",
+  "updated": "2026-11-07T14:51:20.415Z",
   "deploys": [
     {
       "at": "2026-11-07T14:20:40.063Z",
@@ -2850,8 +2850,8 @@
       "id": "f21",
       "name": "Courses et repas : agent natif, étapes C0 à C6 (branche courses-repas)",
       "desc": "Le menu de la semaine, la liste de courses avec comparatif et scénarios, les tickets et le budget, calculés par MAAQ ; remplace l agent Digitorn qui fonctionne mal.",
-      "building": false,
-      "currentAction": "",
+      "building": true,
+      "currentAction": "Tickets : code fait ; service de lecture à déployer (accord à demander)",
       "stories": [
         {
           "id": "f21c0",
@@ -2910,12 +2910,14 @@
         {
           "id": "f21c5",
           "title": "C5 · Tickets de caisse, budget par rayon, base commune des prix, modération (US-160, 161, 163, 175)",
-          "state": "planning",
+          "state": "testing",
           "env": null,
-          "at": "2026-11-06T16:44:47.574Z",
+          "at": "2026-11-07T14:51:20.415Z",
           "unsure": [
-            "Essai sur 2 vrais tickets (06/11) : la lecture par Tesseract ne reconnaît que la moitié des montants et ne masque pas toujours la carte de fidélité. Un autre moteur de lecture est à étudier (décision du PO)."
-          ]
+            "Le service de lecture RapidOCR n a jamais tourné : à déployer et à essayer (tickets fictifs sur la zone de test ; vrais tickets du PO en local seulement, CR-31).",
+            "La mise en forme par le modèle n a pas été essayée sur de vrais textes de ticket."
+          ],
+          "note": "Code des tickets fait et testé avec lecteur et modèle simulés (14 tests dont masquage) : lecture, masquage, mise en forme, correction, enregistrement, doublon, budget, base commune, menu à partir d un ticket ; écran /courses/ticket. Le service de lecture RapidOCR (services/ticket-reader) est écrit mais pas encore déployé ni essayé."
         },
         {
           "id": "f21c6",
