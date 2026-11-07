@@ -3,8 +3,16 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-07T13:41:17.398Z",
+  "updated": "2026-11-07T14:20:40.063Z",
   "deploys": [
+    {
+      "at": "2026-11-07T14:20:40.063Z",
+      "env": "preview",
+      "what": "Courses et repas : formats du classeur chargés (303 références sur 322), correction du décalage d un jour des dates de prix dans la console — rév. 00077",
+      "storyIds": [
+        "f21c1"
+      ]
+    },
     {
       "at": "2026-11-07T13:41:17.398Z",
       "env": "preview",
@@ -2918,6 +2926,10 @@
         }
       ],
       "decisions": [
+        {
+          "at": "2026-11-07T14:20:40.063Z",
+          "text": "Format du classeur repris par l import de la console (303 références sur 322), avec l accord direct du PO ; sauvegarde 14-14-28 faite avant."
+        },
         {
           "at": "2026-11-07T13:41:17.398Z",
           "text": "Format de la référence : colonne package_format (80 caractères, facultative) ; colonne format du fichier d import. Rattrapage deeeda5e appliqué sur la base de test avec l accord direct du PO."
