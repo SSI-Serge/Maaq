@@ -1686,6 +1686,8 @@ export interface GroceryReceipts {
   created_at: Generated<Timestamp>;
   id: Generated<string>;
   purchased_on: Timestamp;
+  /** Heure du ticket (time(0)), vide pour les tickets d'avant CR-41. */
+  purchased_time: string | null;
   recorded_by_user_id: string | null;
   store_chain: string;
   store_city: string | null;

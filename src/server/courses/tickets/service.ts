@@ -7,7 +7,7 @@ import { courseError, displayPlace, loadSettings, requireAccess, translateCourse
 import { loadEngineData } from "../menu/data";
 import { maskTicketText } from "./mask";
 import { ticketReader, TicketReaderError, type TicketImage } from "./reader";
-import { normalizeDraft, ticketStructurer, type TicketDraft } from "./structure";
+import { normalizeDraft, normalizeTime, ticketStructurer, type TicketDraft } from "./structure";
 
 /**
  * Tickets de caisse (US-161, US-160) : lecture d'une ou plusieurs photos par le service de lecture de MAAQ, masquage du texte, mise en forme par le modèle, correction ligne
@@ -33,15 +33,22 @@ export interface TicketReadResult {
 const todayOf = (now: Date) => `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 
 async function receiptsFor(ctx: Ctx, accountId: string) {
-  return ctx.db.selectFrom("grocery_receipts").select(["store_chain", "purchased_on", "total_amount"]).where("account_id", "=", accountId).execute();
+  return ctx.db.selectFrom("grocery_receipts").select(["store_chain", "purchased_on", "purchased_time", "total_amount"]).where("account_id", "=", accountId).execute();
 }
 
 const day = (value: Date | string) => (typeof value === "string" ? value.slice(0, 10) : todayOf(value));
 
-/** Un ticket déjà enregistré se reconnaît au même magasin, à la même date et au même total (US-161 RT2). */
-async function isKnown(ctx: Ctx, accountId: string, ticket: { store: string; date: string; total: number }): Promise<boolean> {
+/**
+ * Un ticket déjà enregistré se reconnaît à la même date, la même heure exacte et le même total, quel que soit le magasin ; sans heure (ancien ticket ou heure non lue),
+ * au même magasin, à la même date et au même total (US-161 RT2, CR-41). Les deux contrôles sont aussi garantis par la base (deux index uniques) ; un ticket sans heure
+ * n'est jamais bloqué par un ticket avec heure.
+ */
+async function isKnown(ctx: Ctx, accountId: string, ticket: { store: string; date: string; time: string | null; total: number }): Promise<boolean> {
   const store = placeKey(ticket.store);
-  return (await receiptsFor(ctx, accountId)).some((r) => r.store_chain === store && day(r.purchased_on as Date | string) === ticket.date && round2(Number(r.total_amount)) === round2(ticket.total));
+  return (await receiptsFor(ctx, accountId)).some((r) => {
+    if (day(r.purchased_on as Date | string) !== ticket.date || round2(Number(r.total_amount)) !== round2(ticket.total)) return false;
+    return ticket.time ? r.purchased_time === ticket.time : r.purchased_time === null && r.store_chain === store;
+  });
 }
 
 /** Lit un ticket (une à trois photos) et le met en forme pour correction. Le couple seulement (CR-10). */
@@ -82,7 +89,7 @@ export async function readTicket(ctx: Ctx, session: SessionContext, images: Tick
   // ville du magasin : celle d'une enseigne du foyer de même nom, à défaut de celle lue
   if (draft.store && !draft.city) draft.city = settings.stores.find((s) => placeKey(s.chain) === placeKey(draft.store))?.city ?? null;
   const total = round2(draft.lines.reduce((s, l) => s + l.total, 0));
-  const duplicate = draft.readable && draft.store ? await isKnown(ctx, who.accountId, { store: draft.store, date: draft.date, total }) : false;
+  const duplicate = draft.readable && draft.store ? await isKnown(ctx, who.accountId, { store: draft.store, date: draft.date, time: draft.time, total }) : false;
   return { draft, total, duplicate, aisles, masked: masked.masked };
 }
 
@@ -90,6 +97,8 @@ export interface TicketInput {
   store: string;
   city: string | null;
   date: string;
+  /** « HH:MM » ou « HH:MM:SS » ; l'écran l'impose (CR-41), le service reste tolérant pour les anciens tickets sans heure. */
+  time?: string | null;
   lines: { product: string; reference: string | null; total: number; qty: number; aisle: string; measured?: number | null; measureUnit?: "kg" | "g" | "l" | "cl" | "ml" | null; pricePerMeasure?: number | null }[];
 }
 
@@ -115,6 +124,8 @@ export async function confirmTicket(ctx: Ctx, session: SessionContext, input: Ti
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date) || Number.isNaN(Date.parse(`${input.date}T12:00:00Z`)) || input.date > todayOf(new Date(ctx.now.getTime() + 86_400_000))) throw courseError("invalid_date", "La date du ticket n'est pas valable.", 422);
   if (!input.lines.length || input.lines.length > 100) throw courseError("invalid_lines", "Un ticket compte de 1 à 100 lignes.", 422);
   const city = input.city?.trim() ? input.city.trim().slice(0, 80) : null;
+  const time = input.time ? normalizeTime(input.time) : null;
+  if (input.time && !time) throw courseError("invalid_time", "L'heure du ticket n'est pas valable.", 422);
 
   const aisleRows = await ctx.db.selectFrom("grocery_aisles").select(["id", "name"]).execute();
   const aisleId = new Map(aisleRows.map((a) => [nameKey(a.name), a.id]));
@@ -132,7 +143,7 @@ export async function confirmTicket(ctx: Ctx, session: SessionContext, input: Ti
     return { product, reference: l.reference?.trim().slice(0, 160) || null, total: round2(l.total), qty: measure ? 1 : l.qty, aisle: l.aisle, aisleId: id, measure, perMeasure, readPerMeasure: !!(measure && l.pricePerMeasure && l.pricePerMeasure > 0) };
   });
   const total = round2(lines.reduce((s, l) => s + l.total, 0));
-  if (await isKnown(ctx, who.accountId, { store, date: input.date, total })) return { duplicate: true, recorded: 0, total, removed: [], aisles: [], shared: 0, receiptId: null };
+  if (await isKnown(ctx, who.accountId, { store, date: input.date, time, total })) return { duplicate: true, recorded: 0, total, removed: [], aisles: [], shared: 0, receiptId: null };
 
   const open = await ctx.db
     .selectFrom("grocery_list_items")
@@ -150,7 +161,7 @@ export async function confirmTicket(ctx: Ctx, session: SessionContext, input: Ti
     await asProfile(ctx.db, who.userId, async (trx) => {
       const receipt = await trx
         .insertInto("grocery_receipts")
-        .values({ account_id: who.accountId, store_chain: placeKey(store).slice(0, 80), store_city: city ? placeKey(city).slice(0, 80) : null, purchased_on: input.date as never, total_amount: total.toFixed(2), recorded_by_user_id: who.userId, created_at: ctx.now })
+        .values({ account_id: who.accountId, store_chain: placeKey(store).slice(0, 80), store_city: city ? placeKey(city).slice(0, 80) : null, purchased_on: input.date as never, purchased_time: time, total_amount: total.toFixed(2), recorded_by_user_id: who.userId, created_at: ctx.now })
         .returning("id")
         .executeTakeFirstOrThrow();
       receiptId = receipt.id;

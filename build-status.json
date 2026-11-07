@@ -3,8 +3,16 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-07T16:25:00.000Z",
+  "updated": "2026-11-07T16:50:00.000Z",
   "deploys": [
+    {
+      "at": "2026-11-07T16:50:00.000Z",
+      "env": "preview",
+      "what": "Courses et repas : correction des tickets (la photo n arrivait pas au serveur, d où aucun ticket lu) et messages à chaque étape — rév. 00081",
+      "storyIds": [
+        "f21c5"
+      ]
+    },
     {
       "at": "2026-11-07T16:25:00.000Z",
       "env": "preview",

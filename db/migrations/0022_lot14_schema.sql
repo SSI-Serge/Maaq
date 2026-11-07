@@ -464,11 +464,11 @@ CREATE TABLE grocery_receipts (
   store_chain          varchar(80) NOT NULL CHECK (store_chain <> '' AND store_chain = grocery_norm(store_chain)),
   store_city           varchar(80) CHECK (store_city IS NULL OR (store_city <> '' AND store_city = grocery_norm(store_city))),
   purchased_on         date NOT NULL,
+  -- Heure du ticket, à la seconde (secondes à 00 quand elles ne sont pas lues), heure locale du magasin ; facultative pour les anciens tickets (CR-41)
+  purchased_time       time(0),
   total_amount         numeric(9,2) NOT NULL,
   recorded_by_user_id  uuid,
   created_at           timestamptz NOT NULL DEFAULT now(),
-  -- Un ticket déjà enregistré se reconnaît au même magasin, à la même date et au même total (US-161 RT2)
-  CONSTRAINT uq_grocery_receipts_duplicate UNIQUE (account_id, store_chain, purchased_on, total_amount),
   UNIQUE (id, account_id),
   CONSTRAINT fk_grocery_receipts_recorded_by FOREIGN KEY (recorded_by_user_id, account_id) REFERENCES users (id, account_id) ON DELETE SET NULL (recorded_by_user_id)
 );
@@ -991,6 +991,10 @@ CREATE INDEX idx_grocery_list_items_product_id ON grocery_list_items (product_id
 CREATE INDEX idx_grocery_list_items_aisle_id ON grocery_list_items (aisle_id) WHERE aisle_id IS NOT NULL;
 CREATE INDEX idx_grocery_list_items_added_by ON grocery_list_items (added_by_user_id, account_id);
 CREATE INDEX idx_grocery_list_items_bought_by ON grocery_list_items (bought_by_user_id, account_id);
+-- Un ticket déjà enregistré est refusé en entier (US-161 RT2, CR-41) : avec une heure, même date, même heure et même total (le magasin n'entre pas en compte) ;
+-- sans heure, même magasin, même date et même total, comme avant. Les deux contrôles sont garantis par la base.
+CREATE UNIQUE INDEX ux_grocery_receipts_duplicate_time ON grocery_receipts (account_id, purchased_on, purchased_time, total_amount) WHERE purchased_time IS NOT NULL;
+CREATE UNIQUE INDEX ux_grocery_receipts_duplicate_no_time ON grocery_receipts (account_id, store_chain, purchased_on, total_amount) WHERE purchased_time IS NULL;
 CREATE INDEX idx_grocery_receipts_recorded_by ON grocery_receipts (recorded_by_user_id, account_id);
 CREATE INDEX idx_grocery_receipts_date ON grocery_receipts (account_id, purchased_on DESC);
 CREATE INDEX idx_grocery_receipt_lines_receipt ON grocery_receipt_lines (receipt_id, account_id);
@@ -1227,7 +1231,8 @@ COMMENT ON COLUMN grocery_list_items.state IS $$preparing = en préparation (auc
 COMMENT ON FUNCTION grocery_list_item_before_write() IS $$Garde-fou de la liste de courses : un invité secondaire (profil indiqué dans app.user_id) peut ajouter un produit en son nom, augmenter une quantité, cocher « acheté » n'importe quel article de la liste validée (état validé ou ajouté depuis la validation, à son nom) et décocher ce qu'il a lui-même coché ; il ne change jamais un magasin, une référence, un prix, une quantité en même temps ni le libellé. Sans profil indiqué, le garde-fou ne s'applique pas (H144). [US-158 RF2, RF3, US-162, CR-10, CR-38]$$;
 COMMENT ON FUNCTION grocery_list_for(uuid) IS $$Articles de la liste de courses de la famille d'un profil, pour l'affichage : le prix estimé n'est rendu qu'au couple, l'invité secondaire ne voit aucun prix (il voit le magasin, la référence, le format du conditionnement et l'unité du prix, sans prix). L'application l'utilise pour lire la liste ; tant qu'elle se connecte avec un seul rôle, la protection effective des colonnes est cette fonction et le code (H150). [US-157 RF8, US-158, CR-10, CR-38, CR-40]$$;
 COMMENT ON FUNCTION grocery_carry_over_unbought(uuid) IS $$Reprend dans la préparation suivante les produits non achetés de la liste validée et du bloc « Ajoutés depuis la validation » : ils redeviennent « en préparation », sans magasin ni prix, avec la mention « pas acheté la dernière fois ». Retourne le nombre de produits repris. À appeler à l'ouverture de la préparation de la liste. [US-162 RF4, CR-28]$$;
-COMMENT ON TABLE grocery_receipts IS $$Ticket de caisse enregistré : magasin, ville, date, total, profil. Aucune photo ni image (supprimée dès la lecture, confirmée ou non), le nom et la carte de fidélité sont masqués avant que l'agent ne reçoive le texte. Un doublon (même magasin, date et total) est refusé. Source du budget par rayon. Conservé 3 ans (année en cours et deux précédentes, réglable). [US-161, US-163, CR-05, CR-08, CR-23]$$;
+COMMENT ON TABLE grocery_receipts IS $$Ticket de caisse enregistré : magasin, ville, date, heure, total, profil. Aucune photo ni image (supprimée dès la lecture, confirmée ou non), le nom et la carte de fidélité sont masqués avant que l'agent ne reçoive le texte. Un doublon est refusé en entier par la base : même date, même heure exacte et même total (le magasin n'entre pas en compte) ; sans heure (anciens tickets), même magasin, même date et même total. Source du budget par rayon. Conservé 3 ans (année en cours et deux précédentes, réglable). [US-161, US-163, CR-05, CR-08, CR-23, CR-41]$$;
+COMMENT ON COLUMN grocery_receipts.purchased_time IS $$Heure du ticket (heures, minutes et secondes si elles sont lues, sinon secondes à 00), heure locale du magasin. Lue sur le ticket ou saisie par l'utilisateur quand elle n'est pas lue. Vide pour les tickets enregistrés avant CR-41 : leur contrôle de doublon reste magasin, date et total. [CR-41, US-161 RT2]$$;
 COMMENT ON COLUMN grocery_receipt_lines.measured_quantity IS $$Poids ou volume mesuré à la caisse, en kilogrammes ou en litres (« 1,234 kg ») ; vide pour une ligne vendue à la pièce. Les grammes et les centilitres sont convertis avant l'écriture. Reste dans le foyer : jamais partagé. quantity (nombre d'articles) ne le porte pas. [CR-39]$$;
 COMMENT ON COLUMN grocery_receipt_lines.measure_unit IS $$Unité du poids ou du volume mesuré : kg ou l. Vide en même temps que la quantité mesurée ; vide = vendu à la pièce. [CR-39]$$;
 COMMENT ON COLUMN grocery_receipt_lines.price_per_measure IS $$Prix au kilo ou au litre lu sur le ticket (« 1,49 €/kg »). S'il n'est pas lu et que le poids est connu, il est calculé (total de la ligne divisé par le poids, arrondi à 2 décimales) ; le prix lu l'emporte toujours. Vide sans poids, sur une remise, ou si le calcul sort des bornes. [CR-39, CR-40]$$;

@@ -29,6 +29,8 @@ export interface TicketDraft {
   /** « AAAA-MM-JJ » ; la date du jour si l'originale est illisible (RF3). */
   date: string;
   dateGuessed: boolean;
+  /** Heure d'achat « HH:MM:SS » (secondes à 00 si non imprimées) ; null si illisible : l'utilisateur la saisit avant de confirmer (CR-41). */
+  time: string | null;
   lines: TicketLineDraft[];
 }
 
@@ -86,12 +88,21 @@ const money = (value: unknown): number | null => {
   return Number.isFinite(n) && Math.abs(n) <= 10_000 && n !== 0 ? Math.round(n * 100) / 100 : null;
 };
 
+/** « 17:08:23 », « 17:08 », « 17h08 »… → « HH:MM:SS » (secondes à 00 si absentes) ; null si ce n'est pas une heure. */
+export function normalizeTime(value: unknown): string | null {
+  const match = /^\s*(\d{1,2})\s*[:hH]\s*(\d{2})(?:\s*[:mM]\s*(\d{2}))?\s*(?:s)?\s*$/.exec(String(value ?? ""));
+  if (!match) return null;
+  const [h, m, s] = [Number(match[1]), Number(match[2]), Number(match[3] ?? 0)];
+  if (h > 23 || m > 59 || s > 59) return null;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
 const clean = (value: unknown, max: number): string => String(value ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 
 /** Vérifie et remet en forme la réponse du modèle ; une ligne douteuse est écartée plutôt que devinée. */
 export function normalizeDraft(raw: unknown, aisles: string[], today: string): TicketDraft {
   const data = extractJson(raw) as Record<string, unknown> | null;
-  const empty: TicketDraft = { readable: false, store: "", city: null, date: today, dateGuessed: true, lines: [] };
+  const empty: TicketDraft = { readable: false, store: "", city: null, date: today, dateGuessed: true, time: null, lines: [] };
   if (!data || typeof data !== "object") return empty;
   const aisleByKey = new Map(aisles.map((a) => [norm(a), a]));
   const lines: TicketLineDraft[] = [];
@@ -120,5 +131,5 @@ export function normalizeDraft(raw: unknown, aisles: string[], today: string): T
   const valid = /^\d{4}-\d{2}-\d{2}$/.test(dateText) && !Number.isNaN(Date.parse(`${dateText}T12:00:00Z`)) && dateText <= today;
   const store = clean(data.store, 80);
   const readable = data.readable !== false && lines.length > 0;
-  return { readable, store, city: clean(data.city, 80) || null, date: valid ? dateText : today, dateGuessed: !valid, lines: readable ? lines : [] };
+  return { readable, store, city: clean(data.city, 80) || null, date: valid ? dateText : today, dateGuessed: !valid, time: normalizeTime(data.time), lines: readable ? lines : [] };
 }

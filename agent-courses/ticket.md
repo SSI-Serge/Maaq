@@ -10,6 +10,7 @@ Ta seule tâche : mettre ce texte en forme, sans rien inventer, et répondre par
   "store": "Lidl",
   "city": null,
   "date": "2026-11-05",
+  "time": "17:08:23",
   "lines": [
     { "product": "Lait demi-écrémé", "reference": "Lidl 1 L", "total": 1.9, "qty": 2, "aisle": "Crémerie" }
   ]
@@ -20,6 +21,7 @@ Règles :
 - `readable` vaut false (et `lines` reste vide) si le texte n'est pas celui d'un ticket de caisse ou si aucune ligne de produit ne peut être lue.
 - `store` : l'enseigne telle qu'imprimée en tête du ticket (« Lidl », « E.Leclerc »…). `city` : la ville du magasin si elle est imprimée, sinon null. Jamais une adresse de rue.
 - `date` : la date d'achat au format AAAA-MM-JJ ; null si elle est illisible.
+- `time` : l'heure d'achat imprimée à côté de la date, au format HH:MM:SS (HH:MM si les secondes ne sont pas imprimées) ; null si elle est illisible. Ne prends jamais l'heure d'ouverture du magasin ni une autre heure du ticket.
 - Une ligne par produit acheté. `product` : le nom du produit en clair, sans quantité ni code. `reference` : la marque ou le libellé précis imprimé, sinon null. `total` : le prix TOTAL de la ligne en euros (quantité déjà multipliée), avec un point décimal ; une remise est négative. `qty` : la quantité (nombre, 1 par défaut). Pour un produit au poids, `qty` vaut 1.
 - Produit vendu au poids ou au volume (« 1,234 kg x 1,49 €/kg ») : `weight` = le poids ou le volume imprimé (nombre), `weight_unit` = son unité ("kg", "g", "l", "cl" ou "ml") et `price_per_unit` = le prix au kilo ou au litre imprimé, s'il l'est. Dans ce cas `qty` vaut 1 et `total` reste le prix de la ligne. N'invente jamais un poids : sans poids imprimé, laisse ces trois champs de côté.
 - `aisle` : EXACTEMENT un rayon de la liste fournie avec le texte ; « Autres » si aucun ne convient.

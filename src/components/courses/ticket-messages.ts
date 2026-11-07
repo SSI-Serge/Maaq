@@ -8,6 +8,8 @@ export const READING_MESSAGE = "Lecture du ticket en cours…";
 export const SAVING_MESSAGE = "Enregistrement du ticket en cours…";
 /** Ticket déjà enregistré : même magasin, même date, même total. */
 export const DUPLICATE_MESSAGE = "Ce ticket est déjà enregistré : rien n'a été ajouté.";
+/** L'heure n'a pas été lue : elle est obligatoire (CR-41), elle sert à reconnaître un ticket déjà enregistré. */
+export const TIME_MISSING_MESSAGE = "L'heure du ticket n'a pas été lue : saisissez-la (elle est imprimée près de la date) avant de confirmer.";
 /** Ticket illisible. */
 export const UNREADABLE_MESSAGE = "Ticket illisible : reprenez une photo plus nette.";
 /** La photo n'a pas pu être lue par l'appareil. */

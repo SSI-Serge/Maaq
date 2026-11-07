@@ -10,7 +10,7 @@ import { Button, Loading, Notice, RetryNotice } from "@/components/ui";
 import type { TicketConfirmation, TicketMenuIdea, TicketReadResult } from "@/server/courses/tickets/service";
 import { euro } from "./ListScreen";
 import styles from "./courses.module.css";
-import { DUPLICATE_MESSAGE, EMPTY_PHOTO_MESSAGE, READING_MESSAGE, READ_TIMEOUT_MS, SAVING_MESSAGE, UNREADABLE_MESSAGE, failureOf, savedMessage } from "./ticket-messages";
+import { DUPLICATE_MESSAGE, TIME_MISSING_MESSAGE, EMPTY_PHOTO_MESSAGE, READING_MESSAGE, READ_TIMEOUT_MS, SAVING_MESSAGE, UNREADABLE_MESSAGE, failureOf, savedMessage } from "./ticket-messages";
 
 const BACK = { href: "/courses", label: "Courses et repas" };
 const MAX_PHOTOS = 3;
@@ -27,6 +27,8 @@ interface Line {
   perMeasure: string;
 }
 
+/** L'heure du ticket est obligatoire (CR-41) : « HH:MM » ou « HH:MM:SS ». */
+const validTime = (text: string) => /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d)?$/.test(text);
 const toNumber = (text: string) => Number(text.replace(/\s/g, "").replace("€", "").replace(",", "."));
 
 /** « Enregistrer un ticket » (US-161) et « Menu à partir d'un ticket » (US-160) : photo, lecture, correction ligne par ligne, confirmation. Aucune photo n'est conservée. */
@@ -49,6 +51,7 @@ function Flow() {
   const [store, setStore] = useState("");
   const [city, setCity] = useState("");
   const [date, setDate] = useState("");
+  const [time, setTime] = useState("");
   const [lines, setLines] = useState<Line[]>([]);
   const [editing, setEditing] = useState<number | null>(null);
   const [result, setResult] = useState<TicketConfirmation | null>(null);
@@ -80,18 +83,19 @@ function Flow() {
     setStore(t.draft.store);
     setCity(t.draft.city ?? "");
     setDate(t.draft.date);
+    setTime(t.draft.time ?? "");
     setLines(t.draft.lines.map((l) => ({ product: l.product, reference: l.reference ?? "", total: String(l.total).replace(".", ","), qty: String(l.qty).replace(".", ","), aisle: l.aisle, measured: l.measured ? String(l.measured).replace(".", ",") : "", measureUnit: l.measureUnit ?? "", perMeasure: l.pricePerMeasure ? String(l.pricePerMeasure).replace(".", ",") : "" })));
     setEditing(null);
     setResult(null);
   }
 
   const total = lines.reduce((s, l) => s + (toNumber(l.total) || 0), 0);
-  const invalid = !store.trim() || lines.length === 0 || lines.some((l) => !l.product.trim() || !toNumber(l.total) || !(toNumber(l.qty) > 0));
+  const invalid = !store.trim() || !validTime(time) || lines.length === 0 || lines.some((l) => !l.product.trim() || !toNumber(l.total) || !(toNumber(l.qty) > 0));
 
   async function submit() {
     const response = await confirm.run<{ result: TicketConfirmation }>("/api/courses/tickets/confirm", {
       method: "POST",
-      body: { store: store.trim(), city: city.trim() || null, date, lines: lines.map((l) => ({ product: l.product.trim(), reference: l.reference.trim() || null, total: toNumber(l.total), qty: toNumber(l.qty), aisle: l.aisle, measured: l.measureUnit && toNumber(l.measured) > 0 ? toNumber(l.measured) : null, measureUnit: l.measureUnit && toNumber(l.measured) > 0 ? l.measureUnit : null, pricePerMeasure: l.measureUnit && toNumber(l.perMeasure) > 0 ? toNumber(l.perMeasure) : null })) },
+      body: { store: store.trim(), city: city.trim() || null, date, time, lines: lines.map((l) => ({ product: l.product.trim(), reference: l.reference.trim() || null, total: toNumber(l.total), qty: toNumber(l.qty), aisle: l.aisle, measured: l.measureUnit && toNumber(l.measured) > 0 ? toNumber(l.measured) : null, measureUnit: l.measureUnit && toNumber(l.measured) > 0 ? l.measureUnit : null, pricePerMeasure: l.measureUnit && toNumber(l.perMeasure) > 0 ? toNumber(l.perMeasure) : null })) },
     });
     if (response) {
       setSummary({ store: store.trim(), date });
@@ -154,6 +158,7 @@ function Flow() {
         Ticket lu : <strong>{store || "enseigne à indiquer"}</strong>
         {city ? `, ${city}` : ""} · {date.split("-").reverse().join("/")}. Vérifiez les lignes, corrigez si besoin.
       </p>
+      {!ticket.draft.time && <p className={family.hint}>{TIME_MISSING_MESSAGE}</p>}
       {ticket.draft.dateGuessed && <p className={family.hint}>La date n&apos;était pas lisible : c&apos;est celle d&apos;aujourd&apos;hui, à corriger si besoin.</p>}
       <div className={family.two}>
         <div className={family.field}>
@@ -167,6 +172,12 @@ function Flow() {
             Date
           </label>
           <input id="tk-date" className={family.input} type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        </div>
+        <div className={family.field}>
+          <label className={family.label} htmlFor="tk-time">
+            Heure
+          </label>
+          <input id="tk-time" className={family.input} type="time" step={1} value={time} required aria-invalid={!validTime(time)} onChange={(e) => setTime(e.target.value)} />
         </div>
       </div>
 

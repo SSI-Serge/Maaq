@@ -6928,17 +6928,22 @@ CREATE TABLE grocery_receipts (
   store_chain          varchar(80) NOT NULL CHECK (store_chain <> '' AND store_chain = grocery_norm(store_chain)),
   store_city           varchar(80) CHECK (store_city IS NULL OR (store_city <> '' AND store_city = grocery_norm(store_city))),
   purchased_on         date NOT NULL,
+  -- Heure du ticket, à la seconde (secondes à 00 quand elles ne sont pas lues), heure locale du magasin ; facultative pour les anciens tickets (CR-41)
+  purchased_time       time(0),
   total_amount         numeric(9,2) NOT NULL,
   recorded_by_user_id  uuid,
   created_at           timestamptz NOT NULL DEFAULT now(),
-  -- Un ticket déjà enregistré se reconnaît au même magasin, à la même date et au même total (US-161 RT2)
-  CONSTRAINT uq_grocery_receipts_duplicate UNIQUE (account_id, store_chain, purchased_on, total_amount),
   UNIQUE (id, account_id),
   CONSTRAINT fk_grocery_receipts_recorded_by FOREIGN KEY (recorded_by_user_id, account_id) REFERENCES users (id, account_id) ON DELETE SET NULL (recorded_by_user_id)
 );
+-- Un ticket déjà enregistré est refusé en entier (US-161 RT2, CR-41) : avec une heure, même date, même heure et même total (le magasin n'entre pas en compte) ;
+-- sans heure, même magasin, même date et même total, comme avant. Les deux contrôles sont garantis par la base.
+CREATE UNIQUE INDEX ux_grocery_receipts_duplicate_time ON grocery_receipts (account_id, purchased_on, purchased_time, total_amount) WHERE purchased_time IS NOT NULL;
+CREATE UNIQUE INDEX ux_grocery_receipts_duplicate_no_time ON grocery_receipts (account_id, store_chain, purchased_on, total_amount) WHERE purchased_time IS NULL;
 CREATE INDEX idx_grocery_receipts_recorded_by ON grocery_receipts (recorded_by_user_id, account_id);
 CREATE INDEX idx_grocery_receipts_date ON grocery_receipts (account_id, purchased_on DESC);
-COMMENT ON TABLE grocery_receipts IS $$Ticket de caisse enregistré : magasin, ville, date, total, profil. Aucune photo ni image (supprimée dès la lecture, confirmée ou non), le nom et la carte de fidélité sont masqués avant que l'agent ne reçoive le texte. Un doublon (même magasin, date et total) est refusé. Source du budget par rayon. Conservé 3 ans (année en cours et deux précédentes, réglable). [US-161, US-163, CR-05, CR-08, CR-23]$$;
+COMMENT ON TABLE grocery_receipts IS $$Ticket de caisse enregistré : magasin, ville, date, heure, total, profil. Aucune photo ni image (supprimée dès la lecture, confirmée ou non), le nom et la carte de fidélité sont masqués avant que l'agent ne reçoive le texte. Un doublon est refusé en entier par la base : même date, même heure exacte et même total (le magasin n'entre pas en compte) ; sans heure (anciens tickets), même magasin, même date et même total. Source du budget par rayon. Conservé 3 ans (année en cours et deux précédentes, réglable). [US-161, US-163, CR-05, CR-08, CR-23, CR-41]$$;
+COMMENT ON COLUMN grocery_receipts.purchased_time IS $$Heure du ticket (heures, minutes et secondes si elles sont lues, sinon secondes à 00), heure locale du magasin. Lue sur le ticket ou saisie par l'utilisateur quand elle n'est pas lue. Vide pour les tickets enregistrés avant CR-41 : leur contrôle de doublon reste magasin, date et total. [CR-41, US-161 RT2]$$;
 
 CREATE TABLE grocery_receipt_lines (
   id               bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
