@@ -54,3 +54,6 @@ export const dateFr = (value: Date | string | null) => {
   const [y, m, d] = s.split("-");
   return `${d}/${m}/${y}`;
 };
+
+/** « AAAA-MM-JJ » d'une date lue de la base (jour local, pas de décalage de fuseau). */
+export const isoDate = (value: Date | string): string => (typeof value === "string" ? value.slice(0, 10) : `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`);

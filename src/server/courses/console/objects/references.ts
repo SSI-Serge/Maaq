@@ -6,7 +6,7 @@ import { REFERENCES_SPEC, REFERENCES_TEMPLATE_HEADERS, type ReferenceStatusLabel
 import { toCsv } from "../../imports/table";
 import { readImport, importRefusal } from "../import";
 import { ROW_LIMIT, type ConsoleContext, type ConsoleObject, type ConsoleQuery } from "../types";
-import { csv, dateFr, euro, text } from "../util";
+import { csv, dateFr, euro, isoDate, text } from "../util";
 
 /**
  * Références par enseigne (US-166, US-174) : pour chaque produit, ses références par enseigne avec leur prix et la date du prix. Une référence au statut « aucun conforme trouvé »
@@ -28,6 +28,7 @@ async function list(c: ConsoleContext, query: ConsoleQuery) {
     .innerJoin("grocery_products as p", "p.id", "r.product_id")
     .innerJoin("grocery_aisles as a", "a.id", "p.aisle_id")
     .select(["r.reference_id", "p.name as product", "a.name as aisle", "p.aisle_id", "r.store_chain", "r.reference_name", "r.unit_price", "r.price_date", "r.is_compliant", "r.excluded_because", "r.compliance_status", "r.composition_text", "r.package_format"])
+    .select((eb) => eb.selectFrom("grocery_product_references as x").select("x.additives").whereRef("x.id", "=", "r.reference_id").as("additives"))
     .orderBy("p.name")
     .orderBy("r.store_chain");
   if (query.q) q = q.where((eb) => eb.or([eb("p.name", "ilike", `%${query.q}%`), eb("r.reference_name", "ilike", `%${query.q}%`)]));
@@ -81,7 +82,7 @@ export const references: ConsoleObject = {
               { key: "ref", label: "Référence", type: "text" as const, value: r.reference_name, required: true },
               { key: "format", label: "Format (« 1 kg », vide si inconnu)", type: "text" as const, value: r.package_format ?? "" },
               { key: "price", label: "Prix unitaire (€, vide = N/A)", type: "text" as const, value: r.unit_price === null ? "" : String(r.unit_price) },
-              { key: "date", label: "Date du prix (AAAA-MM-JJ, vide si pas de prix)", type: "text" as const, value: r.price_date ? new Date(r.price_date as Date | string).toISOString().slice(0, 10) : "" },
+              { key: "date", label: "Date du prix (AAAA-MM-JJ, vide si pas de prix)", type: "text" as const, value: r.price_date ? isoDate(r.price_date as Date | string) : "" },
               { key: "status", label: "Statut", type: "select" as const, value: r.compliance_status, options: (Object.keys(STATUS_TEXT) as (keyof typeof STATUS_TEXT)[]).map((k) => ({ value: k, label: STATUS_TEXT[k] })) },
             ],
           },
@@ -127,7 +128,7 @@ export const references: ConsoleObject = {
       file: "references.csv",
       content: csv(
         REFERENCES_TEMPLATE_HEADERS,
-        rows.map((r) => [r.product, r.aisle, displayPlace(r.store_chain ?? ""), r.reference_name, r.package_format ?? "", r.unit_price === null ? "" : String(r.unit_price).replace(".", ","), r.price_date ? new Date(r.price_date as Date | string).toISOString().slice(0, 10) : "", STATUS_TEXT[r.compliance_status as keyof typeof STATUS_TEXT], "", r.composition_text ?? ""]),
+        rows.map((r) => [r.product, r.aisle, displayPlace(r.store_chain ?? ""), r.reference_name, r.package_format ?? "", r.unit_price === null ? "" : String(r.unit_price).replace(".", ","), r.price_date ? isoDate(r.price_date as Date | string) : "", STATUS_TEXT[r.compliance_status as keyof typeof STATUS_TEXT], ((r.additives as string[] | null) ?? []).join("|"), r.composition_text ?? ""]),
       ),
     };
   },
