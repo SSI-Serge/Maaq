@@ -1,5 +1,6 @@
 import { dishItems, findProd, type RefProduct } from "./products";
 import { has, norm } from "./text";
+import { perUnitPrice, type PerUnitPrice } from "./unitprice";
 import type { Dish } from "./types";
 
 /** Ancienneté d'un prix affichée aux foyers (CR-20, US-166 RF3). */
@@ -43,6 +44,8 @@ export interface Choice {
   labelCheck?: boolean;
   /** Format du conditionnement de la référence. */
   format?: string | null;
+  /** Prix au kilo ou au litre, quand le format de la référence le donne (CR-39). */
+  perUnit?: PerUnitPrice | null;
 }
 
 export type ItemGroup = "menu" | "ajout" | "habituel" | "sante";
@@ -172,7 +175,7 @@ function buildChoices(name: string, input: ListInput): { choices: Choice[]; stor
       .map(([store, v]) => ({ store, v, age: v.price !== null ? priceAge(v.priceDate, now) : "unknown" as PriceAge | null }))
       .filter((x) => x.v.price !== null && x.age !== null);
     for (const x of priced) {
-      choices.push({ kind: "reference", ref: x.v.ref, price: x.v.price, store: x.store, city: null, age: x.age as PriceAge, labelCheck: x.v.labelCheck, format: x.v.format });
+      choices.push({ kind: "reference", ref: x.v.ref, price: x.v.price, store: x.store, city: null, age: x.age as PriceAge, labelCheck: x.v.labelCheck, format: x.v.format, perUnit: perUnitPrice(x.v.price, x.v.format) });
       storePrices.set(x.store, { ref: x.v.ref, price: x.v.price });
     }
     if (!priced.length && refs.length) {
@@ -186,9 +189,15 @@ function buildChoices(name: string, input: ListInput): { choices: Choice[]; stor
     .filter((r) => r.unitPrice !== null && kws.some((k) => has(k, norm(r.product))))
     .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
   if (bought.length) {
-    const last = bought[bought.length - 1];
-    choices.push({ kind: "history", ref: last.ref || last.product, price: last.unitPrice, store: last.store, city: last.city ?? null, age: priceAge(last.date, now) ?? "lt12" });
-    for (const r of bought) if (!storePrices.has(r.store)) storePrices.set(r.store, { ref: r.ref || r.product, price: r.unitPrice });
+    // un choix « Dernier acheté » PAR ENSEIGNE, au prix le plus récent de chacune (CR-39) ; le plus récent toutes enseignes confondues vient en premier
+    const latest = new Map<string, HistoryPrice>();
+    for (const r of bought) latest.set(norm(r.store), r); // trié par date croissante : le dernier écrase les précédents
+    const perStore = [...latest.values()].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+    for (const r of perStore) {
+      choices.push({ kind: "history", ref: r.ref || r.product, price: r.unitPrice, store: r.store, city: r.city ?? null, age: priceAge(r.date, now) ?? "lt12" });
+      // prix du scénario « tout dans un magasin » : l'achat le plus récent de l'enseigne, sauf si une référence conforme y a déjà un prix
+      if (!storePrices.has(r.store)) storePrices.set(r.store, { ref: r.ref || r.product, price: r.unitPrice });
+    }
   }
 
   if (input.sharing) {
@@ -207,9 +216,14 @@ function buildChoices(name: string, input: ListInput): { choices: Choice[]; stor
 /** Index du choix coché au départ : le moins cher parmi ceux qui ont un prix ; à défaut le premier ; aucun si le produit n'a aucun choix. */
 export function defaultChoice(choices: Choice[]): number | null {
   if (!choices.length) return null;
+  // produits au poids : si tous les choix à prix ont un prix au kilo (ou au litre) de même unité, on compare ces prix-là (CR-39)
+  const priced = choices.filter((c) => c.price !== null);
+  const unit = priced[0]?.perUnit?.unit;
+  const byMeasure = !!unit && priced.every((c) => c.perUnit?.unit === unit);
+  const cost = (c: Choice) => (byMeasure ? (c.perUnit as PerUnitPrice).value : (c.price as number));
   let best = -1;
   choices.forEach((c, i) => {
-    if (c.price !== null && (best < 0 || c.price < (choices[best].price as number))) best = i;
+    if (c.price !== null && (best < 0 || cost(c) < cost(choices[best]))) best = i;
   });
   return best >= 0 ? best : 0;
 }

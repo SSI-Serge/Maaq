@@ -332,7 +332,7 @@ function Preparation({ list, reload }: { list: ListPrepared; reload: () => void 
                     <label key={`${c.kind}-${k}`} className={styles.choice}>
                       <input type="checkbox" role="checkbox" checked={on} onChange={() => patch({ selected: { ...picks.selected, [norm(i.name)]: on ? null : k } })} />
                       <span>
-                        {label} · {c.ref}{c.format ? ` (${c.format})` : ""} · {priceText(c.price)} — {c.store}
+                        {label} · {c.ref}{c.format ? ` (${c.format})` : ""} · {priceText(c.price)}{c.perUnit ? ` (${c.perUnit.value.toFixed(2).replace(".", ",")} €/${c.perUnit.unit === "kg" ? "kg" : "L"})` : ""} — {c.store}
                         {c.city ? `, ${c.city}` : ""}
                         {AGE_LABEL[c.age] ? ` — ${AGE_LABEL[c.age]}` : ""}
                         {c.labelCheck && <span className={styles.meta}> · Composition à vérifier sur l&apos;étiquette</span>}
