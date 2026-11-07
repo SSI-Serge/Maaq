@@ -14,7 +14,7 @@ describe("Chargement initial du catalogue Courses et repas", () => {
       expect(report.aisles).toBe(19); // les 19 rayons de départ ; « Poissons » (thon et sardines en boîte) et « Boissons (cuisine) » du classeur sont rangés dans « Conserves et surgelés » et « Boissons »
       expect(report.lightVersions).toBeGreaterThanOrEqual(34);
       expect(report.references).toBe(322); // Conforme 190, Sans objet 83, À vérifier 39, Aucun conforme trouvé 10
-      expect(report.referencesWithoutPrice).toBe(168); // « N/A » : 158 proposées sans prix et les 10 « aucun conforme »
+      expect(report.referencesWithoutPrice).toBe(169); // « N/A » : 159 proposées sans prix (dont la courge Lidl, prix réservé aux porteurs de la carte) et les 10 « aucun conforme »
       expect(report.notLoadedReferences).toBe(326); // « Non trouvé »
       expect(report.references + report.notLoadedReferences).toBe(648);
       expect(report.ingredientLinks).toBeGreaterThan(300);
@@ -48,7 +48,7 @@ describe("Chargement initial du catalogue Courses et repas", () => {
     await withFreshCatalog(db, async (trx) => {
       const rows = await sql<{ n: string; has_price: boolean; needs_label_check: boolean; is_compliant: boolean; compliance_status: string }>`select count(*) as n, has_price, needs_label_check, is_compliant, compliance_status from v_grocery_product_references group by 2, 3, 4, 5`.execute(trx);
       const total = (f: (r: (typeof rows.rows)[number]) => boolean) => rows.rows.filter(f).reduce((s, r) => s + Number(r.n), 0);
-      expect(total((r) => r.has_price)).toBe(154);
+      expect(total((r) => r.has_price)).toBe(153);
       expect(total((r) => r.needs_label_check)).toBe(39);
       expect(total((r) => !r.is_compliant)).toBe(10);
       expect(total((r) => !r.is_compliant && r.compliance_status !== "none_found")).toBe(0);
