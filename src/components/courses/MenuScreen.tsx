@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { useApiMutation, useApiQuery } from "@/client/hooks";
 import { AppShell } from "@/components/app/AppShell";
@@ -18,6 +19,7 @@ const fold = (text: string) => text.normalize("NFD").replace(/\p{M}/gu, "").toLo
 
 /** « Menu de la semaine » (US-155, US-156) : 1 ou 2 plats plaisir, puis le menu proposé autour d'eux, modifiable jour par jour, puis la validation. Réservé au couple. */
 export function CoursesMenuScreen() {
+  const preset = (useSearchParams().get("plats") ?? "").split(",").filter(Boolean).slice(0, 2);
   const query = useApiQuery<{ start: MenuStart }>("/api/courses/menu");
   const forbidden = query.error?.body?.code === "forbidden";
   return (
@@ -25,14 +27,16 @@ export function CoursesMenuScreen() {
       {query.loading && !query.data && <Loading slow={query.slow} />}
       {forbidden && <Notice tone="info">Le menu de la semaine est réservé aux deux parents du couple.</Notice>}
       {query.error && !forbidden && <RetryNotice message={query.error.message} onRetry={query.reload} />}
-      {query.data && <MenuFlow start={query.data.start} />}
+      {query.data && <MenuFlow start={query.data.start} preset={preset} />}
     </AppShell>
   );
 }
 
-function MenuFlow({ start }: { start: MenuStart }) {
+function MenuFlow({ start, preset }: { start: MenuStart; preset: string[] }) {
   const propose = useApiMutation();
-  const [picks, setPicks] = useState<string[]>([]);
+  // plats déjà choisis, par exemple depuis les idées d'un ticket (seuls ceux que le foyer peut choisir sont repris)
+  const known = new Set(start.groups.flatMap((g) => g.dishes.map((d) => d.id)));
+  const [picks, setPicks] = useState<string[]>(() => preset.filter((id) => known.has(id)));
   const [menu, setMenu] = useState<MenuProposal | null>(null);
   const [done, setDone] = useState<ValidatedMenu | null>(null);
 

@@ -15,8 +15,8 @@ const PATHS: { label: string; href: string; ready: boolean; couple: boolean }[] 
   { label: "Liste de courses et menu de la semaine", href: "/courses/menu", ready: true, couple: true },
   { label: "Ajouter un produit", href: "/courses/liste", ready: true, couple: true },
   { label: "Ajouter un plat", href: "/courses/plats/nouveau", ready: true, couple: true },
-  { label: "Menu à partir d'un ticket", href: "/courses/ticket", ready: false, couple: true },
-  { label: "Enregistrer un ticket", href: "/courses/ticket", ready: false, couple: true },
+  { label: "Menu à partir d'un ticket", href: "/courses/ticket?menu=1", ready: true, couple: true },
+  { label: "Enregistrer un ticket", href: "/courses/ticket", ready: true, couple: true },
   { label: "Mettre à jour la liste après un achat", href: "/courses/ma-liste", ready: true, couple: true },
   { label: "Budget par rayon", href: "/courses/budget", ready: true, couple: true },
 ];

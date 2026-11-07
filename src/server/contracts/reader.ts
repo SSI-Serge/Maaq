@@ -46,7 +46,7 @@ export interface DocumentReader {
 
 /** Jeton d'identité du compte de service de Cloud Run pour appeler le service interne ; gardé jusqu'à peu avant sa fin de validité. */
 const identity = new Map<string, { value: string; expiresAt: number }>();
-async function identityToken(audience: string): Promise<string> {
+export async function identityToken(audience: string): Promise<string> {
   const known = identity.get(audience);
   if (known && known.expiresAt > Date.now() + 120_000) return known.value;
   const response = await fetch(`http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity?audience=${encodeURIComponent(audience)}`, { headers: { "Metadata-Flavor": "Google" } });

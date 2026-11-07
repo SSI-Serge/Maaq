@@ -74,6 +74,8 @@ const schema = z.object({
   PRESENTATION_BUCKET: z.string().min(3).optional(),
   /** Service interne de lecture des documents (OCR, noms propres), `services/contract-reader`. Absent : les documents restent en attente de masquage. */
   CONTRACT_READER_URL: z.string().url().optional(),
+  /** Service de lecture des tickets de caisse (RapidOCR, Union européenne) ; sans lui, la lecture d'un ticket répond « indisponible ». */
+  TICKET_READER_URL: z.string().url().optional(),
 });
 
 const checked = schema.superRefine((value, ctx) => {

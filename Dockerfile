@@ -24,6 +24,8 @@ COPY --from=builder --chown=node:node /app/public ./public
 # Instructions et outils de l'Assistant Famille : lus au démarrage par le backend (agent/INTEGRATION.md).
 COPY --from=builder --chown=node:node /app/agent/instructions.md ./agent/instructions.md
 COPY --from=builder --chown=node:node /app/agent/outils ./agent/outils
+# Consignes de l'agent « Courses et repas » (socle fixe, dialogue remplaçable, mise en forme des tickets).
+COPY --from=builder --chown=node:node /app/agent-courses ./agent-courses
 USER node
 EXPOSE 8080
 CMD ["node", "server.js"]
