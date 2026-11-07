@@ -27,7 +27,7 @@ async function list(c: ConsoleContext, query: ConsoleQuery) {
     .selectFrom("v_grocery_product_references as r")
     .innerJoin("grocery_products as p", "p.id", "r.product_id")
     .innerJoin("grocery_aisles as a", "a.id", "p.aisle_id")
-    .select(["r.reference_id", "p.name as product", "a.name as aisle", "p.aisle_id", "r.store_chain", "r.reference_name", "r.unit_price", "r.price_date", "r.is_compliant", "r.excluded_because", "r.compliance_status", "r.composition_text"])
+    .select(["r.reference_id", "p.name as product", "a.name as aisle", "p.aisle_id", "r.store_chain", "r.reference_name", "r.unit_price", "r.price_date", "r.is_compliant", "r.excluded_because", "r.compliance_status", "r.composition_text", "r.package_format"])
     .orderBy("p.name")
     .orderBy("r.store_chain");
   if (query.q) q = q.where((eb) => eb.or([eb("p.name", "ilike", `%${query.q}%`), eb("r.reference_name", "ilike", `%${query.q}%`)]));
@@ -55,6 +55,7 @@ export const references: ConsoleObject = {
         { key: "aisle", label: "Rayon" },
         { key: "store", label: "Enseigne" },
         { key: "ref", label: "Référence" },
+        { key: "format", label: "Format" },
         { key: "price", label: "Prix", align: "right" },
         { key: "date", label: "Date du prix" },
         { key: "compliant", label: "Conforme" },
@@ -67,6 +68,7 @@ export const references: ConsoleObject = {
           aisle: r.aisle,
           store: displayPlace(r.store_chain ?? ""),
           ref: r.reference_name ?? "",
+          format: r.package_format ?? "—",
           price: euro(r.unit_price),
           date: dateFr(r.price_date as Date | string | null) || "—",
           compliant: r.is_compliant ? (r.compliance_status === "to_check" ? "À vérifier" : r.compliance_status === "not_applicable" ? "Sans objet" : "Oui") : r.excluded_because?.length ? r.excluded_because.join(", ") : "Aucun conforme trouvé",
@@ -77,6 +79,7 @@ export const references: ConsoleObject = {
             label: "Modifier",
             fields: [
               { key: "ref", label: "Référence", type: "text" as const, value: r.reference_name, required: true },
+              { key: "format", label: "Format (« 1 kg », vide si inconnu)", type: "text" as const, value: r.package_format ?? "" },
               { key: "price", label: "Prix unitaire (€, vide = N/A)", type: "text" as const, value: r.unit_price === null ? "" : String(r.unit_price) },
               { key: "date", label: "Date du prix (AAAA-MM-JJ, vide si pas de prix)", type: "text" as const, value: r.price_date ? new Date(r.price_date as Date | string).toISOString().slice(0, 10) : "" },
               { key: "status", label: "Statut", type: "select" as const, value: r.compliance_status, options: (Object.keys(STATUS_TEXT) as (keyof typeof STATUS_TEXT)[]).map((k) => ({ value: k, label: STATUS_TEXT[k] })) },
@@ -109,7 +112,7 @@ export const references: ConsoleObject = {
     if (!(status in STATUS_TEXT)) throw courseError("invalid_choice", "Statut non valide.", 422);
     await db
       .updateTable("grocery_product_references")
-      .set({ reference_name: reference, unit_price: price === null ? null : price.toFixed(2), price_date: price === null ? null : (date as never), compliance_status: status, updated_at: now })
+      .set({ reference_name: reference, package_format: (values.format ?? "").trim().slice(0, 80) || null, unit_price: price === null ? null : price.toFixed(2), price_date: price === null ? null : (date as never), compliance_status: status, updated_at: now })
       .where("id", "=", id)
       .execute();
     await logAdminAction(db, { adminId: c.adminId, action: "grocery_catalog_changed", entityType: "grocery_reference", entityId: id, details: { action }, now });
@@ -117,14 +120,14 @@ export const references: ConsoleObject = {
 
   async download(c, key, query) {
     if (key === "template") {
-      return { file: REFERENCES_SPEC.templateFile, content: toCsv(REFERENCES_TEMPLATE_HEADERS, [["Pâtes à lasagne", "Féculents", "Lidl", "Barilla 500 g", "1,35", "2026-10-12", "Conforme", "", "Pâtes de blé dur"]]) };
+      return { file: REFERENCES_SPEC.templateFile, content: toCsv(REFERENCES_TEMPLATE_HEADERS, [["Pâtes à lasagne", "Féculents", "Lidl", "Barilla 500 g", "500 g", "1,35", "2026-10-12", "Conforme", "", "Pâtes de blé dur"]]) };
     }
     const rows = await list(c, { ...query, q: query.q });
     return {
       file: "references.csv",
       content: csv(
         REFERENCES_TEMPLATE_HEADERS,
-        rows.map((r) => [r.product, r.aisle, displayPlace(r.store_chain ?? ""), r.reference_name, r.unit_price === null ? "" : String(r.unit_price).replace(".", ","), r.price_date ? new Date(r.price_date as Date | string).toISOString().slice(0, 10) : "", STATUS_TEXT[r.compliance_status as keyof typeof STATUS_TEXT], "", r.composition_text ?? ""]),
+        rows.map((r) => [r.product, r.aisle, displayPlace(r.store_chain ?? ""), r.reference_name, r.package_format ?? "", r.unit_price === null ? "" : String(r.unit_price).replace(".", ","), r.price_date ? new Date(r.price_date as Date | string).toISOString().slice(0, 10) : "", STATUS_TEXT[r.compliance_status as keyof typeof STATUS_TEXT], "", r.composition_text ?? ""]),
       ),
     };
   },
@@ -164,6 +167,7 @@ export const references: ConsoleObject = {
         const ref = String(it.v.reference).slice(0, 160);
         const price = it.v.prix as number | null;
         const values = {
+          package_format: (it.v.format as string | null) || null,
           unit_price: price === null ? null : price.toFixed(2),
           price_date: price === null ? null : (it.v.date_prix as string as never),
           compliance_status: STATUS[norm(String(it.v.statut ?? "Conforme")) as ReferenceStatusLabel],

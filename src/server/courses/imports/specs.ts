@@ -124,6 +124,7 @@ export const REFERENCES_SPEC: ImportSpec = {
     { key: "rayon" },
     { key: "enseigne", required: true },
     { key: "reference", required: true },
+    { key: "format", parse: (raw) => (raw.length <= 80 ? { ok: true, value: raw } : { ok: false, message: "80 caractères au plus." }) },
     { key: "prix", parse: decimalPrice },
     { key: "date_prix", parse: isoDate },
     { key: "statut", parse: referenceStatus },
@@ -138,4 +139,4 @@ export const REFERENCES_SPEC: ImportSpec = {
   },
 };
 
-export const REFERENCES_TEMPLATE_HEADERS = ["produit", "rayon", "enseigne", "reference", "prix", "date_prix", "statut", "additifs", "composition"];
+export const REFERENCES_TEMPLATE_HEADERS = ["produit", "rayon", "enseigne", "reference", "format", "prix", "date_prix", "statut", "additifs", "composition"];

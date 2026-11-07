@@ -1619,6 +1619,10 @@ export interface GroceryProductReferences {
   composition_text: string | null;
   created_at: Generated<Timestamp>;
   id: Generated<Int8>;
+  /**
+   * Format du conditionnement (« 1 kg », « sachet de 250 g »), 80 caractères au plus, facultatif ; colonne « format » de l'import des références.
+   */
+  package_format: string | null;
   price_date: Timestamp | null;
   product_id: Int8;
   reference_name: string;
@@ -2519,6 +2523,7 @@ export interface VGroceryProductReferences {
   has_price: boolean | null;
   is_compliant: boolean | null;
   needs_label_check: boolean | null;
+  package_format: string | null;
   price_age: string | null;
   price_date: Timestamp | null;
   product_id: Int8 | null;

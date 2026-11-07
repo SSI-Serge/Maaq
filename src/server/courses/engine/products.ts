@@ -15,6 +15,8 @@ export interface ReferenceRow {
   conform: boolean;
   /** Référence proposée avec la mention « Composition à vérifier sur l'étiquette » (statut « à vérifier », CR-37). */
   labelCheck?: boolean;
+  /** Format du conditionnement (« 1 kg », « sachet de 250 g »). */
+  format?: string | null;
 }
 
 export interface StorePrice {
@@ -22,6 +24,7 @@ export interface StorePrice {
   price: number | null;
   priceDate: string | null;
   labelCheck: boolean;
+  format: string | null;
 }
 
 export interface RefProduct {
@@ -45,7 +48,7 @@ export function buildRefProducts(rows: ReferenceRow[]): Map<string, RefProduct> 
       p = { name: r.product, rayon: r.rayon, used: r.used ?? "", stores: new Map(), kw: [], kwFull: [] };
       prods.set(r.product, p);
     }
-    if (r.conform) p.stores.set(r.store, { ref: r.ref, price: r.price, priceDate: r.priceDate, labelCheck: !!r.labelCheck });
+    if (r.conform) p.stores.set(r.store, { ref: r.ref, price: r.price, priceDate: r.priceDate, labelCheck: !!r.labelCheck, format: r.format ?? null });
   }
   for (const [name, p] of prods) {
     const alts = name

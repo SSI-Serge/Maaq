@@ -26,7 +26,7 @@ export interface SeedDish {
 export interface SeedData {
   dishes: SeedDish[];
   plans: Plan[];
-  refs: (Pick<ReferenceRow, "product" | "rayon" | "used" | "store" | "ref" | "price" | "conform"> & { /** Colonne « Statut » du classeur : Conforme, Sans objet, À vérifier, Aucun conforme trouvé, Non trouvé. */ status?: string; priceDate?: string | null; composition?: string })[];
+  refs: (Pick<ReferenceRow, "product" | "rayon" | "used" | "store" | "ref" | "price" | "conform"> & { /** Colonne « Statut » du classeur : Conforme, Sans objet, À vérifier, Aucun conforme trouvé, Non trouvé. */ status?: string; priceDate?: string | null; composition?: string; /** Format du conditionnement (« 1 kg »), repris du classeur quand il le donne. */ format?: string })[];
   allege: { id: string; plat: string; remove: string[]; add: string[]; text: string }[];
 }
 
@@ -163,6 +163,7 @@ export async function seedWithin(trx: Transaction<DB>, data: SeedData, options: 
           price_date: priced ? (ref.priceDate ?? options.priceDate) : null,
           compliance_status: compliance,
           composition_text: ref.composition ? ref.composition.slice(0, 2000) : null,
+          package_format: ref.format?.trim() ? ref.format.trim().slice(0, 80) : null,
         })
         .onConflict((oc) => oc.columns(["product_id", "store_chain", "reference_name"]).doNothing())
         .returning("id")

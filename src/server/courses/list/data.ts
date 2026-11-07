@@ -28,7 +28,7 @@ export async function loadReferences(db: Kysely<DB>): Promise<References> {
     .selectFrom("v_grocery_product_references as r")
     .innerJoin("grocery_products as p", "p.id", "r.product_id")
     .innerJoin("grocery_aisles as a", "a.id", "p.aisle_id")
-    .select(["p.name as product", "a.name as rayon", "r.store_chain", "r.reference_name", "r.unit_price", "r.price_date", "r.is_compliant", "r.needs_label_check", "r.excluded_because", "r.compliance_status"])
+    .select(["p.name as product", "a.name as rayon", "r.store_chain", "r.reference_name", "r.unit_price", "r.price_date", "r.is_compliant", "r.needs_label_check", "r.excluded_because", "r.compliance_status", "r.package_format"])
     .orderBy("p.name")
     .orderBy("r.store_chain")
     .execute();
@@ -52,6 +52,7 @@ export async function loadReferences(db: Kysely<DB>): Promise<References> {
       priceDate: r.price_date ? isoDay(r.price_date as Date | string) : null,
       conform: true,
       labelCheck: !!r.needs_label_check,
+      format: r.package_format,
     });
   }
   return { rows: refs, excluded, aisles };

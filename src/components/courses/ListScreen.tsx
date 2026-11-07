@@ -332,7 +332,7 @@ function Preparation({ list, reload }: { list: ListPrepared; reload: () => void 
                     <label key={`${c.kind}-${k}`} className={styles.choice}>
                       <input type="checkbox" role="checkbox" checked={on} onChange={() => patch({ selected: { ...picks.selected, [norm(i.name)]: on ? null : k } })} />
                       <span>
-                        {label} · {c.ref} · {priceText(c.price)} — {c.store}
+                        {label} · {c.ref}{c.format ? ` (${c.format})` : ""} · {priceText(c.price)} — {c.store}
                         {c.city ? `, ${c.city}` : ""}
                         {AGE_LABEL[c.age] ? ` — ${AGE_LABEL[c.age]}` : ""}
                         {c.labelCheck && <span className={styles.meta}> · Composition à vérifier sur l&apos;étiquette</span>}
@@ -436,7 +436,7 @@ function ScenarioView({
                       <div className={styles.lineMain}>
                         <div className={styles.lineName}>{l.name}</div>
                         <div className={styles.lineSub}>
-                          {l.price === null ? "Prix inconnu (N/A)" : `${l.ref ?? ""}${l.age && AGE_LABEL[l.age] ? ` · ${AGE_LABEL[l.age]}` : ""}`}
+                          {l.price === null ? "Prix inconnu (N/A)" : `${l.ref ?? ""}${l.format ? ` (${l.format})` : ""}${l.age && AGE_LABEL[l.age] ? ` · ${AGE_LABEL[l.age]}` : ""}`}
                           {l.labelCheck && " · Composition à vérifier sur l'étiquette"}
                         </div>
                       </div>

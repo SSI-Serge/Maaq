@@ -204,7 +204,7 @@ function StoreBlock({ store, couple, printing, onTick }: { store: MyStore; coupl
               {printing && <span aria-hidden="true">☐</span>}
               <div className={styles.lineMain}>
                 <div className={styles.lineName}>{l.name}</div>
-                {l.reference && <div className={styles.lineSub}>{l.reference}</div>}
+                {l.reference && <div className={styles.lineSub}>{l.reference}{l.format ? ` · ${l.format}` : ""}</div>}
               </div>
               <span className={styles.meta}>×{l.qty}</span>
               {couple && l.price !== null && <span className={styles.linePrice}>{euro(l.price)}</span>}

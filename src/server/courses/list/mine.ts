@@ -16,6 +16,8 @@ export interface MyLine {
   key: string;
   name: string;
   reference: string | null;
+  /** Format du conditionnement de la référence retenue (visible aussi de l'invité secondaire). */
+  format: string | null;
   qty: number;
   /** Prix de la ligne (prix d'une unité × quantité) ; vide pour l'invité secondaire ou sans prix connu. */
   price: number | null;
@@ -56,8 +58,8 @@ export async function myList(ctx: Ctx, session: SessionContext): Promise<MyList>
 
   const [rows, added, aisles] = await Promise.all([
     // lecture par grocery_list_for : le prix estimé n'est rendu qu'au couple (CR-38), le magasin et la référence restent visibles pour l'invité secondaire
-    sql<{ name_key: string; label: string; quantity: number; state: string; store_chain: string | null; reference_name: string | null; unit_price: string | null; aisle_id: number | null; created_at: Date }>`
-      select name_key, label, quantity, state, store_chain, reference_name, unit_price, aisle_id, bought_at as created_at
+    sql<{ name_key: string; label: string; quantity: number; state: string; store_chain: string | null; reference_name: string | null; unit_price: string | null; aisle_id: number | null; created_at: Date; package_format: string | null }>`
+      select name_key, label, quantity, state, store_chain, reference_name, unit_price, aisle_id, bought_at as created_at, package_format
         from grocery_list_for(${who.userId}::uuid)
        where list_id = ${list.id}::uuid and state = 'validated'
        order by label`.execute(ctx.db).then((r) => r.rows),
@@ -84,6 +86,7 @@ export async function myList(ctx: Ctx, session: SessionContext): Promise<MyList>
             key: r.name_key,
             name: r.label,
             reference: r.reference_name,
+            format: r.package_format,
             qty: r.quantity,
             price: showPrices && r.unit_price !== null ? round2(Number(r.unit_price) * r.quantity) : null,
           })),

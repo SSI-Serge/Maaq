@@ -34,11 +34,12 @@ describe("Console du catalogue : imports et correspondances", () => {
     expect(bad.details?.issues.join(" ")).toMatch(/ligne 3/);
     expect((await loadObject(c, "references", q({}, `Riz ${tag}`))).rows).toHaveLength(0);
 
-    const ok = await importFile(c, "references", file(`produit;rayon;enseigne;reference;prix;date_prix;statut;additifs\nRiz ${tag};Féculents;Lidl;Riz long 1 kg;2,10;2026-10-12;Conforme;\nRiz ${tag};Féculents;Carrefour;Riz bio;;;À vérifier;E250|E171\n`), opts);
+    const ok = await importFile(c, "references", file(`produit;rayon;enseigne;reference;format;prix;date_prix;statut;additifs\nRiz ${tag};Féculents;Lidl;Riz long 1 kg;sachet de 1 kg;2,10;2026-10-12;Conforme;\nRiz ${tag};Féculents;Carrefour;Riz bio;;;;À vérifier;E250|E171\n`), opts);
     expect(ok.count).toBe(2);
     const rows = (await loadObject(c, "references", q({}, `Riz ${tag}`))).rows;
     expect(rows).toHaveLength(2);
-    expect(rows.find((r) => r.cells.store === "Lidl")!.cells).toMatchObject({ price: "2,10 €", date: "12/10/2026" });
+    expect(rows.find((r) => r.cells.store === "Lidl")!.cells).toMatchObject({ price: "2,10 €", date: "12/10/2026", format: "sachet de 1 kg" });
+    expect(rows.find((r) => r.cells.store === "Carrefour")!.cells.format).toBe("—");
     expect(rows.find((r) => r.cells.store === "Carrefour")!.cells.price).toBe("N/A");
 
     await importFile(c, "references", file(`produit;rayon;enseigne;reference;prix;date_prix;statut\nRiz ${tag};Féculents;Lidl;Riz long 1 kg;2,25;2026-11-01;Conforme\n`), opts);
@@ -53,7 +54,9 @@ describe("Console du catalogue : imports et correspondances", () => {
     const lidl = rows.find((r) => r.cells.store === "Lidl")!;
     await runAction(c, "references", "edit", lidl.id, { ref: "Riz long 1 kg", price: "2,30", date: "2026-11-02", status: "compliant" });
     expect((await rejection(runAction(c, "references", "edit", lidl.id, { ref: "x", price: "-1", date: "2026-11-02", status: "compliant" }))).code).toBe("invalid_price");
-    expect((await downloadFile(c, "references", "template", q())).content).toContain("produit;rayon;enseigne");
+    expect((await downloadFile(c, "references", "template", q())).content).toContain("produit;rayon;enseigne;reference;format;prix");
+    const longFormat = "x".repeat(81);
+    expect((await rejection(importFile(c, "references", file(`produit;rayon;enseigne;reference;format;prix;date_prix\nRiz ${tag};Féculents;Lidl;Riz long 1 kg;${longFormat};1;2026-01-01\n`), opts))).code).toBe("invalid_import");
   });
 
   it("une référence importée fait passer le produit à « référencé »", async () => {

@@ -6264,6 +6264,8 @@ CREATE TABLE grocery_product_references (
   -- Enseigne : texte normalisé, pas une liste de la console (CR-25)
   store_chain     varchar(80) NOT NULL CHECK (store_chain <> '' AND store_chain = grocery_norm(store_chain)),
   reference_name  varchar(160) NOT NULL CHECK (btrim(reference_name) <> ''),
+  -- Format du conditionnement (« 1 kg », « sachet de 250 g »), facultatif, tel que donné par le catalogue d'origine (colonne « Format » de l'import, US-166 RF2)
+  package_format  varchar(80) CHECK (package_format IS NULL OR btrim(package_format) <> ''),
   -- Prix et date facultatifs, les deux ou aucun : une référence peut exister sans prix connu (« N/A »), rien n'est jamais inventé (US-157 RF8, CR-36)
   unit_price      numeric(8,2) CHECK (unit_price > 0),
   price_date      date,
@@ -6279,6 +6281,7 @@ CREATE TABLE grocery_product_references (
   CONSTRAINT ck_grocery_product_references_price CHECK ((unit_price IS NULL) = (price_date IS NULL))
 );
 COMMENT ON TABLE grocery_product_references IS $$Référence d'un produit dans une enseigne : nom, prix unitaire (paquet, boîte) et date du prix facultatifs (les deux ou aucun : sans prix connu, « N/A »), additifs contenus, statut de conformité déclaré, résumé de composition. Le prix perd son affichage après 12 mois. La conformité finale se calcule (v_grocery_product_references), elle n'est pas stockée : une modification des critères la recalcule d'elle-même. [US-157 RF8, US-166 RF1, RF3, US-167 RF2, CR-36, CR-37]$$;
+COMMENT ON COLUMN grocery_product_references.package_format IS $$Format du conditionnement de la référence (« 1 kg », « sachet de 250 g »), 80 caractères au plus, facultatif ; colonne « format » du fichier d'import des références. Visible de tous les profils du foyer, sans prix. [US-166 RF2, US-157 RF7]$$;
 COMMENT ON COLUMN grocery_product_references.unit_price IS $$Prix unitaire de la référence ; vide = prix inconnu (« N/A », jamais un prix inventé). Vide en même temps que la date du prix. [US-157 RF8, CR-36]$$;
 COMMENT ON COLUMN grocery_product_references.compliance_status IS $$Statut du catalogue d'origine : compliant = conforme, not_applicable = sans objet (produit frais), to_check = à vérifier (ingrédients non publiés : proposée avec « Composition à vérifier sur l'étiquette »), none_found = aucun conforme trouvé (jamais proposée, listée dans « Ingrédients exclus des références proposées »). Une liste d'additifs qui correspond à un critère actif rend la référence non conforme quel que soit ce statut. [US-166, US-167, CR-37]$$;
 COMMENT ON COLUMN grocery_product_references.composition_text IS $$Résumé de la composition en texte libre (2 000 caractères au plus), tel que donné par le catalogue d'origine ; facultatif. [CR-37]$$;
@@ -6833,15 +6836,17 @@ COMMENT ON FUNCTION grocery_list_item_before_write() IS $$Garde-fou de la liste 
 CREATE FUNCTION grocery_list_for(p_viewer uuid)
 RETURNS TABLE (id uuid, list_id uuid, state grocery_item_state, source text, label varchar, name_key text, product_id bigint, aisle_id integer, quantity smallint,
                added_by_user_id uuid, not_bought_last_time boolean, store_chain varchar, reference_name varchar, unit_price numeric, bought_at timestamptz,
-               bought_by_user_id uuid)
+               bought_by_user_id uuid, package_format varchar)
 LANGUAGE sql STABLE AS $$
   SELECT i.id, i.list_id, i.state, i.source, i.label, i.name_key, i.product_id, i.aisle_id, i.quantity, i.added_by_user_id, i.not_bought_last_time,
-         i.store_chain, i.reference_name, CASE WHEN grocery_access(p_viewer) = 'couple' THEN i.unit_price END, i.bought_at, i.bought_by_user_id
+         i.store_chain, i.reference_name, CASE WHEN grocery_access(p_viewer) = 'couple' THEN i.unit_price END, i.bought_at, i.bought_by_user_id,
+         (SELECT r.package_format FROM grocery_product_references r
+           WHERE r.product_id = i.product_id AND r.store_chain = i.store_chain AND r.reference_name = i.reference_name)
     FROM users v
     JOIN grocery_list_items i ON i.account_id = v.account_id
    WHERE v.id = p_viewer AND grocery_access(p_viewer) IS NOT NULL
 $$;
-COMMENT ON FUNCTION grocery_list_for(uuid) IS $$Articles de la liste de courses de la famille d'un profil, pour l'affichage : le prix estimé n'est rendu qu'au couple, l'invité secondaire ne voit aucun prix (il voit le magasin et la référence). L'application l'utilise pour lire la liste ; tant qu'elle se connecte avec un seul rôle, la protection effective des colonnes est cette fonction et le code (H150). [US-157 RF8, US-158, CR-10, CR-38]$$;
+COMMENT ON FUNCTION grocery_list_for(uuid) IS $$Articles de la liste de courses de la famille d'un profil, pour l'affichage : le prix estimé n'est rendu qu'au couple, l'invité secondaire ne voit aucun prix (il voit le magasin, la référence et le format du conditionnement, sans prix). L'application l'utilise pour lire la liste ; tant qu'elle se connecte avec un seul rôle, la protection effective des colonnes est cette fonction et le code (H150). [US-157 RF8, US-158, CR-10, CR-38]$$;
 
 -- À la préparation de la liste suivante, les produits non achetés (liste validée et « ajoutés depuis la validation ») reviennent en préparation
 CREATE FUNCTION grocery_carry_over_unbought(p_account uuid) RETURNS integer LANGUAGE plpgsql AS $$
@@ -7098,9 +7103,10 @@ SELECT r.id AS reference_id, r.product_id, r.store_chain, r.reference_name, r.un
        r.compliance_status,
        (r.compliance_status = 'to_check' AND NOT EXISTS (SELECT 1 FROM grocery_additive_criteria c WHERE c.is_active
                     AND grocery_norm(c.label) IN (SELECT grocery_norm(a) FROM unnest(r.additives) a))) AS needs_label_check,
-       r.composition_text
+       r.composition_text,
+       r.package_format
   FROM grocery_product_references r;
-COMMENT ON VIEW v_grocery_product_references IS $$Références par enseigne avec leur ancienneté (fresh / aging / NULL au-delà de 12 mois ou sans prix ; has_price les distingue : sans prix, « N/A ») et leur conformité, recalculée à chaque lecture : non conforme si le statut déclaré est « aucun conforme trouvé » (none_found) ou si un additif correspond à un critère actif, quel que soit le statut (excluded_because liste alors les critères). Une référence non conforme n'est jamais proposée et sert à la rubrique « Ingrédients exclus des références proposées ». needs_label_check : référence proposée avec la mention « Composition à vérifier sur l'étiquette » (statut « à vérifier »). [US-157 RF1, RF8, US-166 RF3, US-167 RF2, CA 1.1, CR-36, CR-37]$$;
+COMMENT ON VIEW v_grocery_product_references IS $$Références par enseigne avec leur ancienneté (fresh / aging / NULL au-delà de 12 mois ou sans prix ; has_price les distingue : sans prix, « N/A ») et leur conformité, recalculée à chaque lecture : non conforme si le statut déclaré est « aucun conforme trouvé » (none_found) ou si un additif correspond à un critère actif, quel que soit le statut (excluded_because liste alors les critères). Une référence non conforme n'est jamais proposée et sert à la rubrique « Ingrédients exclus des références proposées ». needs_label_check : référence proposée avec la mention « Composition à vérifier sur l'étiquette » (statut « à vérifier »). package_format : format du conditionnement, en dernière colonne. [US-157 RF1, RF8, US-166 RF3, US-167 RF2, CA 1.1, CR-36, CR-37]$$;
 
 CREATE VIEW v_meal_batch_week_days AS
 SELECT d.week_id, d.weekday, d.planning_dish_name, d.dish_id, d.suggested_dish_id, d.match_pct, d.needs_catalog_addition,
