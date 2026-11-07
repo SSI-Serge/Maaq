@@ -3,8 +3,18 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-07T13:05:40.072Z",
+  "updated": "2026-11-07T13:41:17.398Z",
   "deploys": [
+    {
+      "at": "2026-11-07T13:41:17.398Z",
+      "env": "preview",
+      "what": "Courses et repas : format du conditionnement des références (import, console, comparatif, Ma liste) — rév. 00076",
+      "storyIds": [
+        "f21c1",
+        "f21c3",
+        "f21c4"
+      ]
+    },
     {
       "at": "2026-11-07T13:05:40.072Z",
       "env": "preview",
@@ -2908,6 +2918,10 @@
         }
       ],
       "decisions": [
+        {
+          "at": "2026-11-07T13:41:17.398Z",
+          "text": "Format de la référence : colonne package_format (80 caractères, facultative) ; colonne format du fichier d import. Rattrapage deeeda5e appliqué sur la base de test avec l accord direct du PO."
+        },
         {
           "at": "2026-11-07T13:05:40.072Z",
           "text": "Agent natif déclaré par une ligne agents (anthropic, courses-repas) ; le catalogue filtre sur listed_in_catalog. Rattrapage 9e3600f1 appliqué sur la base de test avec l accord direct du PO."
