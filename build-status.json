@@ -3,8 +3,16 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-07T14:51:20.415Z",
+  "updated": "2026-11-07T15:03:32.074Z",
   "deploys": [
+    {
+      "at": "2026-11-07T15:03:32.074Z",
+      "env": "preview",
+      "what": "Courses et repas : tickets de caisse (service de lecture maaq-tickets, écran /courses/ticket, menu à partir d un ticket) — rév. 00078",
+      "storyIds": [
+        "f21c5"
+      ]
+    },
     {
       "at": "2026-11-07T14:20:40.063Z",
       "env": "preview",
@@ -2850,8 +2858,8 @@
       "id": "f21",
       "name": "Courses et repas : agent natif, étapes C0 à C6 (branche courses-repas)",
       "desc": "Le menu de la semaine, la liste de courses avec comparatif et scénarios, les tickets et le budget, calculés par MAAQ ; remplace l agent Digitorn qui fonctionne mal.",
-      "building": true,
-      "currentAction": "Tickets : code fait ; service de lecture à déployer (accord à demander)",
+      "building": false,
+      "currentAction": "",
       "stories": [
         {
           "id": "f21c0",
@@ -2911,13 +2919,13 @@
           "id": "f21c5",
           "title": "C5 · Tickets de caisse, budget par rayon, base commune des prix, modération (US-160, 161, 163, 175)",
           "state": "testing",
-          "env": null,
-          "at": "2026-11-07T14:51:20.415Z",
+          "env": "preview",
+          "at": "2026-11-07T15:03:32.074Z",
           "unsure": [
-            "Le service de lecture RapidOCR n a jamais tourné : à déployer et à essayer (tickets fictifs sur la zone de test ; vrais tickets du PO en local seulement, CR-31).",
-            "La mise en forme par le modèle n a pas été essayée sur de vrais textes de ticket."
+            "Essai de bout en bout (photo, lecture, mise en forme par le modèle, correction, confirmation) à faire par un profil du couple sur la zone de test, avec un ticket fictif.",
+            "Vrais tickets du PO : en local seulement (CR-31), pas encore mesurés avec ce service."
           ],
-          "note": "Code des tickets fait et testé avec lecteur et modèle simulés (14 tests dont masquage) : lecture, masquage, mise en forme, correction, enregistrement, doublon, budget, base commune, menu à partir d un ticket ; écran /courses/ticket. Le service de lecture RapidOCR (services/ticket-reader) est écrit mais pas encore déployé ni essayé."
+          "note": "Tickets en ligne sur la zone de test (rév. 00078) : service de lecture maaq-tickets (RapidOCR) déployé et essayé seul sur un ticket fictif (97 % de confiance) ; écran /courses/ticket. Pas encore essayé de bout en bout par un profil connecté."
         },
         {
           "id": "f21c6",
@@ -2928,6 +2936,10 @@
         }
       ],
       "decisions": [
+        {
+          "at": "2026-11-07T15:03:32.074Z",
+          "text": "Service de lecture des tickets : nouveau service Cloud Run maaq-tickets (RapidOCR, Tesseract en secours), créé avec l accord direct du PO ; vrais tickets jamais sur la zone de test (CR-31)."
+        },
         {
           "at": "2026-11-07T14:20:40.063Z",
           "text": "Format du classeur repris par l import de la console (303 références sur 322), avec l accord direct du PO ; sauvegarde 14-14-28 faite avant."
