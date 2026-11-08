@@ -168,6 +168,7 @@ export function menuSummary(p: MenuProposal): string {
   return [
     `Menu enregistré pour la semaine du ${p.week} : ${p.dinners.length} dîners, ${p.express.length} plats express${p.complete ? "" : " (INCOMPLET : il manque des dîners, pas de bouton « Valider le menu »)"}.`,
     `Séance de batch : ${p.session.minutes} min (${source})${p.session.overCap ? `, AU-DESSUS du plafond de ${p.session.cap} min : dis-le` : ""}.`,
+    p.express.length < 4 ? `Il manque ${4 - p.express.length} plat(s) express : rappelle proposer_menu avec 4 plats express, qui reprennent des ingrédients du menu.` : "",
     served.length ? `Déjà servis récemment : ${served.join(" ; ")}. L'utilisateur peut les garder.` : "",
     conflicts.length ? `CONFLITS D'ALLERGIE OU DE RÉGIME (validation impossible) : ${conflicts.join(" ; ")}. Remplace ces plats et rappelle proposer_menu.` : "",
     warnings.length ? `Avertissements affichés sur les plats : ${warnings.join(" ; ")}.` : "",

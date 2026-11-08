@@ -242,7 +242,7 @@ describe("CR-42 : le menu composé par l'IA", () => {
     const c = await household();
     const menu = fullMenu(c);
     const model = scripted(
-      useTools({ name: "proposer_menu", input: { ...menu, etapes: [{ texte: "a", duree_minutes: 10, en_meme_temps_que: 2 }, { texte: "b", plat: "Plat absent", duree_minutes: 10 }] } }),
+      useTools({ name: "proposer_menu", input: { ...menu, etapes: [{ texte: "a", duree_minutes: 10, en_meme_temps_que: 2 }, { texte: "b", plat: "Plat absent", conservation: "frigo" }] } }),
       useTools({ name: "proposer_menu", input: { ...menu, etapes: [{ texte: "a", plat: "Curry de pois chiches", conservation: "frigo" }, { texte: "b", plat: "Curry de pois chiches", conservation: "congelateur" }] } }),
     );
     const failed = await sendCourseMessage(at(), c.f.sophie, { requestId: randomUUID(), text: "Menu" }, { model });

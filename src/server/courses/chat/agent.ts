@@ -71,7 +71,7 @@ export interface CourseAgentResult {
   reply: string;
   status: "ok" | "error" | "timeout" | "max_turns" | "refused" | "max_tokens";
   toolCalls: { name: string; ms: number; isError: boolean }[];
-  usage: { inputTokens: number; outputTokens: number };
+  usage: { inputTokens: number; outputTokens: number; cacheRead: number; cacheWrite: number };
   durationMs: number;
 }
 
@@ -103,7 +103,7 @@ export async function runCourseAgent(input: CourseAgentInput): Promise<CourseAge
   const system = courseInstructions({ replacement: input.dialogue });
   const definition = toolsFor(input.tool.access);
   const messages = buildMessages(input);
-  const result: CourseAgentResult = { reply: FAILURE_REPLY, status: "error", toolCalls: [], usage: { inputTokens: 0, outputTokens: 0 }, durationMs: 0 };
+  const result: CourseAgentResult = { reply: FAILURE_REPLY, status: "error", toolCalls: [], usage: { inputTokens: 0, outputTokens: 0, cacheRead: 0, cacheWrite: 0 }, durationMs: 0 };
   try {
     for (let turn = 0; ; turn += 1) {
       if (turn >= maxTurns) {
@@ -117,6 +117,8 @@ export async function runCourseAgent(input: CourseAgentInput): Promise<CourseAge
       const response = await input.model.send({ system, tools: definition, messages });
       result.usage.inputTokens += response.usage.inputTokens;
       result.usage.outputTokens += response.usage.outputTokens;
+      result.usage.cacheRead += response.usage.cacheRead;
+      result.usage.cacheWrite += response.usage.cacheWrite;
       messages.push({ role: "assistant", content: response.content });
       if (response.stopReason === "tool_use") {
         const results: ToolResultBlock[] = [];

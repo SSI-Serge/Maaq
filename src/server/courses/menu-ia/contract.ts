@@ -32,7 +32,7 @@ export const dishInput = z.strictObject({
 
 export const stepInput = z.strictObject({
   texte: text(2000),
-  /** Nom du plat concerné (un des dîners ou plats express du menu). */
+  /** Nom EXACT du plat concerné (un des dîners ou plats express du menu) ; à laisser vide pour une étape générale (préparation, nettoyage…). */
   plat: z.string().trim().max(160).optional(),
   duree_minutes: z.number().int().min(1).max(600).optional(),
   /** Rang (à partir de 1) d'une étape PRÉCÉDENTE avec laquelle celle-ci se fait en même temps. */
@@ -75,7 +75,7 @@ export const MENU_TOOLS = [
   {
     name: "proposer_menu",
     description:
-      "Rend le menu de la semaine à MAAQ, qui l'affiche en carte dans le tchat avec le bouton « Valider le menu ». 7 dîners (lundi à dimanche) et jusqu'à 4 plats express, tous respectant les régimes et allergies du foyer. Les cinq premiers dîners forment la séance de batch : donne leur déroulé dans `etapes`. Rappelle l'outil avec le menu COMPLET à chaque correction demandée. Réservé aux parents du couple.",
+      "Rend le menu de la semaine à MAAQ, qui l'affiche en carte dans le tchat avec le bouton « Valider le menu ». 7 dîners (lundi à dimanche) et 4 plats express, tous respectant les régimes et allergies du foyer. Les cinq premiers dîners forment la séance de batch : donne leur déroulé dans `etapes`. Rappelle l'outil avec le menu COMPLET à chaque correction demandée. Réservé aux parents du couple.",
     input_schema: menuToolSchema(),
   },
 ] as const;

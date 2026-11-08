@@ -174,7 +174,8 @@ function resolveSteps(input: MenuInput, dishNames: string[], errors: string[]): 
     let dish: string | null = null;
     if (s.plat) {
       dish = dishNames.find((n) => norm(n) === norm(s.plat!)) ?? null;
-      if (!dish) errors.push(`${where} : le plat « ${s.plat} » n'est pas dans le menu.`);
+      // une étape générale (« préparation ») n'est liée à aucun plat : seul le plat d'une étape de conservation doit exister
+      if (!dish && s.conservation) errors.push(`${where} : le plat « ${s.plat} » n'est pas dans le menu.`);
     }
     if (s.en_meme_temps_que !== undefined && s.en_meme_temps_que >= position) errors.push(`${where} : « en_meme_temps_que » doit viser une étape précédente (rang inférieur à ${position}).`);
     if (s.jour_sortie !== undefined && !s.conservation) errors.push(`${where} : « jour_sortie » demande « conservation ».`);
