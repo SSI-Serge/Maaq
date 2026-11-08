@@ -9,3 +9,4 @@ export * from "./tickets";
 export * from "./text";
 export * from "./types";
 export * from "./unitprice";
+export * from "./quantities";
