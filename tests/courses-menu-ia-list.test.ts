@@ -33,7 +33,7 @@ const rejection = async (p: Promise<unknown>) => {
 
 const usage = { inputTokens: 10, outputTokens: 5, cacheRead: 0, cacheWrite: 0 };
 const reply = (text: string): ModelResponse => ({ content: [{ type: "text", text }], stopReason: "end_turn", usage, requestId: null });
-const useTools = (...calls: { name: string; input: unknown }[]): ModelResponse => ({
+const callTools = (...calls: { name: string; input: unknown }[]): ModelResponse => ({
   content: calls.map((c, i) => ({ type: "tool_use" as const, id: `tu_${i}_${c.name}`, name: c.name, input: c.input })),
   stopReason: "tool_use",
   usage,
@@ -88,7 +88,7 @@ function fullMenu(c: Ctxt, over: Record<string, unknown> = {}) {
 }
 
 async function compose(c: Ctxt, input: unknown, ctx: Ctx = at()) {
-  const model = scripted(useTools({ name: "preparer_menu", input: {} }), useTools({ name: "proposer_menu", input }), reply("Voici votre menu."));
+  const model = scripted(callTools({ name: "preparer_menu", input: {} }), callTools({ name: "proposer_menu", input }), reply("Voici votre menu."));
   return sendCourseMessage(ctx, c.f.sophie, { requestId: randomUUID(), text: "Compose mon menu" }, { model });
 }
 

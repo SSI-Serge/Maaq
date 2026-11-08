@@ -35,7 +35,7 @@ const rejection = async (p: Promise<unknown>) => {
 
 const usage = { inputTokens: 10, outputTokens: 5, cacheRead: 0, cacheWrite: 0 };
 const reply = (text: string): ModelResponse => ({ content: [{ type: "text", text }], stopReason: "end_turn", usage, requestId: null });
-const useTools = (...calls: { name: string; input: unknown }[]): ModelResponse => ({
+const callTools = (...calls: { name: string; input: unknown }[]): ModelResponse => ({
   content: calls.map((c, i) => ({ type: "tool_use" as const, id: `tu_${i}_${c.name}`, name: c.name, input: c.input })),
   stopReason: "tool_use",
   usage,
@@ -91,7 +91,7 @@ function fullMenu(c: Ctxt, over: Record<string, unknown> = {}) {
 }
 
 async function compose(c: Ctxt, input: unknown, text = "Compose mon menu") {
-  const model = scripted(useTools({ name: "preparer_menu", input: {} }), useTools({ name: "proposer_menu", input }), reply("Voici votre menu."));
+  const model = scripted(callTools({ name: "preparer_menu", input: {} }), callTools({ name: "proposer_menu", input }), reply("Voici votre menu."));
   const done = await sendCourseMessage(at(), c.f.sophie, { requestId: randomUUID(), text }, { model });
   return { done, model };
 }
@@ -224,7 +224,7 @@ describe("CR-42 : le menu composé par l'IA", () => {
     const c = await household();
     const menu = fullMenu(c);
     const broken = { ...menu, diners: [...menu.diners.slice(0, 6), { nom: "Plat sans rien" }] };
-    const fixed = scripted(useTools({ name: "proposer_menu", input: broken }), useTools({ name: "proposer_menu", input: menu }), reply("Voici votre menu corrigé."));
+    const fixed = scripted(callTools({ name: "proposer_menu", input: broken }), callTools({ name: "proposer_menu", input: menu }), reply("Voici votre menu corrigé."));
     const ok = await sendCourseMessage(at(), c.f.sophie, { requestId: randomUUID(), text: "Un menu" }, { model: fixed });
     expect(ok.failed).toBe(false);
     expect(ok.card?.status).toBe("open");
@@ -232,7 +232,7 @@ describe("CR-42 : le menu composé par l'IA", () => {
     expect(feedback).toMatch(/Menu refusé par MAAQ/);
     expect(feedback).toMatch(/plat libre incomplet/);
 
-    const hopeless = scripted(useTools({ name: "proposer_menu", input: broken }));
+    const hopeless = scripted(callTools({ name: "proposer_menu", input: broken }));
     const failed = await sendCourseMessage(at(), c.f.sophie, { requestId: randomUUID(), text: "Un autre menu" }, { model: hopeless });
     expect(failed.failed).toBe(true);
     expect(failed.reply).toBe("Je n'ai pas réussi à composer le menu pour le moment. Vous pouvez réessayer.");
@@ -244,8 +244,8 @@ describe("CR-42 : le menu composé par l'IA", () => {
     const c = await household();
     const menu = fullMenu(c);
     const model = scripted(
-      useTools({ name: "proposer_menu", input: { ...menu, etapes: [{ texte: "a", duree_minutes: 10, en_meme_temps_que: 2 }, { texte: "b", plat: "Plat absent", conservation: "frigo" }] } }),
-      useTools({ name: "proposer_menu", input: { ...menu, etapes: [{ texte: "a", plat: "Curry de pois chiches", conservation: "frigo" }, { texte: "b", plat: "Curry de pois chiches", conservation: "congelateur" }] } }),
+      callTools({ name: "proposer_menu", input: { ...menu, etapes: [{ texte: "a", duree_minutes: 10, en_meme_temps_que: 2 }, { texte: "b", plat: "Plat absent", conservation: "frigo" }] } }),
+      callTools({ name: "proposer_menu", input: { ...menu, etapes: [{ texte: "a", plat: "Curry de pois chiches", conservation: "frigo" }, { texte: "b", plat: "Curry de pois chiches", conservation: "congelateur" }] } }),
     );
     const failed = await sendCourseMessage(at(), c.f.sophie, { requestId: randomUUID(), text: "Menu" }, { model });
     expect(failed.failed).toBe(true);
@@ -257,7 +257,7 @@ describe("CR-42 : le menu composé par l'IA", () => {
   it("un plat proposé deux fois est refusé", async () => {
     const c = await household();
     const menu = fullMenu(c);
-    const model = scripted(useTools({ name: "proposer_menu", input: { ...menu, diners: [...menu.diners.slice(0, 6), menu.diners[3]] } }), reply("Dommage."));
+    const model = scripted(callTools({ name: "proposer_menu", input: { ...menu, diners: [...menu.diners.slice(0, 6), menu.diners[3]] } }), reply("Dommage."));
     await sendCourseMessage(at(), c.f.sophie, { requestId: randomUUID(), text: "Menu" }, { model });
     expect(JSON.stringify(model.seen[1].messages)).toMatch(/proposé deux fois/);
   });
@@ -333,7 +333,8 @@ describe("CR-42 : le menu dans le tchat (M3)", () => {
     await validateMenuCard(at(), c.f.sophie, first.done.card!.messageId);
     const second = await compose(c, fullMenu(c), "Un autre menu");
     expect(second.done.card).toMatchObject({ status: "open", replacesValidated: true });
-    const view = (await listCourseMessages(at(), c.f.sophie)).filter((m) => m.card).map((m) => [m.card!.status, m.card!.replacesValidated]);
+    // l'heure du faux horloge est figée : on compare dans l'ordre de création des cartes
+    const view = (await listCourseMessages(at(), c.f.sophie)).filter((m) => m.card).sort((x, y) => Number(BigInt(x.id) - BigInt(y.id))).map((m) => [m.card!.status, m.card!.replacesValidated]);
     expect(view).toEqual([["validated", true], ["open", true]]);
   });
 

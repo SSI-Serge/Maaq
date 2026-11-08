@@ -3,8 +3,16 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-08T22:10:00.000Z",
+  "updated": "2026-11-08T23:30:00.000Z",
   "deploys": [
+    {
+      "at": "2026-11-08T23:30:00.000Z",
+      "env": "preview",
+      "what": "Courses et repas : menu composé par l IA en conversation ouvert sur la zone de test (MENU_IA=live) : choix des plats, carte de menu, Valider le menu, Menu remplacé, revalidation, recettes et déroulé de la séance dans la liste, Ajouter à vos plats — rév. 00086",
+      "storyIds": [
+        "f21c5"
+      ]
+    },
     {
       "at": "2026-11-08T22:10:00.000Z",
       "env": "preview",

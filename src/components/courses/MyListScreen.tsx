@@ -97,7 +97,7 @@ function Content({ list, reload, onPrint, printing }: { list: MyList; reload: ()
   if (list.empty) {
     return (
       <p className={styles.empty}>
-        Aucune liste validée cette semaine. <Link href={list.hasMenu ? "/courses/liste" : "/courses/menu"}>{list.hasMenu ? "Préparer la liste ›" : "Préparer le menu ›"}</Link>
+        Aucune liste validée cette semaine. <Link href={list.hasMenu ? "/courses/liste" : "/courses?menu=1"}>{list.hasMenu ? "Préparer la liste ›" : "Préparer le menu ›"}</Link>
       </p>
     );
   }

@@ -2,9 +2,9 @@ import { sql } from "kysely";
 import { asProfile } from "@/server/assistant/outings/profile";
 import type { Ctx, SessionContext } from "@/server/auth/service";
 import { nameKey, placeKey } from "../catalog/seed";
-import { allowed, applyTicket, pricePerMeasure, toMeasure, intersect, ingPhrases, round2, tokens, ticketTotal, type Ticket } from "../engine";
+import { applyTicket, pricePerMeasure, toMeasure, round2, ticketTotal, type Ticket } from "../engine";
+import { env } from "@/server/env";
 import { courseError, displayPlace, loadSettings, requireAccess, translateCourseError } from "../household/settings";
-import { loadEngineData } from "../menu/data";
 import { maskTicketText } from "./mask";
 import { ticketReader, TicketReaderError, type TicketImage } from "./reader";
 import { normalizeDraft, normalizeTime, ticketStructurer, type TicketDraft } from "./structure";
@@ -112,8 +112,10 @@ export interface TicketConfirmation {
   aisles: string[];
   /** Prix ajoutés, sans le foyer, à la base commune. */
   shared: number;
-  /** Identifiant du ticket, pour proposer un menu à partir de ce qui a été acheté. */
+  /** Identifiant du ticket enregistré. */
   receiptId: string | null;
+  /** Le menu se compose en conversation (MENU_IA ouvert) : l'écran propose alors « Menu à partir de ce ticket ». */
+  menuIa: boolean;
 }
 
 /** Enregistre un ticket confirmé (US-161 RF5) : prix et journal d'achats, produits retirés de la liste, budget, base commune si le foyer partage. Un doublon est ignoré. */
@@ -143,7 +145,7 @@ export async function confirmTicket(ctx: Ctx, session: SessionContext, input: Ti
     return { product, reference: l.reference?.trim().slice(0, 160) || null, total: round2(l.total), qty: measure ? 1 : l.qty, aisle: l.aisle, aisleId: id, measure, perMeasure, readPerMeasure: !!(measure && l.pricePerMeasure && l.pricePerMeasure > 0) };
   });
   const total = round2(lines.reduce((s, l) => s + l.total, 0));
-  if (await isKnown(ctx, who.accountId, { store, date: input.date, time, total })) return { duplicate: true, recorded: 0, total, removed: [], aisles: [], shared: 0, receiptId: null };
+  if (await isKnown(ctx, who.accountId, { store, date: input.date, time, total })) return { duplicate: true, recorded: 0, total, removed: [], aisles: [], shared: 0, receiptId: null, menuIa: false };
 
   const open = await ctx.db
     .selectFrom("grocery_list_items")
@@ -191,45 +193,21 @@ export async function confirmTicket(ctx: Ctx, session: SessionContext, input: Ti
       }
     });
   } catch (error) {
-    if ((error as { code?: string }).code === "23505") return { duplicate: true, recorded: 0, total, removed: [], aisles: [], shared: 0, receiptId: null };
+    if ((error as { code?: string }).code === "23505") return { duplicate: true, recorded: 0, total, removed: [], aisles: [], shared: 0, receiptId: null, menuIa: false };
     throw translateCourseError(error);
   }
-  return { duplicate: false, recorded: lines.length, total: ticketTotal(ticket), removed: outcome.removedFromList, aisles: [...new Set(lines.map((l) => l.aisle))], shared, receiptId };
+  return { duplicate: false, recorded: lines.length, total: ticketTotal(ticket), removed: outcome.removedFromList, aisles: [...new Set(lines.map((l) => l.aisle))], shared, receiptId, menuIa: env().MENU_IA === "live" };
 }
 
-export interface TicketMenuIdea {
-  id: string;
-  name: string;
-  minutes: number;
-  /** Ingrédients du plat que le ticket couvre. */
-  have: string[];
-  /** Ingrédients qui restent à acheter. */
-  missing: string[];
-}
-
-/** Plats dont les ingrédients correspondent à ce que le foyer vient d'acheter, avec ce qui reste à acheter (US-160). Le filtrage des allergies et des régimes reste appliqué. */
-export async function menuFromTicket(ctx: Ctx, session: SessionContext, receiptId: string): Promise<TicketMenuIdea[]> {
-  const who = await requireAccess(ctx, session, "couple");
-  const lines = await ctx.db.selectFrom("grocery_receipt_lines").select(["label", "line_total"]).where("account_id", "=", who.accountId).where("receipt_id", "=", receiptId).execute();
-  if (!lines.length) throw courseError("not_found", "Ce ticket n'existe pas.", 404);
-  const bought = new Set<string>();
-  for (const l of lines) if (Number(l.line_total) > 0) for (const t of tokens(l.label)) bought.add(t);
-  const settings = await loadSettings(ctx.db, who.accountId);
-  const data = await loadEngineData(ctx.db, who.accountId, settings);
-  const ideas: (TicketMenuIdea & { score: number })[] = [];
-  for (const d of data.dishes) {
-    if (!allowed(d, data.profile)) continue;
-    const phrases = ingPhrases(d.ing);
-    if (!phrases.length) continue;
-    const have = phrases.filter((p) => intersect(tokens(p), bought).size > 0);
-    if (!have.length) continue;
-    const missing = phrases.filter((p) => !have.includes(p));
-    ideas.push({ id: d.id, name: d.name, minutes: d.minutes, have, missing, score: have.length / phrases.length + have.length * 0.05 });
-  }
-  return ideas
-    .sort((a, b) => b.score - a.score || a.minutes - b.minutes)
-    .slice(0, 3)
-    .map((idea) => ({ id: idea.id, name: idea.name, minutes: idea.minutes, have: idea.have, missing: idea.missing }));
+/**
+ * Noms des produits du dernier ticket enregistré par le foyer, pour composer un menu à partir de ce qui vient d'être acheté (US-160, CR-44) : seulement les noms, jamais le prix, le magasin ni la date.
+ * Les remises et les lignes à prix nul sont écartées.
+ */
+export async function lastReceiptProducts(ctx: Ctx, accountId: string): Promise<string[]> {
+  const receipt = await ctx.db.selectFrom("grocery_receipts").select("id").where("account_id", "=", accountId).orderBy("created_at", "desc").limit(1).executeTakeFirst();
+  if (!receipt) return [];
+  const lines = await ctx.db.selectFrom("grocery_receipt_lines").select(["label", "line_total"]).where("account_id", "=", accountId).where("receipt_id", "=", receipt.id).orderBy("position").execute();
+  return [...new Set(lines.filter((l) => Number(l.line_total) > 0).map((l) => l.label.trim()).filter(Boolean))].slice(0, 80);
 }
 
 export { displayPlace };

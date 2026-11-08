@@ -5,10 +5,10 @@ import { getSettings, saveSettings } from "@/server/courses/household/settings";
 import { fromDto } from "@/server/courses/list/dto";
 import { myList } from "@/server/courses/list/mine";
 import { prepareList, validateList } from "@/server/courses/list/service";
-import { menuPropose, menuStart, menuValidate } from "@/server/courses/menu/service";
 import { ensureCatalog } from "./helpers/courses-catalog";
 import { coupleFamily } from "./helpers/couple";
 import { testDb } from "./helpers/fixtures";
+import { validateTestMenu } from "./helpers/menu";
 
 const db = testDb();
 const NOW = new Date(2026, 10, 4, 10, 0, 0);
@@ -20,9 +20,7 @@ describe("Format du conditionnement d'une référence (US-166 RF2)", () => {
     const f = await coupleFamily(db);
     const options = (await getSettings(at(), f.sophie)).options;
     await saveSettings(at(), f.sophie, { city: "Nantes", householdSize: 4, shoppingDays: [6], goals: { time: true }, cuisineIds: options.cuisines.map((c) => c.id), stores: [{ chain: "Lidl", city: "Nantes" }, { chain: "Carrefour", city: "Nantes" }, { chain: "E.Leclerc", city: "Nantes" }] });
-    const pick = (await menuStart(at(), f.sophie)).groups.flatMap((g) => g.dishes).find((d) => d.id === "F4")!;
-    const menu = await menuPropose(at(), f.sophie, { picks: [pick.id] });
-    await menuValidate(at(), f.sophie, { picks: [pick.id], dinners: menu.days.map((d) => d.dish.id), express: [] });
+    await validateTestMenu(db, f, { picks: ["F4"], now: at().now });
 
     const list = await prepareList(at(), f.sophie);
     const model = fromDto(list.model!);

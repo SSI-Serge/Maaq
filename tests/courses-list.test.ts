@@ -7,10 +7,10 @@ import { courseHome } from "@/server/courses/home";
 import { myList, setBought } from "@/server/courses/list/mine";
 import { addProduct, prepareList, removeProduct, saveLightChoices, validateList } from "@/server/courses/list/service";
 import { getSettings, saveSettings, setSharing } from "@/server/courses/household/settings";
-import { menuPropose, menuStart, menuValidate } from "@/server/courses/menu/service";
 import { ensureCatalog } from "./helpers/courses-catalog";
 import { coupleFamily, type CoupleFamily } from "./helpers/couple";
 import { testDb } from "./helpers/fixtures";
+import { validateTestMenu } from "./helpers/menu";
 
 const db = testDb();
 const NOW = new Date(2026, 10, 4, 10, 0, 0);
@@ -36,10 +36,7 @@ async function readyWithMenu(): Promise<{ f: CoupleFamily; dinners: string[] }> 
     cuisineIds: options.cuisines.map((c) => c.id),
     stores: [{ chain: "Lidl", city: "Nantes" }, { chain: "E.Leclerc", city: "Nantes" }],
   });
-  const pick = (await menuStart(at(), f.sophie)).groups.flatMap((g) => g.dishes).find((d) => d.id === "F4")!;
-  const menu = await menuPropose(at(), f.sophie, { picks: [pick.id] });
-  const dinners = menu.days.map((d) => d.dish.id);
-  await menuValidate(at(), f.sophie, { picks: [pick.id], dinners, express: menu.express.map((e) => e.id) });
+  const { dinners } = await validateTestMenu(db, f, { picks: ["F4"], express: true, now: at().now });
   return { f, dinners };
 }
 
@@ -135,9 +132,7 @@ describe("US-156/157 : liste de courses issue du menu", () => {
     await validateList(at(), f.sophie, { scenario: 2, lines });
     await addProduct(at(), f.sophie, { name: "Essuie-tout" });
     // un menu pour la semaine suivante
-    const pick = dinners[0];
-    const next = await menuPropose(at(), f.sophie, { picks: [pick], week: "2026-11-16" });
-    await menuValidate(at(), f.sophie, { week: "2026-11-16", picks: [pick], dinners: next.days.map((d) => d.dish.id), express: [] });
+    await validateTestMenu(db, f, { picks: [dinners[0]], week: "2026-11-16", now: at().now });
     const carried = await db.selectFrom("grocery_list_items").select(["name_key", "state", "not_bought_last_time"]).where("account_id", "=", f.accountId).where("state", "<>", "bought").execute();
     expect(carried.every((r) => r.state === "preparing")).toBe(true);
     expect(carried.find((r) => r.name_key === "essuie tout")?.not_bought_last_time).toBe(true);

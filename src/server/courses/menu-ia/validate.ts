@@ -49,7 +49,7 @@ export async function validateMenuCard(ctx: Ctx, session: SessionContext, messag
     if (data.allergenBlocked.has(known.id) || !allowed(known, data.profile)) throw courseError("allergy_conflict", `Conflit d'allergie ou de régime sur « ${d.name} » : le menu ne peut pas être validé.`, 422);
   }
 
-  const result = await writeMenu(ctx, who.accountId, who.userId, proposal, data);
+  const result = await saveValidatedMenu(ctx, who.accountId, who.userId, proposal, data);
   await markValidated(ctx.db, card.id, card.envelope, ctx.now);
   return result;
 }
@@ -69,7 +69,7 @@ async function reopenList(trx: Parameters<Parameters<typeof asProfile>[2]>[0], a
     .execute();
 }
 
-async function writeMenu(ctx: Ctx, accountId: string, userId: string, proposal: MenuProposal, data: Awaited<ReturnType<typeof loadEngineData>>): Promise<ValidatedMenuCard> {
+export async function saveValidatedMenu(ctx: Ctx, accountId: string, userId: string, proposal: MenuProposal, data: Awaited<ReturnType<typeof loadEngineData>>): Promise<ValidatedMenuCard> {
   const week = proposal.week;
   const batchWeekId = proposal.planId ? (data.weekIds.get(proposal.planId) ?? null) : null;
   const dishesForList: Dish[] = [];

@@ -79,7 +79,7 @@ function Form({ form, reload }: { form: DishForm; reload: () => void }) {
         </span>
         <div className={styles.doneTitle}>{saved} est dans vos plats</div>
         <p className={styles.lead}>Il entre dans « Mes plats » et dans vos prochains menus.</p>
-        <Link href="/courses/menu" className={styles.link}>
+        <Link href="/courses?menu=1" className={styles.link}>
           Préparer le menu ›
         </Link>
       </div>

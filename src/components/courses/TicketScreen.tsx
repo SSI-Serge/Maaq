@@ -1,13 +1,11 @@
 "use client";
 
-import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import { Suspense, useRef, useState } from "react";
-import { useApiMutation, useApiQuery } from "@/client/hooks";
+import { useApiMutation } from "@/client/hooks";
 import { AppShell } from "@/components/app/AppShell";
 import family from "@/components/family/family.module.css";
-import { Button, Loading, Notice, RetryNotice } from "@/components/ui";
-import type { TicketConfirmation, TicketMenuIdea, TicketReadResult } from "@/server/courses/tickets/service";
+import { Button, ButtonLink, Loading, Notice, RetryNotice } from "@/components/ui";
+import type { TicketConfirmation, TicketReadResult } from "@/server/courses/tickets/service";
 import { euro } from "./ListScreen";
 import styles from "./courses.module.css";
 import { DUPLICATE_MESSAGE, TIME_MISSING_MESSAGE, EMPTY_PHOTO_MESSAGE, READING_MESSAGE, READ_TIMEOUT_MS, SAVING_MESSAGE, UNREADABLE_MESSAGE, failureOf, savedMessage } from "./ticket-messages";
@@ -43,7 +41,6 @@ export function CoursesTicketScreen() {
 }
 
 function Flow() {
-  const wantMenu = useSearchParams().get("menu") === "1";
   const read = useApiMutation();
   const confirm = useApiMutation();
   const input = useRef<HTMLInputElement>(null);
@@ -116,14 +113,13 @@ function Flow() {
 
   if (read.error?.body?.code === "forbidden") return <Notice tone="info">L&apos;enregistrement des tickets est réservé aux deux parents du couple.</Notice>;
 
-  if (result) return <Done result={result} summary={summary} shared={shared} wantMenu={wantMenu} onAnother={reset} />;
+  if (result) return <Done result={result} summary={summary} shared={shared} onAnother={reset} />;
 
   if (!ticket) {
     return (
       <>
         <p className={styles.lead}>
           Photographiez votre ticket de caisse (jusqu&apos;à {MAX_PHOTOS} photos si le ticket est long). MAAQ lit les lignes, vous vérifiez, puis vous confirmez.
-          {wantMenu ? " Vous pourrez ensuite obtenir un menu avec ce que vous venez d'acheter." : ""}
         </p>
         <p className={family.hint}>La photo de votre ticket est supprimée une fois lue. Le nom et la carte de fidélité sont masqués avant la lecture.</p>
         <input ref={input} type="file" accept="image/*" capture="environment" multiple hidden aria-label="Photo du ticket" onChange={(e) => onFiles(e.target.files)} />
@@ -250,8 +246,7 @@ function Flow() {
   );
 }
 
-function Done({ result, summary, shared, wantMenu, onAnother }: { result: TicketConfirmation; summary: { store: string; date: string } | null; shared: boolean; wantMenu: boolean; onAnother: () => void }) {
-  const [showMenu, setShowMenu] = useState(wantMenu);
+function Done({ result, summary, shared, onAnother }: { result: TicketConfirmation; summary: { store: string; date: string } | null; shared: boolean; onAnother: () => void }) {
   if (result.duplicate) {
     return (
       <>
@@ -270,43 +265,19 @@ function Done({ result, summary, shared, wantMenu, onAnother }: { result: Ticket
         {shared ? " Les prix sont ajoutés, sans votre nom, à la base commune." : ""}
       </div>
       <p className={family.hint}>La photo a été supprimée.</p>
-      {!showMenu ? (
+      {result.menuIa && (
         <>
           <p className={styles.lead}>Voulez-vous un menu avec ce que vous venez d&apos;acheter ?</p>
-          <Button variant="ghost" onClick={() => setShowMenu(true)}>
+          <ButtonLink href="/courses?depuis=ticket" variant="ghost">
             Menu à partir de ce ticket
-          </Button>
+          </ButtonLink>
         </>
-      ) : (
-        result.receiptId && <Ideas receipt={result.receiptId} />
       )}
       <div style={{ marginTop: 12 }}>
         <button type="button" className={styles.link} onClick={onAnother}>
           Enregistrer un autre ticket
         </button>
       </div>
-    </>
-  );
-}
-
-function Ideas({ receipt }: { receipt: string }) {
-  const query = useApiQuery<{ ideas: TicketMenuIdea[] }>(`/api/courses/tickets/menu?ticket=${receipt}`);
-  if (query.loading && !query.data) return <Loading slow={query.slow} />;
-  if (query.error) return <RetryNotice message={query.error.message} onRetry={query.reload} />;
-  const ideas = query.data?.ideas ?? [];
-  if (!ideas.length) return <p className={styles.empty}>Aucun plat du catalogue ne correspond à ces achats pour l&apos;instant.</p>;
-  return (
-    <>
-      <p className={styles.lead}>Avec ce que vous venez d&apos;acheter :</p>
-      {ideas.map((i) => (
-        <div key={i.id} className={styles.dayCard}>
-          <div className={styles.lineName}>{i.name}</div>
-          <span className={styles.meta}>{i.missing.length ? `Reste à acheter : ${i.missing.join(", ")}` : "Tout est déjà acheté."}</span>
-        </div>
-      ))}
-      <Link href={`/courses/menu?plats=${ideas.slice(0, 2).map((i) => encodeURIComponent(i.id)).join(",")}`} className={styles.link}>
-        Choisir et préparer le menu ›
-      </Link>
     </>
   );
 }

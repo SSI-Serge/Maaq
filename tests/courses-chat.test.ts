@@ -7,10 +7,10 @@ import { listCourseMessages, sendCourseMessage } from "@/server/courses/chat/ser
 import { getSettings, saveSettings } from "@/server/courses/household/settings";
 import { myList } from "@/server/courses/list/mine";
 import { validateList } from "@/server/courses/list/service";
-import { menuPropose, menuStart, menuValidate } from "@/server/courses/menu/service";
 import { ensureCatalog } from "./helpers/courses-catalog";
 import { coupleFamily, type CoupleFamily } from "./helpers/couple";
 import { testDb } from "./helpers/fixtures";
+import { validateTestMenu } from "./helpers/menu";
 
 const db = testDb();
 const NOW = new Date(2026, 10, 6, 10, 0, 0);
@@ -85,9 +85,7 @@ describe("Tchat de l'agent Courses et repas", () => {
 
   it("« J'ai pris le lait et les œufs » coche les produits de la liste validée ; un produit absent est signalé ; l'historique du fil est repris", async () => {
     const f = await household();
-    const pick = (await menuStart(at(), f.sophie)).groups.flatMap((g) => g.dishes)[0];
-    const menu = await menuPropose(at(), f.sophie, { picks: [pick.id] });
-    await menuValidate(at(), f.sophie, { picks: [pick.id], dinners: menu.days.map((d) => d.dish.id), express: [] });
+    await validateTestMenu(db, f);
     await validateList(at(), f.sophie, {
       scenario: 1,
       lines: [
@@ -114,11 +112,11 @@ describe("Tchat de l'agent Courses et repas", () => {
   it("l'invité secondaire ajoute un produit mais l'outil refuse le budget et les écrans réservés au couple", async () => {
     const f = await household();
     const model = scripted(
-      useTools({ name: "ajouter_produit", input: { nom: "Essuie-tout" } }, { name: "chiffres_budget", input: {} }, { name: "ouvrir_ecran", input: { ecran: "menu" } }, { name: "ouvrir_ecran", input: { ecran: "ma_liste" } }),
-      reply("Voici : [[ecran:menu]] [[ecran:ma_liste]]"),
+      useTools({ name: "ajouter_produit", input: { nom: "Essuie-tout" } }, { name: "chiffres_budget", input: {} }, { name: "ouvrir_ecran", input: { ecran: "budget" } }, { name: "ouvrir_ecran", input: { ecran: "ma_liste" } }),
+      reply("Voici : [[ecran:budget]] [[ecran:ma_liste]]"),
     );
     const done = await say(f, "elodie", "Ajoute des essuie-tout, montre-moi le budget", model);
-    expect(done.reply).toBe("Voici : Menu de la semaine [[ecran:ma_liste]]");
+    expect(done.reply).toBe("Voici : Budget par rayon [[ecran:ma_liste]]");
     const results = JSON.stringify(model.seen[1].messages.at(-1));
     expect(results).toContain("réservé aux deux parents du couple");
     const item = await db.selectFrom("grocery_list_items").select("added_by_user_id").where("account_id", "=", f.accountId).where("name_key", "=", "essuie tout").executeTakeFirstOrThrow();

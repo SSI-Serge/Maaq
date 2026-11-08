@@ -4,13 +4,13 @@ import { budgetView } from "@/server/courses/budget";
 import { getSettings, saveSettings, setSharing } from "@/server/courses/household/settings";
 import { myList } from "@/server/courses/list/mine";
 import { validateList } from "@/server/courses/list/service";
-import { menuPropose, menuStart, menuValidate } from "@/server/courses/menu/service";
 import { setTicketReader, TicketReaderError, type TicketReader } from "@/server/courses/tickets/reader";
-import { confirmTicket, menuFromTicket, readTicket } from "@/server/courses/tickets/service";
+import { confirmTicket, lastReceiptProducts, readTicket } from "@/server/courses/tickets/service";
 import { normalizeDraft, setTicketStructurer } from "@/server/courses/tickets/structure";
 import { ensureCatalog } from "./helpers/courses-catalog";
 import { coupleFamily, type CoupleFamily } from "./helpers/couple";
 import { testDb } from "./helpers/fixtures";
+import { validateTestMenu } from "./helpers/menu";
 
 const db = testDb();
 const NOW = new Date(2026, 10, 6, 10, 0, 0);
@@ -103,9 +103,7 @@ describe("US-161 RF5 : confirmation", () => {
   it("enregistre le ticket, retire de la liste les produits trouvés, met le budget à jour ; un doublon n'est pas compté deux fois", async () => {
     const f = await household();
     // une liste validée avec du lait et des œufs
-    const pick = (await menuStart(at(), f.sophie)).groups.flatMap((g) => g.dishes)[0];
-    const menu = await menuPropose(at(), f.sophie, { picks: [pick.id] });
-    await menuValidate(at(), f.sophie, { picks: [pick.id], dinners: menu.days.map((d) => d.dish.id), express: [] });
+    await validateTestMenu(db, f);
     await validateList(at(), f.sophie, {
       scenario: 1,
       lines: [
@@ -162,28 +160,24 @@ describe("US-161 RF5 : confirmation", () => {
   });
 });
 
-describe("US-160 : menu à partir d'un ticket", () => {
-  it("propose des plats qui utilisent ce qui a été acheté, avec ce qui reste à acheter", async () => {
+describe("US-160 : menu à partir d'un ticket (point de départ du tchat)", () => {
+  it("l'IA reçoit seulement les noms des produits du dernier ticket : sans prix, magasin ni date ; remises écartées", async () => {
     const f = await household();
-    const done = await confirmTicket(at(), f.sophie, {
+    expect(await lastReceiptProducts(at(), f.accountId)).toEqual([]);
+    await confirmTicket(at(), f.sophie, { store: "Aldi", city: "Nantes", date: "2026-11-01", lines: [{ product: "Pain", reference: null, total: 1.2, qty: 1, aisle: "Crémerie" }] });
+    await confirmTicket(at(), f.sophie, {
       store: "Lidl",
       city: "Nantes",
       date: "2026-11-05",
+      time: "17:08:23",
       lines: [
         { product: "Poulet entier", reference: null, total: 7.5, qty: 1, aisle: "Volaille" },
         { product: "Poivrons", reference: null, total: 1.89, qty: 1, aisle: "Fruits et légumes" },
-        { product: "Riz long", reference: null, total: 2.15, qty: 1, aisle: "Féculents" },
+        { product: "Remise fidélité", reference: null, total: -0.5, qty: 1, aisle: "Autres" },
       ],
     });
-    const ideas = await menuFromTicket(at(), f.sophie, done.receiptId!);
-    expect(ideas.length).toBeGreaterThan(0);
-    expect(ideas.length).toBeLessThanOrEqual(3);
-    for (const idea of ideas) {
-      expect(idea.have.length).toBeGreaterThan(0);
-      expect(idea.have.length + idea.missing.length).toBeGreaterThanOrEqual(idea.have.length);
-    }
-    expect(ideas.some((i) => i.missing.length > 0)).toBe(true);
-    expect((await rejection(menuFromTicket(at(), f.sophie, "00000000-0000-0000-0000-000000000000"))).code).toBe("not_found");
-    expect((await rejection(menuFromTicket(at(), f.elodie, done.receiptId!))).status).toBe(403);
+    const names = await lastReceiptProducts(at(), f.accountId);
+    expect(names).toEqual(["Poulet entier", "Poivrons"]);
+    expect(JSON.stringify(names)).not.toMatch(/Lidl|Aldi|7,5|1,89|2026/);
   });
 });

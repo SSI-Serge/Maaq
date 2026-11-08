@@ -7,12 +7,12 @@ import { getSettings, saveSettings, setSharing } from "@/server/courses/househol
 import { fromDto } from "@/server/courses/list/dto";
 import { myList } from "@/server/courses/list/mine";
 import { prepareList, validateList } from "@/server/courses/list/service";
-import { menuPropose, menuStart, menuValidate } from "@/server/courses/menu/service";
 import { confirmTicket } from "@/server/courses/tickets/service";
 import { normalizeDraft } from "@/server/courses/tickets/structure";
 import { ensureCatalog } from "./helpers/courses-catalog";
 import { coupleFamily, type CoupleFamily } from "./helpers/couple";
 import { createProfile, testDb } from "./helpers/fixtures";
+import { validateTestMenu } from "./helpers/menu";
 
 const db = testDb();
 const NOW = new Date(2026, 10, 6, 10, 0, 0);
@@ -102,9 +102,7 @@ describe("Prix au kilo : tickets (CR-39)", () => {
   it("l'historique d'un produit pesé propose un « dernier acheté » au kilo, non totalisé", async () => {
     const f = await household();
     await confirmTicket(at(), f.sophie, { store: "Lidl", city: "Nantes", date: "2026-11-05", lines: [{ product: "Oignons", reference: "Vrac", total: 1.84, qty: 1, aisle: "Fruits et légumes", measured: 1.234, measureUnit: "kg" }] });
-    const pick = (await menuStart(at(), f.sophie)).groups.flatMap((g) => g.dishes)[0];
-    const menu = await menuPropose(at(), f.sophie, { picks: [pick.id] });
-    await menuValidate(at(), f.sophie, { picks: [pick.id], dinners: menu.days.map((d) => d.dish.id), express: [] });
+    await validateTestMenu(db, f);
     const model = fromDto((await prepareList(at(), f.sophie)).model!);
     const onions = model.items.find((i) => /oignon/i.test(i.name) && i.choices.some((c) => c.kind === "history"));
     expect(onions?.choices.find((c) => c.kind === "history")).toMatchObject({ priceUnit: "kg", price: 1.49, perUnit: { value: 1.49, unit: "kg" } });
@@ -114,9 +112,7 @@ describe("Prix au kilo : tickets (CR-39)", () => {
 describe("Prix au kilo : liste validée et Ma liste (CR-40)", () => {
   it("un article au kilo garde son unité, n'entre pas dans le total et s'affiche au kilo ; l'invité secondaire ne voit aucun prix", async () => {
     const f = await household();
-    const pick = (await menuStart(at(), f.sophie)).groups.flatMap((g) => g.dishes)[0];
-    const menu = await menuPropose(at(), f.sophie, { picks: [pick.id] });
-    await menuValidate(at(), f.sophie, { picks: [pick.id], dinners: menu.days.map((d) => d.dish.id), express: [] });
+    await validateTestMenu(db, f);
     await validateList(at(), f.sophie, {
       scenario: 1,
       lines: [
@@ -139,9 +135,7 @@ describe("Prix au kilo : liste validée et Ma liste (CR-40)", () => {
 
   it("les scénarios de la préparation comptent à part les articles au kilo", async () => {
     const f = await household();
-    const pick = (await menuStart(at(), f.sophie)).groups.flatMap((g) => g.dishes)[0];
-    const menu = await menuPropose(at(), f.sophie, { picks: [pick.id] });
-    await menuValidate(at(), f.sophie, { picks: [pick.id], dinners: menu.days.map((d) => d.dish.id), express: [] });
+    await validateTestMenu(db, f);
     const model = fromDto((await prepareList(at(), f.sophie)).model!);
     const scenarios = computeScenarios(model, {}, ["Lidl"]);
     for (const s of scenarios) expect(s.notTotaled).toBeGreaterThanOrEqual(0);

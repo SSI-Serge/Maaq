@@ -1,6 +1,6 @@
 import { allowed, deriveDishTags, estimateMinutes, has, norm, type Dish, type Profile } from "../engine";
 import type { EngineData } from "../menu/data";
-import { resolveWeek, weekLabel } from "../menu/service";
+import { resolveWeek, weekLabel } from "../menu/weeks";
 import { DINNER_COUNT, type DishInput, type MenuInput } from "./contract";
 
 /**

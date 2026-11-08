@@ -38,7 +38,7 @@ function ListFlow({ list, reload }: { list: ListPrepared; reload: () => void }) 
   if (!list.menu || !list.model) {
     return (
       <p className={styles.empty}>
-        Aucune liste à préparer pour l&apos;instant. <Link href="/courses/menu">Préparer le menu ›</Link>
+        Aucune liste à préparer pour l&apos;instant. <Link href="/courses?menu=1">Préparer le menu ›</Link>
       </p>
     );
   }

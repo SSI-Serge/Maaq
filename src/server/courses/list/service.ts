@@ -186,7 +186,7 @@ export async function prepareList(ctx: Ctx, session: SessionContext): Promise<Li
     express: entries.filter((e) => e.kind === "express").map((e) => ({ name: e.dish_name, time: fmtMin(minutesOf(e)) })),
     recipes: entries
       .filter((e) => e.kind === "dinner" || e.kind === "express")
-      .map((e, i) => {
+      .map((e) => {
         const dish = dishOf(e);
         return {
           name: e.dish_name,
@@ -195,11 +195,8 @@ export async function prepareList(ctx: Ctx, session: SessionContext): Promise<Li
           time: fmtMin(minutesOf(e)),
           ingredients: (dish?.ing ?? "").split(",").map((x) => x.trim()).filter(Boolean),
           steps: recipeSteps(dish?.recipe ?? ""),
-          // l'ordre d'affichage est celui du menu : dîners puis express
-          order: i,
         };
-      })
-      .map(({ order: _order, ...rest }) => rest),
+      }),
     batch,
   };
   // une liste validée avant la dernière validation du menu est à refaire (CR-45) : la page se rouvre

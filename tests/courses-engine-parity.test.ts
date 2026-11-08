@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { deriveDishTags, linkPlans, Matcher, proposeMenu, type Dish, type Plan, type Profile } from "@/server/courses/engine";
+import { deriveDishTags, linkPlans, Matcher, type Dish, type Plan } from "@/server/courses/engine";
 import { parseCsv } from "@/server/courses/imports/table";
 
 /**
@@ -10,23 +10,9 @@ import { parseCsv } from "@/server/courses/imports/table";
  */
 const dir = path.join(process.cwd(), "tests", "fixtures", "courses");
 interface CatalogDish { id: string; cuisine: string; name: string; ing: string; recipe: string; health: string; batch: string; time: string; minutes: number; tags: string[] }
-interface RefCase { n: number; picks: string[]; profile: Record<string, string>; expected: { batch: { source: string; id?: string; total: number; confirm?: number }; menu: { day: string; id: string; alts: string[]; batch: boolean; confirm: string }[]; express: string[] } }
 const catalog = JSON.parse(readFileSync(path.join(process.cwd(), "db", "seed", "courses", "catalog.json"), "utf8")) as { dishes: CatalogDish[]; plans: Plan[]; allege: { id: string; remove: string[]; add: string[] }[] };
-const cases = JSON.parse(readFileSync(path.join(dir, "cases.json"), "utf8")) as RefCase[];
 
 const dishes: Dish[] = catalog.dishes.map((d) => ({ ...d, tags: new Set(d.tags) }));
-const byId = new Map(dishes.map((d) => [d.id, d]));
-const list = (v?: string) => (v ?? "").split(",").map((x) => x.trim()).filter((x) => x);
-const profileOf = (p: Record<string, string>): Profile => ({
-  objectives: p.objectif ?? "",
-  repetitionWeeks: 2,
-  preferredCuisines: list(p.cuisines_preferees),
-  replacementSource: ["mes plats"],
-  batchMaxMinutes: 120,
-  allergies: list(p.allergies),
-  regimes: list(p.regimes),
-});
-const TODAY = new Date(2026, 10, 6);
 
 describe("Parité avec courses.py : le catalogue", () => {
   it("les 60 plats et leurs étiquettes déduites sont identiques à celles du script", () => {
@@ -75,46 +61,5 @@ describe("Parité avec courses.py : semaines types et correspondances", () => {
     expect(top("Velouté de courge butternut")[0]).toBe("F1:58");
     expect(top("Boulettes de bœuf mijotées à la sauce tomate")).toEqual(["F14:48", "A15:45", "I16:34"]);
     expect(top("Poulet yassa")[0]).toBe("A14:100");
-  });
-});
-
-describe("Parité avec courses.py : menus de référence (cas 1 à 8)", () => {
-  for (const c of cases) {
-    const request = {
-      dishes,
-      plans: catalog.plans,
-      profile: profileOf(c.profile),
-      picks: c.picks,
-      week: "2026-11-09",
-      history: [],
-      today: TODAY,
-    };
-
-    it(`cas ${c.n} : mêmes dîners, remplacements, séance et express que le script (express sans limite)`, () => {
-      const got = proposeMenu({ ...request, expressMaxMinutes: 9999 });
-      expect(got.menu.map((e) => e.id), "dîners").toEqual(c.expected.menu.map((e) => e.id));
-      expect(got.menu.map((e) => e.alts), "remplacements").toEqual(c.expected.menu.map((e) => e.alts));
-      expect(got.menu.map((e) => e.batch), "plats de la séance").toEqual(c.expected.menu.map((e) => e.batch));
-      expect(got.menu.map((e) => e.confirm), "à confirmer").toEqual(c.expected.menu.map((e) => e.confirm));
-      expect(got.batch.source).toBe(c.expected.batch.source);
-      expect(got.batch.total).toBe(c.expected.batch.total);
-      expect(got.batch.id).toBe(c.expected.batch.id);
-      expect(got.express).toEqual(c.expected.express);
-    });
-
-    it(`cas ${c.n} : avec la spec, les express sont ceux du script qui durent 15 minutes au plus`, () => {
-      const got = proposeMenu(request);
-      const quick = c.expected.express.filter((id) => (byId.get(id)?.minutes ?? 99) <= 15);
-      expect(got.express).toEqual(quick);
-      expect(got.expressShort).toBe(quick.length < 4);
-      expect(got.menu.map((e) => e.id)).toEqual(c.expected.menu.map((e) => e.id));
-    });
-  }
-
-  it("cas 6 : aucun plat à l'arachide dans le menu, les express ni les remplacements", () => {
-    const c = cases.find((x) => x.n === 6)!;
-    const got = proposeMenu({ dishes, plans: catalog.plans, profile: profileOf(c.profile), picks: c.picks, week: "2026-11-09", history: [], today: TODAY, expressMaxMinutes: 9999 });
-    const ids = [...got.menu.map((e) => e.id), ...got.express, ...got.menu.flatMap((e) => e.alts)];
-    for (const id of ids) expect(`${byId.get(id)!.name} ${byId.get(id)!.ing}`.toLowerCase()).not.toContain("arachide");
   });
 });

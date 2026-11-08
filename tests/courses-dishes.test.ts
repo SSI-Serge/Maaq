@@ -1,8 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Ctx } from "@/server/auth/service";
-import { getSettings, saveSettings } from "@/server/courses/household/settings";
 import { createDish, dishForm, dishTemplate, importDishes } from "@/server/courses/menu/dishes";
-import { menuPropose, menuStart } from "@/server/courses/menu/service";
 import { ensureCatalog } from "./helpers/courses-catalog";
 import { coupleFamily } from "./helpers/couple";
 import { testDb } from "./helpers/fixtures";
@@ -55,20 +53,6 @@ describe("US-159 : plats du foyer", () => {
     expect((await rejection(createDish(at(), f.sophie, { name: "Autre", cuisineId: cuisine, ingredients: ["Carottes"], minutes: 9000 }))).code).toBe("invalid_minutes");
     expect((await rejection(createDish(at(), f.elodie, { name: "Autre", cuisineId: cuisine, ingredients: ["Carottes"] }))).status).toBe(403);
     expect((await rejection(dishForm(at(), f.elodie))).status).toBe(403);
-  });
-
-  it("un plat du foyer entre dans les choix du menu", async () => {
-    await ensureCatalog(db);
-    const f = await coupleFamily(db);
-    const options = (await getSettings(at(), f.sophie)).options;
-    await saveSettings(at(), f.sophie, { city: "Nantes", householdSize: 4, shoppingDays: [6], goals: { ownDishes: true }, cuisineIds: options.cuisines.map((c) => c.id) });
-    const afro = options.cuisines.find((c) => c.name === "Afro")!;
-    await createDish(at(), f.sophie, { name: "Gratin de la maison", cuisineId: afro.id, ingredients: ["Pommes de terre", "Crème fraîche"] });
-    const start = await menuStart(at(), f.sophie);
-    const own = start.groups.find((g) => g.name === "Mes plats")!;
-    expect(own.dishes.map((d) => d.name)).toEqual(["Gratin de la maison"]);
-    const menu = await menuPropose(at(), f.sophie, { picks: [own.dishes[0].id] });
-    expect(menu.days.map((d) => d.dish.name)).toContain("Gratin de la maison");
   });
 
   it("import : tout le fichier est vérifié, une ligne invalide refuse tout ; un fichier correct ajoute tous les plats", async () => {

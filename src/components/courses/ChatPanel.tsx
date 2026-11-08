@@ -43,7 +43,7 @@ function Rich({ text, couple }: { text: string; couple: boolean }) {
  * tickets. Le menu de la semaine se compose ici, en conversation : choix de 1 ou 2 plats de « Mes plats », échange libre avec l'IA, menu en carte avec « Valider le menu » (CR-42).
  * `startMenu` : compteur incrémenté par le bouton « Liste de courses et menu de la semaine » de l'accueil.
  */
-export function ChatPanel({ couple, startMenu = 0 }: { couple: boolean; startMenu?: number }) {
+export function ChatPanel({ couple, startMenu = 0, fromTicket = 0 }: { couple: boolean; startMenu?: number; fromTicket?: number }) {
   const history = useApiQuery<{ messages: CourseMessageView[] }>("/api/courses/chat");
   const send = useApiMutation();
   const validate = useApiMutation();
@@ -75,6 +75,16 @@ export function ChatPanel({ couple, startMenu = 0 }: { couple: boolean; startMen
       setShown(PAGE);
     }
   }, [startMenu]);
+
+  // « Menu à partir d'un ticket » : le tchat lance le menu avec les produits du dernier ticket (l'agent les lit lui-même, sans prix)
+  const lastTicket = useRef(0);
+  useEffect(() => {
+    if (fromTicket > lastTicket.current) {
+      lastTicket.current = fromTicket;
+      void submit("Composons le menu de la semaine prochaine à partir de ce que je viens d'acheter.");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fromTicket]);
 
   useEffect(() => {
     end.current?.scrollIntoView({ block: "end" });

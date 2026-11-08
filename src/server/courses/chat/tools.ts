@@ -8,6 +8,7 @@ import { euro } from "../console/util";
 import { env } from "@/server/env";
 import { randomUUID } from "node:crypto";
 import { loadSettings } from "../household/settings";
+import { lastReceiptProducts } from "../tickets/service";
 import { menuInput } from "../menu-ia/contract";
 import { loadMenuContext, type MenuContext } from "../menu-ia/context";
 import { buildProposal, type MenuProposal } from "../menu-ia/proposal";
@@ -112,6 +113,12 @@ export async function executeCourseTool(name: string, input: unknown, t: CourseT
         if (settings.missing.length) return fail("Erreur : les réglages du foyer ne sont pas complets. Invite à ouvrir l'écran de réglages avant de composer un menu.");
         t.menu.context = await loadMenuContext(ctx.db, t.accountId, settings, ctx.now);
         return ok(t.menu.context.text);
+      }
+      case "produits_achetes": {
+        const refused = menuRefusal(t);
+        if (refused) return fail(refused);
+        const names = await lastReceiptProducts(ctx, t.accountId);
+        return ok(names.length ? `Produits du dernier ticket enregistré (sans prix, magasin ni date) : ${names.join(" ; ")}.` : "Aucun ticket enregistré : demande à la personne ce qu'elle vient d'acheter.");
       }
       case "proposer_menu": {
         const refused = menuRefusal(t);

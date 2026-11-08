@@ -73,6 +73,12 @@ export const MENU_TOOLS = [
     input_schema: { type: "object", properties: {}, additionalProperties: false },
   },
   {
+    name: "produits_achetes",
+    description:
+      "Donne les NOMS des produits du dernier ticket de caisse enregistré (sans prix, magasin ni date), pour composer un menu à partir de ce que le foyer vient d'acheter. À appeler quand la personne veut un menu « avec ce que j'ai acheté » ou après un ticket. Réservé aux parents du couple.",
+    input_schema: { type: "object", properties: {}, additionalProperties: false },
+  },
+  {
     name: "proposer_menu",
     description:
       "Rend le menu de la semaine à MAAQ, qui l'affiche en carte dans le tchat avec le bouton « Valider le menu ». 7 dîners (lundi à dimanche) et 4 plats express, tous respectant les régimes et allergies du foyer. Les cinq premiers dîners forment la séance de batch : donne leur déroulé dans `etapes`. Rappelle l'outil avec le menu COMPLET à chaque correction demandée. Réservé aux parents du couple.",

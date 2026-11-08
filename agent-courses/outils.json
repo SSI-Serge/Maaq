@@ -35,11 +35,11 @@
   },
   {
     "name": "ouvrir_ecran",
-    "description": "Donne le marqueur d'un écran de l'application, à recopier tel quel dans ta réponse à l'endroit où le lien doit apparaître. Écrans : menu (Menu de la semaine), liste (Liste de courses), ma_liste (Ma liste de courses), budget, reglages (Réglages du foyer), ticket (Enregistrer un ticket), ticket_menu (Menu à partir d'un ticket), plat (Nouveau plat). Un invité secondaire n'a accès qu'à liste et ma_liste.",
+    "description": "Donne le marqueur d'un écran de l'application, à recopier tel quel dans ta réponse à l'endroit où le lien doit apparaître. Écrans : liste (Liste de courses), ma_liste (Ma liste de courses), budget, reglages (Réglages du foyer), ticket (Enregistrer un ticket), plat (Nouveau plat). Un invité secondaire n'a accès qu'à liste et ma_liste.",
     "input_schema": {
       "type": "object",
       "properties": {
-        "ecran": { "type": "string", "enum": ["menu", "liste", "ma_liste", "budget", "reglages", "ticket", "ticket_menu", "plat"] }
+        "ecran": { "type": "string", "enum": ["liste", "ma_liste", "budget", "reglages", "ticket", "plat"] }
       },
       "required": ["ecran"],
       "additionalProperties": false

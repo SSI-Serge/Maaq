@@ -192,6 +192,6 @@ export async function listCourseMessages(ctx: Ctx, session: SessionContext): Pro
     const base = { id: String(r.id), role: r.sender === "agent" ? ("assistant" as const) : ("user" as const), at: r.created_at.toISOString() };
     const envelope = parseCard(text);
     if (!envelope) return { ...base, text };
-    return { ...base, text: "", card: cardView(String(r.id), envelope, weeks.slice(i + 1).includes(envelope.proposal.week), validated.has(envelope.proposal.week), addable.get(envelope.proposal.week) ?? []) };
+    return { ...base, text: "", card: cardView(String(r.id), envelope, decoded.some((other, k) => k !== i && BigInt(other.r.id) > BigInt(r.id) && weeks[k] === envelope.proposal.week), validated.has(envelope.proposal.week), addable.get(envelope.proposal.week) ?? []) };
   });
 }
