@@ -3,8 +3,16 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-08T23:30:00.000Z",
+  "updated": "2026-11-09T00:40:00.000Z",
   "deploys": [
+    {
+      "at": "2026-11-09T00:40:00.000Z",
+      "env": "preview",
+      "what": "Courses et repas : ancien écran Menu de la semaine retiré, Menu à partir d un ticket lancé dans le tchat avec les noms des produits achetés — rév. 00087",
+      "storyIds": [
+        "f21c5"
+      ]
+    },
     {
       "at": "2026-11-08T23:30:00.000Z",
       "env": "preview",

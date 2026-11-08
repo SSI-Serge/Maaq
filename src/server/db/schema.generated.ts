@@ -2104,6 +2104,12 @@ export interface MealMenuEntries {
   slot: number;
 }
 
+export interface MealMenuDailyCounters {
+  account_id: string;
+  menu_count: Generated<number>;
+  menu_date: Timestamp;
+}
+
 export interface MealMenuEntryIngredients {
   account_id: string;
   entry_id: Int8;
@@ -2840,6 +2846,7 @@ export interface DB {
   meal_light_version_items: MealLightVersionItems;
   meal_light_versions: MealLightVersions;
   meal_menu_entries: MealMenuEntries;
+  meal_menu_daily_counters: MealMenuDailyCounters;
   meal_menu_entry_ingredients: MealMenuEntryIngredients;
   meal_menu_entry_light_items: MealMenuEntryLightItems;
   meal_menu_session_steps: MealMenuSessionSteps;

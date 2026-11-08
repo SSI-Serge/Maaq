@@ -17,6 +17,8 @@ import { executeCourseTool, type CourseToolContext } from "./tools";
 export const FAILURE_REPLY = "Je n'ai pas pu traiter votre demande pour le moment. Vous pouvez réessayer dans un instant.";
 
 /** Menu non composé : deux essais invalides, ou l'IA ne répond pas (CR-44). */
+/** Plafond de menus du jour atteint (CR-44) : ce n'est pas une erreur, il n'y a rien à réessayer. */
+export const MENU_LIMIT_REPLY = "Vous avez atteint la limite de menus pour aujourd'hui : vous pourrez reprendre demain.";
 export const MENU_FAILURE_REPLY = "Je n'ai pas réussi à composer le menu pour le moment. Vous pouvez réessayer.";
 
 const tools = (): unknown[] => JSON.parse(readFileSync(path.join(process.env.COURSES_AGENT_DIR ?? path.join(process.cwd(), "agent-courses"), "outils.json"), "utf8")) as unknown[];
@@ -135,6 +137,11 @@ export async function runCourseAgent(input: CourseAgentInput): Promise<CourseAge
           results.push({ type: "tool_result", tool_use_id: use.id, content: outcome.content, ...(outcome.isError ? { is_error: true } : {}) });
         }
         messages.push({ role: "user", content: results });
+        if (input.tool.menu.limitReached) {
+          result.reply = MENU_LIMIT_REPLY;
+          result.status = "ok";
+          break;
+        }
         if (input.tool.menu.aborted) {
           result.reply = MENU_FAILURE_REPLY;
           result.status = "error";

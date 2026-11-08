@@ -141,6 +141,10 @@ export async function purgeExpired(ctx: Ctx): Promise<{ logbook: number; errorRe
     const done = await sql<{ n: string | null }>`select ${sql.ref(job)}() as n`.execute(ctx.db);
     database += Number(done.rows[0]?.n ?? 0);
   }
+  // Lot 14 (Courses et repas) : menus de plus de 12 mois, tickets au-delà de 3 ans, produits achetés, journal des produits à référencer, compteurs de menus de plus de 7 jours.
+  // Une base qui n'a pas encore reçu le lot 14 n'a pas la fonction : on ne l'appelle alors pas (la purge des autres données continue).
+  const grocery = await sql<{ n: string | null }>`select case when to_regprocedure('purge_expired_grocery_data()') is null then null else purge_expired_grocery_data() end as n`.execute(ctx.db);
+  database += Number(grocery.rows[0]?.n ?? 0);
   return {
     logbook: Number(logbook.rows[0]?.n ?? 0),
     errorReports: Number(reports.rows[0]?.n ?? 0),

@@ -6899,6 +6899,32 @@ CREATE CONSTRAINT TRIGGER trg_meal_menus_session_steps_check AFTER UPDATE OF bat
   DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION meal_menu_session_steps_check();
 COMMENT ON FUNCTION meal_menu_session_steps_check() IS $$Contrôle différé : un menu qui reprend une semaine type (batch_week_id renseigné) n'a aucune étape de déroulé enregistrée, son déroulé étant celui du planning. [US-156 RF6bis, CR-47]$$;
 
+-- Plafond de menus complets par foyer et par jour (CR-44, US-156 RF12ter) : un compteur par foyer et par jour, sans autre donnée que le compte
+CREATE TABLE meal_menu_daily_counters (
+  account_id  uuid NOT NULL REFERENCES accounts (id) ON DELETE CASCADE,
+  menu_date   date NOT NULL,
+  menu_count  smallint NOT NULL DEFAULT 0 CHECK (menu_count >= 0),
+  PRIMARY KEY (account_id, menu_date)
+);
+COMMENT ON TABLE meal_menu_daily_counters IS $$Nombre de menus complets composés par un foyer un jour donné, pour le plafond quotidien (réglage de la console meal_menu_daily_cap, 10 par défaut) : chaque menu proposé et chaque correction compte comme un menu. Aucune donnée personnelle hors le compte ; incrémenté seulement par register_meal_menu() ; purgé après 7 jours (purge_expired_grocery_data) ; effacé avec le compte. [US-156 RF12ter, CR-44]$$;
+COMMENT ON COLUMN meal_menu_daily_counters.menu_date IS $$Jour du décompte, calculé par l'application dans le fuseau du foyer [CR-44]$$;
+COMMENT ON COLUMN meal_menu_daily_counters.menu_count IS $$Menus complets déjà acceptés ce jour-là ; borné par le plafond, jamais au-dessus [CR-44]$$;
+
+-- Compte un menu complet d'un foyer et applique le plafond quotidien, de façon atomique (même principe que register_agent_request)
+CREATE FUNCTION register_meal_menu(p_account uuid, p_day date, p_cap integer DEFAULT NULL) RETURNS boolean LANGUAGE plpgsql AS $$
+DECLARE v_cap integer; v_count integer;
+BEGIN
+  v_cap := LEAST(COALESCE(p_cap, grocery_setting_int('meal_menu_daily_cap', 10)), 32000);
+  IF v_cap < 1 THEN RETURN false; END IF;
+  INSERT INTO meal_menu_daily_counters AS c (account_id, menu_date, menu_count)
+       VALUES (p_account, p_day, 1)
+  ON CONFLICT (account_id, menu_date) DO UPDATE SET menu_count = c.menu_count + 1
+        WHERE c.menu_count < v_cap
+  RETURNING c.menu_count INTO v_count;
+  RETURN v_count IS NOT NULL;
+END $$;
+COMMENT ON FUNCTION register_meal_menu(uuid, date, integer) IS $$Compte un menu complet d'un foyer pour un jour et applique le plafond quotidien : true = accepté (le compteur est incrémenté), false = plafond atteint (rien n'est compté). Le plafond est le paramètre ou, s'il est vide, le réglage de la console meal_menu_daily_cap (10 par défaut). Atomique : deux demandes simultanées ne dépassent jamais le plafond. [US-156 RF12ter, CR-44]$$;
+
 -- Un plat libre a au moins un ingrédient : contrôle différé à la fin de la transaction (la ligne de menu et ses ingrédients s'écrivent ensemble)
 CREATE FUNCTION meal_menu_entry_needs_ingredient() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE v_entry bigint;
@@ -7458,9 +7484,12 @@ BEGIN
   DELETE FROM grocery_shared_prices
    WHERE week_start < current_date - make_interval(months => grocery_setting_int('grocery_check_window_months', 12));
   GET DIAGNOSTICS v_n = ROW_COUNT; v_total := v_total + v_n;
+  -- Compteurs du plafond quotidien de menus : 7 jours (CR-44)
+  DELETE FROM meal_menu_daily_counters WHERE menu_date < current_date - 7;
+  GET DIAGNOSTICS v_n = ROW_COUNT; v_total := v_total + v_n;
   RETURN v_total;
 END $$;
-COMMENT ON FUNCTION purge_expired_grocery_data() IS $$Supprime les menus validés de plus de 12 mois, les tickets (avec leurs lignes) antérieurs à l'année en cours moins deux, les produits achetés de la liste de plus de 3 mois (et les listes validées devenues vides), les entrées du journal des produits à référencer de plus de 12 mois, les preuves de consentement arrivées à échéance, et les lignes de la base commune des prix de plus de 12 mois (réglage de la fenêtre grocery_check_window_months ; le catalogue n'est pas concerné). Les durées sont des réglages de la console (à confirmer par le DPO, CR-26). À planifier chaque jour. [CR-23, CR-35]$$;
+COMMENT ON FUNCTION purge_expired_grocery_data() IS $$Supprime les menus validés de plus de 12 mois, les tickets (avec leurs lignes) antérieurs à l'année en cours moins deux, les produits achetés de la liste de plus de 3 mois (et les listes validées devenues vides), les entrées du journal des produits à référencer de plus de 12 mois, les preuves de consentement arrivées à échéance, les lignes de la base commune des prix de plus de 12 mois (réglage de la fenêtre grocery_check_window_months ; le catalogue n'est pas concerné) et les compteurs du plafond quotidien de menus de plus de 7 jours. Les durées sont des réglages de la console (à confirmer par le DPO, CR-26). À planifier chaque jour. [CR-23, CR-35, CR-44]$$;
 
 -- ---------------------------------------------------------------------
 -- Sécurité par ligne des données du foyer (activée, non forcée ; variable de session app.user_id) : le couple a tout, l'invité secondaire lit la liste et
@@ -7502,6 +7531,9 @@ CREATE POLICY meal_menu_entry_light_items_couple ON meal_menu_entry_light_items
 ALTER TABLE meal_menu_session_steps ENABLE ROW LEVEL SECURITY;
 CREATE POLICY meal_menu_session_steps_couple ON meal_menu_session_steps
   USING (account_id = (SELECT grocery_couple_account())) WITH CHECK (account_id = (SELECT grocery_couple_account()));
+ALTER TABLE meal_menu_daily_counters ENABLE ROW LEVEL SECURITY;
+CREATE POLICY meal_menu_daily_counters_couple ON meal_menu_daily_counters
+  USING (account_id = (SELECT grocery_couple_account())) WITH CHECK (account_id = (SELECT grocery_couple_account()));
 ALTER TABLE meal_light_choices ENABLE ROW LEVEL SECURITY;
 CREATE POLICY meal_light_choices_couple ON meal_light_choices
   USING (account_id = (SELECT grocery_couple_account())) WITH CHECK (account_id = (SELECT grocery_couple_account()));
@@ -7534,6 +7566,7 @@ ALTER TABLE grocery_shared_prices ENABLE ROW LEVEL SECURITY;
 -- (en centimes pour les bornes absolues), durées de conservation
 INSERT INTO platform_settings (setting_key, value_type, value_text, min_value, max_value, description) VALUES
   ('meal_session_cap_minutes',          'integer', '120',   30, 600,      $$Plafond de la séance de batch cooking du dimanche, en minutes ; avec l'objectif « temps », seules les semaines sous ce plafond sont retenues, sinon l'alerte « Séance au-dessus de 2 h » (US-156 RF5, RT3)$$),
+  ('meal_menu_daily_cap',               'integer', '10',    1,  100,      $$Nombre maximum de menus complets composés par un foyer et par jour, corrections comprises ; au-delà, l'agent invite à reprendre le lendemain (US-156 RF12ter, CR-44)$$),
   ('meal_repeat_weeks_default',         'integer', '2',     1,  4,        $$Nombre de semaines avant qu'un plat revienne, par défaut, pour les foyers qui n'ont pas choisi (US-153 RF2, US-156 RT3)$$),
   ('meal_match_sure_pct',               'integer', '80',    1,  100,      $$Pourcentage de correspondance à partir duquel un plat de planning est « sûr » (US-171 RF1)$$),
   ('meal_match_check_pct',              'integer', '40',    1,  99,       $$Pourcentage de correspondance à partir duquel un plat de planning est « à confirmer » ; en dessous il est « absent » et bloque sa semaine (US-171 RF1)$$),

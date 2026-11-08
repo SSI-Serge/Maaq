@@ -5,6 +5,10 @@ import { courseError, requireAccess, type CourseAccess } from "../household/sett
 import { setBought } from "../list/mine";
 import { addProduct } from "../list/service";
 import { euro } from "../console/util";
+import { sql } from "kysely";
+import { asProfile } from "@/server/assistant/outings/profile";
+import { familyTimeZone } from "@/server/assistant/reminders";
+import { localDay } from "@/server/chat/service";
 import { env } from "@/server/env";
 import { randomUUID } from "node:crypto";
 import { loadSettings } from "../household/settings";
@@ -32,7 +36,7 @@ export interface CourseToolContext {
   /** Marqueurs d'écran donnés dans cette demande. */
   opened: Set<string>;
   /** Menu composé par l'IA dans cette demande (CR-42). */
-  menu: { invalid: number; aborted: boolean; proposal: MenuProposal | null; context: MenuContext | null };
+  menu: { invalid: number; aborted: boolean; limitReached: boolean; proposal: MenuProposal | null; context: MenuContext | null };
 }
 
 export interface ToolOutcome {
@@ -132,6 +136,11 @@ export async function executeCourseTool(name: string, input: unknown, t: CourseT
         }
         const built = buildProposal(parsed.data, { data: t.menu.context.data, cuisines: t.menu.context.cuisines, householdSize: t.menu.context.householdSize, now: ctx.now, newId: randomUUID });
         if (!built.ok) return invalidMenu(t, built.errors);
+        // plafond de menus complets par foyer et par jour, corrections comprises (CR-44) : seul un menu valide est compté
+        if (!(await registerMenu(t))) {
+          t.menu.limitReached = true;
+          return fail("Erreur : la limite de menus du jour est atteinte pour ce foyer. Dis seulement qu'il pourra reprendre demain.");
+        }
         t.menu.proposal = built.proposal;
         return ok(menuSummary(built.proposal));
       }
@@ -151,6 +160,13 @@ export async function executeCourseTool(name: string, input: unknown, t: CourseT
     if (e.code && typeof e.message === "string" && (e as { status?: number }).status) return fail(`Erreur : ${e.message}`);
     throw error;
   }
+}
+
+/** Compte un menu pour le foyer et le jour (fuseau de la famille) ; faux si le plafond du jour est atteint. Atomique côté base (register_meal_menu). */
+async function registerMenu(t: CourseToolContext): Promise<boolean> {
+  const day = localDay(t.ctx.now, await familyTimeZone(t.ctx.db, t.accountId));
+  const row = await asProfile(t.ctx.db, t.session.user.id, async (trx) => (await sql<{ ok: boolean }>`select register_meal_menu(${t.accountId}::uuid, ${day}::date, null) as ok`.execute(trx)).rows[0]);
+  return row?.ok === true;
 }
 
 function menuRefusal(t: CourseToolContext): string | null {
@@ -188,7 +204,7 @@ export function menuSummary(p: MenuProposal): string {
 /** Contrôle d'accès commun aux outils. */
 export async function toolContext(ctx: Ctx, session: SessionContext): Promise<CourseToolContext> {
   const who = await requireAccess(ctx, session, "list");
-  return { ctx, session, access: who.access, accountId: who.accountId, opened: new Set(), menu: { invalid: 0, aborted: false, proposal: null, context: null } };
+  return { ctx, session, access: who.access, accountId: who.accountId, opened: new Set(), menu: { invalid: 0, aborted: false, limitReached: false, proposal: null, context: null } };
 }
 
 export { courseError };
