@@ -92,9 +92,25 @@ export interface CardView {
   messageId: string;
   proposal: MenuProposal;
   status: CardStatus;
+  /** Un menu est déjà validé pour cette semaine : « Valider » demande confirmation, la liste sera refaite (CR-45). */
+  replacesValidated: boolean;
 }
 
-export const cardView = (messageId: string, envelope: MenuCardEnvelope, newerSameWeek: boolean): CardView => ({ messageId, proposal: envelope.proposal, status: statusOf(envelope, newerSameWeek) });
+export const cardView = (messageId: string, envelope: MenuCardEnvelope, newerSameWeek: boolean, replacesValidated: boolean): CardView => ({
+  messageId,
+  proposal: envelope.proposal,
+  status: statusOf(envelope, newerSameWeek),
+  replacesValidated,
+});
+
+const localDay = (d: Date | string) => (typeof d === "string" ? d.slice(0, 10) : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`);
+
+/** Semaines (lundis) du foyer qui ont déjà un menu validé, parmi celles demandées. */
+export async function validatedWeeks(db: Kysely<DB>, accountId: string, weeks: string[]): Promise<Set<string>> {
+  if (!weeks.length) return new Set();
+  const rows = await db.selectFrom("meal_menus").select("week_start").where("account_id", "=", accountId).where("week_start", "in", weeks as never[]).execute();
+  return new Set(rows.map((r) => localDay(r.week_start as Date | string)));
+}
 
 /** Le menu proposé et pas encore validé le plus récent du fil, dans les dernières 24 h (résumé pour le modèle). */
 export async function menuInProgress(db: Kysely<DB>, conversationId: string, since: Date): Promise<MenuCardEnvelope | null> {

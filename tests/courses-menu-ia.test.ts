@@ -6,6 +6,8 @@ import { listCourseMessages, sendCourseMessage } from "@/server/courses/chat/ser
 import { getSettings, saveSettings } from "@/server/courses/household/settings";
 import { createDish, dishForm } from "@/server/courses/menu/dishes";
 import { menuInput, menuToolSchema } from "@/server/courses/menu-ia/contract";
+import { courseHome } from "@/server/courses/home";
+import { servingsNote, sessionText } from "@/components/courses/menu-text";
 import { validateMenuCard } from "@/server/courses/menu-ia/validate";
 import { minutesFromSteps, type ProposalStep } from "@/server/courses/menu-ia/proposal";
 import { ensureCatalog } from "./helpers/courses-catalog";
@@ -320,5 +322,34 @@ describe("CR-42 : le menu composé par l'IA", () => {
     expect((await rejection(validateMenuCard(at(), c.f.marc, done.card!.messageId))).code).toBe("card_not_found");
     expect((await rejection(validateMenuCard(at(), c.f.elodie, done.card!.messageId))).status).toBe(403);
     expect((await rejection(validateMenuCard(at(), c.f.sophie, "9999999"))).code).toBe("card_not_found");
+  });
+});
+
+describe("CR-42 : le menu dans le tchat (M3)", () => {
+  it("la carte sait si elle remplace un menu déjà validé pour la même semaine (CR-45) ; la nouvelle carte de la semaine validée reste ouverte", async () => {
+    const c = await household();
+    const first = await compose(c, fullMenu(c));
+    expect(first.done.card!.replacesValidated).toBe(false);
+    await validateMenuCard(at(), c.f.sophie, first.done.card!.messageId);
+    const second = await compose(c, fullMenu(c), "Un autre menu");
+    expect(second.done.card).toMatchObject({ status: "open", replacesValidated: true });
+    const view = (await listCourseMessages(at(), c.f.sophie)).filter((m) => m.card).map((m) => [m.card!.status, m.card!.replacesValidated]);
+    expect(view).toEqual([["validated", true], ["open", true]]);
+  });
+
+  it("textes de la carte : séance estimée ou semaine type, facteur pour plus de 4 personnes", () => {
+    const base = { planTheme: null, session: { minutes: 105, estimated: true, overCap: false, cap: 120, source: "formula" as const } };
+    expect(sessionText(base)).toBe("Dimanche · environ 1 h 45 (durée estimée), pour les dîners du lundi au vendredi. Samedi et dimanche : hors séance.");
+    expect(sessionText({ planTheme: "Sauce tomate & volaille", session: { ...base.session, minutes: 110, estimated: false, source: "plan" } })).toBe("Dimanche · 1 h 50 · semaine type « Sauce tomate & volaille », pour les dîners du lundi au vendredi. Samedi et dimanche : hors séance.");
+    expect(servingsNote(4)).toBeNull();
+    expect(servingsNote(null)).toBeNull();
+    expect(servingsNote(6)).toBe("Recettes pour 4 : multipliez par 1,5.");
+    expect(servingsNote(5)).toBe("Recettes pour 4 : multipliez par 1,25.");
+  });
+
+  it("l'accueil dit si le menu se compose en conversation : parents du couple seulement, quand MENU_IA est ouvert", async () => {
+    const c = await household();
+    expect((await courseHome(at(), c.f.sophie)).menuIa).toBe(true);
+    expect((await courseHome(at(), c.f.elodie)).menuIa).toBe(false);
   });
 });

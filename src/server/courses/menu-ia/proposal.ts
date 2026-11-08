@@ -57,8 +57,11 @@ export interface MenuProposal {
   express: ProposalDish[];
   /** Sept dîners : sans cela, pas de bouton « Valider le menu ». */
   complete: boolean;
-  /** Code de la semaine type reprise, ou vide. */
+  /** Code de la semaine type reprise, ou vide, et son thème. */
   planId: string | null;
+  planTheme: string | null;
+  /** Nombre de personnes à table : les recettes sont prévues pour 4 (facteur affiché). */
+  householdSize: number | null;
   /** Déroulé de la séance rédigé par l'IA (sans semaine type) ; avec une semaine type, celui du planning. */
   steps: ProposalStep[];
   planSteps: string[];
@@ -72,6 +75,7 @@ export interface MenuProposal {
 export interface ProposalContext {
   data: EngineData;
   cuisines: { id: number; name: string }[];
+  householdSize: number | null;
   now: Date;
   newId: () => string;
 }
@@ -241,6 +245,8 @@ export function buildProposal(input: MenuInput, ctx: ProposalContext): BuildResu
     express: express as ProposalDish[],
     complete: days.length === DINNER_COUNT,
     planId: plan && planMatches ? plan.id : null,
+    planTheme: plan && planMatches ? plan.theme : null,
+    householdSize: ctx.householdSize,
     steps: plan && planMatches ? [] : steps,
     planSteps: plan && planMatches ? plan.steps : [],
     session,

@@ -3,8 +3,16 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-07T17:00:00.000Z",
+  "updated": "2026-11-08T22:10:00.000Z",
   "deploys": [
+    {
+      "at": "2026-11-08T22:10:00.000Z",
+      "env": "preview",
+      "what": "Courses et repas : menu composé par l IA en conversation, première version côté serveur (outils, contrôles de MAAQ, carte de menu, validation avec plats libres) ; interrupteur MENU_IA fermé, rien d affiché à l écran pour l instant — rév. 00084",
+      "storyIds": [
+        "f21c5"
+      ]
+    },
     {
       "at": "2026-11-07T17:00:00.000Z",
       "env": "preview",

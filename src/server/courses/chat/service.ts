@@ -8,7 +8,7 @@ import { env } from "@/server/env";
 import { Rejection } from "@/server/http";
 import { decrypt, encrypt } from "@/server/security/crypto";
 import { courseError, loadSettings, requireAccess } from "../household/settings";
-import { cardView, hasNewerCard, isCard, menuInProgress, parseCard, saveMenuCard, summaryForModel, type CardView } from "../menu-ia/cards";
+import { cardView, isCard, menuInProgress, parseCard, saveMenuCard, summaryForModel, validatedWeeks, type CardView } from "../menu-ia/cards";
 import { runCourseAgent, type CourseAgentResult } from "./agent";
 import { toolContext } from "./tools";
 
@@ -151,7 +151,7 @@ export async function sendCourseMessage(ctx: Ctx, session: SessionContext, input
   let card: CardView | undefined;
   if (tool.menu.proposal) {
     const cardId = await saveMenuCard(ctx.db, conversation.id, tool.menu.proposal, new Date(answeredAt.getTime() + 1));
-    card = cardView(cardId, { card: "menu", proposal: tool.menu.proposal, validatedAt: null }, false);
+    card = cardView(cardId, { card: "menu", proposal: tool.menu.proposal, validatedAt: null }, false, (await validatedWeeks(ctx.db, who.accountId, [tool.menu.proposal.week])).size > 0);
   }
   return { requestId: input.requestId, reply: result.reply, failed: false, alreadyAnswered: false, card };
 }
@@ -167,7 +167,7 @@ export interface CourseMessageView {
 
 /** Messages récents du fil de ce profil (4 jours au plus), du plus ancien au plus récent. */
 export async function listCourseMessages(ctx: Ctx, session: SessionContext): Promise<CourseMessageView[]> {
-  await requireAccess(ctx, session, "list");
+  const who = await requireAccess(ctx, session, "list");
   const conversation = await ctx.db.selectFrom("agent_conversations").select("id").where("user_id", "=", session.user.id).where("agent_id", "=", await courseAgentId(ctx.db)).executeTakeFirst();
   if (!conversation) return [];
   const since = new Date(ctx.now.getTime() - COURSE_HISTORY_DAYS * 86_400_000);
@@ -182,10 +182,11 @@ export async function listCourseMessages(ctx: Ctx, session: SessionContext): Pro
     .execute();
   const decoded = rows.map((r) => ({ r, text: decrypt(r.content!, key()) }));
   const weeks = decoded.map((d) => parseCard(d.text)?.proposal.week ?? null);
+  const validated = await validatedWeeks(ctx.db, who.accountId, [...new Set(weeks.filter((w): w is string => !!w))]);
   return decoded.map(({ r, text }, i): CourseMessageView => {
     const base = { id: String(r.id), role: r.sender === "agent" ? ("assistant" as const) : ("user" as const), at: r.created_at.toISOString() };
     const envelope = parseCard(text);
     if (!envelope) return { ...base, text };
-    return { ...base, text: "", card: cardView(String(r.id), envelope, weeks.slice(i + 1).includes(envelope.proposal.week)) };
+    return { ...base, text: "", card: cardView(String(r.id), envelope, weeks.slice(i + 1).includes(envelope.proposal.week), validated.has(envelope.proposal.week)) };
   });
 }

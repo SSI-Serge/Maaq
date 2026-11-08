@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { useApiQuery } from "@/client/hooks";
 import { AppShell } from "@/components/app/AppShell";
 import family from "@/components/family/family.module.css";
@@ -38,6 +39,8 @@ export function CoursesHomeScreen() {
 
 function Home({ home }: { home: CourseHome }) {
   const couple = home.access === "couple";
+  // menu composé en conversation (MENU_IA ouvert) : le premier parcours ouvre le tchat plutôt que l'ancien écran
+  const [startMenu, setStartMenu] = useState(0);
   const paths = couple ? PATHS.filter((p) => p.ready) : [{ label: "Ajouter un produit", href: "/courses/liste", ready: true, couple: false }, { label: "Voir ma liste de courses", href: "/courses/ma-liste", ready: true, couple: false }];
   return (
     <>
@@ -88,14 +91,27 @@ function Home({ home }: { home: CourseHome }) {
       )}
 
       <nav aria-label="Parcours" className={family.form}>
-        {paths.map((p) => (
+        {paths.map((p) =>
+          home.menuIa && p.href === "/courses/menu" ? (
+            <button
+              key={p.label}
+              type="button"
+              onClick={() => setStartMenu((n) => n + 1)}
+              className={styles.scenarioCard}
+              style={{ minHeight: 44, background: "var(--primary)", borderColor: "var(--primary)", color: "var(--primary-ink)", textAlign: "left", cursor: "pointer" }}
+            >
+              <span>{p.label}</span>
+              <span aria-hidden="true">›</span>
+            </button>
+          ) : (
           <Link key={p.label} href={p.href} className={styles.scenarioCard} style={{ minHeight: 44, borderColor: "var(--primary)", color: "var(--primary)" }}>
             <span>{p.label}</span>
             <span aria-hidden="true">›</span>
           </Link>
-        ))}
+          ),
+        )}
       </nav>
-      <ChatPanel couple={couple} />
+      <ChatPanel couple={couple} startMenu={startMenu} />
     </>
   );
 }

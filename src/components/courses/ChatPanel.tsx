@@ -4,10 +4,19 @@ import Link from "next/link";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { useApiMutation, useApiQuery } from "@/client/hooks";
 import family from "@/components/family/family.module.css";
-import { Button, Notice } from "@/components/ui";
+import { Button, Notice, RetryNotice } from "@/components/ui";
 import { SCREENS, type ScreenKey } from "@/server/courses/chat/screens";
 import type { CourseMessageView, CourseReply } from "@/server/courses/chat/service";
+import type { CardView } from "@/server/courses/menu-ia/cards";
+import type { ValidatedMenuCard } from "@/server/courses/menu-ia/validate";
+import type { OwnDish } from "@/server/courses/menu/dishes";
+import { MenuCard } from "./MenuCard";
 import styles from "./courses.module.css";
+
+/** Un menu complet demande plus de 15 s : délai long avant le message de connexion lente (CC-3), comme pour la lecture des tickets. */
+const CHAT_TIMEOUT_MS = 110_000;
+const PAGE = 10;
+const MENU_WORDS = /menu|plat|d[iî]ner|express|remplace|chang|semaine|batch|s[eé]ance|recette/i;
 
 /** Texte d'une réponse de l'agent : les marqueurs `[[ecran:nom]]` deviennent des liens vers les écrans de l'application. */
 function Rich({ text, couple }: { text: string; couple: boolean }) {
@@ -30,37 +39,77 @@ function Rich({ text, couple }: { text: string; couple: boolean }) {
 
 /**
  * Tchat de l'agent « Courses et repas » (CR-Tchat) : bandeau « Vous échangez avec une IA », fil des échanges (4 jours), zone de saisie et bouton appareil photo vers l'écran des
- * tickets. L'agent ne calcule rien : il ajoute un produit, coche un achat, donne deux chiffres du budget et renvoie vers les écrans.
+ * tickets. Le menu de la semaine se compose ici, en conversation : choix de 1 ou 2 plats de « Mes plats », échange libre avec l'IA, menu en carte avec « Valider le menu » (CR-42).
+ * `startMenu` : compteur incrémenté par le bouton « Liste de courses et menu de la semaine » de l'accueil.
  */
-export function ChatPanel({ couple }: { couple: boolean }) {
+export function ChatPanel({ couple, startMenu = 0 }: { couple: boolean; startMenu?: number }) {
   const history = useApiQuery<{ messages: CourseMessageView[] }>("/api/courses/chat");
   const send = useApiMutation();
+  const validate = useApiMutation();
   const [text, setText] = useState("");
   const [pending, setPending] = useState<string | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const request = useRef<string>(crypto.randomUUID());
+  const lastText = useRef("");
   const end = useRef<HTMLDivElement>(null);
   const messages = history.data?.messages ?? [];
 
+  // parcours « Liste de courses et menu de la semaine » : 1 ou 2 plats de Mes plats, ou un plat écrit
+  const [starter, setStarter] = useState(false);
+  const [picks, setPicks] = useState<string[]>([]);
+  const [shown, setShown] = useState(PAGE);
+  const [validating, setValidating] = useState<string | null>(null);
+  const [validated, setValidated] = useState<ValidatedMenuCard | null>(null);
+  const own = useApiQuery<{ form: { dishes: OwnDish[] } }>(starter ? "/api/courses/dishes" : null);
+  const dishes = own.data?.form.dishes ?? [];
+  const lastStart = useRef(0);
+
+  useEffect(() => {
+    if (startMenu > lastStart.current) {
+      lastStart.current = startMenu;
+      setStarter(true);
+      setPicks([]);
+      setShown(PAGE);
+    }
+  }, [startMenu]);
+
   useEffect(() => {
     end.current?.scrollIntoView({ block: "end" });
-  }, [messages.length, pending]);
+  }, [messages.length, pending, starter]);
 
-  async function submit() {
-    const value = text.trim();
+  const hasOpenCard = messages.some((m) => m.card?.status === "open" || m.card?.status === "incomplete");
+  const menuIntent = starter || hasOpenCard || MENU_WORDS.test(pending ?? "");
+
+  async function submit(override?: string) {
+    const value = (override ?? text).trim();
     if (!value || send.pending) return;
+    lastText.current = value;
     setPending(value);
     setFailed(null);
-    const result = await send.run<CourseReply>("/api/courses/chat", { method: "POST", body: { requestId: request.current, text: value } });
+    const result = await send.run<CourseReply>("/api/courses/chat", { method: "POST", body: { requestId: request.current, text: value }, timeoutMs: CHAT_TIMEOUT_MS });
     setPending(null);
     if (result && !result.failed) {
       request.current = crypto.randomUUID();
       setText("");
+      setStarter(false);
       history.reload();
     } else if (result?.failed) {
       setFailed(result.reply);
     }
   }
+
+  async function validateCard(card: CardView) {
+    setValidating(card.messageId);
+    const response = await validate.run<{ result: ValidatedMenuCard }>("/api/courses/chat/menu", { method: "POST", body: { messageId: card.messageId } });
+    setValidating(null);
+    if (response) {
+      setValidated(response.result);
+      history.reload();
+    }
+  }
+
+  const error = failed ?? send.error?.message ?? null;
+  const retryable = failed !== null || send.error?.retryable === true;
 
   return (
     <section aria-label="Tchat Courses et repas" style={{ marginTop: 16 }}>
@@ -68,22 +117,68 @@ export function ChatPanel({ couple }: { couple: boolean }) {
         Vous échangez avec une IA. Ses réponses peuvent contenir des erreurs.
       </p>
       <div role="log" aria-live="polite" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {messages.map((m) => (
-          <div key={m.id} className={m.role === "user" ? undefined : styles.dayCard} style={m.role === "user" ? { alignSelf: "flex-end", maxWidth: "85%", padding: "8px 12px", borderRadius: "12px 12px 2px 12px", background: "var(--primary)", color: "var(--primary-ink)", fontSize: 14 } : { fontSize: 14, lineHeight: 1.4 }}>
-            {m.role === "user" ? m.text : <Rich text={m.text} couple={couple} />}
-          </div>
-        ))}
+        {messages.map((m) =>
+          m.card ? (
+            <MenuCard key={m.id} card={m.card} busy={validating === m.card.messageId} onValidate={(c) => void validateCard(c)} />
+          ) : (
+            <div key={m.id} className={m.role === "user" ? undefined : styles.dayCard} style={m.role === "user" ? { alignSelf: "flex-end", maxWidth: "85%", padding: "8px 12px", borderRadius: "12px 12px 2px 12px", background: "var(--primary)", color: "var(--primary-ink)", fontSize: 14 } : { fontSize: 14, lineHeight: 1.4 }}>
+              {m.role === "user" ? m.text : <Rich text={m.text} couple={couple} />}
+            </div>
+          ),
+        )}
+        {starter && !pending && (
+          <>
+            <div className={styles.dayCard} style={{ fontSize: 14, lineHeight: 1.45 }}>
+              {own.loading && !own.data
+                ? "On prépare le menu de la semaine prochaine ?"
+                : dishes.length
+                  ? "On prépare le menu de la semaine prochaine ? Choisissez 1 ou 2 plats pour cette semaine. Vous pouvez aussi écrire un autre plat."
+                  : "On prépare le menu de la semaine prochaine ? Quel plat vous ferait plaisir cette semaine ?"}
+            </div>
+            {dishes.length > 0 && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {dishes.slice(0, shown).map((d) => {
+                    const on = picks.includes(d.name);
+                    return (
+                      <button
+                        key={d.id}
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() => setPicks(on ? picks.filter((x) => x !== d.name) : picks.length >= 2 ? picks : [...picks, d.name])}
+                        style={{ minHeight: 36, padding: "0 12px", borderRadius: 100, fontSize: 12, fontWeight: 700, border: `1px solid ${on ? "var(--primary)" : "var(--line)"}`, background: on ? "var(--primary)" : "var(--bg-raised)", color: on ? "var(--primary-ink)" : "var(--ink)" }}
+                      >
+                        {d.name}
+                      </button>
+                    );
+                  })}
+                </div>
+                {shown < dishes.length && (
+                  <button type="button" className={styles.link} style={{ alignSelf: "flex-start", background: "none", border: "none", padding: "4px 0" }} onClick={() => setShown(shown + PAGE)}>
+                    Voir d&apos;autres plats ›
+                  </button>
+                )}
+                <span className={styles.meta}>{picks.length ? `${picks.length} plat${picks.length > 1 ? "s" : ""} choisi${picks.length > 1 ? "s" : ""} sur 2.` : "Touchez 1 ou 2 plats."}</span>
+                <Button onClick={() => void submit(`Composons le menu de la semaine prochaine en partant de : ${picks.join(" et ")}.`)} disabled={!picks.length} style={{ alignSelf: "flex-start" }}>
+                  Proposer le menu
+                </Button>
+              </div>
+            )}
+          </>
+        )}
         {pending && (
           <>
             <div style={{ alignSelf: "flex-end", maxWidth: "85%", padding: "8px 12px", borderRadius: "12px 12px 2px 12px", background: "var(--primary)", color: "var(--primary-ink)", fontSize: 14 }}>{pending}</div>
             <div className={styles.dayCard} role="status">
-              <span className={styles.meta}>Courses et repas écrit…</span>
+              <span className={styles.meta}>{menuIntent ? (send.slow ? "Je prépare votre menu… Toujours en cours…" : "Je prépare votre menu…") : "Courses et repas écrit…"}</span>
             </div>
           </>
         )}
         <div ref={end} />
       </div>
-      {(failed || send.error) && <Notice tone="error">{failed ?? send.error!.message}</Notice>}
+      {error && (retryable ? <RetryNotice message={error} onRetry={() => void submit(lastText.current)} /> : <Notice tone="error">{error}</Notice>)}
+      {validate.error && <Notice tone="error">{validate.error.message}</Notice>}
+      {validated && <p className={styles.banner}>Menu enregistré : {validated.listed} produit{validated.listed > 1 ? "s" : ""} dans votre liste de courses.</p>}
       <div className={styles.addRow} style={{ marginTop: 10 }}>
         <input
           className={family.input}

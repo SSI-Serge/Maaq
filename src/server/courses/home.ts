@@ -1,4 +1,5 @@
 import type { Ctx, SessionContext } from "@/server/auth/service";
+import { env } from "@/server/env";
 import { loadSettings, requireAccess, type CourseAccess } from "./household/settings";
 
 /** Accueil de l'agent « Courses et repas » (CR-Tchat) : ce qui est prêt, ce que l'autre parent a ajouté, le jour du budget. */
@@ -14,6 +15,8 @@ export interface CourseHome {
   /** Produits ajoutés par quelqu'un d'autre depuis la dernière validation : « Julien a ajouté du lait et du liquide vaisselle ». */
   addedByOthers: { by: string; names: string[] } | null;
   budgetDay: boolean;
+  /** Le menu se compose en conversation avec l'IA (MENU_IA ouvert) ; sinon l'ancien écran « Menu de la semaine » reste en place. */
+  menuIa: boolean;
 }
 
 const WEEKDAYS = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
@@ -46,5 +49,6 @@ export async function courseHome(ctx: Ctx, session: SessionContext): Promise<Cou
     list: summary,
     addedByOthers: others.length ? { by: [...new Set(others.map((o) => o.first_name))].join(" et "), names: others.map((o) => o.label) } : null,
     budgetDay: !!settings && ctx.now.getDate() === settings.budgetDay,
+    menuIa: couple && env().MENU_IA === "live",
   };
 }

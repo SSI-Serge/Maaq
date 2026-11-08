@@ -21,6 +21,7 @@ export interface MenuContext {
   text: string;
   data: EngineData;
   cuisines: { id: number; name: string }[];
+  householdSize: number | null;
 }
 
 export async function loadMenuContext(db: Kysely<DB>, accountId: string, settings: SettingsView, now: Date): Promise<MenuContext> {
@@ -62,7 +63,7 @@ export async function loadMenuContext(db: Kysely<DB>, accountId: string, setting
     `Produits du catalogue (écris les ingrédients avec ces noms quand c'est possible) : ${products.map((p) => p.name).join(" ; ")}`,
     "</foyer>",
   ];
-  return { text: lines.join("\n"), data, cuisines };
+  return { text: lines.join("\n"), data, cuisines, householdSize: settings.householdSize };
 }
 
 /** Pour les tests : les mots que le modèle ne doit jamais recevoir. */

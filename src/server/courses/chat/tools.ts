@@ -123,7 +123,7 @@ export async function executeCourseTool(name: string, input: unknown, t: CourseT
           if (settings.missing.length) return fail("Erreur : les réglages du foyer ne sont pas complets.");
           t.menu.context = await loadMenuContext(ctx.db, t.accountId, settings, ctx.now);
         }
-        const built = buildProposal(parsed.data, { data: t.menu.context.data, cuisines: t.menu.context.cuisines, now: ctx.now, newId: randomUUID });
+        const built = buildProposal(parsed.data, { data: t.menu.context.data, cuisines: t.menu.context.cuisines, householdSize: t.menu.context.householdSize, now: ctx.now, newId: randomUUID });
         if (!built.ok) return invalidMenu(t, built.errors);
         t.menu.proposal = built.proposal;
         return ok(menuSummary(built.proposal));
