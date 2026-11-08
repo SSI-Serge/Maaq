@@ -34,13 +34,16 @@ async function failure(promise: Promise<unknown>): Promise<Rejection> {
   throw new Error("un refus était attendu");
 }
 
-/** Lundi de la semaine en cours (heure de Paris, une heure de marge pour le début de semaine). */
+/** Jour civil à Paris (la semaine du bilan se compte à l'heure de Paris, pas en UTC : juste après minuit le lundi, les deux jours ne sont pas les mêmes). */
+const parisDay = (date: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris", year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
+
+/** Lundi de la semaine en cours, à l'heure de Paris. */
 function thisMonday(): string {
-  const d = new Date(Date.now() - 3_600_000);
-  const day = (d.getUTCDay() + 6) % 7;
-  return new Date(d.getTime() - day * 86_400_000).toISOString().slice(0, 10);
+  const day = parisDay(new Date());
+  const d = new Date(`${day}T12:00:00Z`);
+  return new Date(d.getTime() - ((d.getUTCDay() + 6) % 7) * 86_400_000).toISOString().slice(0, 10);
 }
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => parisDay(new Date());
 
 async function reviews(f: CoupleFamily) {
   const week = thisMonday();
@@ -132,7 +135,8 @@ describe("bilan de la semaine (US-144)", () => {
     await setTaskDone(at(), f.marc, done.id, true);
     const own = await createTask(at(), f.sophie, { title: "Inscription cantine", due: today() });
     await setTaskDone(at(), f.sophie, own.id, true);
-    const event = await seedEvent(db, f, { by: f.userIds.marc, title: "Dentiste de Léo" });
+    // le RDV vient de se terminer : par défaut il date de deux heures, donc de la semaine précédente pendant les deux premières heures du lundi
+    const event = await seedEvent(db, f, { by: f.userIds.marc, title: "Dentiste de Léo", startsInHours: -0.002, endsInHours: -0.001 });
     await setHeart(at(), f.sophie, { kind: "task", id: done.id }, true);
     await setHeart(at(), f.sophie, { kind: "event", id: event }, true);
 

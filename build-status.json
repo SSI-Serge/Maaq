@@ -3,8 +3,16 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-09T00:40:00.000Z",
+  "updated": "2026-11-09T01:00:00.000Z",
   "deploys": [
+    {
+      "at": "2026-11-09T01:00:00.000Z",
+      "env": "preview",
+      "what": "Courses et repas : plafond de 10 menus complets par foyer et par jour (corrections comprises, réglable en console) et purge quotidienne des données du lot 14 — rév. 00088",
+      "storyIds": [
+        "f21c5"
+      ]
+    },
     {
       "at": "2026-11-09T00:40:00.000Z",
       "env": "preview",
