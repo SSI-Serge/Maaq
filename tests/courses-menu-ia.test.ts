@@ -269,7 +269,7 @@ describe("CR-42 : le menu composé par l'IA", () => {
     const second = await compose(c, fullMenu(c), "Change le jeudi");
     expect(second.done.card!.status).toBe("open");
     const view = await listCourseMessages(at(), c.f.sophie);
-    const cards = view.filter((m) => m.card).map((m) => m.card!.status);
+    const cards = view.filter((m) => m.card).sort((x, y) => Number(BigInt(x.id) - BigInt(y.id))).map((m) => m.card!.status);
     expect(cards).toEqual(["replaced", "open"]);
     expect((await rejection(validateMenuCard(at(), c.f.sophie, first.done.card!.messageId))).code).toBe("menu_replaced");
     // le menu en cours est donné au modèle pour la correction suivante, par noms de plats seulement

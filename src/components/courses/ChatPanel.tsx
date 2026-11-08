@@ -3,15 +3,17 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Fragment, useEffect, useRef, useState } from "react";
-import { useApiMutation, useApiQuery } from "@/client/hooks";
+import { useApiMutation, useApiQuery, useStreamAction } from "@/client/hooks";
 import family from "@/components/family/family.module.css";
 import { Button, Notice, RetryNotice } from "@/components/ui";
 import { SCREENS, type ScreenKey } from "@/server/courses/chat/screens";
 import type { CourseMessageView, CourseReply } from "@/server/courses/chat/service";
 import type { CardView } from "@/server/courses/menu-ia/cards";
+import type { MenuProgress } from "@/server/courses/menu-ia/progress";
 import type { ValidatedMenuCard } from "@/server/courses/menu-ia/validate";
 import type { OwnDish } from "@/server/courses/menu/dishes";
 import { MenuCard } from "./MenuCard";
+import { DAY_LABELS } from "./menu-text";
 import styles from "./courses.module.css";
 
 /** Un menu complet demande plus de 15 s : délai long avant le message de connexion lente (CC-3), comme pour la lecture des tickets. */
@@ -45,7 +47,7 @@ function Rich({ text, couple }: { text: string; couple: boolean }) {
  */
 export function ChatPanel({ couple, startMenu = 0, fromTicket = 0 }: { couple: boolean; startMenu?: number; fromTicket?: number }) {
   const history = useApiQuery<{ messages: CourseMessageView[] }>("/api/courses/chat");
-  const send = useApiMutation();
+  const send = useStreamAction<CourseReply, MenuProgress>("/api/courses/chat", CHAT_TIMEOUT_MS);
   const validate = useApiMutation();
   const adding = useApiMutation();
   const router = useRouter();
@@ -99,7 +101,7 @@ export function ChatPanel({ couple, startMenu = 0, fromTicket = 0 }: { couple: b
     lastText.current = value;
     setPending(value);
     setFailed(null);
-    const result = await send.run<CourseReply>("/api/courses/chat", { method: "POST", body: { requestId: request.current, text: value }, timeoutMs: CHAT_TIMEOUT_MS });
+    const result = await send.run({ requestId: request.current, text: value });
     setPending(null);
     if (result && !result.failed) {
       request.current = crypto.randomUUID();
@@ -192,6 +194,16 @@ export function ChatPanel({ couple, startMenu = 0, fromTicket = 0 }: { couple: b
             <div style={{ alignSelf: "flex-end", maxWidth: "85%", padding: "8px 12px", borderRadius: "12px 12px 2px 12px", background: "var(--primary)", color: "var(--primary-ink)", fontSize: 14 }}>{pending}</div>
             <div className={styles.dayCard} role="status">
               <span className={styles.meta}>{menuIntent ? (send.slow ? "Je prépare votre menu… Toujours en cours…" : "Je prépare votre menu…") : "Courses et repas écrit…"}</span>
+              {send.progress && (send.progress.dinners.length > 0 || send.progress.express.length > 0) && (
+                <ol aria-label="Menu en cours d'écriture" style={{ margin: "6px 0 0", paddingLeft: 18, fontSize: 13, lineHeight: 1.5 }}>
+                  {send.progress.dinners.map((name, i) => (
+                    <li key={`d${i}`}>
+                      <span className={styles.meta}>{DAY_LABELS[i] ?? ""}</span> {name}
+                    </li>
+                  ))}
+                  {send.progress.express.length > 0 && <li style={{ listStyle: "none", marginLeft: -18 }} className={styles.meta}>Plats express : {send.progress.express.join(" · ")}</li>}
+                </ol>
+              )}
             </div>
           </>
         )}

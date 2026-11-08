@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { ApiError, apiRequest, newIdempotencyKey, type ApiRequestOptions } from "./api";
+import { postStream } from "./stream";
 
 /** État de la connexion de l'appareil (CC-4). */
 export function useOnline(): boolean {
@@ -272,4 +273,47 @@ function writeStorage(key: string, value: string | null): void {
   } catch {
     // stockage indisponible : la saisie reste en mémoire pour cette session
   }
+}
+
+export interface StreamActionState<R, P> {
+  run: (body: unknown) => Promise<R | undefined>;
+  pending: boolean;
+  slow: boolean;
+  error: ApiError | undefined;
+  /** Dernier état reçu au fil de l'eau (menu en cours d'écriture). */
+  progress: P | null;
+}
+
+/** Comme useApiMutation, pour une réponse en flux (menu au fil de l'eau) : l'état intermédiaire est rendu dans `progress` ; la demande n'est pas rejouée seule. */
+export function useStreamAction<R, P>(path: string, timeoutMs = 110_000): StreamActionState<R, P> {
+  const [pending, setPending] = useState(false);
+  const [slow, setSlow] = useState(false);
+  const [error, setError] = useState<ApiError>();
+  const [progress, setProgress] = useState<P | null>(null);
+  const inFlight = useRef(false);
+
+  const run = useCallback(
+    async (body: unknown) => {
+      if (inFlight.current) return undefined;
+      inFlight.current = true;
+      setPending(true);
+      setSlow(false);
+      setError(undefined);
+      setProgress(null);
+      try {
+        return await postStream<R, P>(path, body, { timeoutMs, onSlow: () => setSlow(true), onProgress: (p) => setProgress(p) });
+      } catch (err) {
+        setError(err instanceof ApiError ? err : new ApiError("server", String(err)));
+        return undefined;
+      } finally {
+        inFlight.current = false;
+        setPending(false);
+        setSlow(false);
+        setProgress(null);
+      }
+    },
+    [path, timeoutMs],
+  );
+
+  return { run, pending, slow, error, progress };
 }

@@ -9,6 +9,7 @@ import { Rejection } from "@/server/http";
 import { decrypt, encrypt } from "@/server/security/crypto";
 import { courseError, loadSettings, requireAccess } from "../household/settings";
 import { addableDishes, cardView, isCard, menuInProgress, parseCard, saveMenuCard, summaryForModel, validatedWeeks, type CardView } from "../menu-ia/cards";
+import type { MenuProgress } from "../menu-ia/progress";
 import { runCourseAgent, type CourseAgentResult } from "./agent";
 import { toolContext } from "./tools";
 
@@ -60,6 +61,8 @@ export interface CourseReply {
 
 export interface CourseDeps {
   model?: AssistantModel;
+  /** Menu au fil de l'eau (réponse en flux de l'écran). */
+  onProgress?: (progress: MenuProgress) => void;
 }
 
 export async function sendCourseMessage(ctx: Ctx, session: SessionContext, input: { requestId: string; text: string }, deps: CourseDeps = {}): Promise<CourseReply> {
@@ -136,6 +139,7 @@ export async function sendCourseMessage(ctx: Ctx, session: SessionContext, input
       // une carte de menu n'est pas du texte à relire : le menu en cours est donné au modèle par le contexte
       .filter((m) => !isCard(m.text)),
     deadlineMs: MODEL_TIMEOUT_MS,
+    onProgress: deps.onProgress,
   });
 
   if (result.status !== "ok") return { requestId: input.requestId, reply: result.reply, failed: true, alreadyAnswered: false };

@@ -5,6 +5,7 @@ import { describeError } from "@/server/safe-log";
 import { courseInstructions } from "../agent/instructions";
 import { env } from "@/server/env";
 import { MENU_TOOLS } from "../menu-ia/contract";
+import { menuProgress, type MenuProgress } from "../menu-ia/progress";
 import { SCREENS } from "./screens";
 import { executeCourseTool, type CourseToolContext } from "./tools";
 
@@ -67,6 +68,8 @@ export interface CourseAgentInput {
   deadlineMs?: number;
   /** Consignes de remplacement du dialogue (US-176, plus tard). */
   dialogue?: string | null;
+  /** Menu au fil de l'eau : rappelé chaque fois qu'un plat ou une étape de plus est écrit par le modèle. */
+  onProgress?: (progress: MenuProgress) => void;
 }
 
 export interface CourseAgentResult {
@@ -116,7 +119,22 @@ export async function runCourseAgent(input: CourseAgentInput): Promise<CourseAge
         result.status = "timeout";
         break;
       }
-      const response = await input.model.send({ system, tools: definition, messages });
+      let shown = "";
+      const response = await input.model.send(
+        { system, tools: definition, messages },
+        input.onProgress
+          ? {
+              onDelta: (delta) => {
+                if (delta.type !== "tool_input" || delta.name !== "proposer_menu") return;
+                const progress = menuProgress(delta.json);
+                const key = `${progress.dinners.length}/${progress.express.length}/${progress.steps}`;
+                if (key === shown) return;
+                shown = key;
+                input.onProgress!(progress);
+              },
+            }
+          : undefined,
+      );
       result.usage.inputTokens += response.usage.inputTokens;
       result.usage.outputTokens += response.usage.outputTokens;
       result.usage.cacheRead += response.usage.cacheRead;
