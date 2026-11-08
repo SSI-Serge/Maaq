@@ -383,17 +383,81 @@ CREATE TABLE meal_menu_entries (
   slot               smallint NOT NULL CHECK (slot BETWEEN 1 AND 7),
   -- Nom conservé tel qu'au moment de la validation : un plat retiré ou supprimé reste lisible dans l'historique (CR-25)
   dish_name          varchar(160) NOT NULL CHECK (btrim(dish_name) <> ''),
+  -- Origine du plat (CR-42) : catalog = plat du catalogue, household = plat de « Mes plats », ai = plat libre composé par l'IA (jamais dans le catalogue). Sans valeur par défaut :
+  -- l'application dit toujours d'où vient le plat.
+  dish_origin        text NOT NULL CHECK (dish_origin IN ('catalog', 'household', 'ai')),
   dish_id            bigint REFERENCES meal_dishes (id) ON DELETE SET NULL,
+  -- Plat de « Mes plats » : le plat choisi (origine household) ou la copie faite après la validation (origines ai et catalog, CR-42, CR-45)
   household_dish_id  uuid,
-  -- Plat remplacé dans la liste déroulante : sorti de la séance de batch
+  -- Contenu d'un plat libre, gardé avec le menu (CR-42) : cuisine, recette en texte, durée ; ses ingrédients sont dans meal_menu_entry_ingredients
+  cuisine_id         integer REFERENCES meal_cuisines (id) ON DELETE RESTRICT,
+  recipe             text,
+  duration_minutes   smallint CHECK (duration_minutes BETWEEN 1 AND 600),
+  -- Version allégée proposée par l'IA (texte et adaptation de la liste) pour un plat qui n'en a pas dans le catalogue ; light_chosen = retenue par le foyer
+  light_by_ai        boolean NOT NULL DEFAULT false,
+  light_text         text CHECK (light_text IS NULL OR btrim(light_text) <> ''),
+  light_chosen       boolean NOT NULL DEFAULT false,
+  -- Plat remplacé dans la liste déroulante : sorti de la séance de batch (inutilisé depuis CR-42)
   is_off_batch       boolean NOT NULL DEFAULT false,
-  -- Plat de planning rapproché du catalogue, correspondance à confirmer (US-156 RF7)
+  -- Plat de planning rapproché du catalogue, correspondance à confirmer (US-156 RF7, inutilisé depuis CR-42)
   planning_match_to_confirm boolean NOT NULL DEFAULT false,
+  UNIQUE (id, account_id),
+  UNIQUE (id, menu_id),
   UNIQUE (menu_id, kind, slot),
   CONSTRAINT ck_meal_menu_entries_slot CHECK (slot <= CASE kind WHEN 'pleasure' THEN 2 WHEN 'express' THEN 4 ELSE 7 END),
-  CONSTRAINT ck_meal_menu_entries_one_dish CHECK (num_nonnulls(dish_id, household_dish_id) <= 1),
+  CONSTRAINT ck_meal_menu_entries_origin CHECK (dish_origin = 'catalog' OR dish_id IS NULL),
+  CONSTRAINT ck_meal_menu_entries_free_dish CHECK ((dish_origin = 'ai' AND cuisine_id IS NOT NULL) OR (dish_origin <> 'ai' AND cuisine_id IS NULL AND recipe IS NULL AND duration_minutes IS NULL)),
+  CONSTRAINT ck_meal_menu_entries_light CHECK (light_by_ai = (light_text IS NOT NULL) AND (light_by_ai OR NOT light_chosen)),
   CONSTRAINT fk_meal_menu_entries_menu FOREIGN KEY (menu_id, account_id) REFERENCES meal_menus (id, account_id) ON DELETE CASCADE,
   CONSTRAINT fk_meal_menu_entries_household_dish FOREIGN KEY (household_dish_id, account_id) REFERENCES meal_household_dishes (id, account_id) ON DELETE SET NULL (household_dish_id)
+);
+-- Ingrédients d'un plat libre du menu (CR-42) : nom, clé normalisée, produit du catalogue s'il est reconnu. Conservés avec le menu, effacés avec lui.
+CREATE TABLE meal_menu_entry_ingredients (
+  id          bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  entry_id    bigint NOT NULL,
+  account_id  uuid NOT NULL REFERENCES accounts (id) ON DELETE CASCADE,
+  label       varchar(120) NOT NULL CHECK (btrim(label) <> ''),
+  name_key    text NOT NULL CHECK (name_key <> '' AND name_key = grocery_norm(name_key)),
+  -- Produit du catalogue reconnu par l'application ; vide si inconnu (la liste le prend sans prix, noté dans les produits à référencer)
+  product_id  bigint REFERENCES grocery_products (id) ON DELETE SET NULL,
+  position    smallint NOT NULL DEFAULT 1 CHECK (position >= 1),
+  UNIQUE (entry_id, name_key),
+  CONSTRAINT fk_meal_menu_entry_ingredients_entry FOREIGN KEY (entry_id, account_id) REFERENCES meal_menu_entries (id, account_id) ON DELETE CASCADE
+);
+-- Adaptation de la liste pour la version allégée proposée par l'IA : produits à retirer ou à ajouter
+CREATE TABLE meal_menu_entry_light_items (
+  id          bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  entry_id    bigint NOT NULL,
+  account_id  uuid NOT NULL REFERENCES accounts (id) ON DELETE CASCADE,
+  kind        text NOT NULL CHECK (kind IN ('remove', 'add')),
+  label       varchar(120) NOT NULL CHECK (btrim(label) <> ''),
+  name_key    text NOT NULL CHECK (name_key <> '' AND name_key = grocery_norm(name_key)),
+  product_id  bigint REFERENCES grocery_products (id) ON DELETE SET NULL,
+  UNIQUE (entry_id, kind, name_key),
+  CONSTRAINT fk_meal_menu_entry_light_items_entry FOREIGN KEY (entry_id, account_id) REFERENCES meal_menu_entries (id, account_id) ON DELETE CASCADE
+);
+-- Déroulé de la séance de batch rédigé par l'IA (CR-47, US-156 RF6bis, US-157 RF1ter) : étapes numérotées d'un menu qui ne reprend pas une semaine type
+CREATE TABLE meal_menu_session_steps (
+  id          bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  menu_id     uuid NOT NULL,
+  account_id  uuid NOT NULL REFERENCES accounts (id) ON DELETE CASCADE,
+  position    smallint NOT NULL CHECK (position >= 1),
+  body        text NOT NULL CHECK (btrim(body) <> '' AND length(body) <= 2000),
+  -- Plat concerné par l'étape (facultatif) : une ligne du même menu ; vide si la ligne de menu est remplacée
+  entry_id    bigint,
+  -- Durée approximative de l'étape, en minutes (facultative)
+  duration_minutes smallint CHECK (duration_minutes BETWEEN 1 AND 600),
+  -- Rang d'une étape PRÉCÉDENTE du même menu avec laquelle celle-ci se chevauche (« en même temps, pendant la cuisson ») : une étape en chevauchement n'allonge pas la séance (durée totale recalculée par l'application)
+  overlaps_position smallint CHECK (overlaps_position >= 1),
+  -- Conservation d'un plat (étape de fin de déroulé) : réfrigérateur ou congélateur, et jour où le sortir (jour ISO de la semaine du menu, 1 = lundi)
+  storage_mode text CHECK (storage_mode IN ('fridge', 'freezer')),
+  take_out_day smallint CHECK (take_out_day BETWEEN 1 AND 7),
+  UNIQUE (menu_id, position),
+  CONSTRAINT ck_meal_menu_session_steps_overlap CHECK (overlaps_position IS NULL OR overlaps_position < position),
+  CONSTRAINT ck_meal_menu_session_steps_storage CHECK (take_out_day IS NULL OR storage_mode IS NOT NULL),
+  CONSTRAINT fk_meal_menu_session_steps_menu FOREIGN KEY (menu_id, account_id) REFERENCES meal_menus (id, account_id) ON DELETE CASCADE,
+  CONSTRAINT fk_meal_menu_session_steps_entry FOREIGN KEY (entry_id, menu_id) REFERENCES meal_menu_entries (id, menu_id) ON DELETE SET NULL (entry_id),
+  CONSTRAINT fk_meal_menu_session_steps_overlap FOREIGN KEY (menu_id, overlaps_position) REFERENCES meal_menu_session_steps (menu_id, position) ON DELETE SET NULL (overlaps_position)
 );
 -- Version standard ou allégée choisie pour un plat, reprise au menu suivant (US-157 RF9)
 CREATE TABLE meal_light_choices (
@@ -611,6 +675,44 @@ BEGIN
     RAISE EXCEPTION 'Un plat personnel a au moins un ingrédient' USING ERRCODE = 'check_violation';
   END IF;
   RETURN NULL;
+END $$;
+-- Les étapes d'un déroulé écrit par l'IA n'existent que pour un menu sans semaine type : contrôle différé à la fin de la transaction (le menu est mis à jour, puis ses étapes remplacées)
+CREATE FUNCTION meal_menu_session_steps_check() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE v_menu uuid;
+BEGIN
+  IF TG_TABLE_NAME = 'meal_menus' THEN
+    v_menu := NEW.id;
+  ELSE
+    v_menu := NEW.menu_id;
+  END IF;
+  IF EXISTS (SELECT 1 FROM meal_menus WHERE id = v_menu AND batch_week_id IS NOT NULL)
+     AND EXISTS (SELECT 1 FROM meal_menu_session_steps WHERE menu_id = v_menu) THEN
+    RAISE EXCEPTION 'Un menu qui reprend une semaine type n''a pas de déroulé de séance enregistré : c''est celui du planning' USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NULL;
+END $$;
+-- Un plat libre a au moins un ingrédient : contrôle différé à la fin de la transaction (la ligne de menu et ses ingrédients s'écrivent ensemble)
+CREATE FUNCTION meal_menu_entry_needs_ingredient() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE v_entry bigint;
+BEGIN
+  IF TG_TABLE_NAME = 'meal_menu_entries' THEN
+    v_entry := NEW.id;
+  ELSE
+    v_entry := OLD.entry_id;
+  END IF;
+  IF EXISTS (SELECT 1 FROM meal_menu_entries WHERE id = v_entry AND dish_origin = 'ai')
+     AND NOT EXISTS (SELECT 1 FROM meal_menu_entry_ingredients WHERE entry_id = v_entry) THEN
+    RAISE EXCEPTION 'Un plat libre du menu a au moins un ingrédient' USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NULL;
+END $$;
+-- Une adaptation de version allégée n'existe que pour un plat dont l'IA a proposé une version allégée
+CREATE FUNCTION meal_menu_entry_light_item_before_write() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM meal_menu_entries WHERE id = NEW.entry_id AND light_by_ai) THEN
+    RAISE EXCEPTION 'Une adaptation allégée suppose une version allégée proposée par l''IA pour ce plat' USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NEW;
 END $$;
 CREATE FUNCTION grocery_list_item_before_write() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE v_user uuid := app_current_user_id();
@@ -979,6 +1081,15 @@ CREATE INDEX idx_meal_menus_validated_at ON meal_menus (validated_at);
 CREATE INDEX idx_meal_menu_entries_account ON meal_menu_entries (account_id);
 CREATE INDEX idx_meal_menu_entries_dish_id ON meal_menu_entries (dish_id) WHERE dish_id IS NOT NULL;
 CREATE INDEX idx_meal_menu_entries_household_dish ON meal_menu_entries (household_dish_id, account_id) WHERE household_dish_id IS NOT NULL;
+CREATE INDEX idx_meal_menu_entries_cuisine_id ON meal_menu_entries (cuisine_id) WHERE cuisine_id IS NOT NULL;
+CREATE INDEX idx_meal_menu_entry_ingredients_account ON meal_menu_entry_ingredients (account_id);
+CREATE INDEX idx_meal_menu_entry_ingredients_product_id ON meal_menu_entry_ingredients (product_id) WHERE product_id IS NOT NULL;
+CREATE INDEX idx_meal_menu_entry_light_items_account ON meal_menu_entry_light_items (account_id);
+CREATE INDEX idx_meal_menu_entry_light_items_product_id ON meal_menu_entry_light_items (product_id) WHERE product_id IS NOT NULL;
+-- Une seule étape de conservation par plat
+CREATE UNIQUE INDEX ux_meal_menu_session_steps_storage ON meal_menu_session_steps (entry_id) WHERE storage_mode IS NOT NULL AND entry_id IS NOT NULL;
+CREATE INDEX idx_meal_menu_session_steps_account ON meal_menu_session_steps (account_id);
+CREATE INDEX idx_meal_menu_session_steps_entry ON meal_menu_session_steps (entry_id, menu_id) WHERE entry_id IS NOT NULL;
 CREATE INDEX idx_meal_light_choices_dish_id ON meal_light_choices (dish_id);
 CREATE INDEX idx_grocery_lists_account ON grocery_lists (account_id, validated_at DESC);
 CREATE INDEX idx_grocery_lists_menu ON grocery_lists (menu_id, account_id) WHERE menu_id IS NOT NULL;
@@ -1015,6 +1126,16 @@ CREATE CONSTRAINT TRIGGER trg_meal_household_dishes_ingredient AFTER INSERT ON m
   DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION meal_household_dish_needs_ingredient();
 CREATE CONSTRAINT TRIGGER trg_meal_household_dish_ingredients_delete AFTER DELETE ON meal_household_dish_ingredients
   DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION meal_household_dish_needs_ingredient();
+CREATE CONSTRAINT TRIGGER trg_meal_menu_session_steps_check AFTER INSERT ON meal_menu_session_steps
+  DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION meal_menu_session_steps_check();
+CREATE CONSTRAINT TRIGGER trg_meal_menus_session_steps_check AFTER UPDATE OF batch_week_id ON meal_menus
+  DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION meal_menu_session_steps_check();
+CREATE CONSTRAINT TRIGGER trg_meal_menu_entries_ingredient AFTER INSERT OR UPDATE OF dish_origin ON meal_menu_entries
+  DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION meal_menu_entry_needs_ingredient();
+CREATE CONSTRAINT TRIGGER trg_meal_menu_entry_ingredients_delete AFTER DELETE ON meal_menu_entry_ingredients
+  DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION meal_menu_entry_needs_ingredient();
+CREATE TRIGGER trg_meal_menu_entry_light_items_before_write BEFORE INSERT OR UPDATE ON meal_menu_entry_light_items
+  FOR EACH ROW EXECUTE FUNCTION meal_menu_entry_light_item_before_write();
 CREATE TRIGGER trg_grocery_list_items_before_write BEFORE INSERT OR UPDATE ON grocery_list_items
   FOR EACH ROW EXECUTE FUNCTION grocery_list_item_before_write();
 CREATE TRIGGER trg_grocery_receipt_lines_measure BEFORE INSERT OR UPDATE ON grocery_receipt_lines
@@ -1061,6 +1182,15 @@ CREATE POLICY meal_menus_couple ON meal_menus
   USING (account_id = (SELECT grocery_couple_account())) WITH CHECK (account_id = (SELECT grocery_couple_account()));
 ALTER TABLE meal_menu_entries ENABLE ROW LEVEL SECURITY;
 CREATE POLICY meal_menu_entries_couple ON meal_menu_entries
+  USING (account_id = (SELECT grocery_couple_account())) WITH CHECK (account_id = (SELECT grocery_couple_account()));
+ALTER TABLE meal_menu_entry_ingredients ENABLE ROW LEVEL SECURITY;
+CREATE POLICY meal_menu_entry_ingredients_couple ON meal_menu_entry_ingredients
+  USING (account_id = (SELECT grocery_couple_account())) WITH CHECK (account_id = (SELECT grocery_couple_account()));
+ALTER TABLE meal_menu_entry_light_items ENABLE ROW LEVEL SECURITY;
+CREATE POLICY meal_menu_entry_light_items_couple ON meal_menu_entry_light_items
+  USING (account_id = (SELECT grocery_couple_account())) WITH CHECK (account_id = (SELECT grocery_couple_account()));
+ALTER TABLE meal_menu_session_steps ENABLE ROW LEVEL SECURITY;
+CREATE POLICY meal_menu_session_steps_couple ON meal_menu_session_steps
   USING (account_id = (SELECT grocery_couple_account())) WITH CHECK (account_id = (SELECT grocery_couple_account()));
 ALTER TABLE meal_light_choices ENABLE ROW LEVEL SECURITY;
 CREATE POLICY meal_light_choices_couple ON meal_light_choices
@@ -1215,14 +1345,37 @@ COMMENT ON COLUMN grocery_household_settings.share_prices IS $$Partage anonyme d
 COMMENT ON COLUMN grocery_household_settings.shopping_days IS $$Jours de courses (jours ISO, 1 = lundi), au moins un, sans doublon$$;
 COMMENT ON TABLE grocery_household_cuisines IS $$Cuisines préférées du foyer, parmi celles du catalogue ; aucune ligne = toutes. [US-153 RF2]$$;
 COMMENT ON TABLE grocery_household_stores IS $$Enseignes de proximité gardées par le foyer, chacune avec sa ville (« Lidl — Rezé ») : proposées d'après la ville du foyer par une recherche web (seuls la ville et le type de commerce partent), gardées ou retirées par le foyer. Servent au comparatif et à la lecture des prix des autres foyers. [US-153 RF3, US-154 RF3, CR-09, CR-21]$$;
-COMMENT ON TABLE grocery_household_dietary IS $$Régimes et allergies du foyer : donnée de santé, CHIFFRÉE par l'application, lue par MAAQ seul pour filtrer les plats (filtrage indicatif) et JAMAIS envoyée à l'agent ni lue par une vue ou une fonction destinée à l'agent. Réservée au couple. [US-153 RF2, RF4, RT2, US-156 RT2, CR-16]$$;
+COMMENT ON TABLE grocery_household_dietary IS $$Régimes et allergies du foyer : donnée de santé, CHIFFRÉE par l'application, lue par l'application seule : elle les déchiffre pour filtrer les plats connus (filtrage indicatif) et, depuis CR-43, les envoie à l'IA pour composer le menu, sans nom ni prénom (accord du DPO à obtenir avant la production). Aucune vue ni fonction de la base ne les lit. Réservée au couple. [US-153 RF2, RF4, RT2, US-156 RT2, CR-16, CR-43]$$;
 COMMENT ON TABLE grocery_household_city_sharing IS $$Inscription du foyer au compteur de sa ville, posée la première fois qu'il active le partage des prix (et déplacée s'il change de ville en partageant). Conservée quand le partage est désactivé ; supprimée avec le compte, ce qui fait baisser le compteur. Sert uniquement à tenir grocery_city_sharing ; jamais lue par une vue ni exposée. [CR-17, CR-22]$$;
 COMMENT ON TABLE meal_household_dishes IS $$Plat personnel du foyer : nom, cuisine, ingrédients (au moins un), durée et recette facultatives. Propre au foyer : ni validation par l'administrateur, ni entrée dans le catalogue commun, jamais proposé à un autre foyer. Peut porter le nom d'un plat du catalogue. Modifiable et supprimable par le couple. [US-159 RF1, RF3 à RF5, CR-04, CR-25]$$;
 COMMENT ON TABLE meal_household_dish_ingredients IS $$Ingrédients d'un plat personnel : nom saisi, clé normalisée, produit du catalogue s'il est reconnu. Aucune quantité par ingrédient. Un plat personnel a au moins un ingrédient (contrôlé à la validation de la transaction). [US-159 RF1, CR-25]$$;
 COMMENT ON TABLE meal_household_dish_tags IS $$Étiquettes (régimes, viandes, allergènes) d'un plat personnel, pour que le filtrage des régimes et des allergies du foyer s'applique aussi à ses plats. [US-159, CR-30]$$;
 COMMENT ON TABLE meal_menus IS $$Menu validé d'un foyer pour une semaine (le menu proposé n'est pas gardé tant qu'il n'est pas validé) : semaine type utilisée, durée de la séance du dimanche, indication « estimée » ou « au-dessus du plafond ». Une validation par semaine. Conservé 12 mois (réglable), purgé par purge_expired_grocery_data(). [US-156 RF5, RF6, RF12, CR-23]$$;
 COMMENT ON COLUMN meal_menus.session_is_estimated IS $$Vrai si aucune semaine type n'était adaptée : la durée est estimée (le plat le plus long, plus 40 % des autres) et signalée comme telle. [US-156 RF6]$$;
-COMMENT ON TABLE meal_menu_entries IS $$Plats d'un menu validé : plats plaisir choisis, 7 dîners, plats express. Chaque ligne garde le nom du plat tel qu'il était, avec son lien vers le catalogue ou vers un plat personnel : un plat retiré ou supprimé ensuite reste lisible dans les menus déjà validés. Les remplacements proposés ne sont pas gardés : le plat choisi remplace la ligne et porte « hors séance batch ». [US-156 RF3, RF4, RF7, RF8, CR-25]$$;
+COMMENT ON TABLE meal_menu_entries IS $$Plats d'un menu validé : 7 dîners et plats express (le type « plaisir » n'est plus utilisé depuis CR-42). Chaque ligne garde le nom du plat tel qu'il était et son origine : catalogue, Mes plats ou plat libre composé par l'IA. Un plat libre garde dans la ligne sa cuisine, sa recette et sa durée, et ses ingrédients dans meal_menu_entry_ingredients : il n'entre jamais dans le catalogue commun (CR-04) et part avec le menu (12 mois). Après la validation, un plat (libre ou du catalogue) ajouté à Mes plats y est copié et la ligne en garde le lien (household_dish_id). La ligne peut porter une version allégée proposée par l'IA (texte, adaptation dans meal_menu_entry_light_items, choix du foyer). Un plat retiré ou supprimé ensuite reste lisible dans les menus déjà validés. Un menu remplacé par un autre de la même semaine garde son identifiant et voit ses lignes remplacées. [US-156 RF3 à RF10, RT4, CR-25, CR-42, CR-45]$$;
+COMMENT ON COLUMN meal_menu_entries.dish_origin IS $$Origine du plat : catalog (plat du catalogue commun), household (plat de Mes plats) ou ai (plat libre composé par l'IA avec le foyer, avec ses ingrédients, jamais dans le catalogue). Renseignée par l'application, sans valeur par défaut ; les menus déjà validés avant CR-42 ont reçu household s'ils pointaient vers un plat personnel, sinon catalog. [CR-42]$$;
+COMMENT ON COLUMN meal_menu_entries.household_dish_id IS $$Plat de Mes plats : le plat choisi (origine household) ou, après « Ajouter à vos plats », la copie faite dans Mes plats d'un plat libre ou du catalogue (la ligne garde son contenu). Vide si le foyer a supprimé ce plat ensuite. [US-156 RF10, CR-42, CR-45]$$;
+COMMENT ON COLUMN meal_menu_entries.cuisine_id IS $$Cuisine d'un plat libre (origine ai, obligatoire) ; vide pour un plat du catalogue ou de Mes plats. [CR-42]$$;
+COMMENT ON COLUMN meal_menu_entries.recipe IS $$Recette en texte d'un plat libre ; vide pour un plat du catalogue ou de Mes plats. [CR-42]$$;
+COMMENT ON COLUMN meal_menu_entries.duration_minutes IS $$Durée d'un plat libre en minutes (1 à 600) ; vide pour un plat du catalogue ou de Mes plats. [CR-42]$$;
+COMMENT ON COLUMN meal_menu_entries.light_by_ai IS $$Vrai si une version allégée a été proposée par l'IA pour ce plat (texte dans light_text, adaptation de la liste dans meal_menu_entry_light_items) ; possible pour toute origine dont le plat n'a pas de version allégée dans le catalogue. [US-157 RF5, CR-42, CR-45]$$;
+COMMENT ON COLUMN meal_menu_entries.light_text IS $$Texte de la version allégée proposée par l'IA ; renseigné si et seulement si light_by_ai. [CR-42]$$;
+COMMENT ON COLUMN meal_menu_entries.light_chosen IS $$Le foyer a retenu la version allégée proposée par l'IA (la liste suit l'adaptation). Ne peut être vrai que si light_by_ai. Pour les plats du catalogue, le choix reste dans meal_light_choices. [US-157 RF9, CR-42]$$;
+COMMENT ON COLUMN meal_menu_entries.is_off_batch IS $$Inutilisé depuis CR-42 (plus de liste déroulante de remplacements) : laissé à faux ; les dîners du samedi et du dimanche, hors séance de batch, se déduisent du rang. [US-156 RF8, CR-42]$$;
+COMMENT ON COLUMN meal_menu_entries.planning_match_to_confirm IS $$Inutilisé depuis CR-42 (le menu ne vient plus d'un planning à rapprocher du catalogue) : laissé à faux. Les correspondances des semaines types (US-170, US-171) restent dans meal_batch_week_days. [US-156 RF7, CR-42]$$;
+COMMENT ON TABLE meal_menu_entry_ingredients IS $$Ingrédients d'un plat libre d'un menu validé : nom saisi, clé normalisée, produit du catalogue s'il est reconnu (un ingrédient inconnu entre dans la liste sans prix et dans les produits à référencer). Aucune quantité par ingrédient. Un plat libre a au moins un ingrédient (contrôlé à la validation de la transaction). Jamais dans le catalogue commun ; conservé et purgé avec le menu. [US-156 RF8, RT4, CR-04, CR-42]$$;
+COMMENT ON TABLE meal_menu_entry_light_items IS $$Produits à retirer et à ajouter pour passer un plat du menu à la version allégée proposée par l'IA (la ligne de menu porte le texte, light_by_ai). Un produit inconnu du catalogue est noté dans les produits à référencer. Conservé et purgé avec le menu. [US-157 RF5, CR-42]$$;
+COMMENT ON TABLE meal_menu_session_steps IS $$Déroulé de la séance de batch du dimanche, rédigé par l'IA pour un menu qui ne reprend pas une semaine type : étapes numérotées (texte, plat concerné facultatif, durée approximative facultative). Le déroulé finit par la conservation de chaque plat, écrite comme des étapes de fin de déroulé : plat concerné, réfrigérateur ou congélateur, jour où le sortir. Une étape peut se chevaucher avec une étape précédente (elle n'allonge alors pas la séance). Réservé aux menus sans semaine type (batch_week_id vide) : avec une semaine type, le déroulé est celui du planning (US-170) et rien n'est enregistré ici. Conservé et purgé avec le menu (12 mois), effacé avec le compte. [US-156 RF6bis, US-157 RF1ter, CR-47]$$;
+COMMENT ON COLUMN meal_menu_session_steps.position IS $$Rang de l'étape dans le déroulé, à partir de 1 [CR-47]$$;
+COMMENT ON COLUMN meal_menu_session_steps.body IS $$Texte de l'étape (2 000 caractères au plus), rédigé par l'IA [CR-47]$$;
+COMMENT ON COLUMN meal_menu_session_steps.entry_id IS $$Plat concerné par l'étape : une ligne du même menu (facultatif) ; repasse à vide si cette ligne est supprimée, l'étape reste lisible [CR-47]$$;
+COMMENT ON COLUMN meal_menu_session_steps.duration_minutes IS $$Durée approximative de l'étape en minutes, 1 à 600 (facultative) [CR-47]$$;
+COMMENT ON COLUMN meal_menu_session_steps.overlaps_position IS $$Rang d'une étape précédente du même menu avec laquelle cette étape se chevauche (« en même temps, pendant la cuisson ») ; facultatif, toujours inférieur au rang de l'étape (pas de cycle). Une étape en chevauchement n'allonge pas la séance : l'application recalcule la durée totale. Repasse à vide si l'étape référencée est supprimée. [CR-47]$$;
+COMMENT ON COLUMN meal_menu_session_steps.storage_mode IS $$Étape de conservation d'un plat : fridge (réfrigérateur) ou freezer (congélateur) ; le plat est entry_id. Vide pour une étape ordinaire. Une seule étape de conservation par plat. [CR-47]$$;
+COMMENT ON COLUMN meal_menu_session_steps.take_out_day IS $$Jour où sortir le plat, jour ISO de la semaine du menu (1 = lundi … 7 = dimanche) ; facultatif, uniquement pour une étape de conservation. [CR-47]$$;
+COMMENT ON FUNCTION meal_menu_session_steps_check() IS $$Contrôle différé : un menu qui reprend une semaine type (batch_week_id renseigné) n'a aucune étape de déroulé enregistrée, son déroulé étant celui du planning. [US-156 RF6bis, CR-47]$$;
+COMMENT ON FUNCTION meal_menu_entry_needs_ingredient() IS $$Contrôle différé : un plat libre d'un menu (origine ai) a au moins un ingrédient à la fin de la transaction. [US-156 RF8, RT3, CR-42]$$;
+COMMENT ON FUNCTION meal_menu_entry_light_item_before_write() IS $$Refuse une adaptation de version allégée sur un plat de menu qui n'a pas de version allégée proposée par l'IA. [US-157 RF5, CR-42]$$;
 COMMENT ON TABLE meal_light_choices IS $$Choix du foyer, plat par plat, entre la version standard et la version allégée : enregistré à « Valider ma liste » et repris au menu suivant. Un retour à la version standard rétablit la liste. [US-157 RF5, RF9]$$;
 COMMENT ON TABLE grocery_lists IS $$Liste de courses validée (« Valider ma liste ») : scénario d'achat choisi, menu d'origine, date, profil. La dernière liste validée est « Ma liste de courses », consultée en magasin par magasin puis par rayon. La liste vide de tout produit est supprimée par la purge. [US-157 RF7, RF9]$$;
 COMMENT ON TABLE grocery_list_items IS $$Produit de la liste de courses du foyer, avec son état : en préparation, validé, ajouté depuis la validation (sans magasin ni prix, en tête de « Ma liste de courses »), acheté. Un produit n'est qu'une fois dans la liste ouverte (la quantité augmente). Les produits non achetés reviennent en préparation avec « pas acheté la dernière fois » (grocery_carry_over_unbought). Les produits achetés forment l'historique du foyer, conservé 3 mois (réglable). Le couple retire tout ; un invité secondaire ne retire que ses propres ajouts, n'augmente que les quantités et peut cocher « acheté » (CR-38), sans voir aucun prix (grocery_list_for). [US-157 RF3, RF9, US-158, US-162, CR-10, CR-27, CR-28]$$;

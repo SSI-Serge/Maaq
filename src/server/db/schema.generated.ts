@@ -2083,15 +2083,58 @@ export interface MealLightVersions {
 
 export interface MealMenuEntries {
   account_id: string;
+  /** Cuisine d'un plat libre (origine « ai »). */
+  cuisine_id: number | null;
   dish_id: Int8 | null;
   dish_name: string;
+  /** « catalog », « household » ou « ai » ; sans valeur par défaut : toute insertion la renseigne (CR-42). */
+  dish_origin: "catalog" | "household" | "ai";
+  /** Durée d'un plat libre en minutes. */
+  duration_minutes: number | null;
   household_dish_id: string | null;
   id: Generated<Int8>;
   is_off_batch: Generated<boolean>;
   kind: MealEntryKind;
+  light_by_ai: Generated<boolean>;
+  light_chosen: Generated<boolean>;
+  light_text: string | null;
   menu_id: string;
   planning_match_to_confirm: Generated<boolean>;
+  recipe: string | null;
   slot: number;
+}
+
+export interface MealMenuEntryIngredients {
+  account_id: string;
+  entry_id: Int8;
+  id: Generated<Int8>;
+  label: string;
+  name_key: string;
+  position: Generated<number>;
+  product_id: Int8 | null;
+}
+
+export interface MealMenuEntryLightItems {
+  account_id: string;
+  entry_id: Int8;
+  id: Generated<Int8>;
+  kind: "remove" | "add";
+  label: string;
+  name_key: string;
+  product_id: Int8 | null;
+}
+
+export interface MealMenuSessionSteps {
+  account_id: string;
+  body: string;
+  duration_minutes: number | null;
+  entry_id: Int8 | null;
+  id: Generated<Int8>;
+  menu_id: string;
+  overlaps_position: number | null;
+  position: number;
+  storage_mode: "fridge" | "freezer" | null;
+  take_out_day: number | null;
 }
 
 export interface MealMenus {
@@ -2797,6 +2840,9 @@ export interface DB {
   meal_light_version_items: MealLightVersionItems;
   meal_light_versions: MealLightVersions;
   meal_menu_entries: MealMenuEntries;
+  meal_menu_entry_ingredients: MealMenuEntryIngredients;
+  meal_menu_entry_light_items: MealMenuEntryLightItems;
+  meal_menu_session_steps: MealMenuSessionSteps;
   meal_menus: MealMenus;
   outing_criteria: OutingCriteria;
   outing_criteria_themes: OutingCriteriaThemes;

@@ -10,8 +10,11 @@ describe("Consignes de l'agent Courses et repas : socle fixe + dialogue remplaç
 
   it("le socle porte les règles de confidentialité et de répartition du travail", () => {
     const text = courseInstructions();
-    expect(text).toMatch(/Tu ne reçois \*\*jamais\*\* les allergies ni les régimes/);
-    expect(text).toMatch(/une photo de ticket/);
+    // CR-43 (remplace CR-16) : les régimes et allergies ne sont donnés que pour composer un menu, jamais un nom ni un prénom
+    expect(text).toMatch(/Pour composer un menu, et seulement alors, tu reçois par l'outil `preparer_menu`/);
+    expect(text).toMatch(/Tu ne reçois jamais de nom ni de prénom/);
+    expect(text).toMatch(/Hors composition du menu, tu ne connais ni les allergies ni les régimes/);
+    expect(text).toMatch(/photo de ticket/);
     expect(text).toMatch(/N\/A/);
     expect(text).toMatch(/Seuls la ville et le mot « supermarché »/);
     expect(text).toMatch(/invité secondaire peut seulement consulter la liste de courses et y ajouter un produit/);
@@ -29,7 +32,7 @@ describe("Consignes de l'agent Courses et repas : socle fixe + dialogue remplaç
     const text = courseInstructions({ replacement: "Nouveau dialogue sans parcours." });
     expect(text).toContain("Nouveau dialogue sans parcours.");
     expect(text).not.toContain("Au début de chaque conversation");
-    expect(text).toContain("Tu ne reçois **jamais** les allergies ni les régimes");
+    expect(text).toContain("Tu ne reçois jamais de nom ni de prénom");
   });
 
   it("un dialogue vide ou trop long est refusé", () => {

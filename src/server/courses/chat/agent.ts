@@ -3,6 +3,8 @@ import path from "node:path";
 import type { AssistantModel, ModelMessage, TextBlock, ToolResultBlock, ToolUseBlock } from "@/server/assistant/model";
 import { describeError } from "@/server/safe-log";
 import { courseInstructions } from "../agent/instructions";
+import { env } from "@/server/env";
+import { MENU_TOOLS } from "../menu-ia/contract";
 import { SCREENS } from "./screens";
 import { executeCourseTool, type CourseToolContext } from "./tools";
 
@@ -14,6 +16,9 @@ import { executeCourseTool, type CourseToolContext } from "./tools";
 
 export const FAILURE_REPLY = "Je n'ai pas pu traiter votre demande pour le moment. Vous pouvez réessayer dans un instant.";
 
+/** Menu non composé : deux essais invalides, ou l'IA ne répond pas (CR-44). */
+export const MENU_FAILURE_REPLY = "Je n'ai pas réussi à composer le menu pour le moment. Vous pouvez réessayer.";
+
 const tools = (): unknown[] => JSON.parse(readFileSync(path.join(process.env.COURSES_AGENT_DIR ?? path.join(process.cwd(), "agent-courses"), "outils.json"), "utf8")) as unknown[];
 
 export interface CourseContextFacts {
@@ -22,6 +27,13 @@ export interface CourseContextFacts {
   budgetDay: boolean;
   missingSettings: string[];
   access: "couple" | "list";
+  /** Menu proposé et pas encore validé (noms des plats seulement) : le modèle le corrige quand l'utilisateur le demande. */
+  menuInProgress?: string | null;
+}
+
+/** Les outils de l'agent : ceux du fichier, plus la composition du menu pour les parents quand elle est ouverte (MENU_IA). */
+function toolsFor(access: "couple" | "list"): unknown[] {
+  return access === "couple" && env().MENU_IA === "live" ? [...tools(), ...MENU_TOOLS] : tools();
 }
 
 const MISSING_TEXT: Record<string, string> = { city: "la ville", householdSize: "le nombre de personnes", shoppingDays: "les jours de courses", cuisines: "les cuisines préférées", goals: "les objectifs" };
@@ -37,6 +49,7 @@ export function contextBlock(facts: CourseContextFacts): string {
     `Jour du budget : ${facts.budgetDay ? "oui, c'est aujourd'hui" : "non"}\n` +
     `Réglages du foyer à renseigner : ${facts.missingSettings.length ? facts.missingSettings.map((m) => MISSING_TEXT[m] ?? m).join(", ") : "aucun"}\n` +
     `Droit de la personne qui écrit : ${facts.access === "couple" ? "parent du couple (tout)" : "invité secondaire (liste de courses seulement)"}\n` +
+    (facts.menuInProgress ? `${facts.menuInProgress}\n` : "") +
     "</contexte>"
   );
 }
@@ -88,7 +101,7 @@ export async function runCourseAgent(input: CourseAgentInput): Promise<CourseAge
   const maxTurns = input.maxTurns ?? 6;
   const deadline = input.deadlineMs ?? 50_000;
   const system = courseInstructions({ replacement: input.dialogue });
-  const definition = tools();
+  const definition = toolsFor(input.tool.access);
   const messages = buildMessages(input);
   const result: CourseAgentResult = { reply: FAILURE_REPLY, status: "error", toolCalls: [], usage: { inputTokens: 0, outputTokens: 0 }, durationMs: 0 };
   try {
@@ -120,6 +133,11 @@ export async function runCourseAgent(input: CourseAgentInput): Promise<CourseAge
           results.push({ type: "tool_result", tool_use_id: use.id, content: outcome.content, ...(outcome.isError ? { is_error: true } : {}) });
         }
         messages.push({ role: "user", content: results });
+        if (input.tool.menu.aborted) {
+          result.reply = MENU_FAILURE_REPLY;
+          result.status = "error";
+          break;
+        }
         continue;
       }
       if (response.stopReason === "refusal") result.status = "refused";

@@ -62,6 +62,11 @@ const schema = z.object({
    */
   OUTINGS_MODE: z.enum(["off", "live"]).default("off"),
   /**
+   * Menu de la semaine composé par l'IA en conversation (CR-42, CR-43) : « off » (par défaut, fermé : aucun régime ni allergie n'est envoyé au modèle) ou « live » (avec
+   * ASSISTANT_MODE=live). Ouvert sur la zone de test ; fermé en production tant que le DPO n'a pas donné son accord (CR-43).
+   */
+  MENU_IA: z.enum(["off", "live"]).default("off"),
+  /**
    * Analyse IA des contrats (Contrats V2, US-131) : « off » (par défaut, fermé : l'interrupteur « Analyse IA » est inactif, aucun appel), « preview » (le masquage et l'aperçu
    * fonctionnent, la transmission pour analyse ne fait aucun appel au modèle) ou « live » (appel réel, avec ASSISTANT_MODE=live). À ouvrir seulement après l'avis du DPO
    * (C-07, C-17).
@@ -90,6 +95,7 @@ const checked = schema.superRefine((value, ctx) => {
   if (value.ASSISTANT_MODE === "live") {
     if (!value.ANTHROPIC_API_KEY) ctx.addIssue({ code: "custom", path: ["ANTHROPIC_API_KEY"], message: "obligatoire avec ASSISTANT_MODE=live" });
   }
+  if (value.MENU_IA === "live" && value.ASSISTANT_MODE !== "live") ctx.addIssue({ code: "custom", path: ["MENU_IA"], message: "demande ASSISTANT_MODE=live" });
   if (value.OUTINGS_MODE === "live" && value.ASSISTANT_MODE !== "live") ctx.addIssue({ code: "custom", path: ["OUTINGS_MODE"], message: "demande ASSISTANT_MODE=live" });
   if (value.CONTRACT_ANALYSIS_MODE === "live" && value.ASSISTANT_MODE !== "live") ctx.addIssue({ code: "custom", path: ["CONTRACT_ANALYSIS_MODE"], message: "demande ASSISTANT_MODE=live" });
   if (value.CONTRACT_STORAGE === "gcs" && !value.CONTRACT_BUCKET) ctx.addIssue({ code: "custom", path: ["CONTRACT_BUCKET"], message: "obligatoire avec CONTRACT_STORAGE=gcs" });

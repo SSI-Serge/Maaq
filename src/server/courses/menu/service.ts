@@ -220,6 +220,7 @@ export async function menuValidate(ctx: Ctx, session: SessionContext, input: Val
     kind,
     slot,
     dish_name: byId.get(id)!.name.slice(0, 160),
+    dish_origin: data.refs.get(id)!.kind,
     is_off_batch: extra.offBatch ?? false,
     planning_match_to_confirm: extra.confirm ?? false,
     ...ref(id),

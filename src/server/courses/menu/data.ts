@@ -21,7 +21,9 @@ export interface EngineData {
   plans: Plan[];
   /** Semaine type du moteur (code) → identifiant de base. */
   weekIds: Map<string, string>;
-  history: { week: string; dishName: string }[];
+  history: { week: string; dishName: string; slot: number }[];
+  /** Plats (identifiant du moteur) qui contiennent un allergène du foyer d'après leurs étiquettes : écartés de `dishes` sauf avec `all`. */
+  allergenBlocked: Set<string>;
   profile: Profile;
   sessionCap: number;
 }
@@ -45,7 +47,8 @@ export function profileOf(settings: SettingsView, cuisineNames: Map<number, stri
   };
 }
 
-const isoDay = (value: Date | string) => (typeof value === "string" ? value.slice(0, 10) : value.toISOString().slice(0, 10));
+/** Jour d'une colonne `date` : la base la rend à minuit heure locale, d'où les composantes locales (toISOString la décalerait d'un jour à l'est de Greenwich). */
+const isoDay = (value: Date | string) => (typeof value === "string" ? value.slice(0, 10) : `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`);
 
 /** `all` : aussi les plats retirés du catalogue et ceux que le foyer écarte (pour relire un menu déjà validé, qui garde ses plats). */
 export async function loadEngineData(db: Kysely<DB>, accountId: string, settings: SettingsView, options: { all?: boolean } = {}): Promise<EngineData> {
@@ -69,7 +72,7 @@ export async function loadEngineData(db: Kysely<DB>, accountId: string, settings
     db
       .selectFrom("meal_menu_entries as e")
       .innerJoin("meal_menus as m", "m.id", "e.menu_id")
-      .select(["m.week_start", "e.dish_name"])
+      .select(["m.week_start", "e.dish_name", "e.slot"])
       .where("e.account_id", "=", accountId)
       .where("e.kind", "in", ["dinner", "pleasure"])
       .execute(),
@@ -90,7 +93,8 @@ export async function loadEngineData(db: Kysely<DB>, accountId: string, settings
   const tagsByDish = group(tagLinks, (r) => String(r.dish_id));
   const ownIngByDish = group(ownIngredients, (r) => r.household_dish_id);
   const ownTagsByDish = group(ownTags, (r) => r.household_dish_id);
-  const forbidden = new Set(options.all ? [] : settings.allergens.map(norm));
+  const forbidden = new Set(settings.allergens.map(norm));
+  const allergenBlocked = new Set<string>();
 
   const dishes: Dish[] = [];
   const refs: EngineData["refs"] = new Map();
@@ -98,7 +102,10 @@ export async function loadEngineData(db: Kysely<DB>, accountId: string, settings
   for (const d of dishRows) {
     const ids = (tagsByDish.get(String(d.id)) ?? []).map((l) => l.tag_id);
     // un plat qui contient un allergène du foyer n'est jamais proposé (filtre indicatif, US-153 RF4)
-    if (allergenOf(ids).some((a) => forbidden.has(a))) continue;
+    if (allergenOf(ids).some((a) => forbidden.has(a))) {
+      allergenBlocked.add(d.code);
+      if (!options.all) continue;
+    }
     dishes.push({
       id: d.code,
       cuisine: cuisineName.get(d.cuisine_id) ?? "",
@@ -116,8 +123,11 @@ export async function loadEngineData(db: Kysely<DB>, accountId: string, settings
   }
   for (const d of own) {
     const ids = (ownTagsByDish.get(d.id) ?? []).map((l) => l.tag_id);
-    if (allergenOf(ids).some((a) => forbidden.has(a))) continue;
     const id = householdDishId(d.id);
+    if (allergenOf(ids).some((a) => forbidden.has(a))) {
+      allergenBlocked.add(id);
+      if (!options.all) continue;
+    }
     dishes.push({
       id,
       cuisine: cuisineName.get(d.cuisine_id) ?? "",
@@ -161,7 +171,8 @@ export async function loadEngineData(db: Kysely<DB>, accountId: string, settings
     cuisineOf,
     plans,
     weekIds,
-    history: history.map((h) => ({ week: isoDay(h.week_start as Date | string), dishName: h.dish_name })),
+    history: history.map((h) => ({ week: isoDay(h.week_start as Date | string), dishName: h.dish_name, slot: h.slot })),
+    allergenBlocked,
     profile: profileOf(settings, cuisineName, repeat, cap),
     sessionCap: cap,
   };

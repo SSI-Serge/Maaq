@@ -5,7 +5,16 @@ import { courseError, requireAccess, type CourseAccess } from "../household/sett
 import { setBought } from "../list/mine";
 import { addProduct } from "../list/service";
 import { euro } from "../console/util";
+import { env } from "@/server/env";
+import { randomUUID } from "node:crypto";
+import { loadSettings } from "../household/settings";
+import { menuInput } from "../menu-ia/contract";
+import { loadMenuContext, type MenuContext } from "../menu-ia/context";
+import { buildProposal, type MenuProposal } from "../menu-ia/proposal";
 import { SCREENS, type ScreenKey } from "./screens";
+
+/** Essais invalides de `proposer_menu` acceptés avant d'abandonner (CR-44) : au deuxième, la demande échoue avec « Réessayer ». */
+export const MAX_INVALID_MENUS = 2;
 
 /**
  * Outils de l'agent « Courses et repas » : MAAQ les exécute lui-même, avec les droits du profil qui écrit (un invité secondaire ne peut qu'ajouter un produit et cocher
@@ -21,6 +30,8 @@ export interface CourseToolContext {
   accountId: string;
   /** Marqueurs d'écran donnés dans cette demande. */
   opened: Set<string>;
+  /** Menu composé par l'IA dans cette demande (CR-42). */
+  menu: { invalid: number; aborted: boolean; proposal: MenuProposal | null; context: MenuContext | null };
 }
 
 export interface ToolOutcome {
@@ -94,6 +105,29 @@ export async function executeCourseTool(name: string, input: unknown, t: CourseT
           `Mois passé (${view.monthLabel}) : ${euro(view.budget.total.lastMonth)} au total. Rayon le plus dépensier : ${top.rayon} (${euro(top.lastMonth)}). Moyenne mensuelle de l'année : ${view.budget.total.currentYearAverage === null ? "pas encore de moyenne" : euro(view.budget.total.currentYearAverage)}. Le budget ne vient que des tickets enregistrés.`,
         );
       }
+      case "preparer_menu": {
+        const refused = menuRefusal(t);
+        if (refused) return fail(refused);
+        const settings = await loadSettings(ctx.db, t.accountId);
+        if (settings.missing.length) return fail("Erreur : les réglages du foyer ne sont pas complets. Invite à ouvrir l'écran de réglages avant de composer un menu.");
+        t.menu.context = await loadMenuContext(ctx.db, t.accountId, settings, ctx.now);
+        return ok(t.menu.context.text);
+      }
+      case "proposer_menu": {
+        const refused = menuRefusal(t);
+        if (refused) return fail(refused);
+        const parsed = menuInput.safeParse(input);
+        if (!parsed.success) return invalidMenu(t, parsed.error.issues.map((i) => `${i.path.join(".") || "menu"} : ${i.message}`));
+        if (!t.menu.context) {
+          const settings = await loadSettings(ctx.db, t.accountId);
+          if (settings.missing.length) return fail("Erreur : les réglages du foyer ne sont pas complets.");
+          t.menu.context = await loadMenuContext(ctx.db, t.accountId, settings, ctx.now);
+        }
+        const built = buildProposal(parsed.data, { data: t.menu.context.data, cuisines: t.menu.context.cuisines, now: ctx.now, newId: randomUUID });
+        if (!built.ok) return invalidMenu(t, built.errors);
+        t.menu.proposal = built.proposal;
+        return ok(menuSummary(built.proposal));
+      }
       case "ouvrir_ecran": {
         const key = String((input as { ecran?: unknown } | null)?.ecran ?? "") as ScreenKey;
         const screen = SCREENS[key];
@@ -112,10 +146,41 @@ export async function executeCourseTool(name: string, input: unknown, t: CourseT
   }
 }
 
+function menuRefusal(t: CourseToolContext): string | null {
+  if (t.access !== "couple") return "Erreur : la composition du menu est réservée aux deux parents du couple.";
+  if (env().MENU_IA !== "live") return "Erreur : la composition du menu par l'agent n'est pas encore ouverte. Renvoie vers l'écran « Liste de courses ».";
+  return null;
+}
+
+function invalidMenu(t: CourseToolContext, problems: string[]): ToolOutcome {
+  t.menu.invalid += 1;
+  if (t.menu.invalid >= MAX_INVALID_MENUS) t.menu.aborted = true;
+  return fail(["Menu refusé par MAAQ :", ...problems.slice(0, 12).map((p) => `- ${p}`), "Corrige et rappelle proposer_menu avec le menu COMPLET."].join("\n"));
+}
+
+/** Ce que le modèle apprend du menu enregistré : il le résume en une ou deux phrases, la carte est affichée par MAAQ. */
+export function menuSummary(p: MenuProposal): string {
+  const all = [...p.dinners, ...p.express];
+  const served = all.filter((d) => d.servedOn).map((d) => `${d.name} (déjà servi le ${d.servedOn})`);
+  const conflicts = all.flatMap((d) => d.blockers);
+  const warnings = all.flatMap((d) => d.warnings.map((w) => `${d.name} : ${w}`));
+  const source = p.session.source === "plan" ? "durée de la semaine type" : p.session.source === "steps" ? "durée estimée par MAAQ d'après le déroulé" : "durée estimée par MAAQ (formule), le déroulé manquait ou était incohérent";
+  return [
+    `Menu enregistré pour la semaine du ${p.week} : ${p.dinners.length} dîners, ${p.express.length} plats express${p.complete ? "" : " (INCOMPLET : il manque des dîners, pas de bouton « Valider le menu »)"}.`,
+    `Séance de batch : ${p.session.minutes} min (${source})${p.session.overCap ? `, AU-DESSUS du plafond de ${p.session.cap} min : dis-le` : ""}.`,
+    served.length ? `Déjà servis récemment : ${served.join(" ; ")}. L'utilisateur peut les garder.` : "",
+    conflicts.length ? `CONFLITS D'ALLERGIE OU DE RÉGIME (validation impossible) : ${conflicts.join(" ; ")}. Remplace ces plats et rappelle proposer_menu.` : "",
+    warnings.length ? `Avertissements affichés sur les plats : ${warnings.join(" ; ")}.` : "",
+    "MAAQ affiche le menu en carte avec le bouton « Valider le menu » : n'écris PAS le menu en entier dans ta réponse. Résume en une ou deux phrases, signale la durée de la séance, les répétitions et les avertissements, et propose de corriger.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
 /** Contrôle d'accès commun aux outils. */
 export async function toolContext(ctx: Ctx, session: SessionContext): Promise<CourseToolContext> {
   const who = await requireAccess(ctx, session, "list");
-  return { ctx, session, access: who.access, accountId: who.accountId, opened: new Set() };
+  return { ctx, session, access: who.access, accountId: who.accountId, opened: new Set(), menu: { invalid: 0, aborted: false, proposal: null, context: null } };
 }
 
 export { courseError };

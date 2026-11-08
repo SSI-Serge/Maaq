@@ -8,6 +8,7 @@ import { env } from "@/server/env";
 import { Rejection } from "@/server/http";
 import { decrypt, encrypt } from "@/server/security/crypto";
 import { courseError, loadSettings, requireAccess } from "../household/settings";
+import { cardView, hasNewerCard, isCard, menuInProgress, parseCard, saveMenuCard, summaryForModel, type CardView } from "../menu-ia/cards";
 import { runCourseAgent, type CourseAgentResult } from "./agent";
 import { toolContext } from "./tools";
 
@@ -20,6 +21,8 @@ export const MAX_COURSE_TEXT = 2000;
 const HISTORY_MESSAGES = 6;
 const HISTORY_HOURS = 24;
 export const COURSE_HISTORY_DAYS = 4;
+/** Un menu complet (7 dîners, express, recettes, déroulé) demande beaucoup de texte : délai long, comme la lecture des tickets. */
+const MODEL_TIMEOUT_MS = 100_000;
 const key = () => Buffer.from(env().ENCRYPTION_KEY, "base64");
 
 let configured: AssistantModel | undefined;
@@ -27,7 +30,7 @@ let configured: AssistantModel | undefined;
 export function courseModel(): AssistantModel {
   const settings = env();
   if (settings.ASSISTANT_MODE !== "live") throw new Rejection("assistant_unavailable", "Le tchat de Courses et repas n'est pas encore ouvert. Les écrans de l'agent restent disponibles.", 409);
-  configured ??= createModel({ provider: settings.ASSISTANT_PROVIDER, apiKey: settings.ANTHROPIC_API_KEY!, model: settings.ASSISTANT_MODEL, effort: "low", timeoutMs: 40_000, maxTokens: 2_000 });
+  configured ??= createModel({ provider: settings.ASSISTANT_PROVIDER, apiKey: settings.ANTHROPIC_API_KEY!, model: settings.ASSISTANT_MODEL, effort: "low", timeoutMs: MODEL_TIMEOUT_MS, maxTokens: 12_000 });
   return configured;
 }
 
@@ -51,6 +54,8 @@ export interface CourseReply {
   reply: string;
   failed: boolean;
   alreadyAnswered: boolean;
+  /** Menu composé dans cette demande, à afficher sous la réponse. */
+  card?: CardView;
 }
 
 export interface CourseDeps {
@@ -119,12 +124,18 @@ export async function sendCourseMessage(ctx: Ctx, session: SessionContext, input
 
   const settings = who.access === "couple" ? await loadSettings(ctx.db, who.accountId) : null;
   const timeZone = session.device.timezone || "Europe/Paris";
+  const tool = await toolContext(ctx, session);
+  const open = who.access === "couple" ? await menuInProgress(ctx.db, conversation.id, since) : null;
   const result: CourseAgentResult = await runCourseAgent({
     model,
-    tool: await toolContext(ctx, session),
-    facts: { now: ctx.now, timeZone, budgetDay: !!settings && ctx.now.getDate() === settings.budgetDay, missingSettings: settings?.missing ?? [], access: who.access },
+    tool,
+    facts: { now: ctx.now, timeZone, budgetDay: !!settings && ctx.now.getDate() === settings.budgetDay, missingSettings: settings?.missing ?? [], access: who.access, menuInProgress: open ? summaryForModel(open.proposal) : null },
     text,
-    history: recent.map((m) => ({ role: m.sender === "agent" ? ("assistant" as const) : ("user" as const), text: decrypt(m.content!, key()) })),
+    history: recent
+      .map((m) => ({ role: m.sender === "agent" ? ("assistant" as const) : ("user" as const), text: decrypt(m.content!, key()) }))
+      // une carte de menu n'est pas du texte à relire : le menu en cours est donné au modèle par le contexte
+      .filter((m) => !isCard(m.text)),
+    deadlineMs: MODEL_TIMEOUT_MS,
   });
 
   if (result.status !== "ok") return { requestId: input.requestId, reply: result.reply, failed: true, alreadyAnswered: false };
@@ -136,7 +147,13 @@ export async function sendCourseMessage(ctx: Ctx, session: SessionContext, input
     .executeTakeFirstOrThrow();
   await ctx.db.updateTable("assistant_requests").set({ reply_message_id: reply.id }).where("conversation_id", "=", conversation.id).where("request_id", "=", input.requestId).execute();
   await ctx.db.updateTable("agent_conversations").set({ last_message_at: answeredAt }).where("id", "=", conversation.id).execute();
-  return { requestId: input.requestId, reply: result.reply, failed: false, alreadyAnswered: false };
+  // le menu composé s'affiche sous la réponse : la carte est rangée juste après elle (un menu plus récent de la même semaine rend les précédents « remplacés »)
+  let card: CardView | undefined;
+  if (tool.menu.proposal) {
+    const cardId = await saveMenuCard(ctx.db, conversation.id, tool.menu.proposal, new Date(answeredAt.getTime() + 1));
+    card = cardView(cardId, { card: "menu", proposal: tool.menu.proposal, validatedAt: null }, false);
+  }
+  return { requestId: input.requestId, reply: result.reply, failed: false, alreadyAnswered: false, card };
 }
 
 export interface CourseMessageView {
@@ -144,6 +161,8 @@ export interface CourseMessageView {
   role: "user" | "assistant";
   text: string;
   at: string;
+  /** Menu composé par l'IA : carte sous le fil, avec « Valider le menu » tant qu'elle est ouverte. */
+  card?: CardView;
 }
 
 /** Messages récents du fil de ce profil (4 jours au plus), du plus ancien au plus récent. */
@@ -161,5 +180,12 @@ export async function listCourseMessages(ctx: Ctx, session: SessionContext): Pro
     .orderBy("created_at")
     .orderBy("id")
     .execute();
-  return rows.map((r) => ({ id: String(r.id), role: r.sender === "agent" ? "assistant" : "user", text: decrypt(r.content!, key()), at: r.created_at.toISOString() }));
+  const decoded = rows.map((r) => ({ r, text: decrypt(r.content!, key()) }));
+  const weeks = decoded.map((d) => parseCard(d.text)?.proposal.week ?? null);
+  return decoded.map(({ r, text }, i): CourseMessageView => {
+    const base = { id: String(r.id), role: r.sender === "agent" ? ("assistant" as const) : ("user" as const), at: r.created_at.toISOString() };
+    const envelope = parseCard(text);
+    if (!envelope) return { ...base, text };
+    return { ...base, text: "", card: cardView(String(r.id), envelope, weeks.slice(i + 1).includes(envelope.proposal.week)) };
+  });
 }
