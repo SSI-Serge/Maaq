@@ -41,9 +41,12 @@ function DishRow({ day, dish }: { day: string; dish: ProposalDish }) {
  * Menu de la semaine en carte dans le tchat (CR-42, CR-Tchat) : 7 dîners, 4 plats express, séance de batch. « Valider le menu » sous la carte tant qu'elle est ouverte ; « Menu remplacé »
  * quand un menu plus récent existe ; pas de bouton si le menu est incomplet ; un conflit d'allergie bloque la validation.
  */
-export function MenuCard({ card, busy, onValidate }: { card: CardView; busy: boolean; onValidate: (card: CardView) => void }) {
+export function MenuCard({ card, busy, onValidate, onAdd }: { card: CardView; busy: boolean; onValidate: (card: CardView) => void; onAdd: (card: CardView, slots: string[]) => Promise<string[] | null> }) {
   const [confirming, setConfirming] = useState(false);
   const [kept, setKept] = useState(false);
+  const [ticked, setTicked] = useState<string[]>([]);
+  const [adding, setAdding] = useState(false);
+  const [addDone, setAddDone] = useState<string[] | null>(null);
   const p = card.proposal;
   const note = servingsNote(p.householdSize);
   const blocking = [...p.dinners, ...p.express].filter((d) => d.blockers.length).map((d) => d.name);
@@ -137,6 +140,33 @@ export function MenuCard({ card, busy, onValidate }: { card: CardView; busy: boo
         <Link href="/courses/liste" style={{ alignSelf: "flex-start", fontSize: 13, fontWeight: 700, color: "var(--success)", background: "var(--success-bg)", borderRadius: 8, padding: "10px 12px" }}>
           ✓ Menu validé · Ouvrir la liste de courses ›
         </Link>
+      )}
+      {card.status === "validated" && card.addable.length > 0 && addDone === null && (
+        <div style={{ ...CARD_STYLE, gap: 4, fontSize: 14, lineHeight: 1.45 }}>
+          <span>Menu enregistré. Ajouter ces plats à vos plats ?</span>
+          {card.addable.map((a) => {
+            const on = ticked.includes(a.slot);
+            return (
+              <button key={a.slot} type="button" role="checkbox" aria-checked={on} onClick={() => setTicked(on ? ticked.filter((s) => s !== a.slot) : [...ticked, a.slot])} style={{ display: "flex", alignItems: "center", gap: 10, background: "none", border: "none", padding: "6px 0", textAlign: "left", fontSize: 13, color: "var(--ink)" }}>
+                <span style={{ width: 22, height: 22, flexShrink: 0, borderRadius: 5, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "#FFFFFF", border: `2px solid ${on ? "var(--success)" : "var(--line)"}`, background: on ? "var(--success)" : "transparent" }}>{on ? "✓" : ""}</span>
+                {a.name}
+              </button>
+            );
+          })}
+          <div style={{ display: "flex", gap: 8 }}>
+            <Button variant="secondary" disabled={adding} onClick={async () => { setAdding(true); const done = await onAdd(card, []); setAdding(false); if (done) setAddDone([]); }}>
+              Non merci
+            </Button>
+            <Button loading={adding} disabled={!ticked.length} onClick={async () => { setAdding(true); const done = await onAdd(card, ticked); setAdding(false); if (done) setAddDone(done); }}>
+              Ajouter à mes plats
+            </Button>
+          </div>
+        </div>
+      )}
+      {card.status === "validated" && addDone !== null && (
+        <div style={{ ...CARD_STYLE, maxWidth: "92%", fontSize: 14, lineHeight: 1.45 }}>
+          {addDone.length ? `C'est fait : ${addDone.join(", ")} ${addDone.length > 1 ? "entrent" : "entre"} dans « Mes plats », avec ingrédients, recette et durée.` : "D'accord, aucun plat ajouté à « Mes plats »."}
+        </div>
       )}
     </div>
   );

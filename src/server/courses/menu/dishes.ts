@@ -57,7 +57,7 @@ export async function dishForm(ctx: Ctx, session: SessionContext): Promise<DishF
   };
 }
 
-function clean(input: DishInput) {
+export function cleanDish(input: DishInput) {
   const name = input.name.trim().replace(/\s+/g, " ");
   const seen = new Set<string>();
   const ingredients = input.ingredients
@@ -76,7 +76,7 @@ function clean(input: DishInput) {
   return { name, ingredients, minutes, recipe };
 }
 
-async function insertDish(trx: Kysely<DB>, accountId: string, userId: string, input: ReturnType<typeof clean> & { cuisineId: number }, now: Date): Promise<string> {
+export async function insertDish(trx: Kysely<DB>, accountId: string, userId: string, input: ReturnType<typeof cleanDish> & { cuisineId: number }, now: Date): Promise<string> {
   const exists = await trx.selectFrom("meal_household_dishes").select("id").where("account_id", "=", accountId).where(sql`lower(name)`, "=", input.name.toLowerCase()).executeTakeFirst();
   if (exists) throw courseError("dish_exists", `« ${input.name} » est déjà dans vos plats.`, 409);
   const count = await trx.selectFrom("meal_household_dishes").select((eb) => eb.fn.countAll<string>().as("n")).where("account_id", "=", accountId).executeTakeFirstOrThrow();
@@ -107,7 +107,7 @@ async function insertDish(trx: Kysely<DB>, accountId: string, userId: string, in
 /** Ajoute un plat du foyer. */
 export async function createDish(ctx: Ctx, session: SessionContext, input: DishInput): Promise<{ id: string; name: string }> {
   const who = await requireAccess(ctx, session, "couple");
-  const data = clean(input);
+  const data = cleanDish(input);
   let id = "";
   try {
     await asProfile(ctx.db, who.userId, async (trx) => {
@@ -142,7 +142,7 @@ export async function importDishes(ctx: Ctx, session: SessionContext, file: { na
   const rows = outcome.rows.map((r) => ({ name: String(r.values.plat), cuisineId: byName.get(norm(String(r.values.cuisine)))!, ingredients: r.values.ingredients as string[] }));
   try {
     await asProfile(ctx.db, who.userId, async (trx) => {
-      for (const r of rows) await insertDish(trx, who.accountId, who.userId, { ...clean({ ...r }), cuisineId: r.cuisineId }, ctx.now);
+      for (const r of rows) await insertDish(trx, who.accountId, who.userId, { ...cleanDish({ ...r }), cuisineId: r.cuisineId }, ctx.now);
     });
   } catch (error) {
     throw translateCourseError(error);

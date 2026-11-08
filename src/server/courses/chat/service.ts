@@ -8,7 +8,7 @@ import { env } from "@/server/env";
 import { Rejection } from "@/server/http";
 import { decrypt, encrypt } from "@/server/security/crypto";
 import { courseError, loadSettings, requireAccess } from "../household/settings";
-import { cardView, isCard, menuInProgress, parseCard, saveMenuCard, summaryForModel, validatedWeeks, type CardView } from "../menu-ia/cards";
+import { addableDishes, cardView, isCard, menuInProgress, parseCard, saveMenuCard, summaryForModel, validatedWeeks, type CardView } from "../menu-ia/cards";
 import { runCourseAgent, type CourseAgentResult } from "./agent";
 import { toolContext } from "./tools";
 
@@ -183,10 +183,15 @@ export async function listCourseMessages(ctx: Ctx, session: SessionContext): Pro
   const decoded = rows.map((r) => ({ r, text: decrypt(r.content!, key()) }));
   const weeks = decoded.map((d) => parseCard(d.text)?.proposal.week ?? null);
   const validated = await validatedWeeks(ctx.db, who.accountId, [...new Set(weeks.filter((w): w is string => !!w))]);
+  const addable = new Map<string, Awaited<ReturnType<typeof addableDishes>>>();
+  for (const [i, d] of decoded.entries()) {
+    const card = parseCard(d.text);
+    if (card?.validatedAt && !card.addAnswered && weeks[i] && !addable.has(weeks[i]!)) addable.set(weeks[i]!, await addableDishes(ctx.db, who.accountId, weeks[i]!));
+  }
   return decoded.map(({ r, text }, i): CourseMessageView => {
     const base = { id: String(r.id), role: r.sender === "agent" ? ("assistant" as const) : ("user" as const), at: r.created_at.toISOString() };
     const envelope = parseCard(text);
     if (!envelope) return { ...base, text };
-    return { ...base, text: "", card: cardView(String(r.id), envelope, weeks.slice(i + 1).includes(envelope.proposal.week), validated.has(envelope.proposal.week)) };
+    return { ...base, text: "", card: cardView(String(r.id), envelope, weeks.slice(i + 1).includes(envelope.proposal.week), validated.has(envelope.proposal.week), addable.get(envelope.proposal.week) ?? []) };
   });
 }

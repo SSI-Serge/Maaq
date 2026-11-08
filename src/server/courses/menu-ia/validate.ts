@@ -54,28 +54,53 @@ export async function validateMenuCard(ctx: Ctx, session: SessionContext, messag
   return result;
 }
 
+/**
+ * La liste déjà validée est refaite : ses produits issus du menu ou de l'historique sont recalculés, les produits ajoutés à la main repassent en préparation, et les produits cochés
+ * « acheté » ou ajoutés depuis la validation sont gardés (CR-45). La ligne de liste validée reste en place (les articles achetés y sont rattachés) ; la page se rouvre parce que le menu
+ * est plus récent qu'elle.
+ */
+async function reopenList(trx: Parameters<Parameters<typeof asProfile>[2]>[0], accountId: string, now: Date): Promise<void> {
+  await trx.deleteFrom("grocery_list_items").where("account_id", "=", accountId).where("state", "=", "validated").where("source", "in", ["menu", "habit"]).execute();
+  await trx
+    .updateTable("grocery_list_items")
+    .set({ state: "preparing", list_id: null, store_chain: null, reference_name: null, unit_price: null, price_unit: null, updated_at: now })
+    .where("account_id", "=", accountId)
+    .where("state", "=", "validated")
+    .execute();
+}
+
 async function writeMenu(ctx: Ctx, accountId: string, userId: string, proposal: MenuProposal, data: Awaited<ReturnType<typeof loadEngineData>>): Promise<ValidatedMenuCard> {
   const week = proposal.week;
   const batchWeekId = proposal.planId ? (data.weekIds.get(proposal.planId) ?? null) : null;
   const dishesForList: Dish[] = [];
   try {
     const listed = await asProfile(ctx.db, userId, async (trx) => {
-      const repeat = !!(await trx.selectFrom("meal_menus").select("id").where("account_id", "=", accountId).where("week_start", "=", week as never).executeTakeFirst());
-      await trx.deleteFrom("meal_menus").where("account_id", "=", accountId).where("week_start", "=", week as never).execute();
-      const menu = await trx
-        .insertInto("meal_menus")
-        .values({
-          account_id: accountId,
-          week_start: week as never,
-          validated_at: ctx.now,
-          validated_by_user_id: userId,
-          batch_week_id: batchWeekId as never,
-          session_minutes: Math.min(Math.max(proposal.session.minutes, 1), 1000),
-          session_is_estimated: proposal.session.estimated,
-          session_over_cap: proposal.session.overCap,
-        })
-        .returning("id")
-        .executeTakeFirstOrThrow();
+      // CR-45 : revalider une semaine déjà validée met à jour le MÊME menu (même identifiant) et remplace ses lignes, dans une transaction ; la liste de courses est refaite
+      const existing = await trx.selectFrom("meal_menus").select("id").where("account_id", "=", accountId).where("week_start", "=", week as never).executeTakeFirst();
+      const repeat = !!existing;
+      const fields = {
+        validated_at: ctx.now,
+        validated_by_user_id: userId,
+        batch_week_id: batchWeekId as never,
+        session_minutes: Math.min(Math.max(proposal.session.minutes, 1), 1000),
+        session_is_estimated: proposal.session.estimated,
+        session_over_cap: proposal.session.overCap,
+      };
+      let menu: { id: string };
+      if (existing) {
+        menu = existing;
+        // l'ancien déroulé et les anciennes lignes (avec ingrédients et versions allégées, en cascade) partent ; un déroulé de semaine type n'est pas enregistré
+        await trx.deleteFrom("meal_menu_session_steps").where("menu_id", "=", existing.id).execute();
+        await trx.deleteFrom("meal_menu_entries").where("menu_id", "=", existing.id).execute();
+        await trx.updateTable("meal_menus").set(fields).where("id", "=", existing.id).execute();
+        await reopenList(trx, accountId, ctx.now);
+      } else {
+        menu = await trx
+          .insertInto("meal_menus")
+          .values({ account_id: accountId, week_start: week as never, ...fields })
+          .returning("id")
+          .executeTakeFirstOrThrow();
+      }
 
       const entryIds = new Map<string, string>();
       const rows = [

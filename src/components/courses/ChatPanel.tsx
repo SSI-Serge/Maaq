@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { useApiMutation, useApiQuery } from "@/client/hooks";
 import family from "@/components/family/family.module.css";
@@ -46,6 +47,8 @@ export function ChatPanel({ couple, startMenu = 0 }: { couple: boolean; startMen
   const history = useApiQuery<{ messages: CourseMessageView[] }>("/api/courses/chat");
   const send = useApiMutation();
   const validate = useApiMutation();
+  const adding = useApiMutation();
+  const router = useRouter();
   const [text, setText] = useState("");
   const [pending, setPending] = useState<string | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
@@ -105,7 +108,15 @@ export function ChatPanel({ couple, startMenu = 0 }: { couple: boolean; startMen
     if (response) {
       setValidated(response.result);
       history.reload();
+      // « Valider le menu » ouvre la page Liste de courses (US-156 RF12) ; la question « Ajouter ces plats à vos plats ? » attend dans le tchat
+      router.push("/courses/liste");
     }
+  }
+
+  /** Copie les plats cochés dans Mes plats ; sans plat, le foyer a refusé (« Non merci »). */
+  async function addDishes(card: CardView, slots: string[]): Promise<string[] | null> {
+    const response = await adding.run<{ result: { added: string[] } }>("/api/courses/chat/menu/dishes", { method: "POST", body: { messageId: card.messageId, week: card.proposal.week, slots } });
+    return response ? response.result.added : null;
   }
 
   const error = failed ?? send.error?.message ?? null;
@@ -119,7 +130,7 @@ export function ChatPanel({ couple, startMenu = 0 }: { couple: boolean; startMen
       <div role="log" aria-live="polite" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {messages.map((m) =>
           m.card ? (
-            <MenuCard key={m.id} card={m.card} busy={validating === m.card.messageId} onValidate={(c) => void validateCard(c)} />
+            <MenuCard key={m.id} card={m.card} busy={validating === m.card.messageId} onValidate={(c) => void validateCard(c)} onAdd={addDishes} />
           ) : (
             <div key={m.id} className={m.role === "user" ? undefined : styles.dayCard} style={m.role === "user" ? { alignSelf: "flex-end", maxWidth: "85%", padding: "8px 12px", borderRadius: "12px 12px 2px 12px", background: "var(--primary)", color: "var(--primary-ink)", fontSize: 14 } : { fontSize: 14, lineHeight: 1.4 }}>
               {m.role === "user" ? m.text : <Rich text={m.text} couple={couple} />}
@@ -178,6 +189,7 @@ export function ChatPanel({ couple, startMenu = 0 }: { couple: boolean; startMen
       </div>
       {error && (retryable ? <RetryNotice message={error} onRetry={() => void submit(lastText.current)} /> : <Notice tone="error">{error}</Notice>)}
       {validate.error && <Notice tone="error">{validate.error.message}</Notice>}
+      {adding.error && <Notice tone="error">{adding.error.message}</Notice>}
       {validated && <p className={styles.banner}>Menu enregistré : {validated.listed} produit{validated.listed > 1 ? "s" : ""} dans votre liste de courses.</p>}
       <div className={styles.addRow} style={{ marginTop: 10 }}>
         <input

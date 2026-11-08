@@ -7,6 +7,7 @@ import { buildListModel, buildRefProducts, DAYS, dishItems, fmtMin, gapType, nor
 import { courseError, loadSettings, requireAccess, translateCourseError, type CourseAccess } from "../household/settings";
 import { loadEngineData } from "../menu/data";
 import { weekLabel } from "../menu/weeks";
+import { aiDishId, loadAiDishes, loadMenuEntries, loadSession, recipeSteps, type SessionView } from "../menu-ia/entries";
 import { loadCommonPrices, loadHistory, loadLightVersions, loadReferences, type ExcludedReference, type References } from "./data";
 import { toDto, type ListModelDto } from "./dto";
 
@@ -31,8 +32,12 @@ export interface MenuSummary {
   week: string;
   weekLabel: string;
   days: { day: string; name: string; time: string }[];
-  session: { label: string; theme: string; estimated: boolean };
+  session: { label: string; theme: string; estimated: boolean; overCap: boolean };
   express: { name: string; time: string }[];
+  /** Recette de chaque dîner et plat express (pour 4 personnes) : ingrédients et étapes ; vide si la recette n'est pas renseignée (CR-46). */
+  recipes: { name: string; kind: "dinner" | "express"; day: string; time: string; ingredients: string[]; steps: string[] }[];
+  /** Déroulé de la séance et conservation (CR-47). */
+  batch: SessionView;
 }
 
 export interface ListPrepared {
@@ -110,7 +115,7 @@ export async function prepareList(ctx: Ctx, session: SessionContext): Promise<Li
     loadEngineData(ctx.db, who.accountId, settings, { all: true }),
     loadReferences(ctx.db),
     loadHistory(ctx.db, who.accountId),
-    ctx.db.selectFrom("meal_menu_entries").select(["kind", "slot", "dish_name", "dish_id", "household_dish_id"]).where("menu_id", "=", menu.id).orderBy("kind").orderBy("slot").execute(),
+    loadMenuEntries(ctx.db, menu.id),
     ctx.db
       .selectFrom("grocery_list_items as i")
       .leftJoin("users as u", "u.id", "i.added_by_user_id")
@@ -120,7 +125,7 @@ export async function prepareList(ctx: Ctx, session: SessionContext): Promise<Li
       .orderBy("i.created_at")
       .execute(),
     ctx.db.selectFrom("grocery_additive_criteria").select(["label", "reason"]).where("is_active", "=", true).orderBy("label").execute(),
-    ctx.db.selectFrom("grocery_lists").select("id").where("account_id", "=", who.accountId).where("menu_id", "=", menu.id).executeTakeFirst(),
+    ctx.db.selectFrom("grocery_lists").select(["id", "validated_at"]).where("account_id", "=", who.accountId).where("menu_id", "=", menu.id).orderBy("validated_at", "desc").executeTakeFirst(),
   ]);
   const common = settings.sharePrices ? await loadCommonPrices(ctx.db, who.userId) : [];
   // les produits cochés « acheté » en magasin rejoignent l'historique, sans prix tant qu'aucun ticket ne l'a donné (CR-28)
@@ -142,13 +147,17 @@ export async function prepareList(ctx: Ctx, session: SessionContext): Promise<Li
     return null;
   };
   const dinners = entries.filter((e) => e.kind === "dinner");
-  const menuDishes = dinners.map(codeOf).filter((c): c is string => !!c).map((c) => byId.get(c)).filter((d): d is Dish => !!d);
+  // plats libres du menu (composés par l'IA) : ils entrent dans la liste comme les autres plats, avec leur version allégée
+  const aiLoad = await loadAiDishes(ctx.db, entries);
+  const dishOf = (e: (typeof entries)[number]): Dish | undefined => (e.dish_origin === "ai" ? aiLoad.dishes.get(aiDishId(e.id)) : byId.get(codeOf(e) ?? ""));
+  const menuDishes = dinners.map(dishOf).filter((d): d is Dish => !!d);
   const unique = [...new Map(menuDishes.map((d) => [d.id, d])).values()];
 
   const light = await loadLightVersions(
     ctx.db,
     unique.flatMap((d) => (data.refs.get(d.id)?.kind === "catalog" ? [{ dishId: data.refs.get(d.id)!.dishId, code: d.id }] : [])),
   );
+  for (const [id, version] of aiLoad.light) if (unique.some((d) => d.id === id)) light.set(id, version);
   const prods = buildRefProducts(refs.rows);
   const buy: BuyRow[] = rows.map((r) => ({ name: r.label, qty: r.quantity, by: r.first_name ?? "", source: r.source === "menu" ? "menu" : "manuel", status: "à acheter", notBoughtLastTime: r.not_bought_last_time }));
   const model = buildListModel({ dishes: unique, prods, buy, history, light, stores: [...new Set(stores.map((s) => s.chain))], sharing: settings.sharePrices, common, now: ctx.now });
@@ -159,21 +168,43 @@ export async function prepareList(ctx: Ctx, session: SessionContext): Promise<Li
   for (const d of unique) {
     const ref = data.refs.get(d.id);
     if (ref?.kind === "catalog" && choiceOf.get(ref.dishId) === "light") modes[d.name] = "light";
+    if (aiLoad.chosenLight.has(d.name)) modes[d.name] = "light";
   }
 
   const inList = new Set(model.items.map((i) => norm(i.name)));
   const excluded = refs.excluded.filter((e) => inList.has(norm(e.product)) || model.items.some((i) => norm(i.name).includes(norm(e.product))));
 
-  const times = new Map(dinners.map((e) => [e.slot, codeOf(e)]));
+  const minutesOf = (e: (typeof entries)[number]) => dishOf(e)?.minutes ?? e.duration_minutes ?? 0;
+  const dishNames = new Map(entries.map((e) => [e.id, e.dish_name]));
+  const batch = await loadSession(ctx.db, { id: menu.id, batch_week_id: menu.batch_week_id === null ? null : String(menu.batch_week_id) }, dishNames);
   const sessionTheme = menu.batch_week_id ? (await ctx.db.selectFrom("meal_batch_weeks").select("theme").where("id", "=", menu.batch_week_id).executeTakeFirst())?.theme ?? "" : "";
   const summary: MenuSummary = {
     week: isoDay(menu.week_start as Date | string),
     weekLabel: weekLabel(isoDay(menu.week_start as Date | string)),
-    days: dinners.map((e, i) => ({ day: DAYS[i] ?? "", name: e.dish_name, time: fmtMin(byId.get(times.get(e.slot) ?? "")?.minutes ?? 0) })),
-    session: { label: menu.session_minutes ? fmtMin(menu.session_minutes) : "", theme: sessionTheme, estimated: menu.session_is_estimated },
-    express: entries.filter((e) => e.kind === "express").map((e) => ({ name: e.dish_name, time: fmtMin(byId.get(codeOf(e) ?? "")?.minutes ?? 0) })),
+    days: dinners.map((e, i) => ({ day: DAYS[i] ?? "", name: e.dish_name, time: fmtMin(minutesOf(e)) })),
+    session: { label: menu.session_minutes ? fmtMin(menu.session_minutes) : "", theme: sessionTheme, estimated: menu.session_is_estimated, overCap: menu.session_over_cap },
+    express: entries.filter((e) => e.kind === "express").map((e) => ({ name: e.dish_name, time: fmtMin(minutesOf(e)) })),
+    recipes: entries
+      .filter((e) => e.kind === "dinner" || e.kind === "express")
+      .map((e, i) => {
+        const dish = dishOf(e);
+        return {
+          name: e.dish_name,
+          kind: e.kind as "dinner" | "express",
+          day: e.kind === "dinner" ? (DAYS[e.slot - 1] ?? "") : `Express ${e.slot}`,
+          time: fmtMin(minutesOf(e)),
+          ingredients: (dish?.ing ?? "").split(",").map((x) => x.trim()).filter(Boolean),
+          steps: recipeSteps(dish?.recipe ?? ""),
+          // l'ordre d'affichage est celui du menu : dîners puis express
+          order: i,
+        };
+      })
+      .map(({ order: _order, ...rest }) => rest),
+    batch,
   };
-  return { ...base, menu: summary, validated: !!list, model: toDto(model), modes, excluded, criteria };
+  // une liste validée avant la dernière validation du menu est à refaire (CR-45) : la page se rouvre
+  const stale = !!list && !!menu.validated_at && list.validated_at < menu.validated_at;
+  return { ...base, menu: summary, validated: !!list && !stale, model: toDto(model), modes, excluded, criteria };
 }
 
 /**
@@ -287,6 +318,14 @@ export async function saveLightChoices(ctx: Ctx, session: SessionContext, modes:
   const settings = await loadSettings(ctx.db, who.accountId);
   const data = await loadEngineData(ctx.db, who.accountId, settings, { all: true });
   const dishes = data.dishes.filter((d) => modes[d.name] && data.refs.get(d.id)?.kind === "catalog");
+  const menu = await currentMenu(ctx.db, who.accountId, ctx.now);
+  if (menu) {
+    // un plat libre garde son choix dans sa ligne de menu (version proposée par l'IA)
+    const entries = await ctx.db.selectFrom("meal_menu_entries").select(["id", "dish_name"]).where("menu_id", "=", menu.id).where("light_by_ai", "=", true).execute();
+    await asProfile(ctx.db, who.userId, async (trx) => {
+      for (const e of entries) if (modes[e.dish_name]) await trx.updateTable("meal_menu_entries").set({ light_chosen: modes[e.dish_name] === "light" }).where("id", "=", e.id).execute();
+    });
+  }
   if (!dishes.length) return;
   await asProfile(ctx.db, who.userId, async (trx) => {
     for (const d of dishes) {

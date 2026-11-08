@@ -9,6 +9,7 @@ import { Button, ButtonLink, Loading, Notice, RetryNotice } from "@/components/u
 import { AGE_LABEL, comparatif, computeScenarios, isReplaced, norm, scenarioLines, selectedChoice, type DishMode, type ListItem, type ListSelection, type Scenario, type ScenarioLine } from "@/server/courses/engine";
 import { fromDto } from "@/server/courses/list/dto";
 import type { AddedLine, ListPrepared, ValidateLine } from "@/server/courses/list/service";
+import { BatchSession, RecipeList } from "./MenuRecipes";
 import styles from "./courses.module.css";
 
 const BACK = { href: "/courses", label: "Courses et repas" };
@@ -199,29 +200,9 @@ function Preparation({ list, reload }: { list: ListPrepared; reload: () => void 
         </Button>
       </div>
 
-      {rub("Menu validé et recettes", false, (
-        <ul style={{ margin: 0, paddingLeft: 0, listStyle: "none" }}>
-          {summary.days.map((d) => (
-            <li key={d.day} className={styles.line}>
-              <span className={styles.lineMain}>
-                <span className={styles.meta}>{d.day}</span>
-                <div className={styles.lineName}>{d.name}</div>
-              </span>
-              <span className={styles.meta}>{d.time}</span>
-            </li>
-          ))}
-        </ul>
-      ))}
-      {rub("Séance de batch", false, <p style={{ margin: 0 }}>Dimanche, {summary.session.label}{summary.session.estimated ? " (durée estimée)" : ""}{summary.session.theme ? ` · semaine type « ${summary.session.theme} »` : ""}. Lundi à vendredi.</p>)}
-      {rub("Plats express", false, (
-        <ul style={{ margin: 0, paddingLeft: 18 }}>
-          {summary.express.map((e) => (
-            <li key={e.name}>
-              {e.name} <span className={styles.meta}>⏱ {e.time}</span>
-            </li>
-          ))}
-        </ul>
-      ))}
+      {rub("Menu validé et recettes", false, <RecipeList recipes={summary.recipes.filter((r) => r.kind === "dinner")} householdSize={list.householdSize} title="Menu de la semaine : recettes" showDays />)}
+      {rub("Séance de batch", false, <BatchSession summary={summary} />)}
+      {rub("Plats express", false, <RecipeList recipes={summary.recipes.filter((r) => r.kind === "express")} householdSize={list.householdSize} title="Plats express : recettes" showDays={false} />)}
 
       {rub("Version standard ou allégée", true, (
         <>

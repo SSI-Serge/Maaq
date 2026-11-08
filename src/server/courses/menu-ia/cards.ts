@@ -16,6 +16,8 @@ export interface MenuCardEnvelope {
   card: "menu";
   proposal: MenuProposal;
   validatedAt: string | null;
+  /** Le foyer a répondu à « Ajouter ces plats à vos plats ? » (il a ajouté ou refusé). */
+  addAnswered?: boolean;
 }
 
 export function isCard(text: string): boolean {
@@ -94,14 +96,29 @@ export interface CardView {
   status: CardStatus;
   /** Un menu est déjà validé pour cette semaine : « Valider » demande confirmation, la liste sera refaite (CR-45). */
   replacesValidated: boolean;
+  /** Plats à proposer pour « Ajouter ces plats à vos plats ? » : carte validée, question pas encore répondue, plats qui ne sont pas dans Mes plats. */
+  addable: { slot: string; name: string }[];
 }
 
-export const cardView = (messageId: string, envelope: MenuCardEnvelope, newerSameWeek: boolean, replacesValidated: boolean): CardView => ({
+export const cardView = (messageId: string, envelope: MenuCardEnvelope, newerSameWeek: boolean, replacesValidated: boolean, addable: CardView["addable"] = []): CardView => ({
   messageId,
   proposal: envelope.proposal,
   status: statusOf(envelope, newerSameWeek),
   replacesValidated,
+  addable: envelope.validatedAt && !envelope.addAnswered && !newerSameWeek ? addable : [],
 });
+
+/** Plats du menu validé d'une semaine qui ne sont pas encore dans « Mes plats » (plats libres et du catalogue). */
+export async function addableDishes(db: Kysely<DB>, accountId: string, week: string): Promise<CardView["addable"]> {
+  const menu = await db.selectFrom("meal_menus").select("id").where("account_id", "=", accountId).where("week_start", "=", week as never).executeTakeFirst();
+  if (!menu) return [];
+  const rows = await db.selectFrom("meal_menu_entries").select(["kind", "slot", "dish_name", "dish_origin", "household_dish_id"]).where("menu_id", "=", menu.id).orderBy("kind").orderBy("slot").execute();
+  return rows.filter((r) => (r.kind === "dinner" || r.kind === "express") && r.dish_origin !== "household" && !r.household_dish_id).map((r) => ({ slot: `${r.kind}:${r.slot}`, name: r.dish_name }));
+}
+
+export async function markAddAnswered(db: Kysely<DB>, messageId: string, envelope: MenuCardEnvelope): Promise<void> {
+  await db.updateTable("agent_conversation_messages").set({ content: encrypt(encodeCard({ ...envelope, addAnswered: true }), key()) }).where("id", "=", messageId as never).execute();
+}
 
 const localDay = (d: Date | string) => (typeof d === "string" ? d.slice(0, 10) : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`);
 

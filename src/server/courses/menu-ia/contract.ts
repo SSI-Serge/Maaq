@@ -14,7 +14,7 @@ const text = (max: number) => z.string().trim().min(1).max(max);
 export const dishInput = z.strictObject({
   /** Identifiant d'un plat de « Mes plats » donné dans le contexte (« H:… ») ; sinon le plat est reconnu par son nom, ou c'est un plat libre. */
   plat_id: z.string().trim().max(60).optional(),
-  nom: text(160),
+  nom: text(80),
   /** Cuisine du plat (une de celles du contexte) : obligatoire pour un plat libre. */
   cuisine: z.string().trim().max(60).optional(),
   duree_minutes: z.number().int().min(1).max(600).optional(),
