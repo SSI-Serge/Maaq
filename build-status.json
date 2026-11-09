@@ -8,7 +8,7 @@
     {
       "at": "2026-11-09T02:30:00.000Z",
       "env": "preview",
-      "what": "Courses et repas : recettes et quantités écrites pour le nombre de personnes du foyer, quantités d ingrédients dans les scénarios d achat (paquets, produits au poids comptés, placard décoché, Quantité à vérifier), placard modifiable en console — rév. 00090",
+      "what": "Courses et repas : recettes et quantités écrites pour le nombre de personnes du foyer, quantités d ingrédients dans les scénarios d achat (paquets, produits au poids comptés, placard décoché, Quantité à vérifier), placard modifiable en console — rév. 00090. Base de test : rattrapage quantités reçu en version 23e5eef3 ; le dépôt porte 9f702bf4 (même résultat, seul le motif des accents change).",
       "storyIds": [
         "f21c5"
       ]
