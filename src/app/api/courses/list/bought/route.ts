@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 /** Coche un produit « acheté » en magasin, ou annule (couple seulement). */
 export const POST = handler(async (request: Request) => {
   const { session, ctx } = await requireProfile();
-  const body = await parseBody(request, z.object({ key: z.string().min(1).max(120), bought: z.boolean(), late: z.boolean() }));
+  const body = await parseBody(request, z.object({ key: z.string().min(1).max(120), bought: z.boolean(), late: z.boolean(), week: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() }));
   await setBought(ctx, session, body);
   return NextResponse.json({ ok: true });
 });

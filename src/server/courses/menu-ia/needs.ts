@@ -49,7 +49,7 @@ export async function applyNeedsToItems(trx: Kysely<DB>, accountId: string, menu
     const key = r.product_id ?? r.name_key ?? "";
     bucket.set(key, [...(bucket.get(key) ?? []), r]);
   }
-  const items = await trx.selectFrom("grocery_list_items").select(["id", "product_id", "name_key"]).where("account_id", "=", accountId).where("state", "=", "preparing").execute();
+  const items = await trx.selectFrom("grocery_list_items").select(["id", "product_id", "name_key"]).where("account_id", "=", accountId).where("menu_id", "=", menuId).where("state", "=", "preparing").execute();
   let applied = 0;
   for (const item of items) {
     const found = (item.product_id !== null ? byProduct.get(String(item.product_id)) : undefined) ?? byName.get(item.name_key);

@@ -5,6 +5,7 @@ import { nameKey, placeKey } from "../catalog/seed";
 import { applyTicket, pricePerMeasure, toMeasure, round2, ticketTotal, type Ticket } from "../engine";
 import { env } from "@/server/env";
 import { courseError, displayPlace, loadSettings, requireAccess, translateCourseError } from "../household/settings";
+import { menusForTicking } from "../list/weeks";
 import { maskTicketText } from "./mask";
 import { ticketReader, TicketReaderError, type TicketImage } from "./reader";
 import { normalizeDraft, normalizeTime, ticketStructurer, type TicketDraft } from "./structure";
@@ -147,12 +148,17 @@ export async function confirmTicket(ctx: Ctx, session: SessionContext, input: Ti
   const total = round2(lines.reduce((s, l) => s + l.total, 0));
   if (await isKnown(ctx, who.accountId, { store, date: input.date, time, total })) return { duplicate: true, recorded: 0, total, removed: [], aisles: [], shared: 0, receiptId: null, menuIa: false };
 
-  const open = await ctx.db
-    .selectFrom("grocery_list_items")
-    .select(["id", "label"])
-    .where("account_id", "=", who.accountId)
-    .where("state", "in", ["validated", "added_after_validation"])
-    .execute();
+  // un produit présent sur les listes des deux semaines est coché sur celle de la semaine en cours d'abord, puis sur l'autre (CR-54)
+  const order = await menusForTicking(ctx.db, who.accountId, ctx.now);
+  const rank = (id: string | null) => (id === null ? 99 : order.indexOf(id) < 0 ? 98 : order.indexOf(id));
+  const open = (
+    await ctx.db
+      .selectFrom("grocery_list_items")
+      .select(["id", "label", "menu_id"])
+      .where("account_id", "=", who.accountId)
+      .where("state", "in", ["validated", "added_after_validation"])
+      .execute()
+  ).sort((a, b) => rank(a.menu_id) - rank(b.menu_id));
   const ticket: Ticket = { store, date: input.date, lines: lines.map((l) => ({ product: l.product, ref: l.reference ?? "", total: l.total, qty: l.qty, rayon: l.aisle })) };
   const outcome = applyTicket(ticket, [], open.map((o) => o.label));
   const removedLabels = new Set(outcome.removedFromList);
@@ -175,7 +181,14 @@ export async function confirmTicket(ctx: Ctx, session: SessionContext, input: Ti
         .values(lines.map((l, i) => ({ receipt_id: receipt.id, account_id: who.accountId, position: i + 1, label: l.product, name_key: keys[i], reference_name: l.reference, line_total: l.total.toFixed(2), quantity: l.qty.toFixed(3), measured_quantity: l.measure ? l.measure.amount.toFixed(3) : null, measure_unit: l.measure?.unit ?? null, price_per_measure: l.readPerMeasure && l.perMeasure ? l.perMeasure.toFixed(2) : null, aisle_id: l.aisleId, product_id: byKey.get(keys[i]) ?? null })))
         .execute();
       // produits de la liste trouvés sur le ticket : cochés « acheté » (ils sortent de la liste et rejoignent l'historique)
-      const ids = open.filter((o) => removedLabels.has(o.label)).map((o) => o.id);
+      const taken = new Set<string>();
+      const ids = open
+        .filter((o) => {
+          if (!removedLabels.has(o.label) || taken.has(o.label)) return false;
+          taken.add(o.label);
+          return true;
+        })
+        .map((o) => o.id);
       if (ids.length) await trx.updateTable("grocery_list_items").set({ state: "bought", bought_at: ctx.now, bought_by_user_id: who.userId, updated_at: ctx.now }).where("id", "in", ids).execute();
       for (const [i, l] of lines.entries()) {
         // ligne pesée : seul le prix au kilo ou au litre est partagé, jamais le poids (CR-40)

@@ -12,6 +12,7 @@ import { addableDishes, cardView, isCard, menuInProgress, parseCard, saveMenuCar
 import type { MenuProgress } from "../menu-ia/progress";
 import { runCourseAgent, type CourseAgentResult } from "./agent";
 import { toolContext } from "./tools";
+import { checkWeek, weekChoices } from "../list/weeks";
 
 /**
  * Tchat de l'agent « Courses et repas » : le message est rangé chiffré, l'agent répond en s'appuyant sur les outils de MAAQ, la réponse est rangée à son tour. Mêmes règles que
@@ -65,11 +66,12 @@ export interface CourseDeps {
   onProgress?: (progress: MenuProgress) => void;
 }
 
-export async function sendCourseMessage(ctx: Ctx, session: SessionContext, input: { requestId: string; text: string }, deps: CourseDeps = {}): Promise<CourseReply> {
+export async function sendCourseMessage(ctx: Ctx, session: SessionContext, input: { requestId: string; text: string; week?: string | null }, deps: CourseDeps = {}): Promise<CourseReply> {
   const who = await requireAccess(ctx, session, "list");
   const text = input.text.trim();
   if (!text) throw new Rejection("empty_request", "Écrivez votre demande avant de l'envoyer.", 422);
   if (text.length > MAX_COURSE_TEXT) throw new Rejection("request_too_long", `Votre demande dépasse ${MAX_COURSE_TEXT} caractères.`, 422);
+  const asked = checkWeek(input.week, ctx.now);
   const model = deps.model ?? courseModel();
   const conversation = await conversationOf(ctx.db, who.accountId, session.user.id, ctx.now);
 
@@ -127,12 +129,15 @@ export async function sendCourseMessage(ctx: Ctx, session: SessionContext, input
 
   const settings = who.access === "couple" ? await loadSettings(ctx.db, who.accountId) : null;
   const timeZone = session.device.timezone || "Europe/Paris";
-  const tool = await toolContext(ctx, session);
-  const open = who.access === "couple" ? await menuInProgress(ctx.db, conversation.id, since) : null;
+  const found = who.access === "couple" ? await menuInProgress(ctx.db, conversation.id, since) : null;
+  // un menu en cours d'une autre semaine que celle choisie n'est pas celui dont on parle
+  const open = found && (!asked || found.proposal.week === asked) ? found : null;
+  const tool = await toolContext(ctx, session, asked ?? open?.proposal.week ?? null);
+  const chosen = tool.menu.week ? (await weekChoices(ctx.db, who.accountId, ctx.now)).find((w) => w.week === tool.menu.week) : undefined;
   const result: CourseAgentResult = await runCourseAgent({
     model,
     tool,
-    facts: { now: ctx.now, timeZone, budgetDay: !!settings && ctx.now.getDate() === settings.budgetDay, missingSettings: settings?.missing ?? [], access: who.access, menuInProgress: open ? summaryForModel(open.proposal) : null },
+    facts: { now: ctx.now, timeZone, budgetDay: !!settings && ctx.now.getDate() === settings.budgetDay, missingSettings: settings?.missing ?? [], access: who.access, menuInProgress: open ? summaryForModel(open.proposal) : null, week: chosen ? { label: chosen.label, hasMenu: chosen.hasMenu } : null },
     text,
     history: recent
       .map((m) => ({ role: m.sender === "agent" ? ("assistant" as const) : ("user" as const), text: decrypt(m.content!, key()) }))

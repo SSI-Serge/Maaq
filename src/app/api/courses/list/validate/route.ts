@@ -23,6 +23,6 @@ const line = z.object({
 /** Valide le scénario choisi : la liste passe dans « Ma liste de courses » (US-157 RF7, couple seulement). */
 export const POST = handler(async (request: Request) => {
   const { session, ctx } = await requireProfile();
-  const body = await parseBody(request, z.object({ scenario: z.union([z.literal(1), z.literal(2), z.literal(3)]), lines: z.array(line).min(1).max(400) }));
+  const body = await parseBody(request, z.object({ scenario: z.union([z.literal(1), z.literal(2), z.literal(3)]), lines: z.array(line).min(1).max(400), week: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() }));
   return NextResponse.json({ validated: await validateList(ctx, session, body) });
 });

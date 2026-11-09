@@ -32,6 +32,8 @@ export interface CourseContextFacts {
   access: "couple" | "list";
   /** Menu proposé et pas encore validé (noms des plats seulement) : le modèle le corrige quand l'utilisateur le demande. */
   menuInProgress?: string | null;
+  /** Semaine choisie au début de la conversation (CR-54) : « du 9 au 15 nov. » et un menu est-il déjà validé pour elle. */
+  week?: { label: string; hasMenu: boolean } | null;
 }
 
 /** Les outils de l'agent : ceux du fichier, plus la composition du menu pour les parents quand elle est ouverte (MENU_IA). */
@@ -52,6 +54,7 @@ export function contextBlock(facts: CourseContextFacts): string {
     `Jour du budget : ${facts.budgetDay ? "oui, c'est aujourd'hui" : "non"}\n` +
     `Réglages du foyer à renseigner : ${facts.missingSettings.length ? facts.missingSettings.map((m) => MISSING_TEXT[m] ?? m).join(", ") : "aucun"}\n` +
     `Droit de la personne qui écrit : ${facts.access === "couple" ? "parent du couple (tout)" : "invité secondaire (liste de courses seulement)"}\n` +
+    (facts.week ? `Semaine choisie pour le menu et la liste : ${facts.week.label} (${facts.week.hasMenu ? "un menu est déjà validé pour cette semaine : le remplacer demande la confirmation de la personne" : "pas encore de menu validé"}). MAAQ place le menu composé sur cette semaine.\n` : "") +
     (facts.menuInProgress ? `${facts.menuInProgress}\n` : "") +
     "</contexte>"
   );

@@ -14,7 +14,7 @@ export const GET = handler(async () => {
   return NextResponse.json({ messages: await listCourseMessages(ctx, session) });
 });
 
-const schema = z.object({ requestId: z.string().uuid(), text: z.string().max(MAX_COURSE_TEXT + 100) });
+const schema = z.object({ requestId: z.string().uuid(), text: z.string().max(MAX_COURSE_TEXT + 100), week: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() });
 
 /**
  * Envoie un message à l'agent ; un renvoi avec le même identifiant de demande ne refait rien. Avec `Accept: application/x-ndjson`, la réponse est un flux de lignes JSON : le menu

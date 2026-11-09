@@ -122,7 +122,7 @@ function Home({ home }: { home: CourseHome }) {
           ),
         )}
       </nav>
-      <ChatPanel couple={couple} startMenu={startMenu} fromTicket={fromTicket} />
+      <ChatPanel couple={couple} startMenu={startMenu} fromTicket={fromTicket} weeks={home.weeks} />
     </>
   );
 }

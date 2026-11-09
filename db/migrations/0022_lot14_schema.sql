@@ -505,6 +505,8 @@ CREATE TABLE grocery_list_items (
   id                   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   account_id           uuid NOT NULL REFERENCES accounts (id) ON DELETE CASCADE,
   list_id              uuid,
+  -- Menu (donc semaine) auquel le produit appartient, pour tout produit : en préparation, validé, acheté, ajouté depuis la validation. Vide seulement pour un ajout à la main quand aucun menu n'existe (CR-54, CR-55)
+  menu_id              uuid,
   -- preparing = en préparation (ingrédients du menu, produits ajoutés, historique) ; validated = dans la liste validée ; added_after_validation = ajouté
   -- depuis la validation, sans magasin ni prix (CR-28) ; bought = acheté (rejoint l'historique)
   state                grocery_item_state NOT NULL DEFAULT 'preparing',
@@ -515,7 +517,7 @@ CREATE TABLE grocery_list_items (
   aisle_id             integer REFERENCES grocery_aisles (id) ON DELETE SET NULL,
   quantity             smallint NOT NULL DEFAULT 1 CHECK (quantity BETWEEN 1 AND 99),
   added_by_user_id     uuid,
-  -- Repris de la liste précédente : « pas acheté la dernière fois » (CR-28)
+  -- Inutilisé depuis CR-55 (les produits non achetés ne sont plus recopiés dans la semaine suivante : pense-bête calculé à la lecture) ; gardé pour les données existantes (CR-28)
   not_bought_last_time boolean NOT NULL DEFAULT false,
   -- Choix du scénario, posés à la validation (estimation : prix d'une unité × quantité)
   store_chain          varchar(80) CHECK (store_chain IS NULL OR (store_chain <> '' AND store_chain = grocery_norm(store_chain))),
@@ -537,6 +539,7 @@ CREATE TABLE grocery_list_items (
   updated_at           timestamptz NOT NULL DEFAULT now(),
   UNIQUE (id, account_id),
   CONSTRAINT fk_grocery_list_items_list FOREIGN KEY (list_id, account_id) REFERENCES grocery_lists (id, account_id) ON DELETE RESTRICT,
+  CONSTRAINT fk_grocery_list_items_menu FOREIGN KEY (menu_id, account_id) REFERENCES meal_menus (id, account_id) ON DELETE CASCADE,
   CONSTRAINT fk_grocery_list_items_added_by FOREIGN KEY (added_by_user_id, account_id) REFERENCES users (id, account_id) ON DELETE SET NULL (added_by_user_id),
   CONSTRAINT fk_grocery_list_items_bought_by FOREIGN KEY (bought_by_user_id, account_id) REFERENCES users (id, account_id) ON DELETE SET NULL (bought_by_user_id),
   CONSTRAINT ck_grocery_list_items_bought CHECK ((state = 'bought') = (bought_at IS NOT NULL)),
@@ -544,7 +547,8 @@ CREATE TABLE grocery_list_items (
   CONSTRAINT ck_grocery_list_items_no_store CHECK (state NOT IN ('preparing', 'added_after_validation') OR (store_chain IS NULL AND reference_name IS NULL AND unit_price IS NULL AND price_unit IS NULL)),
   CONSTRAINT ck_grocery_list_items_price_store CHECK (unit_price IS NULL OR store_chain IS NOT NULL),
   CONSTRAINT ck_grocery_list_items_price_unit CHECK (price_unit IS NULL OR store_chain IS NOT NULL),
-  CONSTRAINT ck_grocery_list_items_needed CHECK ((needed_amount IS NULL) = (needed_unit IS NULL))
+  CONSTRAINT ck_grocery_list_items_needed CHECK ((needed_amount IS NULL) = (needed_unit IS NULL)),
+  CONSTRAINT ck_grocery_list_items_menu CHECK (menu_id IS NOT NULL OR (state = 'preparing' AND source = 'added'))
 );
 -- ---------------------------------------------------------------------
 -- Tickets de caisse (US-161, US-163) : aucune photo (supprimée dès la lecture, CR-05), seulement le texte lu et les montants. Conservés 3 ans.
@@ -769,10 +773,19 @@ BEGIN
   RETURN NEW;
 END $$;
 CREATE FUNCTION grocery_list_item_before_write() RETURNS trigger LANGUAGE plpgsql AS $$
-DECLARE v_user uuid := app_current_user_id();
+DECLARE v_user uuid := app_current_user_id(); v_menu uuid;
 BEGIN
   IF TG_OP = 'UPDATE' AND NEW.account_id IS DISTINCT FROM OLD.account_id THEN
     RAISE EXCEPTION 'Un produit de la liste ne change pas de foyer' USING ERRCODE = 'check_violation';
+  END IF;
+  -- Le produit appartient au menu de sa liste (CR-54) : rempli à partir de la liste s'il est vide, refusé s'il diffère
+  IF NEW.list_id IS NOT NULL THEN
+    SELECT l.menu_id INTO v_menu FROM grocery_lists l WHERE l.id = NEW.list_id AND l.account_id = NEW.account_id;
+    IF NEW.menu_id IS NULL THEN
+      NEW.menu_id := v_menu;
+    ELSIF v_menu IS DISTINCT FROM NEW.menu_id THEN
+      RAISE EXCEPTION 'Un produit de la liste appartient au menu de sa liste' USING ERRCODE = 'check_violation';
+    END IF;
   END IF;
   -- Invité secondaire (CR-10, CR-38) : il ajoute un produit en son nom, augmente sa quantité en le rajoutant, ou coche « acheté » un article de la liste validée ; rien d'autre
   IF v_user IS NOT NULL AND grocery_access(v_user) = 'list' THEN
@@ -798,27 +811,82 @@ CREATE FUNCTION grocery_list_for(p_viewer uuid)
 RETURNS TABLE (id uuid, list_id uuid, state grocery_item_state, source text, label varchar, name_key text, product_id bigint, aisle_id integer, quantity smallint,
                added_by_user_id uuid, not_bought_last_time boolean, store_chain varchar, reference_name varchar, unit_price numeric, bought_at timestamptz,
                bought_by_user_id uuid, package_format varchar, price_unit varchar, needed_amount numeric, needed_unit text, quantity_to_check boolean, is_pantry boolean,
-               is_selected boolean)
+               is_selected boolean, menu_id uuid)
 LANGUAGE sql STABLE AS $$
   SELECT i.id, i.list_id, i.state, i.source, i.label, i.name_key, i.product_id, i.aisle_id, i.quantity, i.added_by_user_id, i.not_bought_last_time,
          i.store_chain, i.reference_name, CASE WHEN grocery_access(p_viewer) = 'couple' THEN i.unit_price END, i.bought_at, i.bought_by_user_id,
          (SELECT r.package_format FROM grocery_product_references r
            WHERE r.product_id = i.product_id AND r.store_chain = i.store_chain AND r.reference_name = i.reference_name),
-         i.price_unit, i.needed_amount, i.needed_unit, i.quantity_to_check, i.is_pantry, i.is_selected
+         i.price_unit, i.needed_amount, i.needed_unit, i.quantity_to_check, i.is_pantry, i.is_selected, i.menu_id
     FROM users v
     JOIN grocery_list_items i ON i.account_id = v.account_id
    WHERE v.id = p_viewer AND grocery_access(p_viewer) IS NOT NULL
 $$;
--- À la préparation de la liste suivante, les produits non achetés (liste validée et « ajoutés depuis la validation ») reviennent en préparation
-CREATE FUNCTION grocery_carry_over_unbought(p_account uuid) RETURNS integer LANGUAGE plpgsql AS $$
-DECLARE v_n integer;
+-- Pas encore acheté la semaine d'avant (CR-55, US-157 RF3bis) : pense-bêtes calculés à la lecture, jamais recopiés. Source : la plus récente liste encore existante d'une semaine
+-- antérieure au menu visé ; produits validés ou ajoutés après la validation, non cochés « acheté ». Ils restent sur leur liste d'origine ; ils disparaissent dès que le produit est
+-- acheté sur cette liste, ou quand le produit existe dans la semaine visée (un pense-bête coché y devient un produit de la semaine).
+CREATE FUNCTION grocery_leftovers_for(p_viewer uuid, p_menu uuid)
+RETURNS TABLE (source_item_id uuid, origin_list_id uuid, origin_menu_id uuid, origin_week_start date, label varchar, name_key text, product_id bigint, aisle_id integer, quantity smallint,
+               store_chain varchar, reference_name varchar, unit_price numeric, price_unit varchar, needed_amount numeric, needed_unit text, quantity_to_check boolean,
+               is_pantry boolean, is_selected boolean)
+LANGUAGE sql STABLE AS $$
+  WITH target AS (
+    SELECT m.id, m.account_id, m.week_start
+      FROM meal_menus m
+      JOIN users v ON v.account_id = m.account_id
+     WHERE m.id = p_menu AND v.id = p_viewer AND grocery_access(p_viewer) IS NOT NULL),
+  origin AS (
+    SELECT l.id AS list_id, om.id AS menu_id, om.week_start
+      FROM target t
+      JOIN meal_menus om ON om.account_id = t.account_id AND om.week_start < t.week_start
+      JOIN grocery_lists l ON l.menu_id = om.id AND l.account_id = om.account_id
+     ORDER BY om.week_start DESC
+     LIMIT 1)
+  SELECT i.id, o.list_id, o.menu_id, o.week_start, i.label, i.name_key, i.product_id, i.aisle_id, i.quantity, i.store_chain, i.reference_name,
+         CASE WHEN grocery_access(p_viewer) = 'couple' THEN i.unit_price END, i.price_unit, i.needed_amount, i.needed_unit, i.quantity_to_check, i.is_pantry, false
+    FROM origin o
+    JOIN grocery_list_items i ON i.list_id = o.list_id
+   WHERE i.state IN ('validated', 'added_after_validation')
+     AND NOT EXISTS (SELECT 1 FROM target t JOIN grocery_list_items n ON n.account_id = t.account_id AND n.menu_id = t.id WHERE n.name_key = i.name_key)
+$$;
+-- Suppression d'un menu ou d'une liste (CR-54, US-157 RF11) : vraie suppression, en une transaction, couple seulement, même avec des produits achetés. Ne touche ni les tickets, ni les prix
+-- partagés, ni les plats copiés dans Mes plats, ni le compteur de menus du jour. Le profil est lu dans app.user_id (comme le garde-fou de la liste) : sans profil indiqué, pas de contrôle (H144).
+CREATE FUNCTION delete_meal_menu(p_menu uuid) RETURNS boolean LANGUAGE plpgsql AS $$
+DECLARE v_user uuid := app_current_user_id(); v_account uuid;
 BEGIN
-  UPDATE grocery_list_items
-     SET state = 'preparing', list_id = NULL, store_chain = NULL, reference_name = NULL, unit_price = NULL, price_unit = NULL, not_bought_last_time = true,
-         needed_amount = NULL, needed_unit = NULL, quantity_to_check = false, is_pantry = false, is_selected = true
-   WHERE account_id = p_account AND state IN ('validated', 'added_after_validation');
-  GET DIAGNOSTICS v_n = ROW_COUNT;
-  RETURN v_n;
+  IF v_user IS NOT NULL AND grocery_access(v_user) IS DISTINCT FROM 'couple' THEN
+    RAISE EXCEPTION 'Seul le couple du foyer supprime un menu' USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  SELECT account_id INTO v_account FROM meal_menus WHERE id = p_menu;
+  IF v_account IS NULL THEN
+    RETURN false;
+  END IF;
+  IF v_user IS NOT NULL AND (SELECT grocery_couple_account()) IS DISTINCT FROM v_account THEN
+    RAISE EXCEPTION 'Ce menu n''est pas celui de votre foyer' USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  DELETE FROM grocery_list_items WHERE menu_id = p_menu AND account_id = v_account;
+  DELETE FROM grocery_lists WHERE menu_id = p_menu AND account_id = v_account;
+  DELETE FROM meal_menus WHERE id = p_menu AND account_id = v_account;
+  RETURN true;
+END $$;
+CREATE FUNCTION delete_grocery_list(p_menu uuid) RETURNS boolean LANGUAGE plpgsql AS $$
+DECLARE v_user uuid := app_current_user_id(); v_account uuid; v_n integer; v_total integer := 0;
+BEGIN
+  IF v_user IS NOT NULL AND grocery_access(v_user) IS DISTINCT FROM 'couple' THEN
+    RAISE EXCEPTION 'Seul le couple du foyer supprime une liste' USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  SELECT account_id INTO v_account FROM meal_menus WHERE id = p_menu;
+  IF v_account IS NULL THEN
+    RETURN false;
+  END IF;
+  IF v_user IS NOT NULL AND (SELECT grocery_couple_account()) IS DISTINCT FROM v_account THEN
+    RAISE EXCEPTION 'Ce menu n''est pas celui de votre foyer' USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  DELETE FROM grocery_list_items WHERE menu_id = p_menu AND account_id = v_account;
+  GET DIAGNOSTICS v_n = ROW_COUNT; v_total := v_total + v_n;
+  DELETE FROM grocery_lists WHERE menu_id = p_menu AND account_id = v_account;
+  GET DIAGNOSTICS v_n = ROW_COUNT; v_total := v_total + v_n;
+  RETURN v_total > 0;
 END $$;
 CREATE FUNCTION grocery_receipt_line_measure_before_write() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE v numeric;
@@ -1151,10 +1219,12 @@ CREATE INDEX idx_meal_menu_session_steps_account ON meal_menu_session_steps (acc
 CREATE INDEX idx_meal_menu_session_steps_entry ON meal_menu_session_steps (entry_id, menu_id) WHERE entry_id IS NOT NULL;
 CREATE INDEX idx_meal_light_choices_dish_id ON meal_light_choices (dish_id);
 CREATE INDEX idx_grocery_lists_account ON grocery_lists (account_id, validated_at DESC);
-CREATE INDEX idx_grocery_lists_menu ON grocery_lists (menu_id, account_id) WHERE menu_id IS NOT NULL;
+-- Une liste par menu (CR-54) : chaque semaine a son menu et sa liste
+CREATE UNIQUE INDEX ux_grocery_lists_menu ON grocery_lists (menu_id) WHERE menu_id IS NOT NULL;
 CREATE INDEX idx_grocery_lists_validated_by ON grocery_lists (validated_by_user_id, account_id);
--- Un produit déjà dans la liste n'est pas ajouté deux fois : sa quantité augmente (US-158 RF3)
-CREATE UNIQUE INDEX ux_grocery_list_items_open ON grocery_list_items (account_id, name_key) WHERE state <> 'bought';
+-- Un produit déjà dans la liste d'une semaine n'est pas ajouté deux fois : sa quantité augmente (US-158 RF3) ; chaque semaine a ses produits (CR-54). Sans menu, les produits ajoutés à la main restent uniques par nom.
+CREATE UNIQUE INDEX ux_grocery_list_items_open ON grocery_list_items (account_id, menu_id, name_key) NULLS NOT DISTINCT WHERE state <> 'bought';
+CREATE INDEX idx_grocery_list_items_menu ON grocery_list_items (menu_id, account_id) WHERE menu_id IS NOT NULL;
 CREATE INDEX idx_grocery_list_items_list ON grocery_list_items (list_id, account_id) WHERE list_id IS NOT NULL;
 CREATE INDEX idx_grocery_list_items_history ON grocery_list_items (account_id, bought_at DESC) WHERE state = 'bought';
 CREATE INDEX idx_grocery_list_items_product_id ON grocery_list_items (product_id) WHERE product_id IS NOT NULL;
@@ -1451,18 +1521,21 @@ COMMENT ON FUNCTION meal_menu_entry_needs_ingredient() IS $$Contrôle différé 
 COMMENT ON VIEW v_meal_menu_needs IS $$Besoins d'un menu validé par produit (ou par nom d'ingrédient inconnu du catalogue) et par unité de base (g, ml, piece) : total des quantités, nombre d'ingrédients additionnés, needs_check (une quantité manque : 1 unité et « Quantité à vérifier »), is_pantry (produit « placard » ou quantité en cuillère ou en pincée : décoché par défaut). Les cuillères, pincées et quantités absentes ont une unité de base vide. L'application divise ensuite le total par le format de la référence choisie et arrondit au paquet supérieur. Vue à droits de l'appelant : la sécurité par ligne du couple s'applique. [US-157 RF7bis, CR-50]$$;
 COMMENT ON FUNCTION meal_menu_entry_light_item_before_write() IS $$Refuse une adaptation de version allégée sur un plat de menu qui n'a pas de version allégée proposée par l'IA. [US-157 RF5, CR-42]$$;
 COMMENT ON TABLE meal_light_choices IS $$Choix du foyer, plat par plat, entre la version standard et la version allégée : enregistré à « Valider ma liste » et repris au menu suivant. Un retour à la version standard rétablit la liste. [US-157 RF5, RF9]$$;
-COMMENT ON TABLE grocery_lists IS $$Liste de courses validée (« Valider ma liste ») : scénario d'achat choisi, menu d'origine, date, profil. La dernière liste validée est « Ma liste de courses », consultée en magasin par magasin puis par rayon. La liste vide de tout produit est supprimée par la purge. [US-157 RF7, RF9]$$;
-COMMENT ON TABLE grocery_list_items IS $$Produit de la liste de courses du foyer, avec son état : en préparation, validé, ajouté depuis la validation (sans magasin ni prix, en tête de « Ma liste de courses »), acheté. Un produit n'est qu'une fois dans la liste ouverte (la quantité augmente). Les produits non achetés reviennent en préparation avec « pas acheté la dernière fois » (grocery_carry_over_unbought). Les produits achetés forment l'historique du foyer, conservé 3 mois (réglable). Le couple retire tout ; un invité secondaire ne retire que ses propres ajouts, n'augmente que les quantités et peut cocher « acheté » (CR-38), sans voir aucun prix (grocery_list_for). [US-157 RF3, RF9, US-158, US-162, CR-10, CR-27, CR-28]$$;
+COMMENT ON TABLE grocery_lists IS $$Liste de courses validée (« Valider ma liste ») : scénario d'achat choisi, menu d'origine (une seule liste par menu, donc par semaine, CR-54), date, profil. « Ma liste de courses » est la liste de la semaine affichée, consultée en magasin par magasin puis par rayon. La liste vide de tout produit est supprimée par la purge. Supprimée avec son menu (delete_meal_menu) ou seule (delete_grocery_list). [US-157 RF7, RF9, RF9bis, RF11, CR-54]$$;
+COMMENT ON TABLE grocery_list_items IS $$Produit de la liste de courses du foyer, avec son état : en préparation, validé, ajouté depuis la validation (sans magasin ni prix, en tête de « Ma liste de courses »), acheté. Un produit n'est qu'une fois dans la liste ouverte d'une semaine (la quantité augmente) ; chaque produit appartient à un menu (menu_id). Les produits non achetés d'une semaine ne sont plus recopiés : la semaine suivante les voit en pense-bête décoché (grocery_leftovers_for), ils restent sur leur liste. Les produits achetés forment l'historique du foyer, conservé 3 mois (réglable). Le couple retire tout ; un invité secondaire ne retire que ses propres ajouts, n'augmente que les quantités et peut cocher « acheté » (CR-38), sans voir aucun prix (grocery_list_for). [US-157 RF3, RF3bis, RF9, US-158, US-162, CR-10, CR-27, CR-28, CR-54, CR-55]$$;
 COMMENT ON COLUMN grocery_list_items.needed_amount IS $$Besoin du menu pour ce produit, additionné sur tous les plats (plats express compris) pour le nombre de personnes du foyer, en g, ml ou pièce ; sert à afficher l'origine de la quantité (« 2 paquets · 900 g pour le menu »). Pour un produit au poids, poids x prix au kilo entre dans le total. Vide pour un produit ajouté à la main ou de l'historique (1 par défaut). [US-157 RF7bis, RF8, CR-50]$$;
 COMMENT ON COLUMN grocery_list_items.needed_unit IS $$Unité de needed_amount : g, ml ou piece. Vide en même temps que la quantité. [CR-50]$$;
 COMMENT ON COLUMN grocery_list_items.quantity_to_check IS $$Vrai quand la quantité n'a pas pu être calculée (format de la référence inconnu, unité incompatible comme « 2 pièces » pour une référence en grammes, quantité absente) : 1 unité, avec la mention « Quantité à vérifier ». [US-157 RF7bis, CR-50]$$;
 COMMENT ON COLUMN grocery_list_items.is_pantry IS $$Produit « placard » (étiquette du produit ou quantité en cuillère ou en pincée) : affiché avec « Vous en avez peut-être déjà ». [US-157 RF7bis, CR-50]$$;
 COMMENT ON COLUMN grocery_list_items.is_selected IS $$Coché pour l'achat. Un produit « placard » démarre décoché et ne compte dans le total que s'il est coché. [US-157 RF7bis, CR-50]$$;
 COMMENT ON COLUMN grocery_list_items.price_unit IS $$Unité de unit_price, copiée de la référence choisie à la validation : unit (ou vide) = par article, kg ou l = par kilo ou par litre. Un article au kilo ou au litre s'affiche « x,xx €/kg » avec la mention « prix au kilo, non totalisé » et n'entre pas dans le total estimé : l'application ne totalise que les articles dont price_unit est vide ou unit. Aucun poids n'est supposé. [CR-40]$$;
+COMMENT ON COLUMN grocery_list_items.menu_id IS $$Menu (donc semaine) du produit, renseigné pour tout produit : en préparation, validé, acheté ou ajouté depuis la validation. Il suit toujours le menu de la liste du produit (rempli à partir de la liste s'il est vide, refusé s'il diffère). Vide seulement pour un ajout à la main en préparation quand aucun menu n'existe ; le premier menu validé le reprend (application). Supprimé avec son menu (cascade). [US-157 RF3bis, RF9bis, RF11, CR-54, CR-55]$$;
 COMMENT ON COLUMN grocery_list_items.state IS $$preparing = en préparation (aucun magasin, aucun prix) ; validated = dans la liste validée, avec son magasin, sa référence et son prix estimé ; added_after_validation = ajouté depuis la validation, sans magasin ni prix ; bought = acheté (date et profil). [US-157 RF9, US-158 RF3bis, CR-28]$$;
-COMMENT ON FUNCTION grocery_list_item_before_write() IS $$Garde-fou de la liste de courses : un invité secondaire (profil indiqué dans app.user_id) peut ajouter un produit en son nom, augmenter une quantité, cocher « acheté » n'importe quel article de la liste validée (état validé ou ajouté depuis la validation, à son nom) et décocher ce qu'il a lui-même coché ; il ne change jamais un magasin, une référence, un prix, une quantité en même temps ni le libellé. Sans profil indiqué, le garde-fou ne s'applique pas (H144). [US-158 RF2, RF3, US-162, CR-10, CR-38]$$;
-COMMENT ON FUNCTION grocery_list_for(uuid) IS $$Articles de la liste de courses de la famille d'un profil, pour l'affichage : le prix estimé n'est rendu qu'au couple, l'invité secondaire ne voit aucun prix (il voit le magasin, la référence, le format du conditionnement et l'unité du prix, sans prix). L'application l'utilise pour lire la liste ; tant qu'elle se connecte avec un seul rôle, la protection effective des colonnes est cette fonction et le code (H150). [US-157 RF7bis, RF8, US-158, CR-10, CR-38, CR-40, CR-50]$$;
-COMMENT ON FUNCTION grocery_carry_over_unbought(uuid) IS $$Reprend dans la préparation suivante les produits non achetés de la liste validée et du bloc « Ajoutés depuis la validation » : ils redeviennent « en préparation », sans magasin ni prix, avec la mention « pas acheté la dernière fois ». Retourne le nombre de produits repris. À appeler à l'ouverture de la préparation de la liste. [US-162 RF4, CR-28]$$;
+COMMENT ON FUNCTION grocery_list_item_before_write() IS $$Garde-fou de la liste de courses : un invité secondaire (profil indiqué dans app.user_id) peut ajouter un produit en son nom, augmenter une quantité, cocher « acheté » n'importe quel article de la liste validée (état validé ou ajouté depuis la validation, à son nom) et décocher ce qu'il a lui-même coché ; il ne change jamais un magasin, une référence, un prix, une quantité en même temps ni le libellé. Il rattache aussi le produit au menu de sa liste (rempli s'il est vide, refusé s'il diffère, CR-54). Sans profil indiqué, le garde-fou de l'invité secondaire ne s'applique pas (H144). [US-158 RF2, RF3, US-162, CR-10, CR-38, CR-54]$$;
+COMMENT ON FUNCTION grocery_list_for(uuid) IS $$Articles de la liste de courses de la famille d'un profil, pour l'affichage : le prix estimé n'est rendu qu'au couple, l'invité secondaire ne voit aucun prix (il voit le magasin, la référence, le format du conditionnement et l'unité du prix, sans prix). L'application l'utilise pour lire la liste ; tant qu'elle se connecte avec un seul rôle, la protection effective des colonnes est cette fonction et le code (H150). [US-157 RF7bis, RF8, RF9bis, US-158, CR-10, CR-38, CR-40, CR-50, CR-54]$$;
+COMMENT ON FUNCTION grocery_leftovers_for(uuid, uuid) IS $$Pense-bêtes « Pas encore acheté (semaine du …) » d'un menu : les produits validés ou ajoutés après la validation, non achetés, de la plus récente liste encore existante d'une semaine antérieure à ce menu (une semaine sautée ne bloque rien ; sans liste précédente, rien n'est repris). Calculés à la lecture : décochés (is_selected faux), hors total tant que l'utilisateur ne les coche pas, toujours présents sur leur liste d'origine ; ils disparaissent quand le produit est acheté sur cette liste ou quand le produit existe déjà dans la semaine visée (un pense-bête coché y devient un produit, copié par l'application). Le prix estimé n'est rendu qu'au couple. Remplace grocery_carry_over_unbought. [US-157 RF3bis, CR-55]$$;
+COMMENT ON FUNCTION delete_meal_menu(uuid) IS $$Supprime définitivement un menu validé : ses produits de liste (achetés et ajoutés à la main compris), sa liste de courses, son déroulé de séance, ses lignes de menu, leurs ingrédients et leurs quantités. Ne touche ni les tickets, ni les prix, ni les plats copiés dans Mes plats, ni le compteur de menus du jour (un menu supprimé reste compté). Réservée au couple du foyer (profil lu dans app.user_id) ; rend faux si le menu n'existe pas. Le menu sort de l'historique (« déjà servi le … »). [US-156 RF1bis, US-157 RF11, RT3, CR-54]$$;
+COMMENT ON FUNCTION delete_grocery_list(uuid) IS $$Supprime définitivement la liste de courses d'un menu et tous ses produits (achetés et ajoutés à la main compris) ; le menu, ses recettes et son déroulé sont gardés, la liste repart de zéro à partir du menu. Ne touche ni les tickets, ni les prix, ni le compteur de menus du jour. Réservée au couple du foyer (profil lu dans app.user_id) ; rend vrai si quelque chose a été supprimé. [US-157 RF11, RT3, CR-54, CR-55]$$;
 COMMENT ON TABLE grocery_receipts IS $$Ticket de caisse enregistré : magasin, ville, date, heure, total, profil. Aucune photo ni image (supprimée dès la lecture, confirmée ou non), le nom et la carte de fidélité sont masqués avant que l'agent ne reçoive le texte. Un doublon est refusé en entier par la base : même date, même heure exacte et même total (le magasin n'entre pas en compte) ; sans heure (anciens tickets), même magasin, même date et même total. Source du budget par rayon. Conservé 3 ans (année en cours et deux précédentes, réglable). [US-161, US-163, CR-05, CR-08, CR-23, CR-41]$$;
 COMMENT ON COLUMN grocery_receipts.purchased_time IS $$Heure du ticket (heures, minutes et secondes si elles sont lues, sinon secondes à 00), heure locale du magasin. Lue sur le ticket ou saisie par l'utilisateur quand elle n'est pas lue. Vide pour les tickets enregistrés avant CR-41 : leur contrôle de doublon reste magasin, date et total. [CR-41, US-161 RT2]$$;
 COMMENT ON COLUMN grocery_receipt_lines.measured_quantity IS $$Poids ou volume mesuré à la caisse, en kilogrammes ou en litres (« 1,234 kg ») ; vide pour une ligne vendue à la pièce. Les grammes et les centilitres sont convertis avant l'écriture. Reste dans le foyer : jamais partagé. quantity (nombre d'articles) ne le porte pas. [CR-39]$$;

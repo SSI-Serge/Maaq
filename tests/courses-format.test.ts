@@ -43,14 +43,18 @@ describe("Format du conditionnement d'une référence (US-166 RF2)", () => {
       expect(comparatif(again, {}).length).toBeGreaterThanOrEqual(0);
       const scenario = computeScenarios(again, {}, list.stores.map((s) => s.chain))[1];
       const lines = scenarioLines(again, {}, scenario);
-      expect(lines.find((l) => l.name === target.item.name)?.format).toBe("sachet de 250 g");
+      // la référence retenue par le scénario peut changer quand le format change le nombre de paquets (CR-50) : le format affiché est toujours celui de la référence retenue
+      const kept = lines.find((l) => l.name === target.item.name)!;
+      const keptChoice = again.items.find((i) => i.name === target.item.name)!.choices.find((c) => c.kind === "reference" && c.ref === kept.ref);
+      expect(kept.format).toBe(keptChoice?.format ?? null);
+      if (kept.ref === target.choice.ref) expect(kept.format).toBe("sachet de 250 g");
       await validateList(at(), f.sophie, { scenario: 2, lines: lines.map((l) => ({ name: l.name, qty: l.qty, store: l.store, ref: l.ref, price: l.price, source: "menu" as const })) });
 
       const couple = (await myList(at(), f.sophie)).stores.flatMap((s) => s.aisles.flatMap((a) => a.lines));
-      expect(couple.find((l) => l.name === target.item.name)).toMatchObject({ reference: target.choice.ref, format: "sachet de 250 g" });
+      expect(couple.find((l) => l.name === target.item.name)).toMatchObject({ reference: kept.ref, format: kept.format });
       const guest = (await myList(at(), f.elodie)).stores.flatMap((s) => s.aisles.flatMap((a) => a.lines));
       const seen = guest.find((l) => l.name === target.item.name)!;
-      expect(seen.format).toBe("sachet de 250 g");
+      expect(seen.format).toBe(kept.format);
       expect(seen.price).toBeNull();
     } finally {
       await db.updateTable("grocery_product_references").set({ package_format: null }).where("id", "=", ref.id).execute();

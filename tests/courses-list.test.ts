@@ -124,21 +124,22 @@ describe("US-156/157 : liste de courses issue du menu", () => {
     expect((await prepareList(at(), f.sophie)).validated).toBe(true);
   });
 
-  it("au menu suivant, les produits non achetés reviennent « pas acheté la dernière fois » ; le journal des produits à référencer ne garde aucun foyer", async () => {
+  it("au menu suivant, les produits non achetés restent sur leur liste et reviennent en pense-bête « Pas encore acheté » ; le journal des produits à référencer ne garde aucun foyer", async () => {
     const { f, dinners } = await readyWithMenu();
     const list = await prepareList(at(), f.sophie);
     const model = fromDto(list.model!);
     const lines = scenarioLines(model, {}, computeScenarios(model, {}, [])[1]).map((l) => ({ name: l.name, qty: l.qty, store: l.store, ref: l.ref, price: l.price, source: "menu" as const }));
     await validateList(at(), f.sophie, { scenario: 2, lines });
     await addProduct(at(), f.sophie, { name: "Essuie-tout" });
-    // un menu pour la semaine suivante
-    await validateTestMenu(db, f, { picks: [dinners[0]], week: "2026-11-16", now: at().now });
-    const carried = await db.selectFrom("grocery_list_items").select(["name_key", "state", "not_bought_last_time"]).where("account_id", "=", f.accountId).where("state", "<>", "bought").execute();
-    expect(carried.every((r) => r.state === "preparing")).toBe(true);
-    expect(carried.find((r) => r.name_key === "essuie tout")?.not_bought_last_time).toBe(true);
-    const after = await prepareList(at(), f.sophie);
+    // la semaine du 9 est en cours : le menu de la semaine du 16 est la semaine suivante
+    const later: Ctx = { db, now: new Date(2026, 10, 11, 10, 0, 0) };
+    await validateTestMenu(db, f, { picks: [dinners[0]], week: "2026-11-16", now: later.now });
+    // rien n'est recopié ni remis en préparation : les produits non achetés restent sur la liste de la semaine du 9
+    const kept = await db.selectFrom("grocery_list_items as i").innerJoin("meal_menus as m", "m.id", "i.menu_id").select(["i.name_key", "i.state"]).where("i.account_id", "=", f.accountId).where("m.week_start", "=", "2026-11-09" as never).execute();
+    expect(kept.every((r) => r.state === "validated" || r.state === "added_after_validation")).toBe(true);
+    const after = await prepareList(later, f.sophie, "2026-11-16");
     expect(after.menu!.week).toBe("2026-11-16");
-    expect(after.added.find((a) => a.name === "Essuie-tout")?.notBoughtLastTime).toBe(true);
+    expect(after.added.find((a) => a.name === "Essuie-tout")?.leftoverOf).toBe("semaine du 9 nov.");
     const columns = await db.selectFrom("grocery_unreferenced_events").selectAll().limit(1).execute();
     expect(Object.keys(columns[0] ?? {}).some((c) => /account|user|household/.test(c))).toBe(false);
   });

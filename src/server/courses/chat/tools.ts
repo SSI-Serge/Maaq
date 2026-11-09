@@ -4,6 +4,7 @@ import { listItemMatches } from "../engine";
 import { courseError, requireAccess, type CourseAccess } from "../household/settings";
 import { setBought } from "../list/mine";
 import { addProduct } from "../list/service";
+import { checkWeek, listOfMenu, menusForTicking, weekChoices } from "../list/weeks";
 import { euro } from "../console/util";
 import { sql } from "kysely";
 import { asProfile } from "@/server/assistant/outings/profile";
@@ -36,7 +37,7 @@ export interface CourseToolContext {
   /** Marqueurs d'écran donnés dans cette demande. */
   opened: Set<string>;
   /** Menu composé par l'IA dans cette demande (CR-42). */
-  menu: { invalid: number; aborted: boolean; limitReached: boolean; proposal: MenuProposal | null; context: MenuContext | null };
+  menu: { invalid: number; aborted: boolean; limitReached: boolean; proposal: MenuProposal | null; context: MenuContext | null; /** Semaine choisie au début de la conversation (lundi) : le menu composé et les produits ajoutés lui appartiennent (CR-54). */ week: string | null };
 }
 
 export interface ToolOutcome {
@@ -59,18 +60,22 @@ export async function executeCourseTool(name: string, input: unknown, t: CourseT
       case "ajouter_produit": {
         const product = String((input as { nom?: unknown } | null)?.nom ?? "").trim();
         if (!product) return fail("Erreur : indiquez le nom du produit.");
-        const result = await addProduct(ctx, session, { name: product });
+        const result = await addProduct(ctx, session, { name: product, week: t.menu.week });
         return ok(result.duplicate ? `Le produit « ${result.duplicate.name} » est déjà dans la liste : sa quantité passe à ${result.duplicate.quantity}.` : `« ${product} » est ajouté aux produits ajoutés de la liste.`);
       }
       case "marquer_achete": {
         const wanted = names(input, "produits");
         if (!wanted.length) return fail("Erreur : indiquez les produits achetés.");
-        const open = await ctx.db
+        // la semaine en cours d'abord, puis la suivante : un produit présent sur les deux listes est coché sur la première (CR-54)
+        const order = await menusForTicking(ctx.db, t.accountId, ctx.now);
+        const found = await ctx.db
           .selectFrom("grocery_list_items")
-          .select(["label", "name_key", "state"])
+          .select(["label", "name_key", "state", "menu_id"])
           .where("account_id", "=", t.accountId)
           .where("state", "in", ["validated", "added_after_validation"])
           .execute();
+        const rank = (id: string | null) => (id === null ? 99 : order.indexOf(id) < 0 ? 98 : order.indexOf(id));
+        const open = [...found].sort((a, b) => rank(a.menu_id) - rank(b.menu_id));
         const done: string[] = [];
         const missing: string[] = [];
         for (const w of wanted) {
@@ -85,21 +90,26 @@ export async function executeCourseTool(name: string, input: unknown, t: CourseT
         return ok(`${done.length ? `Marqués achetés (ils sortent de la liste et rejoignent l'historique) : ${done.join(", ")}.` : "Aucun produit marqué."}${missing.length ? ` Introuvables dans la liste validée : ${missing.join(", ")}.` : ""} Sans ticket, aucun prix n'est enregistré.`);
       }
       case "etat_liste": {
-        const menu = await ctx.db.selectFrom("meal_menus").select(["id", "week_start"]).where("account_id", "=", t.accountId).orderBy("week_start", "desc").limit(1).executeTakeFirst();
-        const list = menu ? await ctx.db.selectFrom("grocery_lists").select("id").where("account_id", "=", t.accountId).where("menu_id", "=", menu.id).executeTakeFirst() : undefined;
-        const items = await ctx.db.selectFrom("grocery_list_items").select(["state"]).where("account_id", "=", t.accountId).execute();
-        const count = (s: string) => items.filter((i) => i.state === s).length;
-        return ok(
-          JSON.stringify({
+        // une réponse par semaine (cette semaine et la suivante) : chacune a son menu et sa liste (CR-54)
+        const weeks = await weekChoices(ctx.db, t.accountId, ctx.now);
+        const out = [];
+        for (const w of weeks) {
+          const menu = await ctx.db.selectFrom("meal_menus").select("id").where("account_id", "=", t.accountId).where("week_start", "=", w.week as never).executeTakeFirst();
+          const list = menu ? await listOfMenu(ctx.db, t.accountId, menu.id) : null;
+          const items = menu ? await ctx.db.selectFrom("grocery_list_items").select(["state"]).where("account_id", "=", t.accountId).where("menu_id", "=", menu.id).execute() : [];
+          const count = (s: string) => items.filter((i) => i.state === s).length;
+          out.push({
+            semaine: w.label,
+            semaine_choisie_dans_ce_tchat: t.menu.week === w.week,
             menu_valide: !!menu,
-            semaine_du_menu: menu ? String(menu.week_start).slice(0, 10) : null,
             liste_validee: !!list,
             produits_a_acheter: count("validated"),
             ajoutes_depuis_la_validation: count("added_after_validation"),
             produits_deja_achetes: count("bought"),
             en_preparation: count("preparing"),
-          }),
-        );
+          });
+        }
+        return ok(JSON.stringify({ semaines: out }));
       }
       case "chiffres_budget": {
         if (t.access !== "couple") return fail("Erreur : le budget est réservé aux deux parents du couple.");
@@ -129,6 +139,8 @@ export async function executeCourseTool(name: string, input: unknown, t: CourseT
         if (refused) return fail(refused);
         const parsed = menuInput.safeParse(input);
         if (!parsed.success) return invalidMenu(t, parsed.error.issues.map((i) => `${i.path.join(".") || "menu"} : ${i.message}`));
+        // la semaine choisie par la personne l'emporte sur celle que le modèle aurait écrite (CR-54)
+        if (t.menu.week) parsed.data.semaine = t.menu.week;
         if (!t.menu.context) {
           const settings = await loadSettings(ctx.db, t.accountId);
           if (settings.missing.length) return fail("Erreur : les réglages du foyer ne sont pas complets.");
@@ -202,9 +214,9 @@ export function menuSummary(p: MenuProposal): string {
 }
 
 /** Contrôle d'accès commun aux outils. */
-export async function toolContext(ctx: Ctx, session: SessionContext): Promise<CourseToolContext> {
+export async function toolContext(ctx: Ctx, session: SessionContext, week?: string | null): Promise<CourseToolContext> {
   const who = await requireAccess(ctx, session, "list");
-  return { ctx, session, access: who.access, accountId: who.accountId, opened: new Set(), menu: { invalid: 0, aborted: false, limitReached: false, proposal: null, context: null } };
+  return { ctx, session, access: who.access, accountId: who.accountId, opened: new Set(), menu: { invalid: 0, aborted: false, limitReached: false, proposal: null, context: null, week: checkWeek(week, ctx.now) } };
 }
 
 export { courseError };

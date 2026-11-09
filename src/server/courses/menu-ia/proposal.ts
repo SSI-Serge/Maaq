@@ -186,13 +186,18 @@ function resolveDish(input: DishInput, ctx: ProposalContext, week: string, error
   };
 }
 
-/** Jour (« 14/10 ») où un plat a déjà été servi dans les semaines de répétition qui précèdent la semaine du menu ; on peut le garder. */
+/**
+ * Jour (« 14/10 ») où un plat a déjà été servi dans les semaines de répétition autour de la semaine du menu ; on peut le garder. Deux semaines ayant chacune leur menu (CR-54), l'autre
+ * semaine compte, avant comme après ; seule la semaine du menu lui-même (remplacé) est écartée.
+ */
 function servedOn(name: string, week: string, data: EngineData): string | null {
-  const from = addDays(week, -7 * Math.max(1, data.profile.repetitionWeeks));
+  const span = 7 * Math.max(1, data.profile.repetitionWeeks);
+  const from = addDays(week, -span);
+  const to = addDays(week, span);
   const key = norm(name);
   let latest: string | null = null;
   for (const h of data.history) {
-    if (h.week >= week || h.week < from || norm(h.dishName) !== key) continue;
+    if (h.week === week || h.week < from || h.week >= to || norm(h.dishName) !== key) continue;
     const day = addDays(h.week, h.slot - 1);
     if (!latest || day > latest) latest = day;
   }

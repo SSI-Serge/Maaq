@@ -11,6 +11,7 @@ import type { MyList, MyStore } from "@/server/courses/list/mine";
 import type { AddedLine } from "@/server/courses/list/service";
 import { formatQuantity } from "@/server/courses/engine/quantities";
 import { euro, euroPer } from "./ListScreen";
+import { DeleteWeek, WeekSelector, weekFromLocation } from "./WeekTools";
 import styles from "./courses.module.css";
 
 const BACK = { href: "/courses", label: "Courses et repas" };
@@ -18,7 +19,9 @@ const UNDO_MS = 8000;
 
 /** « Ma liste de courses » (US-158) : la liste validée par magasin et par rayon, cochée en magasin ; un produit acheté sort de la liste et rejoint l'historique. */
 export function CoursesMyListScreen() {
-  const query = useApiQuery<{ list: MyList }>("/api/courses/list/mine");
+  // semaine affichée (CR-54) : celle de l'adresse (?week=), sinon la semaine en cours si elle a une liste, puis la suivante
+  const [week, setWeek] = useState<string | null>(weekFromLocation);
+  const query = useApiQuery<{ list: MyList }>(`/api/courses/list/mine${week ? `?week=${week}` : ""}`);
   const [printing, setPrinting] = useState(false);
   const forbidden = query.error?.body?.code === "forbidden";
 
@@ -33,7 +36,7 @@ export function CoursesMyListScreen() {
       {query.loading && !query.data && <Loading slow={query.slow} />}
       {forbidden && <Notice tone="info">La liste de courses n&apos;est pas disponible pour ce profil.</Notice>}
       {query.error && !forbidden && <RetryNotice message={query.error.message} onRetry={query.reload} />}
-      {query.data && <Content list={query.data.list} reload={query.reload} onPrint={print} printing={printing} />}
+      {query.data && <Content key={query.data.list.week ?? "none"} list={query.data.list} reload={query.reload} onPrint={print} printing={printing} onWeek={setWeek} />}
     </>
   );
   if (printing) return <div style={{ padding: 16, background: "#fff", color: "#000" }}>{body}</div>;
@@ -44,7 +47,7 @@ export function CoursesMyListScreen() {
   );
 }
 
-function Content({ list, reload, onPrint, printing }: { list: MyList; reload: () => void; onPrint: () => void; printing: boolean }) {
+function Content({ list, reload, onPrint, printing, onWeek }: { list: MyList; reload: () => void; onPrint: () => void; printing: boolean; onWeek: (week: string) => void }) {
   const bought = useApiMutation();
   const add = useApiMutation();
   const drop = useApiMutation();
@@ -56,7 +59,7 @@ function Content({ list, reload, onPrint, printing }: { list: MyList; reload: ()
 
   async function tick(key: string, name: string, late: boolean) {
     setHidden((h) => new Set(h).add(key));
-    const ok = await bought.run("/api/courses/list/bought", { method: "POST", body: { key, bought: true, late } });
+    const ok = await bought.run("/api/courses/list/bought", { method: "POST", body: { key, bought: true, late, week: list.week ?? undefined } });
     if (!ok) {
       setHidden((h) => {
         const next = new Set(h);
@@ -75,7 +78,7 @@ function Content({ list, reload, onPrint, printing }: { list: MyList; reload: ()
     const { key, late } = toast;
     if (timer.current) clearTimeout(timer.current);
     setToast(null);
-    if (await bought.run("/api/courses/list/bought", { method: "POST", body: { key, bought: false, late } })) {
+    if (await bought.run("/api/courses/list/bought", { method: "POST", body: { key, bought: false, late, week: list.week ?? undefined } })) {
       setHidden((h) => {
         const next = new Set(h);
         next.delete(key);
@@ -86,20 +89,29 @@ function Content({ list, reload, onPrint, printing }: { list: MyList; reload: ()
   }
   async function addLate() {
     if (!text.trim()) return;
-    if (await add.run("/api/courses/list/products", { method: "POST", body: { name: text.trim() } })) {
+    if (await add.run("/api/courses/list/products", { method: "POST", body: { name: text.trim(), week: list.week ?? undefined } })) {
       setText("");
       reload();
     }
   }
   async function removeLate(key: string) {
-    if (await drop.run("/api/courses/list/products", { method: "DELETE", body: { key } })) reload();
+    if (await drop.run("/api/courses/list/products", { method: "DELETE", body: { key, week: list.week ?? undefined } })) reload();
   }
+
+  // le sélecteur n'apparaît que si les deux semaines ont une liste (CR-54)
+  const selector = !printing && list.weeks.length === 2 && list.weeks.every((w) => w.hasList) ? <WeekSelector weeks={list.weeks} week={list.week} onChange={onWeek} /> : null;
+  const weekText = `de la semaine ${list.weeks.find((w) => w.week === list.week)?.label.match(/\((.*)\)/)?.[1] ?? ""}`;
+  const remover = !printing && couple && list.week && list.hasMenu ? <DeleteWeek week={list.week} weekText={weekText} hasList={!list.empty} onDone={reload} /> : null;
 
   if (list.empty) {
     return (
-      <p className={styles.empty}>
-        Aucune liste validée cette semaine. <Link href={list.hasMenu ? "/courses/liste" : "/courses?menu=1"}>{list.hasMenu ? "Préparer la liste ›" : "Préparer le menu ›"}</Link>
-      </p>
+      <>
+        {selector}
+        <p className={styles.empty}>
+          Aucune liste validée {list.week ? "pour cette semaine" : "cette semaine"}. <Link href={list.hasMenu ? `/courses/liste${list.week ? `?week=${list.week}` : ""}` : "/courses?menu=1"}>{list.hasMenu ? "Préparer la liste ›" : "Préparer le menu ›"}</Link>
+        </p>
+        {remover}
+      </>
     );
   }
 
@@ -111,6 +123,7 @@ function Content({ list, reload, onPrint, printing }: { list: MyList; reload: ()
 
   return (
     <>
+      {selector}
       {!printing && (
         <div className={styles.tools}>
           <Button variant="ghost" onClick={onPrint}>
@@ -154,6 +167,7 @@ function Content({ list, reload, onPrint, printing }: { list: MyList; reload: ()
           </div>
         )
       )}
+      {remover}
       {(bought.error || add.error || drop.error) && <Notice tone="error">{(bought.error ?? add.error ?? drop.error)!.message}</Notice>}
       {toast && (
         <div role="status" className={styles.toast}>

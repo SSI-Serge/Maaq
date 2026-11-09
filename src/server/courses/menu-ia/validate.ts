@@ -61,12 +61,14 @@ export async function validateMenuCard(ctx: Ctx, session: SessionContext, messag
  * « acheté » ou ajoutés depuis la validation sont gardés (CR-45). La ligne de liste validée reste en place (les articles achetés y sont rattachés) ; la page se rouvre parce que le menu
  * est plus récent qu'elle.
  */
-async function reopenList(trx: Parameters<Parameters<typeof asProfile>[2]>[0], accountId: string, now: Date): Promise<void> {
-  await trx.deleteFrom("grocery_list_items").where("account_id", "=", accountId).where("state", "=", "validated").where("source", "in", ["menu", "habit"]).execute();
+async function reopenList(trx: Parameters<Parameters<typeof asProfile>[2]>[0], accountId: string, menuId: string, now: Date): Promise<void> {
+  // seulement la liste de CE menu : l'autre semaine n'est jamais touchée (CR-54)
+  await trx.deleteFrom("grocery_list_items").where("account_id", "=", accountId).where("menu_id", "=", menuId).where("state", "=", "validated").where("source", "in", ["menu", "habit"]).execute();
   await trx
     .updateTable("grocery_list_items")
     .set({ state: "preparing", list_id: null, store_chain: null, reference_name: null, unit_price: null, price_unit: null, updated_at: now })
     .where("account_id", "=", accountId)
+    .where("menu_id", "=", menuId)
     .where("state", "=", "validated")
     .execute();
 }
@@ -111,7 +113,7 @@ export async function saveValidatedMenu(ctx: Ctx, accountId: string, userId: str
         await trx.deleteFrom("meal_menu_session_steps").where("menu_id", "=", existing.id).execute();
         await trx.deleteFrom("meal_menu_entries").where("menu_id", "=", existing.id).execute();
         await trx.updateTable("meal_menus").set(fields).where("id", "=", existing.id).execute();
-        await reopenList(trx, accountId, ctx.now);
+        await reopenList(trx, accountId, existing.id, ctx.now);
       } else {
         menu = await trx
           .insertInto("meal_menus")
@@ -212,7 +214,7 @@ export async function saveValidatedMenu(ctx: Ctx, accountId: string, userId: str
           .execute();
       }
 
-      const count = await seedListFromMenu(trx, accountId, userId, [...new Map(dishesForList.map((d) => [nameKey(d.name), d])).values()], { repeat });
+      const count = await seedListFromMenu(trx, accountId, userId, menu.id, [...new Map(dishesForList.map((d) => [nameKey(d.name), d])).values()], { repeat });
       // quantités du menu : le besoin de chaque produit, « Quantité à vérifier », placard décoché (CR-50)
       await applyNeedsToItems(trx, accountId, menu.id);
       return count;

@@ -82,6 +82,8 @@ export interface ListItem {
   approx: boolean;
   /** « pas acheté la dernière fois » (CR-28). */
   notBoughtLastTime: boolean;
+  /** Pense-bête d'une liste de la semaine d'avant : lundi de cette semaine (CR-55). */
+  leftoverWeek?: string;
   /** Besoin du menu pour ce produit, en kilos, litres, pièces (CR-50) ; vide pour un ajout à la main, l'historique, ou quand il n'est pas calculable. */
   need: Need | null;
   /** « Quantité à vérifier » : 1 unité, conversion impossible. */
@@ -97,6 +99,8 @@ export interface BuyRow {
   source: "menu" | "manuel" | "version allégée" | "rapport" | "report";
   status: "à acheter" | "différé" | "remplacé";
   notBoughtLastTime?: boolean;
+  /** Pense-bête « Pas encore acheté » : lundi de la semaine de la liste d'origine (CR-55). */
+  leftoverWeek?: string;
   /** Besoin du menu (g, ml ou pièce) lu en base (CR-50). */
   needed?: { amount: number; unit: "g" | "ml" | "piece" } | null;
   toCheck?: boolean;
@@ -315,6 +319,7 @@ export function buildListModel(input: ListInput): ListModel {
       qty: r.qty && r.qty > 0 ? r.qty : 1,
       checked: r.status !== "différé" && r.status !== "remplacé" && r.selected !== false,
       notBoughtLastTime: !!r.notBoughtLastTime,
+      leftoverWeek: r.leftoverWeek,
       need: needOf(r.needed),
       toCheck: !!r.toCheck,
       pantry: !!r.pantry,

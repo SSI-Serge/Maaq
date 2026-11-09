@@ -1554,6 +1554,8 @@ export interface GroceryHouseholdStores {
 
 export interface GroceryListItems {
   account_id: string;
+  /** Menu (donc semaine) du produit ; vide seulement pour un ajout à la main fait quand aucun menu n'existe. */
+  menu_id: string | null;
   /** Besoin du menu pour ce produit (g, ml ou pièce), additionné sur tous les plats ; vide pour un ajout à la main ou l'historique. */
   needed_amount: Numeric | null;
   needed_unit: "g" | "ml" | "piece" | null;

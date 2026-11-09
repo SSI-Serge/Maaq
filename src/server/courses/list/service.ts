@@ -8,6 +8,7 @@ import { courseError, loadSettings, requireAccess, translateCourseError, type Co
 import { loadEngineData } from "../menu/data";
 import { weekLabel } from "../menu/weeks";
 import { aiDishId, loadAiDishes, loadEntryIngredients, loadMenuEntries, loadSession, recipeSteps, type SessionView } from "../menu-ia/entries";
+import { leftoversFor, listOfMenu, pickMenu, weekChoices, weekStartLabel, type Leftover, type WeekChoice } from "./weeks";
 import { loadCommonPrices, loadHistory, loadLightVersions, loadReferences, type ExcludedReference, type References } from "./data";
 import { toDto, type ListModelDto } from "./dto";
 
@@ -26,6 +27,8 @@ export interface AddedLine {
   mine: boolean;
   /** Ajouté depuis la validation de la liste (sans magasin ni prix). */
   late: boolean;
+  /** Pense-bête « Pas encore acheté » : semaine de la liste d'origine (« semaine du 9 nov. ») ; vide pour un produit de cette semaine (CR-55). */
+  leftoverOf: string | null;
 }
 
 export interface MenuSummary {
@@ -45,6 +48,9 @@ export interface MenuSummary {
 export interface ListPrepared {
   access: CourseAccess;
   menu: MenuSummary | null;
+  /** Semaine affichée (lundi) et les deux semaines proposées ; une seule semaine affichée si l'autre n'a ni menu ni liste (CR-54). */
+  week: string | null;
+  weeks: WeekChoice[];
   /** Une liste est déjà validée pour ce menu. */
   validated: boolean;
   model: ListModelDto | null;
@@ -59,58 +65,50 @@ export interface ListPrepared {
   now: string;
 }
 
-const monday = (date: Date) => {
-  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
-  return d;
-};
 const isoDay = (value: Date | string) => (typeof value === "string" ? value.slice(0, 10) : `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`);
 
-/** Menu dont on prépare les courses : le plus récent des semaines à venir ou de la semaine passée. */
-async function currentMenu(db: Kysely<DB>, accountId: string, now: Date) {
-  const since = monday(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7));
-  return db
-    .selectFrom("meal_menus")
-    .selectAll()
-    .where("account_id", "=", accountId)
-    .where("week_start", ">=", isoDay(since) as never)
-    .orderBy("week_start", "desc")
-    .limit(1)
-    .executeTakeFirst();
-}
-
-export async function addedLinesOf(db: Kysely<DB>, accountId: string, userId: string): Promise<AddedLine[]> {
-  const rows = await db
+/**
+ * Produits ajoutés à la main de la semaine affichée (CR-54) et, avec `leftovers`, pense-bêtes « Pas encore acheté (semaine du …) » de la liste précédente, décochés (CR-55).
+ * Sans menu, ce sont les ajouts faits avant tout menu : le premier menu validé les reprend.
+ */
+export async function addedLinesOf(db: Kysely<DB>, accountId: string, userId: string, menuId: string | null, leftovers: Leftover[] = []): Promise<AddedLine[]> {
+  let q = db
     .selectFrom("grocery_list_items as i")
     .leftJoin("users as u", "u.id", "i.added_by_user_id")
-    .select(["i.name_key", "i.label", "i.quantity", "i.not_bought_last_time", "i.added_by_user_id", "i.state", "u.first_name"])
+    .select(["i.name_key", "i.label", "i.quantity", "i.added_by_user_id", "i.state", "u.first_name"])
     .where("i.account_id", "=", accountId)
     .where("i.source", "=", "added")
-    .where("i.state", "in", ["preparing", "added_after_validation"])
-    .orderBy("i.created_at")
-    .execute();
-  return rows.map((r) => ({
+    .where("i.state", "in", ["preparing", "added_after_validation"]);
+  q = menuId ? q.where("i.menu_id", "=", menuId) : q.where("i.menu_id", "is", null);
+  const rows = await q.orderBy("i.created_at").execute();
+  const lines: AddedLine[] = rows.map((r) => ({
     key: r.name_key,
     name: r.label,
     by: r.first_name ?? "",
     qty: r.quantity,
-    notBoughtLastTime: r.not_bought_last_time,
+    notBoughtLastTime: false,
     mine: r.added_by_user_id === userId,
     late: r.state === "added_after_validation",
+    leftoverOf: null,
   }));
+  for (const l of leftovers) lines.push({ key: l.nameKey, name: l.label, by: "", qty: l.quantity, notBoughtLastTime: false, mine: false, late: false, leftoverOf: `semaine du ${weekStartLabel(l.originWeek)}` });
+  return lines;
 }
 
 /** L'écran de préparation de la liste. */
-export async function prepareList(ctx: Ctx, session: SessionContext): Promise<ListPrepared> {
+export async function prepareList(ctx: Ctx, session: SessionContext, requestedWeek?: string | null): Promise<ListPrepared> {
   const who = await requireAccess(ctx, session, "list");
-  const added = await addedLinesOf(ctx.db, who.accountId, who.userId);
+  const menu = await pickMenu(ctx.db, who.accountId, ctx.now, requestedWeek);
+  const weeks = await weekChoices(ctx.db, who.accountId, ctx.now);
+  const leftovers = menu ? await leftoversFor(ctx.db, who.userId, menu.id) : [];
+  const added = await addedLinesOf(ctx.db, who.accountId, who.userId, menu?.id ?? null, who.access === "couple" ? leftovers : []);
+  const week = menu?.week_start ?? null;
   if (who.access === "list") {
-    return { access: "list", menu: null, validated: false, model: null, modes: {}, stores: [], sharing: false, householdSize: null, added, excluded: [], criteria: [], now: ctx.now.toISOString() };
+    return { access: "list", menu: null, week, weeks, validated: false, model: null, modes: {}, stores: [], sharing: false, householdSize: null, added, excluded: [], criteria: [], now: ctx.now.toISOString() };
   }
   const settings = await loadSettings(ctx.db, who.accountId);
-  const menu = await currentMenu(ctx.db, who.accountId, ctx.now);
   const stores = settings.stores;
-  const base = { access: who.access, stores, sharing: settings.sharePrices, householdSize: settings.householdSize, added, now: ctx.now.toISOString() };
+  const base = { access: who.access, stores, sharing: settings.sharePrices, householdSize: settings.householdSize, added, week, weeks, now: ctx.now.toISOString() };
   if (!menu) return { ...base, menu: null, validated: false, model: null, modes: {}, excluded: [], criteria: [] };
 
   const [data, refs, history, entries, rows, criteria, list] = await Promise.all([
@@ -121,13 +119,14 @@ export async function prepareList(ctx: Ctx, session: SessionContext): Promise<Li
     ctx.db
       .selectFrom("grocery_list_items as i")
       .leftJoin("users as u", "u.id", "i.added_by_user_id")
-      .select(["i.label", "i.quantity", "i.source", "i.not_bought_last_time", "u.first_name", "i.needed_amount", "i.needed_unit", "i.quantity_to_check", "i.is_pantry", "i.is_selected"])
+      .select(["i.label", "i.quantity", "i.source", "u.first_name", "i.needed_amount", "i.needed_unit", "i.quantity_to_check", "i.is_pantry", "i.is_selected"])
       .where("i.account_id", "=", who.accountId)
+      .where("i.menu_id", "=", menu.id)
       .where("i.state", "in", ["preparing", "validated", "added_after_validation"])
       .orderBy("i.created_at")
       .execute(),
     ctx.db.selectFrom("grocery_additive_criteria").select(["label", "reason"]).where("is_active", "=", true).orderBy("label").execute(),
-    ctx.db.selectFrom("grocery_lists").select(["id", "validated_at"]).where("account_id", "=", who.accountId).where("menu_id", "=", menu.id).orderBy("validated_at", "desc").executeTakeFirst(),
+    listOfMenu(ctx.db, who.accountId, menu.id),
   ]);
   const common = settings.sharePrices ? await loadCommonPrices(ctx.db, who.userId) : [];
   // les produits cochés « acheté » en magasin rejoignent l'historique, sans prix tant qu'aucun ticket ne l'a donné (CR-28)
@@ -167,13 +166,28 @@ export async function prepareList(ctx: Ctx, session: SessionContext): Promise<Li
     by: r.first_name ?? "",
     source: r.source === "menu" ? "menu" : "manuel",
     status: "à acheter",
-    notBoughtLastTime: r.not_bought_last_time,
+    notBoughtLastTime: false,
     // quantités du menu (CR-50) : besoin, « Quantité à vérifier », placard décoché
     needed: r.needed_amount !== null && r.needed_unit ? { amount: Number(r.needed_amount), unit: r.needed_unit } : null,
     toCheck: r.quantity_to_check,
     pantry: r.is_pantry,
     selected: r.is_selected,
   }));
+  // pense-bêtes de la liste précédente (CR-55) : décochés, hors total et scénarios tant qu'ils ne sont pas cochés ; ils restent sur leur liste d'origine
+  for (const l of leftovers) {
+    buy.push({
+      name: l.label,
+      qty: l.quantity,
+      by: "",
+      source: "manuel",
+      status: "différé",
+      leftoverWeek: l.originWeek,
+      needed: l.neededAmount !== null && l.neededUnit ? { amount: l.neededAmount, unit: l.neededUnit } : null,
+      toCheck: l.quantityToCheck,
+      pantry: l.isPantry,
+      selected: false,
+    });
+  }
   const model = buildListModel({ dishes: unique, prods, buy, history, light, stores: [...new Set(stores.map((s) => s.chain))], sharing: settings.sharePrices, common, now: ctx.now });
 
   const choices = await ctx.db.selectFrom("meal_light_choices").select(["dish_id", "choice"]).where("account_id", "=", who.accountId).execute();
@@ -226,11 +240,13 @@ export async function prepareList(ctx: Ctx, session: SessionContext): Promise<Li
  * menu remplacent ceux du menu précédent, et les produits sans référence conforme sont notés pour l'administration, sans foyer (US-173). `repeat` : le menu de cette semaine
  * est validé de nouveau, il ne compte pas deux fois.
  */
-export async function seedListFromMenu(trx: Kysely<DB>, accountId: string, userId: string, dishes: Dish[], options: { repeat: boolean }): Promise<number> {
+export async function seedListFromMenu(trx: Kysely<DB>, accountId: string, userId: string, menuId: string, dishes: Dish[], options: { repeat: boolean }): Promise<number> {
   const refs = await loadReferences(trx);
   const prods = buildRefProducts(refs.rows);
-  await sql`select grocery_carry_over_unbought(${accountId}::uuid)`.execute(trx);
-  await trx.deleteFrom("grocery_list_items").where("account_id", "=", accountId).where("state", "=", "preparing").where("source", "=", "menu").execute();
+  // les ajouts à la main faits avant tout menu sont repris par le premier menu validé (CR-54)
+  await trx.updateTable("grocery_list_items").set({ menu_id: menuId }).where("account_id", "=", accountId).where("menu_id", "is", null).execute();
+  // la liste de cette semaine repart du menu : les ingrédients précédents du MÊME menu sont remplacés ; les autres semaines ne sont jamais touchées
+  await trx.deleteFrom("grocery_list_items").where("account_id", "=", accountId).where("menu_id", "=", menuId).where("state", "=", "preparing").where("source", "=", "menu").execute();
   const names: string[] = [];
   const seen = new Set<string>();
   for (const d of dishes) {
@@ -242,7 +258,7 @@ export async function seedListFromMenu(trx: Kysely<DB>, accountId: string, userI
       names.push(n);
     }
   }
-  const open = new Set((await trx.selectFrom("grocery_list_items").select("name_key").where("account_id", "=", accountId).where("state", "<>", "bought").execute()).map((r) => r.name_key));
+  const open = new Set((await trx.selectFrom("grocery_list_items").select("name_key").where("account_id", "=", accountId).where("menu_id", "=", menuId).where("state", "<>", "bought").execute()).map((r) => r.name_key));
   const fresh = names.filter((n) => !open.has(nameKey(n)));
   if (!fresh.length) return 0;
   const products = await trx.selectFrom("grocery_products").select(["id", "name_key", "aisle_id"]).where("name_key", "in", fresh.map(nameKey)).execute();
@@ -252,7 +268,7 @@ export async function seedListFromMenu(trx: Kysely<DB>, accountId: string, userI
     .values(
       fresh.map((n) => {
         const p = byKey.get(nameKey(n));
-        return { account_id: accountId, state: "preparing" as const, source: "menu", label: n.slice(0, 120), name_key: nameKey(n).slice(0, 120), product_id: p?.id ?? null, aisle_id: p?.aisle_id ?? null, added_by_user_id: userId };
+        return { account_id: accountId, menu_id: menuId, state: "preparing" as const, source: "menu", label: n.slice(0, 120), name_key: nameKey(n).slice(0, 120), product_id: p?.id ?? null, aisle_id: p?.aisle_id ?? null, added_by_user_id: userId };
       }),
     )
     .execute();
@@ -267,21 +283,18 @@ export async function seedListFromMenu(trx: Kysely<DB>, accountId: string, userI
 }
 
 /** Ajoute un produit à la liste : quantité augmentée si un produit de ce nom (ou commençant par la saisie) y est déjà. */
-export async function addProduct(ctx: Ctx, session: SessionContext, input: { name: string }): Promise<{ duplicate: { name: string; quantity: number } | null; added: AddedLine[] }> {
+export async function addProduct(ctx: Ctx, session: SessionContext, input: { name: string; week?: string | null }): Promise<{ duplicate: { name: string; quantity: number } | null; added: AddedLine[] }> {
   const who = await requireAccess(ctx, session, "list");
+  const menu = await pickMenu(ctx.db, who.accountId, ctx.now, input.week);
   const label = input.name.trim().replace(/\s+/g, " ");
   if (!label || label.length > 120) throw courseError("invalid_name", "Indiquez le nom du produit (120 caractères au plus).", 422);
   const key = nameKey(label);
   let duplicate: { name: string; quantity: number } | null = null;
   try {
     await asProfile(ctx.db, who.userId, async (trx) => {
-      const open = await trx
-        .selectFrom("grocery_list_items")
-        .select(["id", "label", "name_key", "quantity"])
-        .where("account_id", "=", who.accountId)
-        .where("state", "<>", "bought")
-        .orderBy("created_at")
-        .execute();
+      let openQuery = trx.selectFrom("grocery_list_items").select(["id", "label", "name_key", "quantity"]).where("account_id", "=", who.accountId).where("state", "<>", "bought");
+      openQuery = menu ? openQuery.where("menu_id", "=", menu.id) : openQuery.where("menu_id", "is", null);
+      const open = await openQuery.orderBy("created_at").execute();
       const same = open.find((r) => r.name_key === key) ?? open.find((r) => r.name_key.startsWith(key));
       if (same) {
         const quantity = Math.min(same.quantity + 1, 99);
@@ -290,13 +303,13 @@ export async function addProduct(ctx: Ctx, session: SessionContext, input: { nam
         return;
       }
       // une liste déjà validée pour le menu en cours : le produit est « ajouté depuis la validation », sans magasin ni prix (CR-28)
-      const menu = await currentMenu(trx, who.accountId, ctx.now);
-      const list = menu ? await trx.selectFrom("grocery_lists").select("id").where("account_id", "=", who.accountId).where("menu_id", "=", menu.id).executeTakeFirst() : undefined;
+      const list = menu ? await listOfMenu(trx, who.accountId, menu.id) : null;
       const product = await trx.selectFrom("grocery_products").select(["id", "aisle_id"]).where("name_key", "=", key).executeTakeFirst();
       await trx
         .insertInto("grocery_list_items")
         .values({
           account_id: who.accountId,
+          menu_id: menu?.id ?? null,
           state: list ? "added_after_validation" : "preparing",
           list_id: list?.id ?? null,
           source: "added",
@@ -312,27 +325,29 @@ export async function addProduct(ctx: Ctx, session: SessionContext, input: { nam
   } catch (error) {
     throw translateCourseError(error);
   }
-  return { duplicate, added: await addedLinesOf(ctx.db, who.accountId, who.userId) };
+  return { duplicate, added: await addedLinesOf(ctx.db, who.accountId, who.userId, menu?.id ?? null) };
 }
 
 /** Retire un produit ajouté : un invité secondaire retire les siens, le couple retire ceux qu'il veut. Les ingrédients du menu ne se retirent pas ici. */
-export async function removeProduct(ctx: Ctx, session: SessionContext, key: string): Promise<AddedLine[]> {
+export async function removeProduct(ctx: Ctx, session: SessionContext, key: string, week?: string | null): Promise<AddedLine[]> {
   const who = await requireAccess(ctx, session, "list");
+  const menu = await pickMenu(ctx.db, who.accountId, ctx.now, week);
   await asProfile(ctx.db, who.userId, async (trx) => {
     let q = trx.deleteFrom("grocery_list_items").where("account_id", "=", who.accountId).where("name_key", "=", key).where("source", "=", "added").where("state", "in", ["preparing", "added_after_validation"]);
+    q = menu ? q.where("menu_id", "=", menu.id) : q.where("menu_id", "is", null);
     if (who.access === "list") q = q.where("added_by_user_id", "=", who.userId);
     await q.execute();
   });
-  return addedLinesOf(ctx.db, who.accountId, who.userId);
+  return addedLinesOf(ctx.db, who.accountId, who.userId, menu?.id ?? null);
 }
 
 /** Retient la version standard ou allégée de chaque plat, reprise au menu suivant (US-157 RF9). `modes` : nom du plat → version. */
-export async function saveLightChoices(ctx: Ctx, session: SessionContext, modes: Record<string, DishMode>): Promise<void> {
+export async function saveLightChoices(ctx: Ctx, session: SessionContext, modes: Record<string, DishMode>, week?: string | null): Promise<void> {
   const who = await requireAccess(ctx, session, "couple");
   const settings = await loadSettings(ctx.db, who.accountId);
   const data = await loadEngineData(ctx.db, who.accountId, settings, { all: true });
   const dishes = data.dishes.filter((d) => modes[d.name] && data.refs.get(d.id)?.kind === "catalog");
-  const menu = await currentMenu(ctx.db, who.accountId, ctx.now);
+  const menu = await pickMenu(ctx.db, who.accountId, ctx.now, week);
   if (menu) {
     // un plat libre garde son choix dans sa ligne de menu (version proposée par l'IA)
     const entries = await ctx.db.selectFrom("meal_menu_entries").select(["id", "dish_name"]).where("menu_id", "=", menu.id).where("light_by_ai", "=", true).execute();
@@ -380,20 +395,25 @@ function neededOf(need: ValidateLine["need"], weight: number | null | undefined,
 }
 
 /** Valide le scénario choisi : chaque produit retenu prend son magasin, sa référence et son prix estimé ; la liste passe dans « Ma liste de courses ». */
-export async function validateList(ctx: Ctx, session: SessionContext, input: { scenario: 1 | 2 | 3; lines: ValidateLine[] }): Promise<{ listId: string; count: number }> {
+export async function validateList(ctx: Ctx, session: SessionContext, input: { scenario: 1 | 2 | 3; lines: ValidateLine[]; week?: string | null }): Promise<{ listId: string; count: number }> {
   const who = await requireAccess(ctx, session, "couple");
   if (!input.lines.length || input.lines.length > 400) throw courseError("invalid_list", "La liste est vide ou trop longue.", 422);
-  const menu = await currentMenu(ctx.db, who.accountId, ctx.now);
+  const menu = await pickMenu(ctx.db, who.accountId, ctx.now, input.week);
   if (!menu) throw courseError("no_menu", "Validez d'abord le menu de la semaine.", 409);
   let result = { listId: "", count: 0 };
   try {
     await asProfile(ctx.db, who.userId, async (trx) => {
-      const list = await trx
-        .insertInto("grocery_lists")
-        .values({ account_id: who.accountId, menu_id: menu.id, scenario: input.scenario, validated_at: ctx.now, validated_by_user_id: who.userId })
-        .returning("id")
-        .executeTakeFirstOrThrow();
-      const open = await trx.selectFrom("grocery_list_items").select(["id", "name_key"]).where("account_id", "=", who.accountId).where("state", "<>", "bought").execute();
+      // une seule liste par menu (CR-54) : revalider la remet à jour, sans créer de seconde liste
+      const existing = await listOfMenu(trx, who.accountId, menu.id);
+      const list = existing
+        ? await trx.updateTable("grocery_lists").set({ scenario: input.scenario, validated_at: ctx.now, validated_by_user_id: who.userId }).where("id", "=", existing.id).returning("id").executeTakeFirstOrThrow()
+        : await trx
+            .insertInto("grocery_lists")
+            .values({ account_id: who.accountId, menu_id: menu.id, scenario: input.scenario, validated_at: ctx.now, validated_by_user_id: who.userId })
+            .returning("id")
+            .executeTakeFirstOrThrow();
+      // les produits ouverts de CETTE semaine seulement ; un pense-bête de la semaine d'avant, coché, arrive ici comme une ligne ordinaire et devient un produit de la nouvelle semaine (CR-55)
+      const open = await trx.selectFrom("grocery_list_items").select(["id", "name_key"]).where("account_id", "=", who.accountId).where("menu_id", "=", menu.id).where("state", "<>", "bought").execute();
       const openId = new Map(open.map((r) => [r.name_key, r.id]));
       const done = new Set<string>();
       for (const line of input.lines) {
@@ -410,11 +430,10 @@ export async function validateList(ctx: Ctx, session: SessionContext, input: { s
           const product = await trx.selectFrom("grocery_products").select(["id", "aisle_id"]).where("name_key", "=", key).executeTakeFirst();
           await trx
             .insertInto("grocery_list_items")
-            .values({ account_id: who.accountId, source: line.source, label: line.name.trim().slice(0, 120), name_key: key, product_id: product?.id ?? null, aisle_id: product?.aisle_id ?? null, added_by_user_id: who.userId, ...fields })
+            .values({ account_id: who.accountId, menu_id: menu.id, source: line.source, label: line.name.trim().slice(0, 120), name_key: key, product_id: product?.id ?? null, aisle_id: product?.aisle_id ?? null, added_by_user_id: who.userId, ...fields })
             .execute();
         }
       }
-      await trx.deleteFrom("grocery_lists").where("account_id", "=", who.accountId).where("menu_id", "=", menu.id).where("id", "<>", list.id).where((eb) => eb.not(eb.exists(eb.selectFrom("grocery_list_items").select("id").whereRef("list_id", "=", "grocery_lists.id")))).execute();
       result = { listId: list.id, count: done.size };
     });
   } catch (error) {

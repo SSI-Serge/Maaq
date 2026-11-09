@@ -10,6 +10,7 @@ import { AGE_LABEL, comparatif, computeScenarios, formatQuantity, isReplaced, no
 import { fromDto } from "@/server/courses/list/dto";
 import type { AddedLine, ListPrepared, ValidateLine } from "@/server/courses/list/service";
 import { BatchSession, RecipeList } from "./MenuRecipes";
+import { DeleteWeek, WeekSelector, weekFromLocation } from "./WeekTools";
 import styles from "./courses.module.css";
 
 const BACK = { href: "/courses", label: "Courses et repas" };
@@ -21,28 +22,43 @@ const priceText = (value: number | null) => (value === null ? "N/A" : euro(value
 
 /** « Liste de courses » (US-157, US-158) : préparation après la validation du menu, comparatif des prix, trois scénarios d'achat, validation. */
 export function CoursesListScreen() {
-  const query = useApiQuery<{ list: ListPrepared }>("/api/courses/list");
+  // semaine affichée (CR-54) : celle de l'adresse (?week=), sinon celle que choisit le serveur (en cours, puis suivante)
+  const [week, setWeek] = useState<string | null>(weekFromLocation);
+  const query = useApiQuery<{ list: ListPrepared }>(`/api/courses/list${week ? `?week=${week}` : ""}`);
   const forbidden = query.error?.body?.code === "forbidden";
   return (
     <AppShell title="Liste de courses" eyebrow="Courses et repas" back={BACK}>
       {query.loading && !query.data && <Loading slow={query.slow} />}
       {forbidden && <Notice tone="info">La liste de courses n&apos;est pas disponible pour ce profil.</Notice>}
       {query.error && !forbidden && <RetryNotice message={query.error.message} onRetry={query.reload} />}
-      {query.data && <ListFlow list={query.data.list} reload={query.reload} />}
+      {query.data && <ListFlow key={query.data.list.week ?? "none"} list={query.data.list} reload={query.reload} onWeek={setWeek} />}
     </AppShell>
   );
 }
 
-function ListFlow({ list, reload }: { list: ListPrepared; reload: () => void }) {
+/** Le sélecteur de semaine apparaît quand les deux semaines ont un menu (CR-54) ; la semaine en cours est celle de départ. */
+function Weeks({ list, onWeek }: { list: ListPrepared; onWeek: (week: string) => void }) {
+  return list.access === "couple" && list.weeks.length === 2 && list.weeks.every((w) => w.hasMenu || w.hasList) ? <WeekSelector weeks={list.weeks} week={list.week} onChange={onWeek} /> : null;
+}
+
+function ListFlow({ list, reload, onWeek }: { list: ListPrepared; reload: () => void; onWeek: (week: string) => void }) {
   if (list.access === "list") return <GuestView list={list} reload={reload} />;
   if (!list.menu || !list.model) {
     return (
-      <p className={styles.empty}>
-        Aucune liste à préparer pour l&apos;instant. <Link href="/courses?menu=1">Préparer le menu ›</Link>
-      </p>
+      <>
+        <Weeks list={list} onWeek={onWeek} />
+        <p className={styles.empty}>
+          Aucune liste à préparer pour l&apos;instant. <Link href="/courses?menu=1">Préparer le menu ›</Link>
+        </p>
+      </>
     );
   }
-  return <Preparation list={list} reload={reload} />;
+  return (
+    <>
+      <Weeks list={list} onWeek={onWeek} />
+      <Preparation list={list} reload={reload} />
+    </>
+  );
 }
 
 /** Invité secondaire : il ajoute un produit et retire les siens, rien d'autre (CR-10). */
@@ -52,7 +68,7 @@ function GuestView({ list, reload }: { list: ListPrepared; reload: () => void })
       <p className={styles.note}>
         La liste validée est dans <Link href="/courses/ma-liste">Ma liste de courses</Link>. Ici, vous pouvez ajouter un produit et retirer vos propres ajouts.
       </p>
-      <AddedSection added={list.added} access={list.access} reload={reload} />
+      <AddedSection added={list.added} access={list.access} week={list.week} reload={reload} />
     </>
   );
 }
@@ -66,7 +82,7 @@ function Rub({ title, open = false, children }: { title: string; open?: boolean;
   );
 }
 
-function AddedSection({ added, access, reload }: { added: AddedLine[]; access: "couple" | "list"; reload: () => void }) {
+function AddedSection({ added, access, week, reload, leftoverTicked, onLeftover }: { added: AddedLine[]; access: "couple" | "list"; week: string | null; reload: () => void; leftoverTicked?: (name: string) => boolean; onLeftover?: (name: string, ticked: boolean) => void }) {
   const add = useApiMutation();
   const remove = useApiMutation();
   const [text, setText] = useState("");
@@ -74,29 +90,33 @@ function AddedSection({ added, access, reload }: { added: AddedLine[]; access: "
 
   async function submit() {
     if (!text.trim()) return;
-    const result = await add.run<{ duplicate: { name: string; quantity: number } | null }>("/api/courses/list/products", { method: "POST", body: { name: text.trim() } });
+    const result = await add.run<{ duplicate: { name: string; quantity: number } | null }>("/api/courses/list/products", { method: "POST", body: { name: text.trim(), week: week ?? undefined } });
     if (!result) return;
     setMessage(result.duplicate ? `${result.duplicate.name} est déjà dans la liste : quantité ${result.duplicate.quantity}.` : "");
     setText("");
     reload();
   }
   async function drop(key: string) {
-    if (await remove.run("/api/courses/list/products", { method: "DELETE", body: { key } })) reload();
+    if (await remove.run("/api/courses/list/products", { method: "DELETE", body: { key, week: week ?? undefined } })) reload();
   }
 
   return (
     <Rub title="Produits ajoutés" open>
       {added.length === 0 && <p className={styles.empty}>Aucun produit ajouté.</p>}
       {added.map((a) => (
-        <div key={a.key} className={styles.line}>
+        <div key={`${a.leftoverOf ?? ""}${a.key}`} className={styles.line}>
+          {/* pense-bête de la liste d'avant (CR-55) : décoché, hors du total ; coché, il devient un produit de cette semaine */}
+          {a.leftoverOf && onLeftover && leftoverTicked && (
+            <input type="checkbox" aria-label={`Prendre « ${a.name} » cette semaine`} checked={leftoverTicked(a.name)} onChange={(e) => onLeftover(a.name, e.target.checked)} />
+          )}
           <div className={styles.lineMain}>
             <div className={styles.lineName}>{a.name}</div>
             <div className={styles.lineSub}>
-              {a.by ? `ajouté par ${a.by}` : "ajouté"} {a.notBoughtLastTime && <span className={styles.pillWarn}>Pas acheté la dernière fois</span>}
+              {a.leftoverOf ? <span className={styles.pillWarn}>Pas encore acheté ({a.leftoverOf})</span> : a.by ? `ajouté par ${a.by}` : "ajouté"}
             </div>
           </div>
           <span className={styles.meta}>×{a.qty}</span>
-          {(access === "couple" || a.mine) && (
+          {!a.leftoverOf && (access === "couple" || a.mine) && (
             <button type="button" className={styles.link} onClick={() => void drop(a.key)} aria-label={`Retirer ${a.name}`}>
               Retirer
             </button>
@@ -173,7 +193,7 @@ function Preparation({ list, reload }: { list: ListPrepared; reload: () => void 
         pending={validate.pending}
         error={validate.error?.message}
         onValidate={async (lines) => {
-          const result = await validate.run("/api/courses/list/validate", { method: "POST", body: { scenario: view, lines } });
+          const result = await validate.run("/api/courses/list/validate", { method: "POST", body: { scenario: view, lines, week: list.week ?? undefined } });
           if (result) setDone(true);
         }}
         itemsByName={new Map(model.items.map((i) => [norm(i.name), i]))}
@@ -189,12 +209,13 @@ function Preparation({ list, reload }: { list: ListPrepared; reload: () => void 
 
   async function apply() {
     patch({ applied: true });
-    await save.run("/api/courses/list/modes", { method: "PUT", body: { modes: picks.modes } });
+    await save.run("/api/courses/list/modes", { method: "PUT", body: { modes: picks.modes, week: list.week ?? undefined } });
   }
 
   return (
     <>
       <p className={family.hint}>Semaine du {summary.weekLabel}</p>
+      {list.access === "couple" && list.week && <DeleteWeek week={list.week} weekText={`de la semaine ${list.weeks.find((w) => w.week === list.week)?.label.match(/\((.*)\)/)?.[1] ?? ""}`} hasList={!!list.weeks.find((w) => w.week === list.week)?.hasList} onDone={reload} />}
       <div className={styles.tools}>
         <Button variant="ghost" onClick={() => setOpened({ all: true, key: opened.key + 1 })}>
           Tout déplier
@@ -253,7 +274,7 @@ function Preparation({ list, reload }: { list: ListPrepared; reload: () => void 
         </>
       ))}
 
-      <AddedSection added={list.added} access={list.access} reload={reload} />
+      <AddedSection added={list.added} access={list.access} week={list.week} reload={reload} leftoverTicked={(name) => sel.checked?.get(model.items.find((i) => norm(i.name) === norm(name))?.id ?? -1) ?? false} onLeftover={(name, ticked) => patch({ checked: { ...picks.checked, [norm(name)]: ticked } })} />
 
       {rub("Produits de mon historique", true, (
         <>

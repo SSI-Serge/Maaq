@@ -11,6 +11,7 @@ import type { CourseMessageView, CourseReply } from "@/server/courses/chat/servi
 import type { CardView } from "@/server/courses/menu-ia/cards";
 import type { MenuProgress } from "@/server/courses/menu-ia/progress";
 import type { ValidatedMenuCard } from "@/server/courses/menu-ia/validate";
+import type { WeekChoice } from "@/server/courses/list/weeks";
 import type { OwnDish } from "@/server/courses/menu/dishes";
 import { MenuCard } from "./MenuCard";
 import { DAY_LABELS } from "./menu-text";
@@ -45,7 +46,7 @@ function Rich({ text, couple }: { text: string; couple: boolean }) {
  * tickets. Le menu de la semaine se compose ici, en conversation : choix de 1 ou 2 plats de « Mes plats », échange libre avec l'IA, menu en carte avec « Valider le menu » (CR-42).
  * `startMenu` : compteur incrémenté par le bouton « Liste de courses et menu de la semaine » de l'accueil.
  */
-export function ChatPanel({ couple, startMenu = 0, fromTicket = 0 }: { couple: boolean; startMenu?: number; fromTicket?: number }) {
+export function ChatPanel({ couple, startMenu = 0, fromTicket = 0, weeks = [] }: { couple: boolean; startMenu?: number; fromTicket?: number; weeks?: WeekChoice[] }) {
   const history = useApiQuery<{ messages: CourseMessageView[] }>("/api/courses/chat");
   const send = useStreamAction<CourseReply, MenuProgress>("/api/courses/chat", CHAT_TIMEOUT_MS);
   const validate = useApiMutation();
@@ -61,6 +62,10 @@ export function ChatPanel({ couple, startMenu = 0, fromTicket = 0 }: { couple: b
 
   // parcours « Liste de courses et menu de la semaine » : 1 ou 2 plats de Mes plats, ou un plat écrit
   const [starter, setStarter] = useState(false);
+  // semaine du menu (CR-54) : demandée au départ du parcours, puis envoyée avec chaque message tant que la conversation reste ouverte
+  const [week, setWeek] = useState<string | null>(null);
+  const [fromReceipt, setFromReceipt] = useState(false);
+  const weekLabel = weeks.find((w) => w.week === week)?.label.replace(/^(Cette semaine|Semaine prochaine) /, "").replace(/[()]/g, "") ?? "";
   const [picks, setPicks] = useState<string[]>([]);
   const [shown, setShown] = useState(PAGE);
   const [validating, setValidating] = useState<string | null>(null);
@@ -73,6 +78,8 @@ export function ChatPanel({ couple, startMenu = 0, fromTicket = 0 }: { couple: b
     if (startMenu > lastStart.current) {
       lastStart.current = startMenu;
       setStarter(true);
+      setFromReceipt(false);
+      setWeek(null);
       setPicks([]);
       setShown(PAGE);
     }
@@ -83,9 +90,11 @@ export function ChatPanel({ couple, startMenu = 0, fromTicket = 0 }: { couple: b
   useEffect(() => {
     if (fromTicket > lastTicket.current) {
       lastTicket.current = fromTicket;
-      void submit("Composons le menu de la semaine prochaine à partir de ce que je viens d'acheter.");
+      // le parcours commence aussi par « Pour quelle semaine ? » ; le menu part dès que la semaine est choisie
+      setStarter(true);
+      setFromReceipt(true);
+      setWeek(null);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fromTicket]);
 
   useEffect(() => {
@@ -95,13 +104,13 @@ export function ChatPanel({ couple, startMenu = 0, fromTicket = 0 }: { couple: b
   const hasOpenCard = messages.some((m) => m.card?.status === "open" || m.card?.status === "incomplete");
   const menuIntent = starter || hasOpenCard || MENU_WORDS.test(pending ?? "");
 
-  async function submit(override?: string) {
+  async function submit(override?: string, forcedWeek?: string) {
     const value = (override ?? text).trim();
     if (!value || send.pending) return;
     lastText.current = value;
     setPending(value);
     setFailed(null);
-    const result = await send.run({ requestId: request.current, text: value });
+    const result = await send.run({ requestId: request.current, text: value, week: forcedWeek ?? week ?? undefined });
     setPending(null);
     if (result && !result.failed) {
       request.current = crypto.randomUUID();
@@ -121,7 +130,7 @@ export function ChatPanel({ couple, startMenu = 0, fromTicket = 0 }: { couple: b
       setValidated(response.result);
       history.reload();
       // « Valider le menu » ouvre la page Liste de courses (US-156 RF12) ; la question « Ajouter ces plats à vos plats ? » attend dans le tchat
-      router.push("/courses/liste");
+      router.push(`/courses/liste?week=${card.proposal.week}`);
     }
   }
 
@@ -149,14 +158,41 @@ export function ChatPanel({ couple, startMenu = 0, fromTicket = 0 }: { couple: b
             </div>
           ),
         )}
-        {starter && !pending && (
+        {starter && !pending && week === null && (
+          <>
+            <div className={styles.dayCard} style={{ fontSize: 14, lineHeight: 1.45 }}>
+              Pour quelle semaine ?
+            </div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {weeks.map((w) => (
+                <button
+                  key={w.week}
+                  type="button"
+                  className={family.chipToggle}
+                  aria-pressed={false}
+                  onClick={() => {
+                    setWeek(w.week);
+                    if (fromReceipt) {
+                      setStarter(false);
+                      void submit("Composons le menu de cette semaine à partir de ce que je viens d'acheter.", w.week);
+                    }
+                  }}
+                >
+                  {w.label}
+                  {w.hasMenu ? " · menu validé" : ""}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+        {starter && !pending && week !== null && (
           <>
             <div className={styles.dayCard} style={{ fontSize: 14, lineHeight: 1.45 }}>
               {own.loading && !own.data
-                ? "On prépare le menu de la semaine prochaine ?"
+                ? `On prépare le menu de la semaine ${weekLabel} ?`
                 : dishes.length
-                  ? "On prépare le menu de la semaine prochaine ? Choisissez 1 ou 2 plats pour cette semaine. Vous pouvez aussi écrire un autre plat."
-                  : "On prépare le menu de la semaine prochaine ? Quel plat vous ferait plaisir cette semaine ?"}
+                  ? `On prépare le menu de la semaine ${weekLabel} ? Choisissez 1 ou 2 plats pour cette semaine. Vous pouvez aussi écrire un autre plat.`
+                  : `On prépare le menu de la semaine ${weekLabel} ? Quel plat vous ferait plaisir cette semaine ?`}
             </div>
             {dishes.length > 0 && (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -182,7 +218,7 @@ export function ChatPanel({ couple, startMenu = 0, fromTicket = 0 }: { couple: b
                   </button>
                 )}
                 <span className={styles.meta}>{picks.length ? `${picks.length} plat${picks.length > 1 ? "s" : ""} choisi${picks.length > 1 ? "s" : ""} sur 2.` : "Touchez 1 ou 2 plats."}</span>
-                <Button onClick={() => void submit(`Composons le menu de la semaine prochaine en partant de : ${picks.join(" et ")}.`)} disabled={!picks.length} style={{ alignSelf: "flex-start" }}>
+                <Button onClick={() => void submit(`Composons le menu de la semaine ${weekLabel} en partant de : ${picks.join(" et ")}.`)} disabled={!picks.length} style={{ alignSelf: "flex-start" }}>
                   Proposer le menu
                 </Button>
               </div>

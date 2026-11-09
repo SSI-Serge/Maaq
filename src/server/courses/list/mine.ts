@@ -4,6 +4,7 @@ import type { Ctx, SessionContext } from "@/server/auth/service";
 import { courseError, displayPlace, loadSettings, requireAccess, translateCourseError, type CourseAccess } from "../household/settings";
 import { weekLabel } from "../menu/weeks";
 import { addedLinesOf } from "./service";
+import { checkWeek, listOfMenu, menuOfWeek, menusForTicking, pickMenu, weekChoices, type WeekChoice } from "./weeks";
 import type { AddedLine } from "./service";
 
 /**
@@ -39,6 +40,9 @@ export interface MyStore {
 
 export interface MyList {
   access: CourseAccess;
+  /** Semaine affichée (lundi) et choix « Cette semaine / Semaine prochaine » ; le sélecteur n'apparaît que si les deux semaines ont une liste (CR-54). */
+  week: string | null;
+  weeks: WeekChoice[];
   /** Aucune liste validée pour le menu en cours. */
   empty: boolean;
   /** Un menu est validé (sinon « Préparer le menu », sinon « Préparer la liste »). */
@@ -69,14 +73,16 @@ function lineTotal(r: { unit_price: string | null; price_unit: string | null; qu
   const weight = weightOf(r);
   return weight === null ? null : round2(weight * Number(r.unit_price));
 }
-const isoDay = (value: Date | string) => (typeof value === "string" ? value.slice(0, 10) : `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`);
 
-export async function myList(ctx: Ctx, session: SessionContext): Promise<MyList> {
+export async function myList(ctx: Ctx, session: SessionContext, requestedWeek?: string | null): Promise<MyList> {
   const who = await requireAccess(ctx, session, "list");
-  const since = new Date(ctx.now.getFullYear(), ctx.now.getMonth(), ctx.now.getDate() - 14);
-  const menu = await ctx.db.selectFrom("meal_menus").select(["id", "week_start"]).where("account_id", "=", who.accountId).where("week_start", ">=", isoDay(since) as never).orderBy("week_start", "desc").limit(1).executeTakeFirst();
-  const list = menu ? await ctx.db.selectFrom("grocery_lists").select("id").where("account_id", "=", who.accountId).where("menu_id", "=", menu.id).executeTakeFirst() : undefined;
-  const base = { access: who.access, hasMenu: !!menu, weekLabel: menu ? weekLabel(isoDay(menu.week_start as Date | string)) : null };
+  const weeks = await weekChoices(ctx.db, who.accountId, ctx.now);
+  // semaine demandée ; sinon la semaine en cours si elle a une liste, puis la suivante, puis ce que l'écran affichait avant (dernier menu récent)
+  const asked = checkWeek(requestedWeek, ctx.now);
+  const fallbackWeek = asked ?? weeks.find((w) => w.hasList)?.week ?? null;
+  const menu = fallbackWeek ? await menuOfWeek(ctx.db, who.accountId, fallbackWeek) : await pickMenu(ctx.db, who.accountId, ctx.now);
+  const list = menu ? await listOfMenu(ctx.db, who.accountId, menu.id) : null;
+  const base = { access: who.access, week: menu?.week_start ?? null, weeks, hasMenu: !!menu, weekLabel: menu ? weekLabel(menu.week_start) : null };
   if (!list) return { ...base, empty: true, late: [], stores: [], remaining: null, allBought: false };
 
   const [rows, added, aisles] = await Promise.all([
@@ -86,7 +92,7 @@ export async function myList(ctx: Ctx, session: SessionContext): Promise<MyList>
         from grocery_list_for(${who.userId}::uuid)
        where list_id = ${list.id}::uuid and state = 'validated'
        order by label`.execute(ctx.db).then((r) => r.rows),
-    addedLinesOf(ctx.db, who.accountId, who.userId),
+    addedLinesOf(ctx.db, who.accountId, who.userId, menu?.id ?? null),
     ctx.db.selectFrom("grocery_aisles").select(["id", "name", "sort_order"]).execute(),
   ]);
   const settings = who.access === "couple" ? await loadSettings(ctx.db, who.accountId) : null;
@@ -129,29 +135,39 @@ export async function myList(ctx: Ctx, session: SessionContext): Promise<MyList>
  * Coche un produit « acheté » (il sort de la liste et rejoint l'historique) ou annule. Le couple et l'invité secondaire (CR-38) ; l'invité ne décoche que ses propres coches (la base le garantit). `late` : le produit venait de « Ajoutés depuis la validation »,
  * pour le remettre au bon endroit à l'annulation.
  */
-export async function setBought(ctx: Ctx, session: SessionContext, input: { key: string; bought: boolean; late: boolean }): Promise<void> {
+export async function setBought(ctx: Ctx, session: SessionContext, input: { key: string; bought: boolean; late: boolean; week?: string | null }): Promise<void> {
   const who = await requireAccess(ctx, session, "list");
+  // la semaine affichée d'abord ; sans semaine, la semaine en cours puis la suivante (CR-54)
+  const asked = checkWeek(input.week, ctx.now);
+  const asked_menu = asked ? await menuOfWeek(ctx.db, who.accountId, asked) : null;
+  const menus = asked ? (asked_menu ? [asked_menu.id] : []) : await menusForTicking(ctx.db, who.accountId, ctx.now);
   try {
     await asProfile(ctx.db, who.userId, async (trx) => {
-      if (input.bought) {
-        const done = await trx
-          .updateTable("grocery_list_items")
-          .set({ state: "bought", bought_at: ctx.now, bought_by_user_id: who.userId, updated_at: ctx.now })
-          .where("account_id", "=", who.accountId)
-          .where("name_key", "=", input.key)
-          .where("state", "in", ["validated", "added_after_validation"])
-          .executeTakeFirst();
-        if (!done.numUpdatedRows) throw courseError("not_in_list", "Ce produit n'est plus dans la liste.", 404);
-      } else {
-        const back = await trx
-          .updateTable("grocery_list_items")
-          .set({ state: input.late ? "added_after_validation" : "validated", bought_at: null, bought_by_user_id: null, updated_at: ctx.now })
-          .where("account_id", "=", who.accountId)
-          .where("name_key", "=", input.key)
-          .where("state", "=", "bought")
-          .executeTakeFirst();
-        if (!back.numUpdatedRows) throw courseError("not_bought", "Ce produit n'est pas marqué acheté.", 404);
+      for (const menuId of menus) {
+        if (input.bought) {
+          const done = await trx
+            .updateTable("grocery_list_items")
+            .set({ state: "bought", bought_at: ctx.now, bought_by_user_id: who.userId, updated_at: ctx.now })
+            .where("account_id", "=", who.accountId)
+            .where("menu_id", "=", menuId)
+            .where("name_key", "=", input.key)
+            .where("state", "in", ["validated", "added_after_validation"])
+            .executeTakeFirst();
+          if (done.numUpdatedRows) return;
+        } else {
+          const back = await trx
+            .updateTable("grocery_list_items")
+            .set({ state: input.late ? "added_after_validation" : "validated", bought_at: null, bought_by_user_id: null, updated_at: ctx.now })
+            .where("account_id", "=", who.accountId)
+            .where("menu_id", "=", menuId)
+            .where("name_key", "=", input.key)
+            .where("state", "=", "bought")
+            .executeTakeFirst();
+          if (back.numUpdatedRows) return;
+        }
       }
+      if (input.bought) throw courseError("not_in_list", "Ce produit n'est plus dans la liste.", 404);
+      throw courseError("not_bought", "Ce produit n'est pas marqué acheté.", 404);
     });
   } catch (error) {
     if (/seulement augmenter une quantité ou cocher/.test((error as Error).message ?? "")) throw courseError("not_yours", "Vous ne pouvez annuler que vos propres coches.", 403);
