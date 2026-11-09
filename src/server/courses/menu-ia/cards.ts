@@ -60,6 +60,15 @@ export async function loadCard(db: Kysely<DB>, userId: string, messageId: string
   return envelope ? { id: String(row.id), conversationId: row.conversation_id, envelope } : null;
 }
 
+/** Remplace la proposition d'une carte encore ouverte (remplacement d'un plat, CR-57) : la carte garde son identifiant, le navigateur recharge le fil. */
+export async function updateCardProposal(db: Kysely<DB>, messageId: string, envelope: MenuCardEnvelope, proposal: MenuProposal): Promise<void> {
+  await db
+    .updateTable("agent_conversation_messages")
+    .set({ content: encrypt(encodeCard({ ...envelope, proposal }), key()) })
+    .where("id", "=", messageId as never)
+    .execute();
+}
+
 export async function markValidated(db: Kysely<DB>, messageId: string, envelope: MenuCardEnvelope, at: Date): Promise<void> {
   await db
     .updateTable("agent_conversation_messages")

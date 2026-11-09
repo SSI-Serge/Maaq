@@ -78,6 +78,8 @@ export interface MenuProposal {
   freeDishes: boolean;
   /** Au moins un conflit d'allergie : validation impossible. */
   blocked: boolean;
+  /** Un plat de la séance a été remplacé (CR-57) : le déroulé affiché n'est plus à jour ; l'IA le réécrit une fois à la validation. */
+  stepsStale?: boolean;
 }
 
 export interface ProposalContext {
@@ -93,6 +95,8 @@ const addDays = (iso: string, n: number) => new Date(Date.parse(`${iso}T12:00:00
 const ingredientList = (text: string): IngredientLine[] => text.split(",").map((s) => s.trim()).filter(Boolean).map((label) => ({ label, quantity: null, unit: null }));
 
 const UNIT_OF_INPUT: Record<string, QuantityUnit> = { g: "g", kg: "kg", ml: "ml", cl: "cl", l: "l", piece: "piece", cuillere: "spoon", pincee: "pinch" };
+/** Unité de la base → unité du format du menu. */
+export const INPUT_OF_UNIT: Record<string, string> = { g: "g", kg: "kg", ml: "ml", cl: "cl", l: "l", piece: "piece", spoon: "cuillere", pinch: "pincee" };
 
 /** Ingrédients écrits par le modèle : doublons retirés ; une quantité absente, sans unité ou hors des bornes plausibles pour le foyer devient « quantité à vérifier » (vide). */
 export function ingredientsOf(input: DishInput["ingredients"], servings: number | null): IngredientLine[] {
@@ -129,7 +133,7 @@ function matchKnown(input: DishInput, data: EngineData): Dish | null {
   return same.find((d) => d.mine) ?? same[0] ?? null;
 }
 
-function resolveDish(input: DishInput, ctx: ProposalContext, week: string, errors: string[], where: string): ProposalDish | null {
+export function resolveDish(input: DishInput, ctx: ProposalContext, week: string, errors: string[], where: string): ProposalDish | null {
   const { data } = ctx;
   const known = matchKnown(input, data);
   if (known) {
@@ -204,7 +208,7 @@ function servedOn(name: string, week: string, data: EngineData): string | null {
   return latest ? dayText(latest) : null;
 }
 
-function resolveSteps(input: MenuInput, dishNames: string[], errors: string[]): ProposalStep[] {
+export function resolveSteps(input: Pick<MenuInput, "etapes">, dishNames: string[], errors: string[]): ProposalStep[] {
   const steps: ProposalStep[] = [];
   const stored = new Set<string>();
   input.etapes.forEach((s, i) => {
@@ -291,3 +295,37 @@ export function buildProposal(input: MenuInput, ctx: ProposalContext): BuildResu
   return { ok: true, proposal };
 }
 
+
+/**
+ * Menu après un remplacement de plat (CR-57) : les plats changent, MAAQ refait les contrôles de la carte (conflits, avertissements, doublons) et, si un des cinq dîners de la séance a
+ * changé, recalcule la durée avec la formule (RF6), abandonne la semaine type et marque le déroulé « à mettre à jour ».
+ */
+export function refreshProposal(base: MenuProposal, dinners: ProposalDish[], express: ProposalDish[]): MenuProposal {
+  const all = [...dinners, ...express];
+  const before = base.dinners.slice(0, 5).map((d) => norm(d.name)).join("|");
+  const after = dinners.slice(0, 5).map((d) => norm(d.name)).join("|");
+  const changed = before !== after;
+  let { session, planId, planTheme, planSteps } = base;
+  let stale = base.stepsStale ?? false;
+  if (changed) {
+    const minutes = Math.round(estimateMinutes(dinners.slice(0, 5)));
+    session = { minutes, estimated: true, overCap: minutes > base.session.cap, cap: base.session.cap, source: "formula" };
+    planId = null;
+    planTheme = null;
+    planSteps = [];
+    stale = true;
+  }
+  return {
+    ...base,
+    dinners,
+    express,
+    complete: dinners.length === DINNER_COUNT,
+    session,
+    planId,
+    planTheme,
+    planSteps,
+    stepsStale: stale,
+    freeDishes: all.some((d) => d.origin === "ai"),
+    blocked: all.some((d) => d.blockers.length > 0),
+  };
+}

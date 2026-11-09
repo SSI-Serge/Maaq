@@ -13,7 +13,9 @@ import type { MenuProgress } from "@/server/courses/menu-ia/progress";
 import type { ValidatedMenuCard } from "@/server/courses/menu-ia/validate";
 import type { WeekChoice } from "@/server/courses/list/weeks";
 import type { OwnDish } from "@/server/courses/menu/dishes";
-import { MenuCard } from "./MenuCard";
+import { apiRequest } from "@/client/api";
+import type { ReplaceChoice, ReplaceKind, ReplaceOptions } from "@/server/courses/menu-ia/replace";
+import { MenuCard, type ReplaceApi } from "./MenuCard";
 import { DAY_LABELS } from "./menu-text";
 import styles from "./courses.module.css";
 
@@ -51,6 +53,7 @@ export function ChatPanel({ couple, startMenu = 0, fromTicket = 0, weeks = [] }:
   const send = useStreamAction<CourseReply, MenuProgress>("/api/courses/chat", CHAT_TIMEOUT_MS);
   const validate = useApiMutation();
   const adding = useApiMutation();
+  const replacing = useApiMutation();
   const router = useRouter();
   const [text, setText] = useState("");
   const [pending, setPending] = useState<string | null>(null);
@@ -124,7 +127,7 @@ export function ChatPanel({ couple, startMenu = 0, fromTicket = 0, weeks = [] }:
 
   async function validateCard(card: CardView) {
     setValidating(card.messageId);
-    const response = await validate.run<{ result: ValidatedMenuCard }>("/api/courses/chat/menu", { method: "POST", body: { messageId: card.messageId } });
+    const response = await validate.run<{ result: ValidatedMenuCard }>("/api/courses/chat/menu", { method: "POST", body: { messageId: card.messageId }, timeoutMs: CHAT_TIMEOUT_MS });
     setValidating(null);
     if (response) {
       setValidated(response.result);
@@ -140,6 +143,25 @@ export function ChatPanel({ couple, startMenu = 0, fromTicket = 0, weeks = [] }:
     return response ? response.result.added : null;
   }
 
+  /** « Remplacer » (CR-57) : MAAQ change le plat de la carte sans IA ; le fil est rechargé avec la carte mise à jour. */
+  function replaceApiOf(card: CardView): ReplaceApi {
+    return {
+      options: async (kind: ReplaceKind, index: number) => {
+        try {
+          return (await apiRequest<{ options: ReplaceOptions }>(`/api/courses/chat/menu/replace?messageId=${card.messageId}&kind=${kind}&index=${index}`)).options;
+        } catch (err) {
+          setFailed(err instanceof Error ? err.message : "Impossible de charger les plats.");
+          return null;
+        }
+      },
+      replace: async (kind: ReplaceKind, index: number, choice: ReplaceChoice) => {
+        const done = await replacing.run("/api/courses/chat/menu/replace", { method: "POST", body: { messageId: card.messageId, kind, index, choice } });
+        if (done) history.reload();
+        return !!done;
+      },
+    };
+  }
+
   const error = failed ?? send.error?.message ?? null;
   const retryable = failed !== null || send.error?.retryable === true;
 
@@ -151,7 +173,7 @@ export function ChatPanel({ couple, startMenu = 0, fromTicket = 0, weeks = [] }:
       <div role="log" aria-live="polite" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {messages.map((m) =>
           m.card ? (
-            <MenuCard key={m.id} card={m.card} busy={validating === m.card.messageId} onValidate={(c) => void validateCard(c)} onAdd={addDishes} />
+            <MenuCard key={m.id} card={m.card} busy={validating === m.card.messageId} onValidate={(c) => void validateCard(c)} onAdd={addDishes} replaceApi={couple ? replaceApiOf(m.card) : undefined} />
           ) : (
             <div key={m.id} className={m.role === "user" ? undefined : styles.dayCard} style={m.role === "user" ? { alignSelf: "flex-end", maxWidth: "85%", padding: "8px 12px", borderRadius: "12px 12px 2px 12px", background: "var(--primary)", color: "var(--primary-ink)", fontSize: 14 } : { fontSize: 14, lineHeight: 1.4 }}>
               {m.role === "user" ? m.text : <Rich text={m.text} couple={couple} />}
@@ -249,6 +271,7 @@ export function ChatPanel({ couple, startMenu = 0, fromTicket = 0, weeks = [] }:
       {error && (retryable ? <RetryNotice message={error} onRetry={() => void submit(lastText.current)} /> : <Notice tone="error">{error}</Notice>)}
       {validate.error && <Notice tone="error">{validate.error.message}</Notice>}
       {adding.error && <Notice tone="error">{adding.error.message}</Notice>}
+      {replacing.error && <Notice tone="error">{replacing.error.message}</Notice>}
       {validated && <p className={styles.banner}>Menu enregistré : {validated.listed} produit{validated.listed > 1 ? "s" : ""} dans votre liste de courses.</p>}
       <div className={styles.addRow} style={{ marginTop: 10 }}>
         <input

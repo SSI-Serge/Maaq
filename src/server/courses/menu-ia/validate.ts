@@ -8,6 +8,7 @@ import { seedListFromMenu } from "../list/service";
 import { loadEngineData } from "../menu/data";
 import { hasNewerCard, loadCard, markValidated } from "./cards";
 import { applyNeedsToItems } from "./needs";
+import { rewriteStepsOnValidation, type StepsDeps } from "./steps";
 import type { MenuProposal, ProposalDish } from "./proposal";
 
 /**
@@ -29,7 +30,7 @@ export interface ValidatedMenuCard {
 
 const toDish = (d: ProposalDish): Dish => ({ id: d.engineId ?? "", cuisine: d.cuisine, name: d.name, ing: d.ingredients.map((i) => i.label).join(", "), recipe: d.recipe, health: "", batch: "", time: "", minutes: d.minutes, tags: new Set() });
 
-export async function validateMenuCard(ctx: Ctx, session: SessionContext, messageId: string): Promise<ValidatedMenuCard> {
+export async function validateMenuCard(ctx: Ctx, session: SessionContext, messageId: string, deps: StepsDeps = {}): Promise<ValidatedMenuCard> {
   const who = await requireAccess(ctx, session, "couple");
   const card = await loadCard(ctx.db, session.user.id, messageId);
   if (!card) throw courseError("card_not_found", "Ce menu n'est plus disponible : demandez-en un nouveau.", 404);
@@ -51,7 +52,20 @@ export async function validateMenuCard(ctx: Ctx, session: SessionContext, messag
     if (data.allergenBlocked.has(known.id) || !allowed(known, data.profile)) throw courseError("allergy_conflict", `Conflit d'allergie ou de régime sur « ${d.name} » : le menu ne peut pas être validé.`, 422);
   }
 
-  const result = await saveValidatedMenu(ctx, who.accountId, who.userId, proposal, data);
+  // un plat de la séance a été remplacé (CR-57) : l'IA réécrit le déroulé une seule fois, hors limite de menus ; si elle échoue, le menu est validé avec la durée estimée, sans déroulé
+  let toSave = proposal;
+  if (proposal.stepsStale) {
+    const dishes = proposal.dinners.slice(0, 5).map((d) => ({ name: d.name, minutes: d.minutes, ingredients: d.ingredients.map((i) => i.label) }));
+    const written = dishes.length >= 2 ? await rewriteStepsOnValidation(ctx, who, dishes, deps) : null;
+    toSave = {
+      ...proposal,
+      steps: written?.steps ?? [],
+      planSteps: [],
+      stepsStale: false,
+      session: written ? { ...proposal.session, minutes: written.minutes, estimated: true, overCap: written.minutes > proposal.session.cap, source: "steps" } : proposal.session,
+    };
+  }
+  const result = await saveValidatedMenu(ctx, who.accountId, who.userId, toSave, data);
   await markValidated(ctx.db, card.id, card.envelope, ctx.now);
   return result;
 }

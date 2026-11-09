@@ -225,7 +225,7 @@ function Preparation({ list, reload }: { list: ListPrepared; reload: () => void 
       </div>
 
       {rub("Menu validé et recettes", false, <RecipeList recipes={summary.recipes.filter((r) => r.kind === "dinner")} servings={summary.servings} title="Menu de la semaine : recettes" showDays />)}
-      {rub("Séance de batch", false, <BatchSession summary={summary} />)}
+      {rub("Séance de batch", false, <BatchSession summary={summary} onWritten={reload} />)}
       {rub("Plats express", false, <RecipeList recipes={summary.recipes.filter((r) => r.kind === "express")} servings={summary.servings} title="Plats express : recettes" showDays={false} />)}
 
       {rub("Version standard ou allégée", true, (

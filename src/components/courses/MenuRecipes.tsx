@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useApiMutation } from "@/client/hooks";
+import { Button, Notice } from "@/components/ui";
 import type { MenuSummary } from "@/server/courses/list/service";
 import { ingredientText } from "@/server/courses/engine/quantities";
 import { servingsText } from "./menu-text";
@@ -95,9 +97,14 @@ export function RecipeList({ recipes, servings, title, showDays }: { recipes: Re
 }
 
 /** Séance de batch : durée (réelle ou estimée), déroulé étape par étape, chevauchements, conservation de chaque plat (CR-47). */
-export function BatchSession({ summary }: { summary: MenuSummary }) {
+export function BatchSession({ summary, onWritten }: { summary: MenuSummary; onWritten?: () => void }) {
   const [ref, setRef] = useState<HTMLDivElement | null>(null);
+  const write = useApiMutation();
   const { session, batch } = summary;
+  // menu validé sans déroulé (l'IA n'a pas répondu à la validation) : « Rédiger le déroulé », hors limite de menus (CR-57)
+  async function draft() {
+    if (await write.run("/api/courses/list/steps", { method: "POST", body: { week: summary.week }, timeoutMs: 110_000 })) onWritten?.();
+  }
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 6, padding: "6px 0" }}>
       <p style={{ margin: 0, fontSize: 13, lineHeight: 1.45 }}>
@@ -106,6 +113,16 @@ export function BatchSession({ summary }: { summary: MenuSummary }) {
         {session.theme ? ` · semaine type « ${session.theme} »` : ""}. Lundi à vendredi.
       </p>
       {session.overCap && <div style={{ alignSelf: "flex-start", fontSize: 12, fontWeight: 700, background: "var(--warning-bg)", borderRadius: 6, padding: "4px 8px" }}>Séance au-dessus de 2 h.</div>}
+      {summary.canWriteSteps && onWritten && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-start" }}>
+          <span className={styles.meta}>Ce menu n&apos;a pas de déroulé : la durée est estimée.</span>
+          <Button variant="ghost" onClick={() => void draft()} loading={write.pending}>
+            Rédiger le déroulé
+          </Button>
+          {write.pending && <span className={styles.meta}>Je rédige le déroulé… (jusqu&apos;à une minute)</span>}
+          {write.error && <Notice tone="error">{write.error.message}</Notice>}
+        </div>
+      )}
       {(batch.steps.length > 0 || batch.storage.length > 0) && (
         <>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, paddingTop: 4 }}>

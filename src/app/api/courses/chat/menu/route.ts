@@ -5,6 +5,7 @@ import { validateMenuCard } from "@/server/courses/menu-ia/validate";
 import { handler, parseBody } from "@/server/http";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 120;
 
 const schema = z.object({ messageId: z.string().regex(/^\d{1,18}$/) });
 

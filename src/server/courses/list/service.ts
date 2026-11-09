@@ -2,6 +2,7 @@ import { sql, type Kysely } from "kysely";
 import { asProfile } from "@/server/assistant/outings/profile";
 import type { Ctx, SessionContext } from "@/server/auth/service";
 import type { DB } from "@/server/db/schema.generated";
+import { env } from "@/server/env";
 import { nameKey, placeKey } from "../catalog/seed";
 import { buildListModel, buildRefProducts, DAYS, dishItems, fmtMin, gapType, norm, type BuyRow, type Dish, type DishMode } from "../engine";
 import { courseError, loadSettings, requireAccess, translateCourseError, type CourseAccess } from "../household/settings";
@@ -43,6 +44,8 @@ export interface MenuSummary {
   servings: number | null;
   /** Déroulé de la séance et conservation (CR-47). */
   batch: SessionView;
+  /** Le menu n'a pas de déroulé et l'IA peut le rédiger : « Rédiger le déroulé » est proposé (CR-57, couple seulement, MENU_IA ouvert). */
+  canWriteSteps: boolean;
 }
 
 export interface ListPrepared {
@@ -229,6 +232,7 @@ export async function prepareList(ctx: Ctx, session: SessionContext, requestedWe
       }),
     servings: menu.servings,
     batch,
+    canWriteSteps: who.access === "couple" && env().MENU_IA === "live" && menu.batch_week_id === null && batch.steps.length === 0 && batch.storage.length === 0 && dinners.length >= 2,
   };
   // une liste validée avant la dernière validation du menu est à refaire (CR-45) : la page se rouvre
   const stale = !!list && !!menu.validated_at && list.validated_at < menu.validated_at;
