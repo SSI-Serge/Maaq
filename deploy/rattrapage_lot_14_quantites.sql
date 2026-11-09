@@ -5,7 +5,8 @@
 -- moment où la colonne est créée (une nouvelle application du fichier ne remet jamais en cause les corrections faites ensuite dans la console) ; le nombre de produits marqués et leurs noms
 -- sont donnés par un message (NOTICE) à l'exécution.
 --  1. grocery_products.is_pantry (faux par défaut) ; marquage initial des produits dont le nom contient : sel, poivre, huile(s), vinaigre(s), sucre, farine, levure, moutarde, bouillon(s), épice(s),
---     quatre-épices, cumin, paprika, curry, cannelle, curcuma, muscade, herbes de Provence, herbes séchées ou sèches (mots entiers).
+--     quatre-épices, cumin, paprika, curry, cannelle, curcuma, muscade, herbes de Provence, herbes séchées ou sèches (mots entiers). Le nom normalisé du catalogue peut être écrit AVEC ou SANS
+--     accents (la normalisation fine est celle de l'application) : le motif accepte les deux (« epices », « épices », « quatre epices », « quatre-épices », « herbes sechees », « herbes séchées »).
 --  2. meal_menus.servings : nombre de personnes pour lequel le menu est écrit.
 --  3. meal_menu_entries : la contrainte ck_meal_menu_entries_free_dish est REMPLACÉE (la recette est permise pour toute origine ; la cuisine et la durée restent réservées au plat libre).
 --  4. meal_menu_entry_ingredients : quantity, unit (g, kg, ml, cl, l, piece, spoon, pinch) et deux colonnes calculées base_unit et base_quantity ; contrainte ck_meal_menu_entry_ingredients_quantity.
@@ -20,7 +21,7 @@ BEGIN
     ALTER TABLE grocery_products ADD COLUMN is_pantry boolean NOT NULL DEFAULT false;
     WITH m AS (
       UPDATE grocery_products SET is_pantry = true
-       WHERE name_key ~ '(^| )(sel|poivre|huiles?|vinaigres?|sucre|farine|levure|moutarde|bouillons?|épices?|quatre-épices|cumin|paprika|curry|cannelle|curcuma|muscade|herbes de provence|herbes séchées|herbes sèches)( |$)'
+       WHERE name_key ~ '(^| )(sel|poivre|huiles?|vinaigres?|sucre|farine|levure|moutarde|bouillons?|[eé]pices?|quatre[- ][eé]pices|cumin|paprika|curry|cannelle|curcuma|muscade|herbes de provence|herbes s[eé]ch[eé]es|herbes s[eèé]ches)( |$)'
       RETURNING name_key)
     SELECT count(*), string_agg(name_key, ', ' ORDER BY name_key) INTO v_n, v_names FROM m;
     RAISE NOTICE 'Produits marqués « placard » : % (%)', v_n, COALESCE(v_names, 'aucun');

@@ -3,8 +3,16 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-09T01:00:00.000Z",
+  "updated": "2026-11-09T02:30:00.000Z",
   "deploys": [
+    {
+      "at": "2026-11-09T02:30:00.000Z",
+      "env": "preview",
+      "what": "Courses et repas : recettes et quantités écrites pour le nombre de personnes du foyer, quantités d ingrédients dans les scénarios d achat (paquets, produits au poids comptés, placard décoché, Quantité à vérifier), placard modifiable en console — rév. 00090",
+      "storyIds": [
+        "f21c5"
+      ]
+    },
     {
       "at": "2026-11-09T01:00:00.000Z",
       "env": "preview",
