@@ -115,6 +115,8 @@ describe("Ajuster le menu après un ticket (CR-58)", () => {
     expect(after).toBe(before + 1);
 
     // accepter : le plat est remplacé dans le menu validé, la liste se rouvre, le produit acheté reste acheté
+    const menuRow = await db.selectFrom("meal_menus").select("id").where("account_id", "=", f.accountId).executeTakeFirstOrThrow();
+    await db.insertInto("meal_menu_session_steps").values({ menu_id: menuRow.id, account_id: f.accountId, position: 1, body: "Tout préparer.", duration_minutes: 90 } as never).execute();
     const [kind, slot] = target.key.split(":");
     const accepted = await decideAdjustment({ db, now: new Date(NOW.getTime() + 3_600_000) }, f.sophie, { messageId: card.messageId, key: target.key, accept: true });
     expect(accepted.decided[target.key]).toBe("accepted");
@@ -125,6 +127,12 @@ describe("Ajuster le menu après un ticket (CR-58)", () => {
     expect(items.some((i) => i.state === "bought")).toBe(true);
     expect(items.filter((i) => i.state === "validated")).toEqual([]);
     expect((await prepareList(at(), f.sophie, W1)).validated).toBe(false);
+    // un plat de la séance a changé : le déroulé est effacé, la durée est estimée, « Déroulé à mettre à jour » avec « Rédiger le déroulé » est proposé
+    if (kind === "dinner" && Number(slot) <= 5) {
+      expect(await db.selectFrom("meal_menu_session_steps").select("id").where("menu_id", "=", menuRow.id).execute()).toEqual([]);
+      expect((await db.selectFrom("meal_menus").select("session_is_estimated").where("id", "=", menuRow.id).executeTakeFirstOrThrow()).session_is_estimated).toBe(true);
+      expect((await prepareList(at(), f.sophie, W1)).menu!.canWriteSteps).toBe(true);
+    }
 
     // refuser le second : le plat reste, la carte se ferme
     const closed = await decideAdjustment(at(), f.sophie, { messageId: card.messageId, key: second.key, accept: false });

@@ -14,6 +14,7 @@ export function WeekSelector({ weeks, week, onChange }: { weeks: WeekChoice[]; w
       {weeks.map((w) => (
         <button key={w.week} type="button" className={family.chipToggle} style={weeks.length > 3 ? { flex: "0 0 auto", whiteSpace: "nowrap" } : undefined} aria-pressed={w.week === week} onClick={() => onChange(w.week)}>
           {w.label}
+          {w.grouped ? " · liste du mois" : ""}
         </button>
       ))}
     </div>

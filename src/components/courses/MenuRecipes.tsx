@@ -115,7 +115,7 @@ export function BatchSession({ summary, onWritten }: { summary: MenuSummary; onW
       {session.overCap && <div style={{ alignSelf: "flex-start", fontSize: 12, fontWeight: 700, background: "var(--warning-bg)", borderRadius: 6, padding: "4px 8px" }}>Séance au-dessus de 2 h.</div>}
       {summary.canWriteSteps && onWritten && (
         <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-start" }}>
-          <span className={styles.meta}>Ce menu n&apos;a pas de déroulé : la durée est estimée.</span>
+          <span className={styles.meta} style={{ fontWeight: 700 }}>Déroulé à mettre à jour : la durée est estimée tant qu&apos;il n&apos;est pas rédigé.</span>
           <Button variant="ghost" onClick={() => void draft()} loading={write.pending}>
             Rédiger le déroulé
           </Button>

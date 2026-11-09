@@ -9,7 +9,7 @@ import { localDay } from "@/server/chat/service";
 import type { DB } from "@/server/db/schema.generated";
 import { env } from "@/server/env";
 import { decrypt, encrypt } from "@/server/security/crypto";
-import { buildRefProducts, DAYS, listItemMatches, norm } from "../engine";
+import { buildRefProducts, DAYS, estimateMinutes, listItemMatches, norm } from "../engine";
 import { courseError, loadSettings, requireAccess, translateCourseError } from "../household/settings";
 import { loadReferences } from "../list/data";
 import { seedListFromMenu } from "../list/service";
@@ -271,7 +271,8 @@ export async function decideAdjustment(ctx: Ctx, session: SessionContext, input:
   if (input.accept) {
     const [kind, slotText] = input.key.split(":");
     const slot = Number(slotText);
-    const refs = (await loadEngineData(ctx.db, who.accountId, await loadSettings(ctx.db, who.accountId), { all: true })).refs;
+    const engine = await loadEngineData(ctx.db, who.accountId, await loadSettings(ctx.db, who.accountId), { all: true });
+    const refs = engine.refs;
     const prods = buildRefProducts((await loadReferences(ctx.db)).rows);
     try {
       await asProfile(ctx.db, who.userId, async (trx) => {
@@ -289,6 +290,18 @@ export async function decideAdjustment(ctx: Ctx, session: SessionContext, input:
         const dishes = entries.map((x) => ({ id: "", cuisine: "", name: x.dish_name, ing: lines.filter((l) => String(l.entry_id) === String(x.id)).map((l) => l.label).join(", "), recipe: "", health: "", batch: "", time: "", minutes: 0, tags: new Set<string>() }));
         await seedListFromMenu(trx, who.accountId, who.userId, menu.id, dishes, { repeat: true });
         await applyNeedsToItems(trx, who.accountId, menu.id);
+        // un des cinq plats de la séance change : son déroulé est effacé, la durée repasse à la formule et « Déroulé à mettre à jour » est proposé avec « Rédiger le déroulé » (US-177 RF3)
+        if (kind === "dinner" && slot <= 5) {
+          await trx.deleteFrom("meal_menu_session_steps").where("menu_id", "=", menu.id).execute();
+          const first = await trx.selectFrom("meal_menu_entries").select(["slot", "duration_minutes", "dish_id", "household_dish_id"]).where("menu_id", "=", menu.id).where("kind", "=", "dinner").where("slot", "<=", 5).orderBy("slot").execute();
+          const minutesOf = (e: (typeof first)[number]) => {
+            if (e.duration_minutes) return e.duration_minutes;
+            const code = e.household_dish_id ? `H:${e.household_dish_id}` : e.dish_id ? ([...engine.refs].find(([, r]) => r.kind === "catalog" && r.dishId === String(e.dish_id))?.[0] ?? null) : null;
+            return engine.dishes.find((d) => d.id === code)?.minutes ?? 30;
+          };
+          const minutes = Math.round(estimateMinutes(first.map((e) => ({ minutes: minutesOf(e) }))));
+          await trx.updateTable("meal_menus").set({ batch_week_id: null, session_minutes: Math.min(Math.max(minutes, 1), 1000), session_is_estimated: true, session_over_cap: minutes > engine.sessionCap }).where("id", "=", menu.id).execute();
+        }
       });
     } catch (error) {
       throw translateCourseError(error);

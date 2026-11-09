@@ -48,6 +48,8 @@ export interface WeekChoice {
   hasMenu: boolean;
   /** Une liste est validée pour cette semaine. */
   hasList: boolean;
+  /** La liste de cette semaine est regroupée dans une liste du mois validée (CR-56). */
+  grouped: boolean;
 }
 
 export interface WeekMenu {
@@ -78,8 +80,9 @@ export const weekMondays = (now: Date): string[] => Array.from({ length: WEEKS_A
 export async function weekChoices(db: Kysely<DB>, accountId: string, now: Date): Promise<WeekChoice[]> {
   const mondays = weekMondays(now);
   const menus = await db.selectFrom("meal_menus").select(["id", "week_start"]).where("account_id", "=", accountId).where("week_start", "in", mondays as never[]).execute();
-  const lists = menus.length ? await db.selectFrom("grocery_lists").select("menu_id").where("account_id", "=", accountId).where("menu_id", "in", menus.map((m) => m.id)).execute() : [];
+  const lists = menus.length ? await db.selectFrom("grocery_lists").select(["menu_id", "group_id"]).where("account_id", "=", accountId).where("menu_id", "in", menus.map((m) => m.id)).execute() : [];
   const listed = new Set(lists.map((l) => l.menu_id));
+  const grouped = new Set(lists.filter((l) => l.group_id !== null).map((l) => l.menu_id));
   const byWeek = new Map(menus.map((m) => [typeof m.week_start === "string" ? (m.week_start as string).slice(0, 10) : isoDate(m.week_start as Date), m.id]));
   return mondays.map((week, i) => ({
     week,
@@ -88,6 +91,7 @@ export async function weekChoices(db: Kysely<DB>, accountId: string, now: Date):
     current: i === 0,
     hasMenu: byWeek.has(week),
     hasList: listed.has(byWeek.get(week) ?? ""),
+    grouped: grouped.has(byWeek.get(week) ?? ""),
   }));
 }
 

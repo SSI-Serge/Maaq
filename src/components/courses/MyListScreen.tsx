@@ -141,6 +141,7 @@ function Content({ list, reload, onPrint, printing, onWeek, onScope }: { list: M
     <>
       {selector}
       {scopes}
+      {printing && list.scope === "group" && list.group && <h2 style={{ margin: "0 0 8px", fontSize: 16 }}>Liste du mois · {list.group.weeks.length} semaines</h2>}
       {!printing && (
         <div className={styles.tools}>
           <Button variant="ghost" onClick={onPrint}>

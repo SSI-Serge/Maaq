@@ -9,8 +9,8 @@ const KEYS = [
   { key: "meal_repeat_weeks_default", label: "Répétition par défaut (semaines)" },
   { key: "meal_match_sure_pct", label: "Correspondance « sûre » à partir de (%)" },
   { key: "meal_match_check_pct", label: "Correspondance « à confirmer » à partir de (%)" },
-  { key: "meal_season_dishes_count", label: "Plats de saison demandés pour le menu du mois" },
-  { key: "meal_season_dishes_max", label: "Plats de saison au plus par menu du mois" },
+  { key: "meal_season_dishes_count", label: "Plats de saison demandés par menu du mois" },
+  { key: "meal_season_dishes_max", label: "Plafond de plats de saison par menu du mois" },
 ] as const;
 
 export const moduleSettings: ConsoleObject = {
