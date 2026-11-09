@@ -7,12 +7,12 @@ import { Button, Notice } from "@/components/ui";
 import type { WeekChoice } from "@/server/courses/list/weeks";
 import styles from "./courses.module.css";
 
-/** Choix de la semaine (CR-54) : « Cette semaine » ou « Semaine prochaine », chacune avec son menu et sa liste. */
+/** Choix de la semaine (CR-54, CR-56) : « Cette semaine », puis « Semaine du 16 au 22 nov. »… ; au-delà de trois semaines, les boutons défilent horizontalement. */
 export function WeekSelector({ weeks, week, onChange }: { weeks: WeekChoice[]; week: string | null; onChange: (week: string) => void }) {
   return (
-    <div className={family.wrapRow} role="group" aria-label="Semaine">
+    <div className={family.wrapRow} role="group" aria-label="Semaine" style={weeks.length > 3 ? { flexWrap: "nowrap", overflowX: "auto", paddingBottom: 6 } : undefined}>
       {weeks.map((w) => (
-        <button key={w.week} type="button" className={family.chipToggle} aria-pressed={w.week === week} onClick={() => onChange(w.week)}>
+        <button key={w.week} type="button" className={family.chipToggle} style={weeks.length > 3 ? { flex: "0 0 auto", whiteSpace: "nowrap" } : undefined} aria-pressed={w.week === week} onClick={() => onChange(w.week)}>
           {w.label}
         </button>
       ))}

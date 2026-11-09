@@ -99,8 +99,10 @@ function Content({ list, reload, onPrint, printing, onWeek }: { list: MyList; re
   }
 
   // le sélecteur n'apparaît que si les deux semaines ont une liste (CR-54)
-  const selector = !printing && list.weeks.length === 2 && list.weeks.every((w) => w.hasList) ? <WeekSelector weeks={list.weeks} week={list.week} onChange={onWeek} /> : null;
-  const weekText = `de la semaine ${list.weeks.find((w) => w.week === list.week)?.label.match(/\((.*)\)/)?.[1] ?? ""}`;
+  // le sélecteur porte sur les semaines qui ont une liste (CR-56)
+  const withList = list.weeks.filter((w) => w.hasList);
+  const selector = !printing && withList.length > 1 ? <WeekSelector weeks={withList} week={list.week} onChange={onWeek} /> : null;
+  const weekText = `de la semaine ${list.weeks.find((w) => w.week === list.week)?.range ?? ""}`;
   const remover = !printing && couple && list.week && list.hasMenu ? <DeleteWeek week={list.week} weekText={weekText} hasList={!list.empty} onDone={reload} /> : null;
 
   if (list.empty) {

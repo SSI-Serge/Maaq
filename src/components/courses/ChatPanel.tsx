@@ -65,7 +65,7 @@ export function ChatPanel({ couple, startMenu = 0, fromTicket = 0, weeks = [] }:
   // semaine du menu (CR-54) : demandée au départ du parcours, puis envoyée avec chaque message tant que la conversation reste ouverte
   const [week, setWeek] = useState<string | null>(null);
   const [fromReceipt, setFromReceipt] = useState(false);
-  const weekLabel = weeks.find((w) => w.week === week)?.label.replace(/^(Cette semaine|Semaine prochaine) /, "").replace(/[()]/g, "") ?? "";
+  const weekLabel = weeks.find((w) => w.week === week)?.range ?? "";
   const [picks, setPicks] = useState<string[]>([]);
   const [shown, setShown] = useState(PAGE);
   const [validating, setValidating] = useState<string | null>(null);
@@ -163,12 +163,13 @@ export function ChatPanel({ couple, startMenu = 0, fromTicket = 0, weeks = [] }:
             <div className={styles.dayCard} style={{ fontSize: 14, lineHeight: 1.45 }}>
               Pour quelle semaine ?
             </div>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: 6, flexWrap: "nowrap", overflowX: "auto", paddingBottom: 6 }}>
               {weeks.map((w) => (
                 <button
                   key={w.week}
                   type="button"
                   className={family.chipToggle}
+                  style={{ flex: "0 0 auto", whiteSpace: "nowrap" }}
                   aria-pressed={false}
                   onClick={() => {
                     setWeek(w.week);

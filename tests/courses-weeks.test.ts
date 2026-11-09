@@ -73,9 +73,13 @@ describe("CR-54 : deux semaines, chacune avec son menu et sa liste", () => {
     await menu(f, W1);
     const first = await prepareList(at(), f.sophie);
     expect(first.week).toBe(W0);
+    // la semaine en cours et les quatre suivantes (CR-56)
     expect(first.weeks.map((w) => [w.week, w.label, w.hasMenu, w.hasList])).toEqual([
       [W0, "Cette semaine (du 2 au 8 nov.)", true, false],
-      [W1, "Semaine prochaine (du 9 au 15 nov.)", true, false],
+      [W1, "Semaine du 9 au 15 nov.", true, false],
+      ["2026-11-16", "Semaine du 16 au 22 nov.", false, false],
+      ["2026-11-23", "Semaine du 23 au 29 nov.", false, false],
+      ["2026-11-30", "Semaine du 30 nov. au 6 déc.", false, false],
     ]);
     expect((await items(f, W0)).length).toBeGreaterThan(10);
     expect((await items(f, W1)).every((i) => i.state === "preparing")).toBe(true);
@@ -84,7 +88,7 @@ describe("CR-54 : deux semaines, chacune avec son menu et sa liste", () => {
     const next = await prepareList(at(), f.sophie, W1);
     expect(next.validated).toBe(true);
     expect((await prepareList(at(), f.sophie, W0)).validated).toBe(false);
-    expect(next.weeks.map((w) => w.hasList)).toEqual([false, true]);
+    expect(next.weeks.map((w) => w.hasList)).toEqual([false, true, false, false, false]);
     expect((await items(f, W0)).every((i) => i.state === "preparing")).toBe(true);
     expect((await items(f, W1)).every((i) => i.state === "validated")).toBe(true);
     expect(await db.selectFrom("grocery_lists").select("id").where("account_id", "=", f.accountId).execute()).toHaveLength(1);
@@ -102,8 +106,29 @@ describe("CR-54 : deux semaines, chacune avec son menu et sa liste", () => {
     await validate(f, W1);
     expect(await db.selectFrom("grocery_lists").select("id").where("account_id", "=", f.accountId).execute()).toHaveLength(2);
 
-    expect((await rejection(prepareList(at(), f.sophie, "2026-11-23"))).code).toBe("invalid_week");
+    expect((await rejection(prepareList(at(), f.sophie, "2026-12-07"))).code).toBe("invalid_week");
     expect((await rejection(prepareList(at(), f.sophie, "2026-10-26"))).status).toBe(422);
+  });
+
+  it("CR-56 : on prépare la semaine en cours et les quatre suivantes, pas une de plus ; le sélecteur de Ma liste ne porte que sur les semaines qui ont une liste", async () => {
+    const f = await ready();
+    await menu(f, "2026-11-30");
+    await menu(f, "2026-11-16");
+    expect((await prepareList(at(), f.sophie, "2026-11-30")).menu?.week).toBe("2026-11-30");
+    expect((await prepareList(at(), f.sophie)).week).toBe("2026-11-16");
+    expect((await rejection(menu(f, "2026-12-07"))).message).toMatch(/quatre suivantes/);
+    await validate(f, "2026-11-30");
+    const mine = await myList(at(), f.sophie);
+    expect(mine.week).toBe("2026-11-30");
+    expect(mine.weeks.filter((w) => w.hasList).map((w) => w.week)).toEqual(["2026-11-30"]);
+    // ticket ou coche : la semaine la plus proche d'abord, puis les suivantes
+    await validate(f, "2026-11-16");
+    const key = nameKey((await items(f, "2026-11-16")).find((i) => i.state === "validated")!.label);
+    await setBought(at(), f.sophie, { key, bought: true, late: false });
+    const near = (await items(f, "2026-11-16")).find((i) => i.name_key === key)!.state;
+    const far = (await items(f, "2026-11-30")).find((i) => i.name_key === key)?.state;
+    expect(near).toBe("bought");
+    if (far) expect(far).toBe("validated");
   });
 
   it("Ma liste : la semaine en cours par défaut, la semaine suivante au choix ; un produit présent sur les deux listes est coché sur la semaine en cours d'abord", async () => {
@@ -116,7 +141,7 @@ describe("CR-54 : deux semaines, chacune avec son menu et sa liste", () => {
 
     const mine = await myList(at(), f.sophie);
     expect(mine.week).toBe(W0);
-    expect(mine.weeks.map((w) => w.hasList)).toEqual([true, true]);
+    expect(mine.weeks.map((w) => w.hasList)).toEqual([true, true, false, false, false]);
     expect((await myList(at(), f.sophie, W1)).week).toBe(W1);
 
     await setBought(at(), f.sophie, { key, bought: true, late: false });
@@ -166,10 +191,12 @@ describe("CR-54 : deux semaines, chacune avec son menu et sa liste", () => {
     await menu(f, W1);
     const t = await toolContext(at(), f.sophie, W1);
     const state = JSON.parse((await executeCourseTool("etat_liste", {}, t)).content) as { semaines: { semaine: string; semaine_choisie_dans_ce_tchat: boolean; menu_valide: boolean; liste_validee: boolean }[] };
-    expect(state.semaines.map((s) => [s.semaine, s.semaine_choisie_dans_ce_tchat, s.menu_valide, s.liste_validee])).toEqual([
+    expect(state.semaines.map((s) => [s.semaine, s.semaine_choisie_dans_ce_tchat, s.menu_valide, s.liste_validee]).slice(0, 3)).toEqual([
       ["Cette semaine (du 2 au 8 nov.)", false, true, false],
-      ["Semaine prochaine (du 9 au 15 nov.)", true, true, false],
+      ["Semaine du 9 au 15 nov.", true, true, false],
+      ["Semaine du 16 au 22 nov.", false, false, false],
     ]);
+    expect(state.semaines).toHaveLength(5);
     await executeCourseTool("ajouter_produit", { nom: "Piles" }, t);
     expect((await db.selectFrom("grocery_list_items").select("menu_id").where("account_id", "=", f.accountId).where("name_key", "=", "piles").executeTakeFirstOrThrow()).menu_id).toBe(await menuId(f, W1));
 
@@ -187,9 +214,9 @@ describe("CR-54 : deux semaines, chacune avec son menu et sa liste", () => {
     const done = await sendCourseMessage(at(), f.sophie, { requestId: randomUUID(), text: "Un menu", week: W1 }, { model });
     expect(done.card?.proposal.week).toBe(W1);
     // le modèle sait pour quelle semaine il compose et qu'un menu y est déjà validé
-    expect(JSON.stringify(seen[0].messages)).toContain("Semaine choisie pour le menu et la liste : Semaine prochaine (du 9 au 15 nov.)");
+    expect(JSON.stringify(seen[0].messages)).toContain("Semaine choisie pour le menu et la liste : Semaine du 9 au 15 nov.");
     expect(done.card?.replacesValidated).toBe(true);
-    expect((await rejection(sendCourseMessage(at(), f.sophie, { requestId: randomUUID(), text: "Un menu", week: "2026-11-23" }, { model }))).code).toBe("invalid_week");
+    expect((await rejection(sendCourseMessage(at(), f.sophie, { requestId: randomUUID(), text: "Un menu", week: "2026-12-07" }, { model }))).code).toBe("invalid_week");
   });
 
   it("« déjà servi » compte l'autre semaine, avant comme après ; le menu de la même semaine (remplacé) est écarté", async () => {
@@ -268,7 +295,7 @@ describe("CR-55 : produits « pas encore acheté » de la liste d'avant", () => 
     expect(rebuilt.menu).not.toBeNull();
     expect(rebuilt.added.filter((a) => a.leftoverOf).map((a) => a.key).sort()).toEqual(expected);
     expect((await items(f, W1)).filter((i) => i.state === "preparing").length).toBeGreaterThan(5);
-    expect(rebuilt.weeks.map((w) => [w.hasMenu, w.hasList])).toEqual([[true, true], [true, false]]);
+    expect(rebuilt.weeks.slice(0, 2).map((w) => [w.hasMenu, w.hasList])).toEqual([[true, true], [true, false]]);
   });
 
   it("semaine sautée : les pense-bêtes viennent de la dernière liste encore existante d'une semaine antérieure ; liste supprimée : plus rien", async () => {
@@ -322,7 +349,7 @@ describe("CR-54 : suppression d'un menu ou d'une liste", () => {
     expect((await rejection(deleteWeekMenu(at(), f.elodie, W1))).status).toBe(403);
     expect((await rejection(deleteWeekList(at(), f.elodie, W1))).status).toBe(403);
     expect((await items(f, W1)).length).toBeGreaterThan(0);
-    expect((await rejection(deleteWeekMenu(at(), f.sophie, "2026-11-23"))).code).toBe("invalid_week");
+    expect((await rejection(deleteWeekMenu(at(), f.sophie, "2026-12-07"))).code).toBe("invalid_week");
 
     await deleteWeekMenu(at(), f.marc, W1);
     expect(await db.selectFrom("meal_menus").select("id").where("account_id", "=", f.accountId).where("week_start", "=", W1 as never).execute()).toEqual([]);
@@ -333,7 +360,7 @@ describe("CR-54 : suppression d'un menu ou d'une liste", () => {
     expect(await db.selectFrom("grocery_receipts").select("id").where("account_id", "=", f.accountId).execute()).toHaveLength(1);
     expect((await db.selectFrom("meal_menu_daily_counters").select("menu_count").where("account_id", "=", f.accountId).executeTakeFirstOrThrow()).menu_count).toBe(2);
     expect((await rejection(deleteWeekMenu(at(), f.sophie, W1))).code).toBe("no_menu");
-    expect((await prepareList(at(), f.sophie)).weeks.map((w) => w.hasMenu)).toEqual([true, false]);
+    expect((await prepareList(at(), f.sophie)).weeks.map((w) => w.hasMenu)).toEqual([true, false, false, false, false]);
   });
 
   it("supprimer la liste garde le menu : la liste est recalculée à partir de lui, à valider de nouveau", async () => {

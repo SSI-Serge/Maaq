@@ -5,10 +5,12 @@ import { courseError } from "../household/settings";
 
 /**
  * Deux semaines à la fois (CR-54) : chaque semaine a son menu et sa liste. Ce fichier dit quelle semaine un écran affiche : celle qu'il demande (`?week=` : le lundi de cette
- * semaine ou de la suivante), sinon la semaine en cours, sinon la suivante, sinon la dernière semaine passée qui a encore un menu (comme avant CR-54).
+ * semaine ou de la suivante), sinon la première semaine qui a un menu (en cours, puis les suivantes), sinon la dernière semaine passée qui a encore un menu (comme avant CR-54).
  */
 
 const DAYS = 86_400_000;
+/** Semaines préparées à l'avance (CR-56) : la semaine en cours et les quatre suivantes. */
+export const WEEKS_AHEAD = 4;
 const MONTHS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
 
 /** Lundi de la semaine de `date`, « AAAA-MM-JJ ». */
@@ -37,8 +39,10 @@ export function weekStartLabel(week: string): string {
 export interface WeekChoice {
   /** Lundi, « AAAA-MM-JJ ». */
   week: string;
-  /** « Cette semaine (du 9 au 15 nov.) » ou « Semaine prochaine (du 16 au 22 nov.) ». */
+  /** « Cette semaine (du 9 au 15 nov.) » pour la semaine en cours, « Semaine du 16 au 22 nov. » pour les suivantes. */
   label: string;
+  /** « du 9 au 15 nov. ». */
+  range: string;
   current: boolean;
   /** Un menu est validé pour cette semaine. */
   hasMenu: boolean;
@@ -68,18 +72,23 @@ const asWeekMenu = (r: { id: string; week_start: Date | string; validated_at: Da
   session_over_cap: r.session_over_cap,
 });
 
-/** Cette semaine et la suivante, avec leur menu et leur liste. */
+/** La semaine en cours et les quatre suivantes, avec leur menu et leur liste. */
+export const weekMondays = (now: Date): string[] => Array.from({ length: WEEKS_AHEAD + 1 }, (_, i) => addDaysIso(mondayIso(now), 7 * i));
+
 export async function weekChoices(db: Kysely<DB>, accountId: string, now: Date): Promise<WeekChoice[]> {
-  const current = mondayIso(now);
-  const next = addDaysIso(current, 7);
-  const menus = await db.selectFrom("meal_menus").select(["id", "week_start"]).where("account_id", "=", accountId).where("week_start", "in", [current, next] as never[]).execute();
+  const mondays = weekMondays(now);
+  const menus = await db.selectFrom("meal_menus").select(["id", "week_start"]).where("account_id", "=", accountId).where("week_start", "in", mondays as never[]).execute();
   const lists = menus.length ? await db.selectFrom("grocery_lists").select("menu_id").where("account_id", "=", accountId).where("menu_id", "in", menus.map((m) => m.id)).execute() : [];
   const listed = new Set(lists.map((l) => l.menu_id));
   const byWeek = new Map(menus.map((m) => [typeof m.week_start === "string" ? (m.week_start as string).slice(0, 10) : isoDate(m.week_start as Date), m.id]));
-  return [
-    { week: current, label: `Cette semaine (${weekRange(current)})`, current: true, hasMenu: byWeek.has(current), hasList: listed.has(byWeek.get(current) ?? "") },
-    { week: next, label: `Semaine prochaine (${weekRange(next)})`, current: false, hasMenu: byWeek.has(next), hasList: listed.has(byWeek.get(next) ?? "") },
-  ];
+  return mondays.map((week, i) => ({
+    week,
+    label: i === 0 ? `Cette semaine (${weekRange(week)})` : `Semaine ${weekRange(week)}`,
+    range: weekRange(week),
+    current: i === 0,
+    hasMenu: byWeek.has(week),
+    hasList: listed.has(byWeek.get(week) ?? ""),
+  }));
 }
 
 const MENU_COLUMNS = ["id", "week_start", "validated_at", "batch_week_id", "servings", "session_minutes", "session_is_estimated", "session_over_cap"] as const;
@@ -89,11 +98,10 @@ export async function menuOfWeek(db: Kysely<DB>, accountId: string, week: string
   return row ? asWeekMenu(row) : null;
 }
 
-/** Lundi demandé : seulement celui de cette semaine ou de la suivante (une semaine passée n'a plus d'écran). */
+/** Lundi demandé : seulement celui de cette semaine ou des quatre suivantes (une semaine passée n'a plus d'écran). */
 export function checkWeek(requested: string | undefined | null, now: Date): string | null {
   if (!requested) return null;
-  const current = mondayIso(now);
-  if (requested !== current && requested !== addDaysIso(current, 7)) throw courseError("invalid_week", "Choisissez cette semaine ou la semaine prochaine.", 422);
+  if (!weekMondays(now).includes(requested)) throw courseError("invalid_week", "Choisissez la semaine en cours ou l'une des quatre suivantes.", 422);
   return requested;
 }
 
@@ -102,7 +110,7 @@ export async function pickMenu(db: Kysely<DB>, accountId: string, now: Date, req
   const wanted = checkWeek(requested, now);
   if (wanted) return menuOfWeek(db, accountId, wanted);
   const current = mondayIso(now);
-  for (const week of [current, addDaysIso(current, 7)]) {
+  for (const week of weekMondays(now)) {
     const menu = await menuOfWeek(db, accountId, week);
     if (menu) return menu;
   }

@@ -38,7 +38,9 @@ export function CoursesListScreen() {
 
 /** Le sélecteur de semaine apparaît quand les deux semaines ont un menu (CR-54) ; la semaine en cours est celle de départ. */
 function Weeks({ list, onWeek }: { list: ListPrepared; onWeek: (week: string) => void }) {
-  return list.access === "couple" && list.weeks.length === 2 && list.weeks.every((w) => w.hasMenu || w.hasList) ? <WeekSelector weeks={list.weeks} week={list.week} onChange={onWeek} /> : null;
+  // les semaines qui ont un menu (ou une liste), plus celle qui est affichée (CR-56)
+  const shown = list.weeks.filter((w) => w.hasMenu || w.hasList || w.week === list.week);
+  return list.access === "couple" && shown.length > 1 ? <WeekSelector weeks={shown} week={list.week} onChange={onWeek} /> : null;
 }
 
 function ListFlow({ list, reload, onWeek }: { list: ListPrepared; reload: () => void; onWeek: (week: string) => void }) {
@@ -215,7 +217,7 @@ function Preparation({ list, reload }: { list: ListPrepared; reload: () => void 
   return (
     <>
       <p className={family.hint}>Semaine du {summary.weekLabel}</p>
-      {list.access === "couple" && list.week && <DeleteWeek week={list.week} weekText={`de la semaine ${list.weeks.find((w) => w.week === list.week)?.label.match(/\((.*)\)/)?.[1] ?? ""}`} hasList={!!list.weeks.find((w) => w.week === list.week)?.hasList} onDone={reload} />}
+      {list.access === "couple" && list.week && <DeleteWeek week={list.week} weekText={`de la semaine ${list.weeks.find((w) => w.week === list.week)?.range ?? ""}`} hasList={!!list.weeks.find((w) => w.week === list.week)?.hasList} onDone={reload} />}
       <div className={styles.tools}>
         <Button variant="ghost" onClick={() => setOpened({ all: true, key: opened.key + 1 })}>
           Tout déplier
