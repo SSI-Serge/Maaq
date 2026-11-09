@@ -3,8 +3,16 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-09T09:55:00.000Z",
+  "updated": "2026-11-09T10:40:00.000Z",
   "deploys": [
+    {
+      "at": "2026-11-09T10:40:00.000Z",
+      "env": "preview",
+      "what": "Courses et repas, CR-57 : dans la carte du menu, chaque plat se déplie (ingrédients, quantités, recette), « Voir la séance de batch », « Remplacer » sans IA (express, échange de jour, Mes plats avec les quantités de leur dernier menu validé) ; déroulé réécrit une fois par l'IA à la validation, hors limite de menus ; « Rédiger le déroulé » — rév. 00093. Pas de changement de base. Menu IA fermé en production.",
+      "storyIds": [
+        "f21c4"
+      ]
+    },
     {
       "at": "2026-11-09T09:55:00.000Z",
       "env": "preview",
