@@ -75,7 +75,7 @@ export async function validateMenuCard(ctx: Ctx, session: SessionContext, messag
  * « acheté » ou ajoutés depuis la validation sont gardés (CR-45). La ligne de liste validée reste en place (les articles achetés y sont rattachés) ; la page se rouvre parce que le menu
  * est plus récent qu'elle.
  */
-async function reopenList(trx: Parameters<Parameters<typeof asProfile>[2]>[0], accountId: string, menuId: string, now: Date): Promise<void> {
+export async function reopenList(trx: Parameters<Parameters<typeof asProfile>[2]>[0], accountId: string, menuId: string, now: Date): Promise<void> {
   // seulement la liste de CE menu : l'autre semaine n'est jamais touchée (CR-54)
   await trx.deleteFrom("grocery_list_items").where("account_id", "=", accountId).where("menu_id", "=", menuId).where("state", "=", "validated").where("source", "in", ["menu", "habit"]).execute();
   await trx
@@ -88,7 +88,7 @@ async function reopenList(trx: Parameters<Parameters<typeof asProfile>[2]>[0], a
 }
 
 /** Une ligne par ingrédient (clé unique par plat) ; la quantité d'un doublon est additionnée quand l'unité est la même. */
-function dedupe(lines: { label: string; quantity: number | null; unit: QuantityUnit | null }[], keys: string[]): { line: (typeof lines)[number]; key: string; position: number }[] {
+export function dedupe(lines: { label: string; quantity: number | null; unit: QuantityUnit | null }[], keys: string[]): { line: (typeof lines)[number]; key: string; position: number }[] {
   const out = new Map<string, { line: (typeof lines)[number]; key: string; position: number }>();
   lines.forEach((line, k) => {
     const key = keys[k];
@@ -97,6 +97,77 @@ function dedupe(lines: { label: string; quantity: number | null; unit: QuantityU
     else if (seen.line.unit === line.unit && seen.line.quantity !== null && line.quantity !== null) seen.line.quantity = Math.round((seen.line.quantity + line.quantity) * 1000) / 1000;
   });
   return [...out.values()];
+}
+
+/** Insère une ligne de menu (plat, ingrédients avec quantités, version allégée) : la validation d'un menu et l'ajustement d'un plat après un ticket (CR-58) s'en servent. */
+export async function insertMenuEntry(
+  trx: Parameters<Parameters<typeof asProfile>[2]>[0],
+  accountId: string,
+  menuId: string,
+  kind: "dinner" | "express",
+  slot: number,
+  d: ProposalDish,
+  refs: Map<string, { kind: "catalog"; dishId: string } | { kind: "household"; dishId: string }>,
+  prods: ReturnType<typeof buildRefProducts>,
+): Promise<string> {
+  const ref = d.engineId ? refs.get(d.engineId) : undefined;
+  const inserted = await trx
+    .insertInto("meal_menu_entries")
+    .values({
+      menu_id: menuId,
+      account_id: accountId,
+      kind,
+      slot,
+      dish_name: d.name.slice(0, 160),
+      dish_origin: d.origin,
+      dish_id: ref?.kind === "catalog" ? (ref.dishId as never) : null,
+      household_dish_id: ref?.kind === "household" ? ref.dishId : null,
+      cuisine_id: d.origin === "ai" ? d.cuisineId : null,
+      // la recette du menu est celle écrite pour le foyer, pour toute origine ; le plat d'origine n'est pas modifié (CR-49)
+      recipe: d.recipe || null,
+      duration_minutes: d.origin === "ai" ? d.minutes : null,
+      light_by_ai: !!d.light,
+      light_text: d.light?.text ?? null,
+    })
+    .returning("id")
+    .executeTakeFirstOrThrow();
+  // ingrédients de TOUT plat du menu, avec leur quantité pour le foyer : la base refuse un plat sans ingrédient (CR-49, CR-50)
+  const lines = d.ingredients.length ? d.ingredients : [{ label: d.name, quantity: null, unit: null }];
+  const keys = lines.map((i) => nameKey(i.label).slice(0, 120));
+  const productKey = (label: string, key: string): string => {
+    const found = findProd(prods, label);
+    return found ? nameKey(found).slice(0, 120) : key;
+  };
+  const lookup = [...new Set([...keys, ...lines.map((l, k) => productKey(l.label, keys[k]))])];
+  const products = await trx.selectFrom("grocery_products").select(["id", "name_key"]).where("name_key", "in", lookup).execute();
+  const byKey = new Map(products.map((pr) => [pr.name_key, pr.id]));
+  await trx
+    .insertInto("meal_menu_entry_ingredients")
+    .values(
+      dedupe(lines, keys).map(({ line, key, position }) => ({
+        entry_id: inserted.id,
+        account_id: accountId,
+        label: line.label.slice(0, 120),
+        name_key: key,
+        product_id: byKey.get(key) ?? byKey.get(productKey(line.label, key)) ?? null,
+        position,
+        quantity: line.quantity === null ? null : line.quantity.toFixed(3),
+        unit: line.quantity === null ? null : line.unit,
+      })),
+    )
+    .execute();
+  if (d.light && (d.light.remove.length || d.light.add.length)) {
+    const items = [...d.light.remove.map((label) => ({ kind: "remove" as const, label })), ...d.light.add.map((label) => ({ kind: "add" as const, label }))];
+    const unique = new Map(items.map((i) => [`${i.kind}:${nameKey(i.label)}`, i]));
+    const keys = [...unique.values()].map((i) => nameKey(i.label).slice(0, 120));
+    const products = await trx.selectFrom("grocery_products").select(["id", "name_key"]).where("name_key", "in", keys).execute();
+    const byKey = new Map(products.map((p) => [p.name_key, p.id]));
+    await trx
+      .insertInto("meal_menu_entry_light_items")
+      .values([...unique.values()].map((i) => ({ entry_id: inserted.id, account_id: accountId, kind: i.kind, label: i.label.slice(0, 120), name_key: nameKey(i.label).slice(0, 120), product_id: byKey.get(nameKey(i.label).slice(0, 120)) ?? null })))
+      .execute();
+  }
+  return String(inserted.id);
 }
 
 export async function saveValidatedMenu(ctx: Ctx, accountId: string, userId: string, proposal: MenuProposal, data: Awaited<ReturnType<typeof loadEngineData>>): Promise<ValidatedMenuCard> {
@@ -142,64 +213,7 @@ export async function saveValidatedMenu(ctx: Ctx, accountId: string, userId: str
         ...proposal.express.map((d, i) => ({ kind: "express" as const, slot: i + 1, d })),
       ];
       for (const { kind, slot, d } of rows) {
-        const ref = d.engineId ? data.refs.get(d.engineId) : undefined;
-        const inserted = await trx
-          .insertInto("meal_menu_entries")
-          .values({
-            menu_id: menu.id,
-            account_id: accountId,
-            kind,
-            slot,
-            dish_name: d.name.slice(0, 160),
-            dish_origin: d.origin,
-            dish_id: ref?.kind === "catalog" ? (ref.dishId as never) : null,
-            household_dish_id: ref?.kind === "household" ? ref.dishId : null,
-            cuisine_id: d.origin === "ai" ? d.cuisineId : null,
-            // la recette du menu est celle écrite pour le foyer, pour toute origine ; le plat d'origine n'est pas modifié (CR-49)
-            recipe: d.recipe || null,
-            duration_minutes: d.origin === "ai" ? d.minutes : null,
-            light_by_ai: !!d.light,
-            light_text: d.light?.text ?? null,
-          })
-          .returning("id")
-          .executeTakeFirstOrThrow();
-        entryIds.set(`${kind}:${slot}`, String(inserted.id));
-        // ingrédients de TOUT plat du menu, avec leur quantité pour le foyer : la base refuse un plat sans ingrédient (CR-49, CR-50)
-        const lines = d.ingredients.length ? d.ingredients : [{ label: d.name, quantity: null, unit: null }];
-        const keys = lines.map((i) => nameKey(i.label).slice(0, 120));
-        const productKey = (label: string, key: string): string => {
-          const found = findProd(prods, label);
-          return found ? nameKey(found).slice(0, 120) : key;
-        };
-        const lookup = [...new Set([...keys, ...lines.map((l, k) => productKey(l.label, keys[k]))])];
-        const products = await trx.selectFrom("grocery_products").select(["id", "name_key"]).where("name_key", "in", lookup).execute();
-        const byKey = new Map(products.map((pr) => [pr.name_key, pr.id]));
-        await trx
-          .insertInto("meal_menu_entry_ingredients")
-          .values(
-            dedupe(lines, keys).map(({ line, key, position }) => ({
-              entry_id: inserted.id,
-              account_id: accountId,
-              label: line.label.slice(0, 120),
-              name_key: key,
-              product_id: byKey.get(key) ?? byKey.get(productKey(line.label, key)) ?? null,
-              position,
-              quantity: line.quantity === null ? null : line.quantity.toFixed(3),
-              unit: line.quantity === null ? null : line.unit,
-            })),
-          )
-          .execute();
-        if (d.light && (d.light.remove.length || d.light.add.length)) {
-          const items = [...d.light.remove.map((label) => ({ kind: "remove" as const, label })), ...d.light.add.map((label) => ({ kind: "add" as const, label }))];
-          const unique = new Map(items.map((i) => [`${i.kind}:${nameKey(i.label)}`, i]));
-          const keys = [...unique.values()].map((i) => nameKey(i.label).slice(0, 120));
-          const products = await trx.selectFrom("grocery_products").select(["id", "name_key"]).where("name_key", "in", keys).execute();
-          const byKey = new Map(products.map((p) => [p.name_key, p.id]));
-          await trx
-            .insertInto("meal_menu_entry_light_items")
-            .values([...unique.values()].map((i) => ({ entry_id: inserted.id, account_id: accountId, kind: i.kind, label: i.label.slice(0, 120), name_key: nameKey(i.label).slice(0, 120), product_id: byKey.get(nameKey(i.label).slice(0, 120)) ?? null })))
-            .execute();
-        }
+        entryIds.set(`${kind}:${slot}`, await insertMenuEntry(trx, accountId, menu.id, kind, slot, d, data.refs, prods));
         dishesForList.push(toDish(d));
       }
 

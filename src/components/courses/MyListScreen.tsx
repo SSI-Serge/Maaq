@@ -12,7 +12,6 @@ import type { AddedLine } from "@/server/courses/list/service";
 import { formatQuantity } from "@/server/courses/engine/quantities";
 import { euro, euroPer } from "./ListScreen";
 import { DeleteWeek, WeekSelector, scopeFromLocation, weekFromLocation } from "./WeekTools";
-import family2 from "@/components/family/family.module.css";
 import styles from "./courses.module.css";
 
 const BACK = { href: "/courses", label: "Courses et repas" };
@@ -181,6 +180,12 @@ function Content({ list, reload, onPrint, printing, onWeek, onScope }: { list: M
       {stores.map((s) => (
         <StoreBlock key={s.name} store={s} couple={couple} printing={printing} onTick={(key, name) => void tick(key, name, false)} />
       ))}
+      {list.cost && (
+        <p className={family.hint} role="status">
+          Coût réel : {euro(list.cost.real)}
+          {list.cost.estimated > 0 ? ` (dont ${euro(list.cost.estimated)} encore estimés)` : ""} · estimé à la validation : {euro(list.cost.atValidation)}
+        </p>
+      )}
       {list.allBought || (stores.length === 0 && late.length === 0) ? (
         <p className={styles.session} role="status">
           ✓ Tout est acheté. Bonne semaine !

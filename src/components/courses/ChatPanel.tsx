@@ -15,6 +15,7 @@ import type { WeekChoice } from "@/server/courses/list/weeks";
 import type { OwnDish } from "@/server/courses/menu/dishes";
 import { apiRequest } from "@/client/api";
 import type { ReplaceChoice, ReplaceKind, ReplaceOptions } from "@/server/courses/menu-ia/replace";
+import { AdjustCard } from "./AdjustCard";
 import { MenuCard, type ReplaceApi } from "./MenuCard";
 import { DAY_LABELS } from "./menu-text";
 import styles from "./courses.module.css";
@@ -54,6 +55,8 @@ export function ChatPanel({ couple, startMenu = 0, fromTicket = 0, weeks = [] }:
   const validate = useApiMutation();
   const adding = useApiMutation();
   const replacing = useApiMutation();
+  const adjusting = useApiMutation();
+  const [adjustingId, setAdjustingId] = useState<string | null>(null);
   const router = useRouter();
   const [text, setText] = useState("");
   const [pending, setPending] = useState<string | null>(null);
@@ -172,7 +175,20 @@ export function ChatPanel({ couple, startMenu = 0, fromTicket = 0, weeks = [] }:
       </p>
       <div role="log" aria-live="polite" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {messages.map((m) =>
-          m.card ? (
+          m.adjust ? (
+            <AdjustCard
+              key={m.id}
+              view={m.adjust}
+              busy={adjustingId === m.adjust.messageId}
+              onAction={async (action, key) => {
+                setAdjustingId(m.adjust!.messageId);
+                const done = await adjusting.run("/api/courses/chat/adjust", { method: "POST", body: { action, messageId: m.adjust!.messageId, ...(key ? { key } : {}) }, timeoutMs: CHAT_TIMEOUT_MS });
+                setAdjustingId(null);
+                if (done) history.reload();
+                return !!done;
+              }}
+            />
+          ) : m.card ? (
             <MenuCard key={m.id} card={m.card} busy={validating === m.card.messageId} onValidate={(c) => void validateCard(c)} onAdd={addDishes} replaceApi={couple ? replaceApiOf(m.card) : undefined} />
           ) : (
             <div key={m.id} className={m.role === "user" ? undefined : styles.dayCard} style={m.role === "user" ? { alignSelf: "flex-end", maxWidth: "85%", padding: "8px 12px", borderRadius: "12px 12px 2px 12px", background: "var(--primary)", color: "var(--primary-ink)", fontSize: 14 } : { fontSize: 14, lineHeight: 1.4 }}>
@@ -272,6 +288,7 @@ export function ChatPanel({ couple, startMenu = 0, fromTicket = 0, weeks = [] }:
       {validate.error && <Notice tone="error">{validate.error.message}</Notice>}
       {adding.error && <Notice tone="error">{adding.error.message}</Notice>}
       {replacing.error && <Notice tone="error">{replacing.error.message}</Notice>}
+      {adjusting.error && <Notice tone="error">{adjusting.error.message}</Notice>}
       {validated && <p className={styles.banner}>Menu enregistré : {validated.listed} produit{validated.listed > 1 ? "s" : ""} dans votre liste de courses.</p>}
       <div className={styles.addRow} style={{ marginTop: 10 }}>
         <input

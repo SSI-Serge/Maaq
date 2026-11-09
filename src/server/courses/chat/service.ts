@@ -12,6 +12,7 @@ import { addableDishes, cardView, isCard, menuInProgress, parseCard, saveMenuCar
 import type { MenuProgress } from "../menu-ia/progress";
 import { runCourseAgent, type CourseAgentResult } from "./agent";
 import { toolContext } from "./tools";
+import { adjustView, parseAdjust, type AdjustView } from "../menu-ia/adjust";
 import { checkWeek, weekChoices } from "../list/weeks";
 
 /**
@@ -42,7 +43,7 @@ export async function courseAgentId(db: Kysely<DB>): Promise<string> {
   return row.id;
 }
 
-async function conversationOf(db: Kysely<DB>, accountId: string, userId: string, now: Date): Promise<{ id: string }> {
+export async function conversationOf(db: Kysely<DB>, accountId: string, userId: string, now: Date): Promise<{ id: string }> {
   return db
     .insertInto("agent_conversations")
     .values({ account_id: accountId, user_id: userId, agent_id: await courseAgentId(db), last_message_at: now })
@@ -172,6 +173,8 @@ export interface CourseMessageView {
   at: string;
   /** Menu composé par l'IA : carte sous le fil, avec « Valider le menu » tant qu'elle est ouverte. */
   card?: CardView;
+  /** Ingrédients manquants après un ticket (CR-58) : « Ajuster le menu » ou « Je l'achèterai plus tard », puis les propositions de l'IA. */
+  adjust?: AdjustView;
 }
 
 /** Messages récents du fil de ce profil (4 jours au plus), du plus ancien au plus récent. */
@@ -199,6 +202,8 @@ export async function listCourseMessages(ctx: Ctx, session: SessionContext): Pro
   }
   return decoded.map(({ r, text }, i): CourseMessageView => {
     const base = { id: String(r.id), role: r.sender === "agent" ? ("assistant" as const) : ("user" as const), at: r.created_at.toISOString() };
+    const adjust = parseAdjust(text);
+    if (adjust) return { ...base, text: "", adjust: adjustView(String(r.id), adjust) };
     const envelope = parseCard(text);
     if (!envelope) return { ...base, text };
     return { ...base, text: "", card: cardView(String(r.id), envelope, decoded.some((other, k) => k !== i && BigInt(other.r.id) > BigInt(r.id) && weeks[k] === envelope.proposal.week), validated.has(envelope.proposal.week), addable.get(envelope.proposal.week) ?? []) };

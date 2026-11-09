@@ -1595,6 +1595,10 @@ export interface GroceryListItems {
   store_chain: string | null;
   unit_price: Numeric | null;
   updated_at: Generated<Timestamp>;
+  /**
+   * Ligne de ticket de caisse qui a servi à payer ce produit acheté : le coût réel du menu est la somme des lignes reliées aux produits de ses listes. Vide pour un produit coché à la main (le prix estimé est gardé) ; repasse à vide si le ticket est supprimé ou si le produit n'est plus acheté. Un ingrédient inconnu du catalogue est rapproché par son nom, moins fiable. [US-157 RF8, US-177, CR-58]
+   */
+  receipt_line_id: Int8 | null;
 }
 
 export interface GroceryListGroups {

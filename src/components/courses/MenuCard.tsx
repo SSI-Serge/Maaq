@@ -22,7 +22,7 @@ export interface ReplaceApi {
 }
 
 /** Détail d'un plat (CR-57) : ingrédients avec les quantités pour le foyer, puis recette. */
-function DishDetail({ dish }: { dish: ProposalDish }) {
+export function DishDetail({ dish }: { dish: ProposalDish }) {
   const steps = recipeSteps(dish.recipe);
   return (
     <div style={{ fontSize: 12, lineHeight: 1.5, padding: "4px 0 6px" }}>

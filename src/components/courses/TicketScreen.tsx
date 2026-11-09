@@ -265,6 +265,19 @@ function Done({ result, summary, shared, onAnother }: { result: TicketConfirmati
         {shared ? " Les prix sont ajoutés, sans votre nom, à la base commune." : ""}
       </div>
       <p className={family.hint}>La photo a été supprimée.</p>
+      {result.adjust && (
+        <div className={styles.dayCard} role="status">
+          <span className={styles.dayName}>Il manque des ingrédients pour votre menu</span>
+          {result.adjust.dishes.map((d) => (
+            <span key={d.key} className={styles.meta}>
+              {d.missing.join(", ")} non acheté{d.missing.length > 1 ? "s" : ""} : {d.name} {d.day === "express" ? "(plat express)" : `du ${d.day}`}.
+            </span>
+          ))}
+          <ButtonLink href="/courses" variant="ghost">
+            Ajuster le menu dans le tchat
+          </ButtonLink>
+        </div>
+      )}
       {result.menuIa && (
         <>
           <p className={styles.lead}>Voulez-vous un menu avec ce que vous venez d&apos;acheter ?</p>

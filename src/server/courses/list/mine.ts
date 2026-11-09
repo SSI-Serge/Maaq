@@ -57,6 +57,8 @@ export interface MyList {
   stores: MyStore[];
   /** Reste à acheter, pour le couple ; vide si tout est acheté. */
   remaining: number | null;
+  /** Coût réel du menu (CR-58) : prix des tickets pour les produits achetés, prix estimés pour le reste ; vide pour l'invité secondaire ou tant que rien n'est acheté. */
+  cost: null | { real: number; estimated: number; atValidation: number };
   allBought: boolean;
 }
 
@@ -90,7 +92,7 @@ export async function myList(ctx: Ctx, session: SessionContext, requestedWeek?: 
   const group = menu && list ? await groupOfMenu(ctx.db, who.accountId, menu.id) : null;
   const scope = group && scopeAsked === "group" ? "group" : "week";
   const base = { access: who.access, week: menu?.week_start ?? null, weeks, hasMenu: !!menu, weekLabel: menu ? weekLabel(menu.week_start) : null, group: group ? { weeks: group.weeks } : null, scope: scope as "week" | "group", later: [] as MyList["later"] };
-  if (!list) return { ...base, empty: true, late: [], stores: [], remaining: null, allBought: false };
+  if (!list) return { ...base, empty: true, late: [], stores: [], remaining: null, cost: null, allBought: false };
   // liste du mois : les listes de toutes les semaines regroupées, les produits identiques additionnés
   const groupLists = scope === "group" ? await ctx.db.selectFrom("grocery_lists as l").innerJoin("meal_menus as m", "m.id", "l.menu_id").select(["l.id", "l.menu_id", "m.week_start"]).where("l.account_id", "=", who.accountId).where("l.group_id", "=", (await ctx.db.selectFrom("grocery_lists").select("group_id").where("id", "=", list.id).executeTakeFirstOrThrow()).group_id!).orderBy("m.week_start").execute() : null;
   const listIds = groupLists ? groupLists.map((l) => l.id) : [list.id];
@@ -162,7 +164,7 @@ export async function myList(ctx: Ctx, session: SessionContext, requestedWeek?: 
       if (names.length) later.push({ week, label: `semaine du ${weekStartLabel(week)}`, names });
     }
   }
-  return { ...base, later, empty: false, late, stores, remaining, allBought: lines.length === 0 && late.length === 0 };
+  return { ...base, later, empty: false, late, stores, remaining, cost: showPrices ? await realCost(ctx, who.accountId, listIds) : null, allBought: lines.length === 0 && late.length === 0 };
 }
 
 /**
@@ -217,4 +219,39 @@ async function addedLines(ctx: Ctx, who: { accountId: string; userId: string }, 
   const out: AddedLine[] = [];
   for (const m of menus) for (const a of await addedLinesOf(ctx.db, who.accountId, who.userId, m.id, [], m.week)) if (!out.some((x) => x.key === a.key)) out.push(a);
   return out;
+}
+
+/**
+ * Coût réel du menu (CR-58, US-177 RF5) : une ligne de ticket est comptée en entier dans la semaine dont elle coche le produit ; un produit acheté à la main, sans ligne de ticket, et tout produit
+ * encore à acheter restent estimés ; les produits achetés hors liste ne comptent pas. Vide tant que rien n'est acheté. « Estimé à la validation » : le prix estimé de toute la liste.
+ */
+async function realCost(ctx: Ctx, accountId: string, listIds: string[]): Promise<MyList["cost"]> {
+  const rows = await ctx.db
+    .selectFrom("grocery_list_items as i")
+    .leftJoin("grocery_receipt_lines as rl", (j) => j.onRef("rl.id", "=", "i.receipt_line_id").onRef("rl.account_id", "=", "i.account_id"))
+    .select(["i.state", "i.quantity", "i.unit_price", "i.price_unit", "i.needed_amount", "i.needed_unit", "i.receipt_line_id", "rl.line_total"])
+    .where("i.account_id", "=", accountId)
+    .where("i.list_id", "in", listIds)
+    .where("i.state", "in", ["validated", "bought"])
+    .execute();
+  if (!rows.some((r) => r.state === "bought")) return null;
+  const lineSeen = new Set<string>();
+  let real = 0;
+  let estimated = 0;
+  let atValidation = 0;
+  for (const r of rows) {
+    const guess = lineTotal({ unit_price: r.unit_price, price_unit: r.price_unit, quantity: r.quantity, needed_amount: r.needed_amount, needed_unit: r.needed_unit }) ?? 0;
+    atValidation += guess;
+    if (r.state === "bought" && r.receipt_line_id !== null && r.line_total !== null) {
+      const id = String(r.receipt_line_id);
+      if (!lineSeen.has(id)) {
+        lineSeen.add(id);
+        real += Number(r.line_total);
+      }
+    } else {
+      real += guess;
+      estimated += guess;
+    }
+  }
+  return { real: round2(real), estimated: round2(estimated), atValidation: round2(atValidation) };
 }

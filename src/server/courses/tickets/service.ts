@@ -2,10 +2,11 @@ import { sql } from "kysely";
 import { asProfile } from "@/server/assistant/outings/profile";
 import type { Ctx, SessionContext } from "@/server/auth/service";
 import { nameKey, placeKey } from "../catalog/seed";
-import { applyTicket, pricePerMeasure, toMeasure, round2, ticketTotal, type Ticket } from "../engine";
+import { applyTicket, listItemMatches, pricePerMeasure, toMeasure, round2, ticketTotal, type Ticket } from "../engine";
 import { env } from "@/server/env";
 import { courseError, displayPlace, loadSettings, requireAccess, translateCourseError } from "../household/settings";
 import { menusForTicking } from "../list/weeks";
+import { postAdjustCard, type AdjustView } from "../menu-ia/adjust";
 import { maskTicketText } from "./mask";
 import { ticketReader, TicketReaderError, type TicketImage } from "./reader";
 import { normalizeDraft, normalizeTime, ticketStructurer, type TicketDraft } from "./structure";
@@ -117,6 +118,8 @@ export interface TicketConfirmation {
   receiptId: string | null;
   /** Le menu se compose en conversation (MENU_IA ouvert) : l'écran propose alors « Menu à partir de ce ticket ». */
   menuIa: boolean;
+  /** Ingrédients manquants du menu validé après ce ticket (CR-58) : la carte « Ajuster le menu » est aussi rangée dans le tchat ; vide si rien ne manque ou si MENU_IA est fermé. */
+  adjust: AdjustView | null;
 }
 
 /** Enregistre un ticket confirmé (US-161 RF5) : prix et journal d'achats, produits retirés de la liste, budget, base commune si le foyer partage. Un doublon est ignoré. */
@@ -146,7 +149,7 @@ export async function confirmTicket(ctx: Ctx, session: SessionContext, input: Ti
     return { product, reference: l.reference?.trim().slice(0, 160) || null, total: round2(l.total), qty: measure ? 1 : l.qty, aisle: l.aisle, aisleId: id, measure, perMeasure, readPerMeasure: !!(measure && l.pricePerMeasure && l.pricePerMeasure > 0) };
   });
   const total = round2(lines.reduce((s, l) => s + l.total, 0));
-  if (await isKnown(ctx, who.accountId, { store, date: input.date, time, total })) return { duplicate: true, recorded: 0, total, removed: [], aisles: [], shared: 0, receiptId: null, menuIa: false };
+  if (await isKnown(ctx, who.accountId, { store, date: input.date, time, total })) return { duplicate: true, recorded: 0, total, removed: [], aisles: [], shared: 0, receiptId: null, menuIa: false, adjust: null };
 
   // un produit présent sur les listes des deux semaines est coché sur celle de la semaine en cours d'abord, puis sur l'autre (CR-54)
   const order = await menusForTicking(ctx.db, who.accountId, ctx.now);
@@ -161,7 +164,15 @@ export async function confirmTicket(ctx: Ctx, session: SessionContext, input: Ti
   ).sort((a, b) => rank(a.menu_id) - rank(b.menu_id));
   const ticket: Ticket = { store, date: input.date, lines: lines.map((l) => ({ product: l.product, ref: l.reference ?? "", total: l.total, qty: l.qty, rayon: l.aisle })) };
   const outcome = applyTicket(ticket, [], open.map((o) => o.label));
-  const removedLabels = new Set(outcome.removedFromList);
+  // quelle ligne du ticket coche quel produit de la liste (CR-58) : chaque ligne coche au plus un produit, le plus proche d'abord ; le produit garde le lien vers sa ligne de ticket
+  const matched: { itemId: string; line: number }[] = [];
+  {
+    const left = [...open];
+    ticket.lines.forEach((line, i) => {
+      const at = left.findIndex((o) => listItemMatches(o.label, line.product));
+      if (at >= 0) matched.push({ itemId: left.splice(at, 1)[0].id, line: i });
+    });
+  }
 
   let receiptId = "";
   let shared = 0;
@@ -176,20 +187,16 @@ export async function confirmTicket(ctx: Ctx, session: SessionContext, input: Ti
       const keys = lines.map((l) => nameKey(l.product).slice(0, 120));
       const products = await trx.selectFrom("grocery_products").select(["id", "name_key"]).where("name_key", "in", keys).execute();
       const byKey = new Map(products.map((p) => [p.name_key, p.id]));
-      await trx
+      const inserted = await trx
         .insertInto("grocery_receipt_lines")
         .values(lines.map((l, i) => ({ receipt_id: receipt.id, account_id: who.accountId, position: i + 1, label: l.product, name_key: keys[i], reference_name: l.reference, line_total: l.total.toFixed(2), quantity: l.qty.toFixed(3), measured_quantity: l.measure ? l.measure.amount.toFixed(3) : null, measure_unit: l.measure?.unit ?? null, price_per_measure: l.readPerMeasure && l.perMeasure ? l.perMeasure.toFixed(2) : null, aisle_id: l.aisleId, product_id: byKey.get(keys[i]) ?? null })))
+        .returning(["id", "position"])
         .execute();
-      // produits de la liste trouvés sur le ticket : cochés « acheté » (ils sortent de la liste et rejoignent l'historique)
-      const taken = new Set<string>();
-      const ids = open
-        .filter((o) => {
-          if (!removedLabels.has(o.label) || taken.has(o.label)) return false;
-          taken.add(o.label);
-          return true;
-        })
-        .map((o) => o.id);
-      if (ids.length) await trx.updateTable("grocery_list_items").set({ state: "bought", bought_at: ctx.now, bought_by_user_id: who.userId, updated_at: ctx.now }).where("id", "in", ids).execute();
+      // produits de la liste trouvés sur le ticket : cochés « acheté » (ils sortent de la liste et rejoignent l'historique), avec le lien vers la ligne du ticket (coût réel du menu, CR-58)
+      const lineId = new Map(inserted.map((r) => [r.position, r.id]));
+      for (const m of matched) {
+        await trx.updateTable("grocery_list_items").set({ state: "bought", bought_at: ctx.now, bought_by_user_id: who.userId, receipt_line_id: (lineId.get(m.line + 1) ?? null) as never, updated_at: ctx.now }).where("id", "=", m.itemId).execute();
+      }
       for (const [i, l] of lines.entries()) {
         // ligne pesée : seul le prix au kilo ou au litre est partagé, jamais le poids (CR-40)
         const weighed = !!(l.measure && l.perMeasure);
@@ -206,10 +213,18 @@ export async function confirmTicket(ctx: Ctx, session: SessionContext, input: Ti
       }
     });
   } catch (error) {
-    if ((error as { code?: string }).code === "23505") return { duplicate: true, recorded: 0, total, removed: [], aisles: [], shared: 0, receiptId: null, menuIa: false };
+    if ((error as { code?: string }).code === "23505") return { duplicate: true, recorded: 0, total, removed: [], aisles: [], shared: 0, receiptId: null, menuIa: false, adjust: null };
     throw translateCourseError(error);
   }
-  return { duplicate: false, recorded: lines.length, total: ticketTotal(ticket), removed: outcome.removedFromList, aisles: [...new Set(lines.map((l) => l.aisle))], shared, receiptId, menuIa: env().MENU_IA === "live" };
+  // ticket qui coche au moins un produit d'un menu validé : MAAQ compare les ingrédients du menu à ce qui est acheté (CR-58)
+  let adjust: AdjustView | null = null;
+  if (matched.length && env().MENU_IA === "live") {
+    const menuOfItem = new Map(open.map((o) => [o.id, o.menu_id]));
+    const menuId = matched.map((m) => menuOfItem.get(m.itemId) ?? null).filter((m): m is string => !!m).sort((a, b) => rank(a) - rank(b))[0];
+    const unplanned = lines.filter((_, i) => !matched.some((m) => m.line === i)).filter((l) => l.total > 0).map((l) => l.product);
+    if (menuId) adjust = await postAdjustCard(ctx, who.userId, who.accountId, menuId, unplanned);
+  }
+  return { duplicate: false, recorded: lines.length, total: ticketTotal(ticket), removed: outcome.removedFromList, aisles: [...new Set(lines.map((l) => l.aisle))], shared, receiptId, menuIa: env().MENU_IA === "live", adjust };
 }
 
 /**

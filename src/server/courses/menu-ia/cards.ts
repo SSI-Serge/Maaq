@@ -10,6 +10,8 @@ import type { MenuProposal } from "./proposal";
  */
 
 export const CARD_PREFIX = '{"card":"menu"';
+/** Carte « ingrédients manquants » après un ticket (CR-58) : rangée dans le même fil, jamais relue par le modèle. */
+export const ADJUST_PREFIX = '{"card":"adjust"';
 const key = () => Buffer.from(env().ENCRYPTION_KEY, "base64");
 
 export interface MenuCardEnvelope {
@@ -21,7 +23,7 @@ export interface MenuCardEnvelope {
 }
 
 export function isCard(text: string): boolean {
-  return text.startsWith(CARD_PREFIX);
+  return text.startsWith(CARD_PREFIX) || text.startsWith(ADJUST_PREFIX);
 }
 
 export function parseCard(text: string): MenuCardEnvelope | null {
