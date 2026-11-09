@@ -59,6 +59,8 @@ CREATE TABLE grocery_aisles (
   name        varchar(60) NOT NULL CHECK (btrim(name) <> ''),
   sort_order  smallint NOT NULL DEFAULT 100,
   is_hidden   boolean NOT NULL DEFAULT false,
+  -- Rayon frais (CR-56) : réglable dans la console ; sert à la liste du mois (« À acheter plus tard ») ; un produit sans rayon n'est pas frais
+  is_fresh    boolean NOT NULL DEFAULT false,
   created_at  timestamptz NOT NULL DEFAULT now(),
   updated_at  timestamptz NOT NULL DEFAULT now()
 );
@@ -283,6 +285,8 @@ CREATE TABLE grocery_household_settings (
   replacement_source     text NOT NULL DEFAULT 'own' CHECK (replacement_source IN ('own', 'cuisine')),
   replacement_cuisine_id integer REFERENCES meal_cuisines (id) ON DELETE RESTRICT,
   budget_day             smallint NOT NULL DEFAULT 1 CHECK (budget_day BETWEEN 1 AND 31),
+  -- Budget mensuel des repas, en euros, hors restaurant, boissons et réceptions (menu du mois dans le budget, CR-59) ; vide = non renseigné
+  monthly_meal_budget    numeric(7,2) CHECK (monthly_meal_budget BETWEEN 1 AND 99999),
   share_prices           boolean NOT NULL DEFAULT false,
   updated_by_user_id     uuid,
   created_at             timestamptz NOT NULL DEFAULT now(),
@@ -357,6 +361,64 @@ CREATE TABLE meal_household_dish_tags (
   CONSTRAINT fk_meal_household_dish_tags_dish FOREIGN KEY (household_dish_id, account_id) REFERENCES meal_household_dishes (id, account_id) ON DELETE CASCADE
 );
 -- ---------------------------------------------------------------------
+-- Plats de saison (CR-60, CR-61, CR-62, US-178 RF2, RF2bis) : base COMMUNE et ANONYME des plats obtenus de l'IA pour le menu du mois, partagée par tous les foyers, sans doublon (nom
+-- normalisé). Elle est distincte du catalogue commun des plats (meal_dishes), où les plats libres n'entrent jamais (CR-04) : aucune clé ne les relie. Aucun foyer, aucun profil, aucun prix,
+-- aucune date au jour près (lundi de la semaine). Une seule porte d'écriture (share_season_dish) ; lecture par fonctions ; sécurité par ligne activée sans règle, comme la base commune des prix.
+-- ---------------------------------------------------------------------
+CREATE TABLE meal_season_dishes (
+  id                bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  name              varchar(120) NOT NULL CHECK (btrim(name) <> ''),
+  -- Nom normalisé par l'application (minuscules, accents, pluriel simple) : la base garde la clé et son unicité
+  name_key          text NOT NULL UNIQUE CHECK (name_key <> '' AND name_key = grocery_norm(name_key)),
+  cuisine_id        integer NOT NULL REFERENCES meal_cuisines (id) ON DELETE RESTRICT,
+  -- Nombre de personnes pour lequel les quantités des ingrédients sont écrites
+  servings          smallint NOT NULL CHECK (servings BETWEEN 1 AND 30),
+  recipe            text,
+  duration_minutes  smallint CHECK (duration_minutes BETWEEN 1 AND 600),
+  -- Nombre de foyers qui l'ont choisi dans un menu validé (une fois par foyer et par plat, choose_season_dish) ; ne redescend jamais
+  chosen_count      integer NOT NULL DEFAULT 0 CHECK (chosen_count >= 0),
+  -- Lundi de la semaine d'entrée dans la base : jamais le jour (anonymat)
+  entered_week      date NOT NULL DEFAULT (current_date - (extract(isodow FROM current_date)::integer - 1)) CHECK (date_part('isodow', entered_week) = 1),
+  -- Masqué par l'administrateur : n'est plus proposé (console)
+  hidden_at         timestamptz,
+  hidden_by_user_id uuid REFERENCES users (id) ON DELETE SET NULL,
+  CONSTRAINT ck_meal_season_dishes_hidden CHECK ((hidden_at IS NULL) = (hidden_by_user_id IS NULL) OR hidden_by_user_id IS NULL)
+);
+CREATE TABLE meal_season_dish_ingredients (
+  id            bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  dish_id       bigint NOT NULL REFERENCES meal_season_dishes (id) ON DELETE CASCADE,
+  label         varchar(120) NOT NULL CHECK (btrim(label) <> ''),
+  name_key      text NOT NULL CHECK (name_key <> '' AND name_key = grocery_norm(name_key)),
+  -- Produit du catalogue reconnu ; vide si inconnu (noté dans les produits à référencer seulement quand le plat est choisi dans un menu validé)
+  product_id    bigint REFERENCES grocery_products (id) ON DELETE SET NULL,
+  position      smallint NOT NULL DEFAULT 1 CHECK (position >= 1),
+  quantity      numeric(10,3) CHECK (quantity > 0),
+  unit          text CHECK (unit IN ('g', 'kg', 'ml', 'cl', 'l', 'piece', 'spoon', 'pinch')),
+  base_unit     text GENERATED ALWAYS AS (CASE unit WHEN 'g' THEN 'g' WHEN 'kg' THEN 'g' WHEN 'ml' THEN 'ml' WHEN 'cl' THEN 'ml' WHEN 'l' THEN 'ml' WHEN 'piece' THEN 'piece' END) STORED,
+  base_quantity numeric(14,3) GENERATED ALWAYS AS (CASE unit WHEN 'g' THEN quantity WHEN 'kg' THEN quantity * 1000 WHEN 'ml' THEN quantity WHEN 'cl' THEN quantity * 10 WHEN 'l' THEN quantity * 1000 WHEN 'piece' THEN quantity END) STORED,
+  UNIQUE (dish_id, name_key),
+  CONSTRAINT ck_meal_season_dish_ingredients_quantity CHECK ((quantity IS NULL) = (unit IS NULL))
+);
+CREATE TABLE meal_season_dish_months (
+  dish_id      bigint NOT NULL REFERENCES meal_season_dishes (id) ON DELETE CASCADE,
+  season_month smallint NOT NULL CHECK (season_month BETWEEN 1 AND 12),
+  PRIMARY KEY (dish_id, season_month)
+);
+CREATE TABLE meal_season_dish_tag_links (
+  dish_id  bigint NOT NULL REFERENCES meal_season_dishes (id) ON DELETE CASCADE,
+  tag_id   integer NOT NULL REFERENCES meal_dish_tags (id) ON DELETE CASCADE,
+  PRIMARY KEY (dish_id, tag_id)
+);
+-- Sélection du foyer : les plats de saison de la base commune retenus pour son menu du mois, gardés jusqu'à la fin du mois (CR-60, CR-62). Propre au foyer, effacée une fois le mois passé et avec le compte ;
+-- le nombre de plats (10, jusqu'à 44) est contrôlé par l'application (réglages de console meal_season_dishes_count et meal_season_dishes_max). Elle ne garde pas le contenu du plat, seulement le lien.
+CREATE TABLE meal_season_household_dishes (
+  account_id   uuid NOT NULL REFERENCES accounts (id) ON DELETE CASCADE,
+  dish_id      bigint NOT NULL REFERENCES meal_season_dishes (id) ON DELETE CASCADE,
+  -- Premier jour du mois (heure du foyer)
+  season_month date NOT NULL CHECK (date_part('day', season_month) = 1),
+  PRIMARY KEY (account_id, dish_id, season_month)
+);
+-- ---------------------------------------------------------------------
 -- Menus validés (US-156) : l'historique du foyer (12 mois), dont se servent la répétition et le choix standard ou allégé
 -- ---------------------------------------------------------------------
 CREATE TABLE meal_menus (
@@ -401,6 +463,8 @@ CREATE TABLE meal_menu_entries (
   light_by_ai        boolean NOT NULL DEFAULT false,
   light_text         text CHECK (light_text IS NULL OR btrim(light_text) <> ''),
   light_chosen       boolean NOT NULL DEFAULT false,
+  -- Plat de la base commune des plats de saison d'où vient ce plat libre (CR-61) ; repasse à vide si le plat est supprimé de la base
+  season_dish_id     bigint REFERENCES meal_season_dishes (id) ON DELETE SET NULL,
   -- Plat remplacé dans la liste déroulante : sorti de la séance de batch (inutilisé depuis CR-42)
   is_off_batch       boolean NOT NULL DEFAULT false,
   -- Plat de planning rapproché du catalogue, correspondance à confirmer (US-156 RF7, inutilisé depuis CR-42)
@@ -412,6 +476,7 @@ CREATE TABLE meal_menu_entries (
   CONSTRAINT ck_meal_menu_entries_origin CHECK (dish_origin = 'catalog' OR dish_id IS NULL),
   CONSTRAINT ck_meal_menu_entries_free_dish CHECK ((dish_origin = 'ai' AND cuisine_id IS NOT NULL) OR (dish_origin <> 'ai' AND cuisine_id IS NULL AND duration_minutes IS NULL)),
   CONSTRAINT ck_meal_menu_entries_light CHECK (light_by_ai = (light_text IS NOT NULL) AND (light_by_ai OR NOT light_chosen)),
+  CONSTRAINT ck_meal_menu_entries_season CHECK (season_dish_id IS NULL OR dish_origin = 'ai'),
   CONSTRAINT fk_meal_menu_entries_menu FOREIGN KEY (menu_id, account_id) REFERENCES meal_menus (id, account_id) ON DELETE CASCADE,
   CONSTRAINT fk_meal_menu_entries_household_dish FOREIGN KEY (household_dish_id, account_id) REFERENCES meal_household_dishes (id, account_id) ON DELETE SET NULL (household_dish_id)
 );
@@ -488,10 +553,23 @@ CREATE TABLE meal_light_choices (
 -- ---------------------------------------------------------------------
 -- Liste de courses (US-157, US-158, US-162, CR-27, CR-28)
 -- ---------------------------------------------------------------------
+-- Liste du mois (CR-56, US-157 RF9ter) : validation unique de plusieurs semaines, avec un seul scénario d'achat et une seule date. Chaque semaine garde sa liste ; le regroupement les relie.
+CREATE TABLE grocery_list_groups (
+  id                   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  account_id           uuid NOT NULL REFERENCES accounts (id) ON DELETE CASCADE,
+  scenario             smallint NOT NULL CHECK (scenario BETWEEN 1 AND 3),
+  validated_at         timestamptz NOT NULL DEFAULT now(),
+  validated_by_user_id uuid,
+  created_at           timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (id, account_id),
+  CONSTRAINT fk_grocery_list_groups_validated_by FOREIGN KEY (validated_by_user_id, account_id) REFERENCES users (id, account_id) ON DELETE SET NULL (validated_by_user_id)
+);
 CREATE TABLE grocery_lists (
   id                   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   account_id           uuid NOT NULL REFERENCES accounts (id) ON DELETE CASCADE,
   menu_id              uuid,
+  -- Liste du mois à laquelle cette semaine est regroupée (CR-56) ; vide = liste de la semaine seule
+  group_id             uuid,
   -- Scénario d'achat choisi : 1 tout dans le magasin qui couvre le plus de produits, 2 chaque référence choisie, 3 mes produits habituels
   scenario             smallint NOT NULL CHECK (scenario BETWEEN 1 AND 3),
   validated_at         timestamptz NOT NULL DEFAULT now(),
@@ -499,6 +577,7 @@ CREATE TABLE grocery_lists (
   created_at           timestamptz NOT NULL DEFAULT now(),
   UNIQUE (id, account_id),
   CONSTRAINT fk_grocery_lists_menu FOREIGN KEY (menu_id, account_id) REFERENCES meal_menus (id, account_id) ON DELETE SET NULL (menu_id),
+  CONSTRAINT fk_grocery_lists_group FOREIGN KEY (group_id, account_id) REFERENCES grocery_list_groups (id, account_id) ON DELETE SET NULL (group_id),
   CONSTRAINT fk_grocery_lists_validated_by FOREIGN KEY (validated_by_user_id, account_id) REFERENCES users (id, account_id) ON DELETE SET NULL (validated_by_user_id)
 );
 CREATE TABLE grocery_list_items (
@@ -535,6 +614,8 @@ CREATE TABLE grocery_list_items (
   is_selected          boolean NOT NULL DEFAULT true,
   bought_at            timestamptz,
   bought_by_user_id    uuid,
+  -- Ligne de ticket qui a servi à payer ce produit (coût réel du menu, CR-58) ; vide pour un produit coché à la main (prix estimé gardé) ; repasse à vide si le ticket est supprimé
+  receipt_line_id      bigint,
   created_at           timestamptz NOT NULL DEFAULT now(),
   updated_at           timestamptz NOT NULL DEFAULT now(),
   UNIQUE (id, account_id),
@@ -548,7 +629,8 @@ CREATE TABLE grocery_list_items (
   CONSTRAINT ck_grocery_list_items_price_store CHECK (unit_price IS NULL OR store_chain IS NOT NULL),
   CONSTRAINT ck_grocery_list_items_price_unit CHECK (price_unit IS NULL OR store_chain IS NOT NULL),
   CONSTRAINT ck_grocery_list_items_needed CHECK ((needed_amount IS NULL) = (needed_unit IS NULL)),
-  CONSTRAINT ck_grocery_list_items_menu CHECK (menu_id IS NOT NULL OR (state = 'preparing' AND source = 'added'))
+  CONSTRAINT ck_grocery_list_items_menu CHECK (menu_id IS NOT NULL OR (state = 'preparing' AND source = 'added')),
+  CONSTRAINT ck_grocery_list_items_receipt CHECK (receipt_line_id IS NULL OR state = 'bought')
 );
 -- ---------------------------------------------------------------------
 -- Tickets de caisse (US-161, US-163) : aucune photo (supprimée dès la lecture, CR-05), seulement le texte lu et les montants. Conservés 3 ans.
@@ -584,6 +666,7 @@ CREATE TABLE grocery_receipt_lines (
   measured_quantity numeric(9,3) CHECK (measured_quantity > 0),
   measure_unit      varchar(2) CHECK (measure_unit IN ('kg', 'l')),
   price_per_measure numeric(8,2) CHECK (price_per_measure > 0),
+  UNIQUE (id, account_id),
   CONSTRAINT ck_grocery_receipt_lines_measure CHECK ((measured_quantity IS NULL) = (measure_unit IS NULL) AND (price_per_measure IS NULL OR measured_quantity IS NOT NULL)),
   CONSTRAINT fk_grocery_receipt_lines_receipt FOREIGN KEY (receipt_id, account_id) REFERENCES grocery_receipts (id, account_id) ON DELETE CASCADE
 );
@@ -599,6 +682,8 @@ ALTER TABLE agents
 -- Présent dans le catalogue (rubriques Pro et Perso) : faux pour un agent à tuile fixe comme l'Assistant Famille (lot 14, décision du PO du 07/11/2026) ; la plateforme ne sert plus de critère de liste
 ALTER TABLE agents
   ADD COLUMN listed_in_catalog       boolean NOT NULL DEFAULT true;
+ALTER TABLE grocery_list_items
+  ADD CONSTRAINT fk_grocery_list_items_receipt_line FOREIGN KEY (receipt_line_id, account_id) REFERENCES grocery_receipt_lines (id, account_id) ON DELETE SET NULL (receipt_line_id);
 -- Un agent retiré porte sa date de retrait ; un agent qui ne l'est pas n'en porte pas
 ALTER TABLE agents
   ADD CONSTRAINT ck_agents_retired CHECK ((status = 'retired') = (retired_at IS NOT NULL));
@@ -707,6 +792,21 @@ BEGIN
   END IF;
   RETURN NULL;
 END $$;
+-- Un plat de saison a au moins un ingrédient et au moins un mois : contrôle différé à la fin de la transaction (le plat, ses ingrédients et ses mois s'écrivent ensemble)
+CREATE FUNCTION meal_season_dish_needs_content() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE v_dish bigint;
+BEGIN
+  IF TG_TABLE_NAME = 'meal_season_dishes' THEN
+    v_dish := NEW.id;
+  ELSE
+    v_dish := OLD.dish_id;
+  END IF;
+  IF EXISTS (SELECT 1 FROM meal_season_dishes WHERE id = v_dish)
+     AND (NOT EXISTS (SELECT 1 FROM meal_season_dish_ingredients WHERE dish_id = v_dish) OR NOT EXISTS (SELECT 1 FROM meal_season_dish_months WHERE dish_id = v_dish)) THEN
+    RAISE EXCEPTION 'Un plat de saison a au moins un ingrédient et au moins un mois' USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NULL;
+END $$;
 -- Les étapes d'un déroulé écrit par l'IA n'existent que pour un menu sans semaine type : contrôle différé à la fin de la transaction (le menu est mis à jour, puis ses étapes remplacées)
 CREATE FUNCTION meal_menu_session_steps_check() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE v_menu uuid;
@@ -735,6 +835,69 @@ BEGIN
   RETURNING c.menu_count INTO v_count;
   RETURN v_count IS NOT NULL;
 END $$;
+-- Seule porte d'écriture de la base commune des plats de saison (CR-61) : crée le plat s'il n'existe pas (même nom normalisé), sinon rend le plat existant sans rien écraser ni fusionner (le premier est gardé,
+-- la console corrige). Ne reçoit aucun foyer : aucune trace de qui l'a obtenu. Ingrédients : tableau JSON de {label, name_key, product_id, quantity, unit, position}.
+CREATE FUNCTION share_season_dish(p_name text, p_name_key text, p_cuisine_id integer, p_servings integer, p_recipe text, p_duration integer, p_months integer[], p_tag_ids integer[], p_ingredients jsonb)
+RETURNS bigint LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE v_id bigint;
+BEGIN
+  INSERT INTO meal_season_dishes (name, name_key, cuisine_id, servings, recipe, duration_minutes)
+  VALUES (p_name, p_name_key, p_cuisine_id, p_servings, p_recipe, p_duration)
+  ON CONFLICT (name_key) DO NOTHING
+  RETURNING id INTO v_id;
+  IF v_id IS NULL THEN
+    SELECT d.id INTO v_id FROM meal_season_dishes d WHERE d.name_key = p_name_key;
+    RETURN v_id;
+  END IF;
+  INSERT INTO meal_season_dish_months (dish_id, season_month) SELECT DISTINCT v_id, m FROM unnest(COALESCE(p_months, '{}')) m;
+  INSERT INTO meal_season_dish_tag_links (dish_id, tag_id) SELECT DISTINCT v_id, tg FROM unnest(COALESCE(p_tag_ids, '{}')) tg;
+  INSERT INTO meal_season_dish_ingredients (dish_id, label, name_key, product_id, quantity, unit, position)
+  SELECT v_id, x.label, x.name_key, x.product_id, x.quantity, x.unit, COALESCE(x.position, 1)
+    FROM jsonb_to_recordset(COALESCE(p_ingredients, '[]'::jsonb)) AS x(label text, name_key text, product_id bigint, quantity numeric, unit text, position integer);
+  RETURN v_id;
+END $$;
+-- Choix d'un plat de saison dans un menu validé : le compteur de la base commune monte une seule fois par foyer et par plat. Le foyer ne sert qu'à vérifier qu'aucune ligne de menu de ce foyer ne pointe déjà vers ce plat,
+-- il n'est pas gardé. À appeler AVANT d'écrire la ligne de menu qui porte season_dish_id. Rend vrai si le compteur a monté.
+CREATE FUNCTION choose_season_dish(p_account uuid, p_dish bigint) RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM meal_season_dishes WHERE id = p_dish) THEN
+    RETURN false;
+  END IF;
+  IF EXISTS (SELECT 1 FROM meal_menu_entries e WHERE e.account_id = p_account AND e.season_dish_id = p_dish) THEN
+    RETURN false;
+  END IF;
+  UPDATE meal_season_dishes SET chosen_count = chosen_count + 1 WHERE id = p_dish;
+  RETURN true;
+END $$;
+-- Recherche des plats de saison du mois (CR-61) : plats non masqués dont le mois de saison est celui demandé, dans les cuisines données, avec toutes les étiquettes demandées et aucune étiquette exclue, sans les plats déjà
+-- écartés ; les plus choisis d'abord. Les filtres viennent de l'application (les allergies et les régimes du foyer sont chiffrés et ne sont jamais lus par la base) ; l'exclusion des allergies par mots-clés se fait
+-- dans l'application sur les candidats rendus. Valeur vide = pas de filtre.
+CREATE FUNCTION search_season_dishes(p_month date, p_cuisines integer[] DEFAULT NULL, p_required_tags integer[] DEFAULT NULL, p_excluded_tags integer[] DEFAULT NULL,
+                                     p_exclude_ids bigint[] DEFAULT NULL, p_limit integer DEFAULT 100)
+RETURNS TABLE (dish_id bigint, name varchar, name_key text, cuisine_id integer, servings smallint, recipe text, duration_minutes smallint, chosen_count integer, tag_ids integer[], months smallint[])
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
+  SELECT d.id, d.name, d.name_key, d.cuisine_id, d.servings, d.recipe, d.duration_minutes, d.chosen_count,
+         ARRAY(SELECT l.tag_id FROM meal_season_dish_tag_links l WHERE l.dish_id = d.id ORDER BY l.tag_id),
+         ARRAY(SELECT m.season_month FROM meal_season_dish_months m WHERE m.dish_id = d.id ORDER BY m.season_month)
+    FROM meal_season_dishes d
+   WHERE d.hidden_at IS NULL
+     AND EXISTS (SELECT 1 FROM meal_season_dish_months m WHERE m.dish_id = d.id AND m.season_month = extract(month FROM p_month)::smallint)
+     AND (p_cuisines IS NULL OR d.cuisine_id = ANY (p_cuisines))
+     AND (p_required_tags IS NULL OR NOT EXISTS (SELECT 1 FROM unnest(p_required_tags) rt WHERE NOT EXISTS (SELECT 1 FROM meal_season_dish_tag_links l WHERE l.dish_id = d.id AND l.tag_id = rt)))
+     AND (p_excluded_tags IS NULL OR NOT EXISTS (SELECT 1 FROM meal_season_dish_tag_links l WHERE l.dish_id = d.id AND l.tag_id = ANY (p_excluded_tags)))
+     AND (p_exclude_ids IS NULL OR d.id <> ALL (p_exclude_ids))
+   ORDER BY d.chosen_count DESC, d.id
+   LIMIT p_limit
+$$;
+CREATE FUNCTION season_dish_ingredients_for(p_dishes bigint[])
+RETURNS TABLE (dish_id bigint, label varchar, name_key text, product_id bigint, quantity numeric, unit text, "position" smallint)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
+  SELECT i.dish_id, i.label, i.name_key, i.product_id, i.quantity, i.unit, i.position
+    FROM meal_season_dish_ingredients i
+    JOIN meal_season_dishes d ON d.id = i.dish_id
+   WHERE i.dish_id = ANY (p_dishes) AND d.hidden_at IS NULL
+   ORDER BY i.dish_id, i.position
+$$;
 -- Un plat libre a au moins un ingrédient : contrôle différé à la fin de la transaction (la ligne de menu et ses ingrédients s'écrivent ensemble)
 CREATE FUNCTION meal_menu_entry_needs_ingredient() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE v_entry bigint;
@@ -772,6 +935,29 @@ BEGIN
   END IF;
   RETURN NEW;
 END $$;
+-- Le scénario d'une liste regroupée est celui du regroupement ; un regroupement qui n'a plus 2 listes disparaît (les listes qui restent redeviennent des listes de semaine)
+CREATE FUNCTION grocery_list_group_check() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE v_scenario smallint;
+BEGIN
+  IF NEW.group_id IS NOT NULL THEN
+    SELECT g.scenario INTO v_scenario FROM grocery_list_groups g WHERE g.id = NEW.group_id AND g.account_id = NEW.account_id;
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'Le regroupement n''existe pas ou n''est pas celui du foyer' USING ERRCODE = 'foreign_key_violation';
+    ELSIF NEW.scenario IS DISTINCT FROM v_scenario THEN
+      RAISE EXCEPTION 'Une liste regroupée a le scénario d''achat de son regroupement' USING ERRCODE = 'check_violation';
+    END IF;
+  END IF;
+  RETURN NEW;
+END $$;
+CREATE FUNCTION grocery_list_group_cleanup() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF OLD.group_id IS NOT NULL AND (TG_OP = 'DELETE' OR NEW.group_id IS DISTINCT FROM OLD.group_id) THEN
+    IF (SELECT count(*) FROM grocery_lists WHERE group_id = OLD.group_id) < 2 THEN
+      DELETE FROM grocery_list_groups WHERE id = OLD.group_id;
+    END IF;
+  END IF;
+  RETURN NULL;
+END $$;
 CREATE FUNCTION grocery_list_item_before_write() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE v_user uuid := app_current_user_id(); v_menu uuid;
 BEGIN
@@ -803,6 +989,10 @@ BEGIN
     ELSE
       RAISE EXCEPTION 'Un invité secondaire peut seulement augmenter une quantité ou cocher « acheté » un article de la liste validée' USING ERRCODE = 'check_violation';
     END IF;
+  END IF;
+  -- Un produit qui n'est plus acheté n'est plus relié à une ligne de ticket (CR-58)
+  IF NEW.state IS DISTINCT FROM 'bought' THEN
+    NEW.receipt_line_id := NULL;
   END IF;
   RETURN NEW;
 END $$;
@@ -1074,6 +1264,13 @@ SELECT d.id AS dish_id, d.code, d.name, d.cuisine_id, d.duration_minutes, d.is_e
        EXISTS (SELECT 1 FROM meal_batch_week_days b WHERE b.dish_id = d.id OR b.suggested_dish_id = d.id) AS in_batch_week,
        EXISTS (SELECT 1 FROM meal_light_versions v WHERE v.dish_id = d.id) AS has_light_version
   FROM meal_dishes d;
+CREATE VIEW v_meal_season_dishes AS
+SELECT d.id AS dish_id, d.name, d.name_key, d.cuisine_id, d.servings, d.duration_minutes, d.chosen_count, d.entered_week, d.hidden_at, d.hidden_by_user_id,
+       d.hidden_at IS NOT NULL AS is_hidden,
+       ARRAY(SELECT m.season_month FROM meal_season_dish_months m WHERE m.dish_id = d.id ORDER BY m.season_month) AS months,
+       ARRAY(SELECT l.tag_id FROM meal_season_dish_tag_links l WHERE l.dish_id = d.id ORDER BY l.tag_id) AS tag_ids,
+       (SELECT count(*) FROM meal_season_dish_ingredients i WHERE i.dish_id = d.id) AS ingredient_count
+  FROM meal_season_dishes d;
 CREATE VIEW v_grocery_unreferenced AS
 SELECT e.name_key, count(*) AS occurrences, min(e.occurred_at) AS first_seen_at, max(e.occurred_at) AS last_seen_at,
        CASE WHEN bool_or(e.kind = 'unknown') THEN 'unknown' ELSE 'no_reference' END AS kind,
@@ -1147,6 +1344,9 @@ BEGIN
   -- Compteurs du plafond quotidien de menus : 7 jours (CR-44)
   DELETE FROM meal_menu_daily_counters WHERE menu_date < current_date - 7;
   GET DIAGNOSTICS v_n = ROW_COUNT; v_total := v_total + v_n;
+  -- Sélection de plats de saison d'un mois passé (CR-60) : le mois du foyer est fini pour tous (marge de deux jours pour les fuseaux) ; la base commune n'est jamais purgée
+  DELETE FROM meal_season_household_dishes WHERE season_month < date_trunc('month', current_date - 2)::date;
+  GET DIAGNOSTICS v_n = ROW_COUNT; v_total := v_total + v_n;
   RETURN v_total;
 END $$;
 CREATE OR REPLACE VIEW v_dashboard_agents AS
@@ -1202,6 +1402,11 @@ CREATE INDEX idx_meal_household_dish_ingredients_account ON meal_household_dish_
 CREATE INDEX idx_meal_household_dish_ingredients_product_id ON meal_household_dish_ingredients (product_id) WHERE product_id IS NOT NULL;
 CREATE INDEX idx_meal_household_dish_tags_account ON meal_household_dish_tags (account_id);
 CREATE INDEX idx_meal_household_dish_tags_tag_id ON meal_household_dish_tags (tag_id);
+CREATE INDEX idx_meal_season_dishes_cuisine_id ON meal_season_dishes (cuisine_id);
+CREATE INDEX idx_meal_season_dishes_hidden_by ON meal_season_dishes (hidden_by_user_id) WHERE hidden_by_user_id IS NOT NULL;
+CREATE INDEX idx_meal_season_dish_ingredients_product_id ON meal_season_dish_ingredients (product_id) WHERE product_id IS NOT NULL;
+CREATE INDEX idx_meal_season_dish_tag_links_tag_id ON meal_season_dish_tag_links (tag_id);
+CREATE INDEX idx_meal_season_household_dishes_dish_id ON meal_season_household_dishes (dish_id);
 CREATE INDEX idx_meal_menus_validated_by ON meal_menus (validated_by_user_id, account_id);
 CREATE INDEX idx_meal_menus_batch_week_id ON meal_menus (batch_week_id) WHERE batch_week_id IS NOT NULL;
 CREATE INDEX idx_meal_menus_validated_at ON meal_menus (validated_at);
@@ -1209,6 +1414,7 @@ CREATE INDEX idx_meal_menu_entries_account ON meal_menu_entries (account_id);
 CREATE INDEX idx_meal_menu_entries_dish_id ON meal_menu_entries (dish_id) WHERE dish_id IS NOT NULL;
 CREATE INDEX idx_meal_menu_entries_household_dish ON meal_menu_entries (household_dish_id, account_id) WHERE household_dish_id IS NOT NULL;
 CREATE INDEX idx_meal_menu_entries_cuisine_id ON meal_menu_entries (cuisine_id) WHERE cuisine_id IS NOT NULL;
+CREATE INDEX idx_meal_menu_entries_season_dish ON meal_menu_entries (season_dish_id, account_id) WHERE season_dish_id IS NOT NULL;
 CREATE INDEX idx_meal_menu_entry_ingredients_account ON meal_menu_entry_ingredients (account_id);
 CREATE INDEX idx_meal_menu_entry_ingredients_product_id ON meal_menu_entry_ingredients (product_id) WHERE product_id IS NOT NULL;
 CREATE INDEX idx_meal_menu_entry_light_items_account ON meal_menu_entry_light_items (account_id);
@@ -1218,9 +1424,12 @@ CREATE UNIQUE INDEX ux_meal_menu_session_steps_storage ON meal_menu_session_step
 CREATE INDEX idx_meal_menu_session_steps_account ON meal_menu_session_steps (account_id);
 CREATE INDEX idx_meal_menu_session_steps_entry ON meal_menu_session_steps (entry_id, menu_id) WHERE entry_id IS NOT NULL;
 CREATE INDEX idx_meal_light_choices_dish_id ON meal_light_choices (dish_id);
+CREATE INDEX idx_grocery_list_groups_account ON grocery_list_groups (account_id, validated_at DESC);
+CREATE INDEX idx_grocery_list_groups_validated_by ON grocery_list_groups (validated_by_user_id, account_id);
 CREATE INDEX idx_grocery_lists_account ON grocery_lists (account_id, validated_at DESC);
 -- Une liste par menu (CR-54) : chaque semaine a son menu et sa liste
 CREATE UNIQUE INDEX ux_grocery_lists_menu ON grocery_lists (menu_id) WHERE menu_id IS NOT NULL;
+CREATE INDEX idx_grocery_lists_group ON grocery_lists (group_id, account_id) WHERE group_id IS NOT NULL;
 CREATE INDEX idx_grocery_lists_validated_by ON grocery_lists (validated_by_user_id, account_id);
 -- Un produit déjà dans la liste d'une semaine n'est pas ajouté deux fois : sa quantité augmente (US-158 RF3) ; chaque semaine a ses produits (CR-54). Sans menu, les produits ajoutés à la main restent uniques par nom.
 CREATE UNIQUE INDEX ux_grocery_list_items_open ON grocery_list_items (account_id, menu_id, name_key) NULLS NOT DISTINCT WHERE state <> 'bought';
@@ -1241,6 +1450,7 @@ CREATE INDEX idx_grocery_receipt_lines_receipt ON grocery_receipt_lines (receipt
 CREATE INDEX idx_grocery_receipt_lines_account ON grocery_receipt_lines (account_id);
 CREATE INDEX idx_grocery_receipt_lines_aisle_id ON grocery_receipt_lines (aisle_id);
 CREATE INDEX idx_grocery_receipt_lines_product_id ON grocery_receipt_lines (product_id) WHERE product_id IS NOT NULL;
+CREATE INDEX idx_grocery_list_items_receipt_line ON grocery_list_items (receipt_line_id, account_id) WHERE receipt_line_id IS NOT NULL;
 
 -- ---------------------------------------------------------------------
 -- Triggers et sécurité par ligne
@@ -1255,6 +1465,12 @@ CREATE CONSTRAINT TRIGGER trg_meal_household_dishes_ingredient AFTER INSERT ON m
   DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION meal_household_dish_needs_ingredient();
 CREATE CONSTRAINT TRIGGER trg_meal_household_dish_ingredients_delete AFTER DELETE ON meal_household_dish_ingredients
   DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION meal_household_dish_needs_ingredient();
+CREATE CONSTRAINT TRIGGER trg_meal_season_dishes_content AFTER INSERT ON meal_season_dishes
+  DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION meal_season_dish_needs_content();
+CREATE CONSTRAINT TRIGGER trg_meal_season_dish_ingredients_delete AFTER DELETE ON meal_season_dish_ingredients
+  DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION meal_season_dish_needs_content();
+CREATE CONSTRAINT TRIGGER trg_meal_season_dish_months_delete AFTER DELETE ON meal_season_dish_months
+  DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION meal_season_dish_needs_content();
 CREATE CONSTRAINT TRIGGER trg_meal_menu_session_steps_check AFTER INSERT ON meal_menu_session_steps
   DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION meal_menu_session_steps_check();
 CREATE CONSTRAINT TRIGGER trg_meal_menus_session_steps_check AFTER UPDATE OF batch_week_id ON meal_menus
@@ -1265,6 +1481,10 @@ CREATE CONSTRAINT TRIGGER trg_meal_menu_entry_ingredients_delete AFTER DELETE ON
   DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION meal_menu_entry_needs_ingredient();
 CREATE TRIGGER trg_meal_menu_entry_light_items_before_write BEFORE INSERT OR UPDATE ON meal_menu_entry_light_items
   FOR EACH ROW EXECUTE FUNCTION meal_menu_entry_light_item_before_write();
+CREATE TRIGGER trg_grocery_lists_group_check BEFORE INSERT OR UPDATE OF group_id, scenario ON grocery_lists
+  FOR EACH ROW EXECUTE FUNCTION grocery_list_group_check();
+CREATE TRIGGER trg_grocery_lists_group_cleanup AFTER DELETE OR UPDATE OF group_id ON grocery_lists
+  FOR EACH ROW EXECUTE FUNCTION grocery_list_group_cleanup();
 CREATE TRIGGER trg_grocery_list_items_before_write BEFORE INSERT OR UPDATE ON grocery_list_items
   FOR EACH ROW EXECUTE FUNCTION grocery_list_item_before_write();
 CREATE TRIGGER trg_grocery_receipt_lines_measure BEFORE INSERT OR UPDATE ON grocery_receipt_lines
@@ -1324,6 +1544,13 @@ CREATE POLICY meal_menu_session_steps_couple ON meal_menu_session_steps
 ALTER TABLE meal_menu_daily_counters ENABLE ROW LEVEL SECURITY;
 CREATE POLICY meal_menu_daily_counters_couple ON meal_menu_daily_counters
   USING (account_id = (SELECT grocery_couple_account())) WITH CHECK (account_id = (SELECT grocery_couple_account()));
+ALTER TABLE meal_season_household_dishes ENABLE ROW LEVEL SECURITY;
+CREATE POLICY meal_season_household_dishes_couple ON meal_season_household_dishes
+  USING (account_id = (SELECT grocery_couple_account())) WITH CHECK (account_id = (SELECT grocery_couple_account()));
+ALTER TABLE meal_season_dishes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE meal_season_dish_ingredients ENABLE ROW LEVEL SECURITY;
+ALTER TABLE meal_season_dish_months ENABLE ROW LEVEL SECURITY;
+ALTER TABLE meal_season_dish_tag_links ENABLE ROW LEVEL SECURITY;
 ALTER TABLE meal_light_choices ENABLE ROW LEVEL SECURITY;
 CREATE POLICY meal_light_choices_couple ON meal_light_choices
   USING (account_id = (SELECT grocery_couple_account())) WITH CHECK (account_id = (SELECT grocery_couple_account()));
@@ -1338,6 +1565,11 @@ ALTER TABLE grocery_lists ENABLE ROW LEVEL SECURITY;
 CREATE POLICY grocery_lists_couple ON grocery_lists
   USING (account_id = (SELECT grocery_couple_account())) WITH CHECK (account_id = (SELECT grocery_couple_account()));
 CREATE POLICY grocery_lists_member_read ON grocery_lists FOR SELECT
+  USING (account_id = (SELECT grocery_member_account()));
+ALTER TABLE grocery_list_groups ENABLE ROW LEVEL SECURITY;
+CREATE POLICY grocery_list_groups_couple ON grocery_list_groups
+  USING (account_id = (SELECT grocery_couple_account())) WITH CHECK (account_id = (SELECT grocery_couple_account()));
+CREATE POLICY grocery_list_groups_member_read ON grocery_list_groups FOR SELECT
   USING (account_id = (SELECT grocery_member_account()));
 ALTER TABLE grocery_list_items ENABLE ROW LEVEL SECURITY;
 CREATE POLICY grocery_list_items_couple ON grocery_list_items
@@ -1373,6 +1605,7 @@ INSERT INTO grocery_aisles (name, sort_order) VALUES
   ('Féculents', 1), ('Fruits et légumes', 2), ('Crémerie', 3), ('Épicerie du monde', 4), ('Épices et aromates', 5), ('Huiles et condiments', 6),
   ('Légumineuses', 7), ('Charcuterie', 8), ('Conserves et surgelés', 9), ('Épicerie sucrée', 10), ('Boucherie', 11), ('Poissonnerie', 12),
   ('Volaille', 13), ('Sauces tomate', 14), ('Boissons', 15), ('Entretien', 16), ('Soins du corps', 17), ('Petit-déjeuner', 18), ('Autres', 19);
+UPDATE grocery_aisles SET is_fresh = true WHERE name IN ('Fruits et légumes', 'Crémerie', 'Boucherie', 'Poissonnerie', 'Volaille', 'Charcuterie');
 INSERT INTO legal_document_versions (document_type, version_label, content, published_at) VALUES
   ('grocery_price_sharing_consent', '1.0', 'Les prix de vos tickets sont ajoutés, sans votre nom, à une base commune. En échange, vous voyez les prix relevés par les autres foyers.', now());
 -- L'Assistant Famille a une tuile fixe : il n'est jamais listé dans le catalogue
@@ -1399,6 +1632,8 @@ Partagez vos prix pour voir ceux des foyers proches.', 'available');
 -- (en centimes pour les bornes absolues), durées de conservation
 INSERT INTO platform_settings (setting_key, value_type, value_text, min_value, max_value, description) VALUES
   ('meal_session_cap_minutes',          'integer', '120',   30, 600,      $$Plafond de la séance de batch cooking du dimanche, en minutes ; avec l'objectif « temps », seules les semaines sous ce plafond sont retenues, sinon l'alerte « Séance au-dessus de 2 h » (US-156 RF5, RT3)$$),
+  ('meal_season_dishes_count',          'integer', '10',    1,  100,      $$Nombre de plats de saison demandés pour le menu du mois (US-178 RF2, CR-60)$$),
+  ('meal_season_dishes_max',            'integer', '44',    1,  200,      $$Nombre maximum de plats de saison retenus pour le foyer quand ses plats ne suffisent pas à remplir les quatre semaines (US-178 RF2, CR-62)$$),
   ('meal_menu_daily_cap',               'integer', '10',    1,  100,      $$Nombre maximum de menus complets composés par un foyer et par jour, corrections comprises ; au-delà, l'agent invite à reprendre le lendemain (US-156 RF12ter, CR-44)$$),
   ('meal_repeat_weeks_default',         'integer', '2',     1,  4,        $$Nombre de semaines avant qu'un plat revienne, par défaut, pour les foyers qui n'ont pas choisi (US-153 RF2, US-156 RT3)$$),
   ('meal_match_sure_pct',               'integer', '80',    1,  100,      $$Pourcentage de correspondance à partir duquel un plat de planning est « sûr » (US-171 RF1)$$),
@@ -1434,6 +1669,7 @@ COMMENT ON TABLE meal_cuisines IS $$Cuisines du catalogue (Afro, Français, Ital
 COMMENT ON TABLE meal_dish_categories IS $$Catégories des plats (salades, soupes, viandes, végétarien…), gérées dans la console. Une catégorie utilisée ne se supprime pas, elle se masque : les plats sont classés par des données, pas devinés à partir de leur nom. [US-165 RF1, RF2]$$;
 COMMENT ON TABLE meal_dish_tags IS $$Étiquettes des plats, gérées dans la console : régimes (« végétarien », « sans gluten »), viandes (« viande : poulet ») et allergènes (« contient du gluten »). Le filtrage des régimes et des allergies d'un foyer s'appuie sur elles, non sur des mots-clés codés en dur. Une étiquette utilisée ne se supprime pas, elle se masque. [US-164 RF1, CR-30]$$;
 COMMENT ON COLUMN meal_dish_tags.kind IS $$diet = régime que le plat respecte ; meat = viande ou poisson que le plat contient ; allergen = allergène que le plat contient. [CR-30]$$;
+COMMENT ON COLUMN grocery_aisles.is_fresh IS $$Rayon frais (Fruits et légumes, Crémerie, Boucherie, Poissonnerie, Volaille, Charcuterie au départ), réglable dans la console. Dans la liste du mois, les produits d'un rayon frais des semaines après la première sont « À acheter plus tard », décochés et hors total ; ce marquage se lit à la lecture. Un produit sans rayon n'est pas frais. [US-169 RF2bis, US-157 RF9ter, CR-56]$$;
 COMMENT ON TABLE grocery_aisles IS $$Rayons de magasin, communs à tous les foyers : tickets, liste de courses et budget sont rangés de la même façon. Un rayon utilisé ne se supprime pas : il se renomme ou se fusionne avec un autre (merge_grocery_aisles). [US-169]$$;
 COMMENT ON COLUMN grocery_products.is_pantry IS $$Produit « placard » (sel, poivre, huiles, vinaigres, épices, herbes séchées, bouillons en cube, sucre, farine, levure, moutarde…) : dans la liste de courses il est décoché par défaut avec « Vous en avez peut-être déjà » et ne compte dans le total que s'il est coché. Réglé produit par produit dans la console (US-166) ; une quantité en cuillère ou en pincée rend aussi un ingrédient « placard », quelle que soit cette valeur. [CR-50, CR-51]$$;
 COMMENT ON TABLE grocery_products IS $$Produit du catalogue commun (lait, riz basmati…) : nom, clé normalisée unique, rayon. Les ingrédients des plats, les références par enseigne, les prix partagés et le calendrier de saison s'y rattachent. [US-166 RF1]$$;
@@ -1475,6 +1711,7 @@ COMMENT ON COLUMN grocery_price_sharing_events.account_id IS $$Identifiant du co
 COMMENT ON COLUMN grocery_price_sharing_events.actor_email_hash IS $$Empreinte HMAC-SHA256 de l'email de la personne qui a activé ou désactivé le partage (clé hors base) : preuve nominative sans conserver l'email$$;
 COMMENT ON TABLE grocery_household_settings IS $$Réglages Courses et repas du foyer, communs au couple (un invité secondaire ne les voit pas) : ville, nombre de personnes, jours de courses, objectifs cumulables (temps, mes plats, saison), répétition, source des remplacements, jour du budget, partage anonyme des prix (désactivé par défaut). Les allergies et les régimes sont à part, chiffrés (grocery_household_dietary). [US-153 RF2, RF5, US-154 RF1, CR-01, CR-10]$$;
 COMMENT ON COLUMN grocery_household_settings.repeat_weeks IS $$Un plat n'est pas servi avant N semaines (1 à 4) ; vide = valeur par défaut de la console (meal_repeat_weeks_default, 2). [US-153 RF2, US-156 RF9, RT3]$$;
+COMMENT ON COLUMN grocery_household_settings.monthly_meal_budget IS $$Budget mensuel des repas du foyer, en euros (de 1 à 99 999), hors restaurant, boissons et réceptions. Sert au menu du mois dans le budget ; vide tant que le foyer ne l'a pas renseigné. [US-153, US-178, CR-59]$$;
 COMMENT ON COLUMN grocery_household_settings.share_prices IS $$Partage anonyme des prix de nos tickets avec les autres foyers (réciproque) ; désactivé par défaut. Ne passe à vrai qu'après l'inscription de la preuve de consentement, avec une ville renseignée. Le désactiver arrête les envois suivants sans retirer les lignes déjà partagées. [US-154 RF1 à RF5, CR-12, CR-24]$$;
 COMMENT ON COLUMN grocery_household_settings.shopping_days IS $$Jours de courses (jours ISO, 1 = lundi), au moins un, sans doublon$$;
 COMMENT ON TABLE grocery_household_cuisines IS $$Cuisines préférées du foyer, parmi celles du catalogue ; aucune ligne = toutes. [US-153 RF2]$$;
@@ -1484,12 +1721,24 @@ COMMENT ON TABLE grocery_household_city_sharing IS $$Inscription du foyer au com
 COMMENT ON TABLE meal_household_dishes IS $$Plat personnel du foyer : nom, cuisine, ingrédients (au moins un), durée et recette facultatives. Propre au foyer : ni validation par l'administrateur, ni entrée dans le catalogue commun, jamais proposé à un autre foyer. Peut porter le nom d'un plat du catalogue. Modifiable et supprimable par le couple. [US-159 RF1, RF3 à RF5, CR-04, CR-25]$$;
 COMMENT ON TABLE meal_household_dish_ingredients IS $$Ingrédients d'un plat personnel : nom saisi, clé normalisée, produit du catalogue s'il est reconnu. Aucune quantité par ingrédient. Un plat personnel a au moins un ingrédient (contrôlé à la validation de la transaction). [US-159 RF1, CR-25]$$;
 COMMENT ON TABLE meal_household_dish_tags IS $$Étiquettes (régimes, viandes, allergènes) d'un plat personnel, pour que le filtrage des régimes et des allergies du foyer s'applique aussi à ses plats. [US-159, CR-30]$$;
+COMMENT ON TABLE meal_season_dishes IS $$Plat de saison obtenu de l'IA pour le menu du mois, dans la base COMMUNE et ANONYME partagée par tous les foyers : nom (clé normalisée unique : sans doublon, le premier est gardé), cuisine, nombre de personnes des quantités, recette, durée, nombre de foyers qui l'ont choisi, lundi de la semaine d'entrée, état masqué par l'administrateur. Aucun foyer, aucun profil, aucun prix. Distincte du catalogue commun des plats (CR-04) : aucune clé vers meal_dishes. Ne s'efface pas en fin de mois ni avec un compte ; conservation sans limite pour l'instant (à soumettre au DPO avec CR-43). Écrite par share_season_dish() seulement. [US-178 RF2, RF2bis, CR-60, CR-61, CR-62]$$;
+COMMENT ON COLUMN meal_season_dishes.servings IS $$Nombre de personnes pour lequel les quantités des ingrédients sont écrites ; l'application met à l'échelle le foyer. [CR-61]$$;
+COMMENT ON COLUMN meal_season_dishes.chosen_count IS $$Nombre de foyers qui ont choisi ce plat dans un menu validé : une fois par foyer et par plat (choose_season_dish, vérifié par les lignes de menu du foyer), sans rien garder du foyer. Ne redescend pas après une suppression ou une purge de menu. Les plus choisis sont proposés en premier. [CR-61, CR-62]$$;
+COMMENT ON COLUMN meal_season_dishes.entered_week IS $$Lundi de la semaine d'entrée du plat dans la base (jamais le jour : un jour précis, rapproché d'un foyer, permettrait de deviner qui l'a obtenu). [CR-61]$$;
+COMMENT ON COLUMN meal_season_dishes.hidden_at IS $$Date à laquelle l'administrateur a masqué le plat (il n'est plus proposé) ; vide = visible. [CR-61]$$;
+COMMENT ON TABLE meal_season_dish_ingredients IS $$Ingrédients d'un plat de saison de la base commune, avec leur quantité et leur unité pour le nombre de personnes du plat (mêmes unités que les ingrédients de menu, ramenées en g, ml ou pièce). Un plat a au moins un ingrédient (contrôlé à la validation de la transaction). Anonyme : aucun foyer. [US-178 RF2, RF2bis, CR-50, CR-61]$$;
+COMMENT ON TABLE meal_season_dish_months IS $$Mois de saison d'un plat de la base commune (un à douze, donnés par l'IA, corrigeables dans la console). La recherche des plats du mois cherche le mois en cours dans cette liste. Un plat a au moins un mois. [US-178 RF2bis, CR-61]$$;
+COMMENT ON TABLE meal_season_dish_tag_links IS $$Étiquettes (régimes, viandes, allergènes) d'un plat de la base commune, prises dans la liste de la console (meal_dish_tags, CR-30), corrigeables par l'administrateur. [US-178 RF2bis, CR-30, CR-61]$$;
+COMMENT ON TABLE meal_season_household_dishes IS $$Sélection du foyer pour son menu du mois : les plats de saison de la base commune qu'il garde jusqu'à la fin du mois (10, jusqu'à 44 si ses plats ne suffisent pas, contrôle par l'application). Réservée au couple ; effacée une fois le mois passé (purge, heure du foyer) et avec le compte ; ne touche jamais la base commune. [US-178 RF2, RF2bis, CR-60, CR-62]$$;
+COMMENT ON COLUMN meal_season_household_dishes.season_month IS $$Premier jour du mois civil de la sélection, calculé par l'application à l'heure du foyer. [CR-60]$$;
+COMMENT ON FUNCTION meal_season_dish_needs_content() IS $$Contrôle différé : un plat de saison de la base commune a au moins un ingrédient et au moins un mois de saison à la fin de la transaction. [CR-61]$$;
 COMMENT ON TABLE meal_menus IS $$Menu validé d'un foyer pour une semaine (le menu proposé n'est pas gardé tant qu'il n'est pas validé) : semaine type utilisée, durée de la séance du dimanche, indication « estimée » ou « au-dessus du plafond ». Une validation par semaine. Conservé 12 mois (réglable), purgé par purge_expired_grocery_data(). [US-156 RF5, RF6, RF12, CR-23]$$;
 COMMENT ON COLUMN meal_menus.servings IS $$Nombre de personnes pour lequel l'IA a écrit les recettes et les quantités du menu (« Pour 6 personnes »), gardé avec le menu : le foyer peut changer ensuite. Vide pour un menu validé avant CR-49. [US-156 RF11, CR-49]$$;
 COMMENT ON COLUMN meal_menus.session_is_estimated IS $$Vrai si aucune semaine type n'était adaptée : la durée est estimée (le plat le plus long, plus 40 % des autres) et signalée comme telle. [US-156 RF6]$$;
 COMMENT ON TABLE meal_menu_entries IS $$Plats d'un menu validé : 7 dîners et plats express (le type « plaisir » n'est plus utilisé depuis CR-42). Chaque ligne garde le nom du plat tel qu'il était et son origine : catalogue, Mes plats ou plat libre composé par l'IA. Un plat libre garde dans la ligne sa cuisine, sa recette et sa durée, et ses ingrédients dans meal_menu_entry_ingredients : il n'entre jamais dans le catalogue commun (CR-04) et part avec le menu (12 mois). Après la validation, un plat (libre ou du catalogue) ajouté à Mes plats y est copié et la ligne en garde le lien (household_dish_id). La ligne peut porter une version allégée proposée par l'IA (texte, adaptation dans meal_menu_entry_light_items, choix du foyer). Un plat retiré ou supprimé ensuite reste lisible dans les menus déjà validés. Un menu remplacé par un autre de la même semaine garde son identifiant et voit ses lignes remplacées. [US-156 RF3 à RF10, RT4, CR-25, CR-42, CR-45]$$;
 COMMENT ON COLUMN meal_menu_entries.dish_origin IS $$Origine du plat : catalog (plat du catalogue commun), household (plat de Mes plats) ou ai (plat libre composé par l'IA avec le foyer, avec ses ingrédients, jamais dans le catalogue). Renseignée par l'application, sans valeur par défaut ; les menus déjà validés avant CR-42 ont reçu household s'ils pointaient vers un plat personnel, sinon catalog. [CR-42]$$;
 COMMENT ON COLUMN meal_menu_entries.household_dish_id IS $$Plat de Mes plats : le plat choisi (origine household) ou, après « Ajouter à vos plats », la copie faite dans Mes plats d'un plat libre ou du catalogue (la ligne garde son contenu). Vide si le foyer a supprimé ce plat ensuite. [US-156 RF10, CR-42, CR-45]$$;
+COMMENT ON COLUMN meal_menu_entries.season_dish_id IS $$Plat de la base commune des plats de saison d'où vient ce plat libre (origine ai), quand il a été choisi parmi eux (CR-61) ; repasse à vide si le plat est supprimé de la base. Sert à n'écarter ni ne compter deux fois un plat déjà présent dans les menus du foyer : le compteur de la base commune ne monte qu'une fois par foyer et par plat. [US-178 RF2bis, CR-61, CR-62]$$;
 COMMENT ON COLUMN meal_menu_entries.cuisine_id IS $$Cuisine d'un plat libre (origine ai, obligatoire) ; vide pour un plat du catalogue ou de Mes plats. [CR-42]$$;
 COMMENT ON COLUMN meal_menu_entries.recipe IS $$Recette en texte, écrite par l'IA pour le nombre de personnes du foyer (meal_menus.servings), pour tout plat du menu : plat libre, plat du catalogue ou de Mes plats (le plat d'origine n'est pas modifié). Vide si le plat de Mes plats n'a pas de recette. [US-156 RF11, CR-42, CR-49]$$;
 COMMENT ON COLUMN meal_menu_entries.duration_minutes IS $$Durée d'un plat libre en minutes (1 à 600) ; vide pour un plat du catalogue ou de Mes plats. [CR-42]$$;
@@ -1517,11 +1766,19 @@ COMMENT ON TABLE meal_menu_daily_counters IS $$Nombre de menus complets composé
 COMMENT ON COLUMN meal_menu_daily_counters.menu_date IS $$Jour du décompte, calculé par l'application dans le fuseau du foyer [CR-44]$$;
 COMMENT ON COLUMN meal_menu_daily_counters.menu_count IS $$Menus complets déjà acceptés ce jour-là ; borné par le plafond, jamais au-dessus [CR-44]$$;
 COMMENT ON FUNCTION register_meal_menu(uuid, date, integer) IS $$Compte un menu complet d'un foyer pour un jour et applique le plafond quotidien : true = accepté (le compteur est incrémenté), false = plafond atteint (rien n'est compté). Le plafond est le paramètre ou, s'il est vide, le réglage de la console meal_menu_daily_cap (10 par défaut). Atomique : deux demandes simultanées ne dépassent jamais le plafond. [US-156 RF12ter, CR-44]$$;
+COMMENT ON FUNCTION share_season_dish(text, text, integer, integer, text, integer, integer[], integer[], jsonb) IS $$Seule porte d'écriture de la base commune des plats de saison : crée le plat (avec ses mois, ses étiquettes et ses ingrédients) si son nom normalisé n'existe pas, sinon rend l'identifiant du plat existant sans rien modifier (le premier est gardé). Ne reçoit ni foyer ni profil. Exécutée avec les droits du propriétaire. [US-178 RF2bis, CR-61]$$;
+COMMENT ON FUNCTION choose_season_dish(uuid, bigint) IS $$Compte le choix d'un plat de saison dans un menu validé, une seule fois par foyer et par plat : le compteur de la base commune ne monte que si aucune ligne de menu du foyer ne pointe déjà vers ce plat. Le foyer n'est pas gardé. À appeler avant d'écrire la ligne de menu (season_dish_id). Rend vrai si le compteur a monté. Le compteur peut remonter après une purge ou une suppression de menu (accepté). Exécutée avec les droits du propriétaire. [US-178 RF2bis, CR-61, CR-62]$$;
+COMMENT ON FUNCTION search_season_dishes(date, integer[], integer[], integer[], bigint[], integer) IS $$Plats de saison de la base commune pour un mois : non masqués, de saison dans le mois demandé, dans les cuisines données, portant toutes les étiquettes demandées et aucune étiquette exclue, hors des plats déjà écartés ; les plus choisis d'abord. Les filtres viennent de l'application : la base ne lit jamais les allergies ni les régimes du foyer (chiffrés), l'application filtre les allergies sur les candidats rendus. Exécutée avec les droits du propriétaire. [US-178 RF2bis, CR-61]$$;
+COMMENT ON FUNCTION season_dish_ingredients_for(bigint[]) IS $$Ingrédients (avec quantité et unité pour le nombre de personnes du plat) des plats de saison demandés, hors plats masqués. Exécutée avec les droits du propriétaire. [US-178 RF2bis, CR-61]$$;
 COMMENT ON FUNCTION meal_menu_entry_needs_ingredient() IS $$Contrôle différé : tout plat d'un menu, de toute origine, a au moins un ingrédient à la fin de la transaction (les lignes de menus validés avant CR-49 ne sont pas revérifiées). [US-156 RF8, RT3, CR-42, CR-49, CR-51]$$;
 COMMENT ON VIEW v_meal_menu_needs IS $$Besoins d'un menu validé par produit (ou par nom d'ingrédient inconnu du catalogue) et par unité de base (g, ml, piece) : total des quantités, nombre d'ingrédients additionnés, needs_check (une quantité manque : 1 unité et « Quantité à vérifier »), is_pantry (produit « placard » ou quantité en cuillère ou en pincée : décoché par défaut). Les cuillères, pincées et quantités absentes ont une unité de base vide. L'application divise ensuite le total par le format de la référence choisie et arrondit au paquet supérieur. Vue à droits de l'appelant : la sécurité par ligne du couple s'applique. [US-157 RF7bis, CR-50]$$;
 COMMENT ON FUNCTION meal_menu_entry_light_item_before_write() IS $$Refuse une adaptation de version allégée sur un plat de menu qui n'a pas de version allégée proposée par l'IA. [US-157 RF5, CR-42]$$;
 COMMENT ON TABLE meal_light_choices IS $$Choix du foyer, plat par plat, entre la version standard et la version allégée : enregistré à « Valider ma liste » et repris au menu suivant. Un retour à la version standard rétablit la liste. [US-157 RF5, RF9]$$;
-COMMENT ON TABLE grocery_lists IS $$Liste de courses validée (« Valider ma liste ») : scénario d'achat choisi, menu d'origine (une seule liste par menu, donc par semaine, CR-54), date, profil. « Ma liste de courses » est la liste de la semaine affichée, consultée en magasin par magasin puis par rayon. La liste vide de tout produit est supprimée par la purge. Supprimée avec son menu (delete_meal_menu) ou seule (delete_grocery_list). [US-157 RF7, RF9, RF9bis, RF11, CR-54]$$;
+COMMENT ON TABLE grocery_list_groups IS $$Regroupement de plusieurs semaines en une « Liste du mois » : un seul scénario d'achat et une seule date de validation pour toutes les semaines regroupées. Chaque semaine garde sa liste (grocery_lists.group_id). Supprimer une semaine la retire du regroupement ; le regroupement disparaît s'il reste moins de 2 listes. [US-157 RF9ter, RF11, CR-56]$$;
+COMMENT ON TABLE grocery_lists IS $$Liste de courses validée (« Valider ma liste ») : scénario d'achat choisi, menu d'origine (une seule liste par menu, donc par semaine, CR-54), date, profil. « Ma liste de courses » est la liste de la semaine affichée, consultée en magasin par magasin puis par rayon. La liste vide de tout produit est supprimée par la purge. Supprimée avec son menu (delete_meal_menu) ou seule (delete_grocery_list) ; elle quitte alors son regroupement en liste du mois, qui disparaît s'il reste moins de 2 listes. [US-157 RF7, RF9, RF9bis, RF9ter, RF11, CR-54, CR-56]$$;
+COMMENT ON COLUMN grocery_lists.group_id IS $$Liste du mois (grocery_list_groups) à laquelle cette semaine est regroupée ; vide = liste de la semaine seule. Son scénario d'achat est celui du regroupement (vérifié). Repasse à vide si le regroupement disparaît. [US-157 RF9ter, CR-56]$$;
+COMMENT ON FUNCTION grocery_list_group_check() IS $$Une liste regroupée (liste du mois) a le même scénario d'achat que son regroupement. [US-157 RF9ter, CR-56]$$;
+COMMENT ON FUNCTION grocery_list_group_cleanup() IS $$Quand une liste quitte son regroupement ou est supprimée (suppression d'une semaine, d'un menu ou purge), le regroupement disparaît s'il reste moins de 2 listes ; les listes restantes redeviennent des listes de semaine. [US-157 RF9ter, RF11, CR-56]$$;
 COMMENT ON TABLE grocery_list_items IS $$Produit de la liste de courses du foyer, avec son état : en préparation, validé, ajouté depuis la validation (sans magasin ni prix, en tête de « Ma liste de courses »), acheté. Un produit n'est qu'une fois dans la liste ouverte d'une semaine (la quantité augmente) ; chaque produit appartient à un menu (menu_id). Les produits non achetés d'une semaine ne sont plus recopiés : la semaine suivante les voit en pense-bête décoché (grocery_leftovers_for), ils restent sur leur liste. Les produits achetés forment l'historique du foyer, conservé 3 mois (réglable). Le couple retire tout ; un invité secondaire ne retire que ses propres ajouts, n'augmente que les quantités et peut cocher « acheté » (CR-38), sans voir aucun prix (grocery_list_for). [US-157 RF3, RF3bis, RF9, US-158, US-162, CR-10, CR-27, CR-28, CR-54, CR-55]$$;
 COMMENT ON COLUMN grocery_list_items.needed_amount IS $$Besoin du menu pour ce produit, additionné sur tous les plats (plats express compris) pour le nombre de personnes du foyer, en g, ml ou pièce ; sert à afficher l'origine de la quantité (« 2 paquets · 900 g pour le menu »). Pour un produit au poids, poids x prix au kilo entre dans le total. Vide pour un produit ajouté à la main ou de l'historique (1 par défaut). [US-157 RF7bis, RF8, CR-50]$$;
 COMMENT ON COLUMN grocery_list_items.needed_unit IS $$Unité de needed_amount : g, ml ou piece. Vide en même temps que la quantité. [CR-50]$$;
@@ -1531,13 +1788,14 @@ COMMENT ON COLUMN grocery_list_items.is_selected IS $$Coché pour l'achat. Un pr
 COMMENT ON COLUMN grocery_list_items.price_unit IS $$Unité de unit_price, copiée de la référence choisie à la validation : unit (ou vide) = par article, kg ou l = par kilo ou par litre. Un article au kilo ou au litre s'affiche « x,xx €/kg » avec la mention « prix au kilo, non totalisé » et n'entre pas dans le total estimé : l'application ne totalise que les articles dont price_unit est vide ou unit. Aucun poids n'est supposé. [CR-40]$$;
 COMMENT ON COLUMN grocery_list_items.menu_id IS $$Menu (donc semaine) du produit, renseigné pour tout produit : en préparation, validé, acheté ou ajouté depuis la validation. Il suit toujours le menu de la liste du produit (rempli à partir de la liste s'il est vide, refusé s'il diffère). Vide seulement pour un ajout à la main en préparation quand aucun menu n'existe ; le premier menu validé le reprend (application). Supprimé avec son menu (cascade). [US-157 RF3bis, RF9bis, RF11, CR-54, CR-55]$$;
 COMMENT ON COLUMN grocery_list_items.state IS $$preparing = en préparation (aucun magasin, aucun prix) ; validated = dans la liste validée, avec son magasin, sa référence et son prix estimé ; added_after_validation = ajouté depuis la validation, sans magasin ni prix ; bought = acheté (date et profil). [US-157 RF9, US-158 RF3bis, CR-28]$$;
-COMMENT ON FUNCTION grocery_list_item_before_write() IS $$Garde-fou de la liste de courses : un invité secondaire (profil indiqué dans app.user_id) peut ajouter un produit en son nom, augmenter une quantité, cocher « acheté » n'importe quel article de la liste validée (état validé ou ajouté depuis la validation, à son nom) et décocher ce qu'il a lui-même coché ; il ne change jamais un magasin, une référence, un prix, une quantité en même temps ni le libellé. Il rattache aussi le produit au menu de sa liste (rempli s'il est vide, refusé s'il diffère, CR-54). Sans profil indiqué, le garde-fou de l'invité secondaire ne s'applique pas (H144). [US-158 RF2, RF3, US-162, CR-10, CR-38, CR-54]$$;
+COMMENT ON FUNCTION grocery_list_item_before_write() IS $$Garde-fou de la liste de courses : un invité secondaire (profil indiqué dans app.user_id) peut ajouter un produit en son nom, augmenter une quantité, cocher « acheté » n'importe quel article de la liste validée (état validé ou ajouté depuis la validation, à son nom) et décocher ce qu'il a lui-même coché ; il ne change jamais un magasin, une référence, un prix, une quantité en même temps ni le libellé. Il rattache aussi le produit au menu de sa liste (rempli s'il est vide, refusé s'il diffère, CR-54) et vide son lien vers une ligne de ticket quand il n'est plus acheté (CR-58). Sans profil indiqué, le garde-fou de l'invité secondaire ne s'applique pas (H144). [US-158 RF2, RF3, US-162, CR-10, CR-38, CR-54]$$;
 COMMENT ON FUNCTION grocery_list_for(uuid) IS $$Articles de la liste de courses de la famille d'un profil, pour l'affichage : le prix estimé n'est rendu qu'au couple, l'invité secondaire ne voit aucun prix (il voit le magasin, la référence, le format du conditionnement et l'unité du prix, sans prix). L'application l'utilise pour lire la liste ; tant qu'elle se connecte avec un seul rôle, la protection effective des colonnes est cette fonction et le code (H150). [US-157 RF7bis, RF8, RF9bis, US-158, CR-10, CR-38, CR-40, CR-50, CR-54]$$;
 COMMENT ON FUNCTION grocery_leftovers_for(uuid, uuid) IS $$Pense-bêtes « Pas encore acheté (semaine du …) » d'un menu : les produits validés ou ajoutés après la validation, non achetés, de la plus récente liste encore existante d'une semaine antérieure à ce menu (une semaine sautée ne bloque rien ; sans liste précédente, rien n'est repris). Calculés à la lecture : décochés (is_selected faux), hors total tant que l'utilisateur ne les coche pas, toujours présents sur leur liste d'origine ; ils disparaissent quand le produit est acheté sur cette liste ou quand le produit existe déjà dans la semaine visée (un pense-bête coché y devient un produit, copié par l'application). Le prix estimé n'est rendu qu'au couple. Remplace grocery_carry_over_unbought. [US-157 RF3bis, CR-55]$$;
-COMMENT ON FUNCTION delete_meal_menu(uuid) IS $$Supprime définitivement un menu validé : ses produits de liste (achetés et ajoutés à la main compris), sa liste de courses, son déroulé de séance, ses lignes de menu, leurs ingrédients et leurs quantités. Ne touche ni les tickets, ni les prix, ni les plats copiés dans Mes plats, ni le compteur de menus du jour (un menu supprimé reste compté). Réservée au couple du foyer (profil lu dans app.user_id) ; rend faux si le menu n'existe pas. Le menu sort de l'historique (« déjà servi le … »). [US-156 RF1bis, US-157 RF11, RT3, CR-54]$$;
-COMMENT ON FUNCTION delete_grocery_list(uuid) IS $$Supprime définitivement la liste de courses d'un menu et tous ses produits (achetés et ajoutés à la main compris) ; le menu, ses recettes et son déroulé sont gardés, la liste repart de zéro à partir du menu. Ne touche ni les tickets, ni les prix, ni le compteur de menus du jour. Réservée au couple du foyer (profil lu dans app.user_id) ; rend vrai si quelque chose a été supprimé. [US-157 RF11, RT3, CR-54, CR-55]$$;
+COMMENT ON FUNCTION delete_meal_menu(uuid) IS $$Supprime définitivement un menu validé : ses produits de liste (achetés et ajoutés à la main compris), sa liste de courses, son déroulé de séance, ses lignes de menu, leurs ingrédients et leurs quantités. Ne touche ni les tickets, ni les prix, ni les plats copiés dans Mes plats, ni le compteur de menus du jour (un menu supprimé reste compté). Réservée au couple du foyer (profil lu dans app.user_id) ; rend faux si le menu n'existe pas. Le menu sort de l'historique (« déjà servi le … »). Sa liste quitte son regroupement en liste du mois, qui disparaît s'il reste moins de 2 listes. [US-156 RF1bis, US-157 RF9ter, RF11, RT3, CR-54, CR-56]$$;
+COMMENT ON FUNCTION delete_grocery_list(uuid) IS $$Supprime définitivement la liste de courses d'un menu et tous ses produits (achetés et ajoutés à la main compris) ; le menu, ses recettes et son déroulé sont gardés, la liste repart de zéro à partir du menu. Ne touche ni les tickets, ni les prix, ni le compteur de menus du jour. Réservée au couple du foyer (profil lu dans app.user_id) ; rend vrai si quelque chose a été supprimé. La liste quitte son regroupement en liste du mois, qui disparaît s'il reste moins de 2 listes. [US-157 RF9ter, RF11, RT3, CR-54, CR-55, CR-56]$$;
 COMMENT ON TABLE grocery_receipts IS $$Ticket de caisse enregistré : magasin, ville, date, heure, total, profil. Aucune photo ni image (supprimée dès la lecture, confirmée ou non), le nom et la carte de fidélité sont masqués avant que l'agent ne reçoive le texte. Un doublon est refusé en entier par la base : même date, même heure exacte et même total (le magasin n'entre pas en compte) ; sans heure (anciens tickets), même magasin, même date et même total. Source du budget par rayon. Conservé 3 ans (année en cours et deux précédentes, réglable). [US-161, US-163, CR-05, CR-08, CR-23, CR-41]$$;
 COMMENT ON COLUMN grocery_receipts.purchased_time IS $$Heure du ticket (heures, minutes et secondes si elles sont lues, sinon secondes à 00), heure locale du magasin. Lue sur le ticket ou saisie par l'utilisateur quand elle n'est pas lue. Vide pour les tickets enregistrés avant CR-41 : leur contrôle de doublon reste magasin, date et total. [CR-41, US-161 RT2]$$;
+COMMENT ON COLUMN grocery_list_items.receipt_line_id IS $$Ligne de ticket de caisse qui a servi à payer ce produit acheté : le coût réel du menu est la somme des lignes reliées aux produits de ses listes. Vide pour un produit coché à la main (le prix estimé est gardé) ; repasse à vide si le ticket est supprimé ou si le produit n'est plus acheté. Un ingrédient inconnu du catalogue est rapproché par son nom, moins fiable. [US-157 RF8, US-177, CR-58]$$;
 COMMENT ON COLUMN grocery_receipt_lines.measured_quantity IS $$Poids ou volume mesuré à la caisse, en kilogrammes ou en litres (« 1,234 kg ») ; vide pour une ligne vendue à la pièce. Les grammes et les centilitres sont convertis avant l'écriture. Reste dans le foyer : jamais partagé. quantity (nombre d'articles) ne le porte pas. [CR-39]$$;
 COMMENT ON COLUMN grocery_receipt_lines.measure_unit IS $$Unité du poids ou du volume mesuré : kg ou l. Vide en même temps que la quantité mesurée ; vide = vendu à la pièce. [CR-39]$$;
 COMMENT ON COLUMN grocery_receipt_lines.price_per_measure IS $$Prix au kilo ou au litre lu sur le ticket (« 1,49 €/kg »). S'il n'est pas lu et que le poids est connu, il est calculé (total de la ligne divisé par le poids, arrondi à 2 décimales) ; le prix lu l'emporte toujours. Vide sans poids, sur une remise, ou si le calcul sort des bornes. [CR-39, CR-40]$$;
@@ -1556,7 +1814,8 @@ COMMENT ON VIEW v_grocery_product_references IS $$Références par enseigne avec
 COMMENT ON VIEW v_meal_batch_week_days IS $$Plats de planning avec leur statut de correspondance (sure / to_confirm / absent, d'après les seuils de la console), le plat du catalogue effectivement utilisé (le plat confirmé, sinon le plat suggéré tant que la correspondance est sûre par son pourcentage ou à confirmer) et s'ils bloquent leur semaine (« absent »). Alimente la liste des correspondances à corriger. [US-171 RF1, RF2, CA 1.1]$$;
 COMMENT ON VIEW v_meal_batch_weeks IS $$Semaines types avec leur durée, le nombre de plats reliés au catalogue et si elles sont utilisables : cinq jours renseignés et aucun plat « absent » du catalogue. Une semaine bloquée n'est pas proposée aux foyers. [US-170 RF4, US-171 CA 1.1]$$;
 COMMENT ON VIEW v_meal_dishes_console IS $$Plats du catalogue pour la console : plat express (15 minutes au plus), retiré ou non, présence dans une semaine type et d'une version allégée. Permet de signaler les plats sans semaine type et de compter les plats express. [US-164 RF2, RF4]$$;
+COMMENT ON VIEW v_meal_season_dishes IS $$Liste de console des plats de saison de la base commune : nom, cuisine, nombre de personnes des quantités, mois de saison, étiquettes, nombre de foyers qui l'ont choisi, lundi d'entrée, masqué ou visible, nombre d'ingrédients. Aucune colonne ne retrouve un foyer. L'administrateur masque un plat et corrige ses étiquettes et ses mois (journal d'administration : seasonal_dish_changed). [US-178 RF2bis, CR-61]$$;
 COMMENT ON VIEW v_grocery_unreferenced IS $$Produits à référencer regroupés par nom normalisé, avec leur nombre d'occurrences (du plus demandé au moins demandé), leur type (inconnu / sans référence), leur rayon et leur statut (à référencer par défaut). Aucune donnée de foyer. [US-173 RF2, CA 2.1]$$;
 COMMENT ON VIEW v_grocery_shared_prices_moderation IS $$Base commune pour la modération, avec le signalement « à vérifier » : le prix est comparé à la médiane du même produit dans la même enseigne sur 12 mois (au moins 3 autres valeurs), sinon au prix de référence de l'enseigne ; il est à vérifier sous 50 % ou au-dessus de 200 % de cette base. Sans aucune base : sous 0,05 € ou au-dessus de 500 €. Les quatre bornes, le nombre de valeurs et la fenêtre sont des réglages de la console. Une ligne retirée n'est jamais signalée. Aucune colonne ne retrouve le foyer. Un prix au kilo ou au litre n'est comparé qu'à des prix de même unité (médiane) ou, à défaut, au prix au kilo ou au litre des références (price_unit, en dernière colonne). [US-175 RF1 à RF4, CR-33, CR-39]$$;
-COMMENT ON FUNCTION purge_expired_grocery_data() IS $$Supprime les menus validés de plus de 12 mois, les tickets (avec leurs lignes) antérieurs à l'année en cours moins deux, les produits achetés de la liste de plus de 3 mois (et les listes validées devenues vides), les entrées du journal des produits à référencer de plus de 12 mois, les preuves de consentement arrivées à échéance, les lignes de la base commune des prix de plus de 12 mois (réglage de la fenêtre grocery_check_window_months ; le catalogue n'est pas concerné) et les compteurs du plafond quotidien de menus de plus de 7 jours. Les durées sont des réglages de la console (à confirmer par le DPO, CR-26). À planifier chaque jour. [CR-23, CR-35, CR-44]$$;
+COMMENT ON FUNCTION purge_expired_grocery_data() IS $$Supprime les menus validés de plus de 12 mois, les tickets (avec leurs lignes) antérieurs à l'année en cours moins deux, les produits achetés de la liste de plus de 3 mois (et les listes validées devenues vides), les entrées du journal des produits à référencer de plus de 12 mois, les preuves de consentement arrivées à échéance, les lignes de la base commune des prix de plus de 12 mois (réglage de la fenêtre grocery_check_window_months ; le catalogue n'est pas concerné) les compteurs du plafond quotidien de menus de plus de 7 jours, et les sélections de plats de saison d'un mois passé (la base commune des plats de saison n'est jamais purgée). Les durées sont des réglages de la console (à confirmer par le DPO, CR-26). À planifier chaque jour. [CR-23, CR-35, CR-44]$$;
 COMMENT ON VIEW v_dashboard_agents IS $$Agents actifs d'un profil avec statut Prêt / À configurer / Bloqué ; les agents retirés du catalogue n'y figurent pas. [US-22, 29, 31, 42, CR-34]$$;

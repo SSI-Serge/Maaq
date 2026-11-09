@@ -10,3 +10,4 @@ ALTER TYPE audit_action ADD VALUE 'meal_catalog_changed' AFTER 'agent_restored';
 ALTER TYPE audit_action ADD VALUE 'meal_planning_changed' AFTER 'meal_catalog_changed';
 ALTER TYPE audit_action ADD VALUE 'grocery_catalog_changed' AFTER 'meal_planning_changed';
 ALTER TYPE audit_action ADD VALUE 'grocery_price_moderated' AFTER 'grocery_catalog_changed';
+ALTER TYPE audit_action ADD VALUE 'seasonal_dish_changed' AFTER 'grocery_price_moderated';
