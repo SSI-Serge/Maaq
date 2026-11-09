@@ -10,7 +10,7 @@ import { AGE_LABEL, comparatif, computeScenarios, formatQuantity, isReplaced, no
 import { fromDto } from "@/server/courses/list/dto";
 import type { AddedLine, ListPrepared, ValidateLine } from "@/server/courses/list/service";
 import { BatchSession, RecipeList } from "./MenuRecipes";
-import { DeleteWeek, WeekSelector, weekFromLocation } from "./WeekTools";
+import { DeleteWeek, WeekSelector, groupFromLocation, weekFromLocation } from "./WeekTools";
 import styles from "./courses.module.css";
 
 const BACK = { href: "/courses", label: "Courses et repas" };
@@ -25,7 +25,7 @@ export function CoursesListScreen() {
   // semaine affichée (CR-54) : celle de l'adresse (?week=), sinon celle que choisit le serveur (en cours, puis suivante)
   const [week, setWeek] = useState<string | null>(weekFromLocation);
   // liste du mois (CR-56) : les semaines regroupées, ou aucune
-  const [group, setGroup] = useState<string[] | null>(null);
+  const [group, setGroup] = useState<string[] | null>(groupFromLocation);
   const query = useApiQuery<{ list: ListPrepared }>(group ? `/api/courses/list?group=${group.join(",")}` : `/api/courses/list${week ? `?week=${week}` : ""}`);
   const forbidden = query.error?.body?.code === "forbidden";
   return (

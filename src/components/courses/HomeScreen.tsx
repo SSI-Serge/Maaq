@@ -52,6 +52,8 @@ function Home({ home }: { home: CourseHome }) {
   const wantMenu = home.menuIa && !wantTicket && params.get("menu") === "1";
   const [startMenu, setStartMenu] = useState(wantMenu ? 1 : 0);
   const [fromTicket, setFromTicket] = useState(wantTicket ? 1 : 0);
+  // « Menu du mois dans le budget » avant 6 menus validés : le toucher ouvre un message qui explique les conditions (CR-63)
+  const [monthInfo, setMonthInfo] = useState(false);
   const paths = couple ? PATHS.filter((p) => p.ready && (!p.chat || home.menuIa)) : [{ label: "Ajouter un produit", href: "/courses/liste", ready: true, couple: false }, { label: "Voir ma liste de courses", href: "/courses/ma-liste", ready: true, couple: false }];
   return (
     <>
@@ -122,6 +124,46 @@ function Home({ home }: { home: CourseHome }) {
           ),
         )}
       </nav>
+      {couple && home.month && (
+        <>
+          {home.month.ready ? (
+            <Link href="/courses/menu-du-mois" className={styles.scenarioCard} style={{ minHeight: 44, borderColor: "var(--primary)", color: "var(--primary)" }}>
+              <span>Menu du mois dans le budget</span>
+              <span aria-hidden="true">›</span>
+            </Link>
+          ) : (
+            <button type="button" aria-expanded={monthInfo} onClick={() => setMonthInfo((v) => !v)} className={styles.scenarioCard} style={{ minHeight: 44, borderColor: "var(--primary)", color: "var(--primary)", textAlign: "left", cursor: "pointer", background: "transparent" }}>
+              <span>Menu du mois dans le budget</span>
+              <span aria-hidden="true">›</span>
+            </button>
+          )}
+          {monthInfo && !home.month.ready && (
+            <div className={styles.dayCard} role="dialog" aria-label="Menu du mois dans le budget">
+              <p className={styles.lead} style={{ margin: 0 }}>
+                Le menu du mois dans le budget s&apos;appuie sur vos habitudes. Il faut {home.month.needed} menus validés (vous en avez {home.month.menus}) et vos tickets de caisse enregistrés, pour que MAAQ connaisse vos prix ({home.month.tickets} ticket{home.month.tickets > 1 ? "s" : ""} enregistré{home.month.tickets > 1 ? "s" : ""}).
+              </p>
+              <div className={family.wrapRow}>
+                {home.menuIa && (
+                  <button
+                    type="button"
+                    className={styles.scenarioCard}
+                    style={{ minHeight: 40, background: "var(--primary)", borderColor: "var(--primary)", color: "var(--primary-ink)", cursor: "pointer" }}
+                    onClick={() => {
+                      setMonthInfo(false);
+                      setStartMenu((n) => n + 1);
+                    }}
+                  >
+                    Composer un menu
+                  </button>
+                )}
+                <Link href="/courses/ticket" className={styles.scenarioCard} style={{ minHeight: 40, borderColor: "var(--primary)", color: "var(--primary)" }}>
+                  Enregistrer un ticket
+                </Link>
+              </div>
+            </div>
+          )}
+        </>
+      )}
       <ChatPanel couple={couple} startMenu={startMenu} fromTicket={fromTicket} weeks={home.weeks} />
     </>
   );

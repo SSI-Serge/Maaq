@@ -27,6 +27,14 @@ export function weekFromLocation(): string | null {
   return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
 }
 
+/** « group=2026-11-09,2026-11-16 » dans l'adresse : la Liste de courses s'ouvre sur la liste du mois de ces semaines (après « Valider les 4 menus », CR-59). */
+export function groupFromLocation(): string[] | null {
+  if (typeof window === "undefined") return null;
+  const value = new URLSearchParams(window.location.search).get("group");
+  const weeks = value ? value.split(",").filter((w) => /^\d{4}-\d{2}-\d{2}$/.test(w)) : [];
+  return weeks.length >= 2 ? weeks : null;
+}
+
 /** « scope=group » dans l'adresse : Ma liste s'ouvre sur la liste du mois (CR-56). */
 export function scopeFromLocation(): "week" | "group" {
   if (typeof window === "undefined") return "week";

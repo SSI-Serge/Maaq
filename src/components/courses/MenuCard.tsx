@@ -86,7 +86,7 @@ function ReplacePanel({ kind, options, busy, onPick, onClose }: { kind: ReplaceK
   );
 }
 
-function DishRow({ day, dish, kind, index, replacing }: { day: string; dish: ProposalDish; kind: ReplaceKind; index: number; replacing: { api: ReplaceApi; allowed: boolean } }) {
+export function DishRow({ day, dish, kind, index, replacing }: { day: string; dish: ProposalDish; kind: ReplaceKind; index: number; replacing: { api: ReplaceApi; allowed: boolean } }) {
   const [open, setOpen] = useState(false);
   const [options, setOptions] = useState<ReplaceOptions | null>(null);
   const [loading, setLoading] = useState(false);

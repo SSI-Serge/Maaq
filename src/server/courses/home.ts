@@ -2,6 +2,7 @@ import type { Ctx, SessionContext } from "@/server/auth/service";
 import { env } from "@/server/env";
 import { loadSettings, requireAccess, type CourseAccess } from "./household/settings";
 import { weekChoices, type WeekChoice } from "./list/weeks";
+import { countMenusAndTickets, MIN_MENUS } from "./month/service";
 
 /** Accueil de l'agent « Courses et repas » (CR-Tchat) : ce qui est prêt, ce que l'autre parent a ajouté, le jour du budget. */
 
@@ -20,6 +21,8 @@ export interface CourseHome {
   menuIa: boolean;
   /** Cette semaine et la suivante, avec « menu validé » quand il y en a un : le tchat demande « Pour quelle semaine ? » (CR-54). */
   weeks: WeekChoice[];
+  /** « Menu du mois dans le budget » (CR-63) : toujours affiché ; avant 6 menus validés, le toucher explique les conditions avec ces deux nombres. */
+  month: { menus: number; tickets: number; ready: boolean; needed: number } | null;
 }
 
 const WEEKDAYS = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
@@ -54,5 +57,6 @@ export async function courseHome(ctx: Ctx, session: SessionContext): Promise<Cou
     budgetDay: !!settings && ctx.now.getDate() === settings.budgetDay,
     menuIa: couple && env().MENU_IA === "live",
     weeks: couple ? await weekChoices(ctx.db, who.accountId, ctx.now) : [],
+    month: couple ? await countMenusAndTickets(ctx.db, who.accountId).then((c) => ({ ...c, ready: c.menus >= MIN_MENUS, needed: MIN_MENUS })) : null,
   };
 }
