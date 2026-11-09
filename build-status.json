@@ -3,8 +3,16 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-09T02:30:00.000Z",
+  "updated": "2026-11-09T09:55:00.000Z",
   "deploys": [
+    {
+      "at": "2026-11-09T09:55:00.000Z",
+      "env": "preview",
+      "what": "Courses et repas : deux semaines à la fois puis cinq (semaine en cours et quatre suivantes), chacune avec son menu et sa liste ; question « Pour quelle semaine ? » au départ du tchat ; sélecteurs de semaine ; suppression d'un menu ou d'une liste (couple seulement) ; produits « Pas encore acheté » de la liste d'avant — rév. 00091 puis 00092. Base de test : rattrapage « semaines » (c7304fb6) appliqué avec accord direct du PO, après sauvegarde et vérification en lecture seule (aucune anomalie).",
+      "storyIds": [
+        "f21c4"
+      ]
+    },
     {
       "at": "2026-11-09T02:30:00.000Z",
       "env": "preview",
