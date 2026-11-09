@@ -3,8 +3,16 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-09T12:00:00.000Z",
+  "updated": "2026-11-09T13:00:00.000Z",
   "deploys": [
+    {
+      "at": "2026-11-09T13:00:00.000Z",
+      "env": "preview",
+      "what": "Courses et repas, CR-58 : coût réel du menu dans Ma liste (prix des tickets, reste estimé) ; après un ticket, ingrédients manquants plat par plat dans le tchat, « Ajuster le menu » (IA, compté 1 dans la limite) ou « Je l'achèterai plus tard » ; un plat accepté remplace l'ancien dans le menu validé — rév. 00095. Pas de changement de base. Menu IA fermé en production.",
+      "storyIds": [
+        "f21c4"
+      ]
+    },
     {
       "at": "2026-11-09T12:00:00.000Z",
       "env": "preview",
