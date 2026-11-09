@@ -3,8 +3,16 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-09T13:00:00.000Z",
+  "updated": "2026-11-09T15:00:00.000Z",
   "deploys": [
+    {
+      "at": "2026-11-09T15:00:00.000Z",
+      "env": "preview",
+      "what": "Courses et repas, CR-59 à CR-63 : plats de saison (base commune, console, sélection du mois, IA seulement pour les manquants), menu du mois dans le budget (4 semaines chiffrées, autre proposition, remplacer sans IA, valider les 4 menus), parcours toujours affiché avec le message des conditions, budget mensuel dans les réglages — rév. 00096 puis 00097. Pas de changement de base. Menu IA fermé en production.",
+      "storyIds": [
+        "f21c4"
+      ]
+    },
     {
       "at": "2026-11-09T13:00:00.000Z",
       "env": "preview",
