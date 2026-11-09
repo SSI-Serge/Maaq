@@ -12,8 +12,7 @@ export function sessionText(proposal: Pick<MenuProposal, "session" | "planTheme"
   return `${head}, pour les dîners du lundi au vendredi. Samedi et dimanche : hors séance.`;
 }
 
-/** « Recettes pour 4 : multipliez par 1,5 » quand le foyer compte plus de 4 personnes. */
-export function servingsNote(size: number | null): string | null {
-  if (!size || size <= 4) return null;
-  return `Recettes pour 4 : multipliez par ${String(Math.round((size / 4) * 100) / 100).replace(".", ",")}.`;
+/** « Pour 6 personnes » : les recettes et les quantités sont écrites pour le foyer (CR-49) ; vide pour un menu validé avant. */
+export function servingsText(size: number | null): string | null {
+  return size ? `Pour ${size} personne${size > 1 ? "s" : ""}` : null;
 }

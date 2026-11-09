@@ -29,6 +29,26 @@ const TO_BASE: Record<QuantityUnit, { unit: BaseUnit; factor: number }> = {
 
 const round3 = (n: number) => Math.round(n * 1000) / 1000;
 
+const UNIT_TEXT: Record<QuantityUnit, [string, string]> = { g: ["g", "g"], kg: ["kg", "kg"], ml: ["ml", "ml"], cl: ["cl", "cl"], l: ["L", "L"], piece: ["pièce", "pièces"], spoon: ["cuillère", "cuillères"], pinch: ["pincée", "pincées"] };
+
+/** « 900 g de blanc de poulet », « 2 œufs », « 1 pincée de sel », « 20 cl d'eau » : un ingrédient avec sa quantité (le nom seul quand elle manque). */
+export function ingredientText(line: { label: string; quantity: number | null; unit: string | null }): string {
+  const label = line.label.trim();
+  if (line.quantity === null || !line.unit) return label;
+  const amount = formatQuantity(line.quantity, line.unit);
+  if (!amount) return label;
+  if (line.unit === "piece") return `${String(Math.round(line.quantity * 1000) / 1000).replace(".", ",")} ${label}`;
+  return `${amount} ${/^[aeiouyàâéèêëîïôöûùh]/i.test(label) ? "d'" : "de "}${label}`;
+}
+
+/** « 900 g », « 1,5 kg », « 2 pièces », « 1 pincée » ; vide si la quantité manque. */
+export function formatQuantity(quantity: number | null, unit: string | null): string {
+  if (quantity === null || !unit || !(unit in UNIT_TEXT)) return "";
+  const [one, many] = UNIT_TEXT[unit as QuantityUnit];
+  const text = String(Math.round(quantity * 1000) / 1000).replace(".", ",");
+  return `${text} ${quantity > 1 && one !== many ? many : one}`;
+}
+
 /** « 900 g » → 0,9 kg ; null si la quantité ou l'unité n'est pas valable. */
 export function toBase(quantity: number, unit: string): BaseQuantity | null {
   const f = TO_BASE[unit as QuantityUnit];
@@ -91,7 +111,7 @@ export interface Packages {
 
 /** Nombre de paquets d'une référence pour un besoin : arrondi au paquet supérieur ; 1 « à vérifier » quand la conversion est impossible. */
 export function packagesFor(need: Need | null, unknown: boolean, reference: Reference | null): Packages {
-  if (!need) return { qty: 1, check: false };
+  if (!need) return { qty: 1, check: unknown };
   const measure = singleMeasure(need);
   if (unknown || !measure || measure.unit === "piece" || !reference || reference.unit !== measure.unit || reference.amount <= 0) return { qty: 1, check: true };
   // 1e-9 : 900 g en paquets de 300 g font 3 paquets, pas 4 à cause d'un arrondi de flottants

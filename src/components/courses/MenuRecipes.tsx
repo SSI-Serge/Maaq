@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import type { MenuSummary } from "@/server/courses/list/service";
-import { servingsNote } from "./menu-text";
+import { ingredientText } from "@/server/courses/engine/quantities";
+import { servingsText } from "./menu-text";
 import styles from "./courses.module.css";
 
 type Recipe = MenuSummary["recipes"][number];
@@ -21,14 +22,14 @@ function printBlock(title: string, element: HTMLElement | null): void {
 }
 
 /** Recette d'un plat : ingrédients et étapes pour 4 personnes, ou « Recette non renseignée » (CR-46). */
-function RecipeBody({ recipe }: { recipe: Recipe }) {
+function RecipeBody({ recipe, servings }: { recipe: Recipe; servings: number | null }) {
   if (!recipe.ingredients.length && !recipe.steps.length) return <p className={styles.meta}>Recette non renseignée. Vous pouvez l&apos;ajouter dans « Mes plats ».</p>;
   return (
     <div style={{ fontSize: 12, lineHeight: 1.5 }}>
       <div className={styles.meta} style={{ textTransform: "uppercase" }}>
-        Ingrédients · pour 4
+        Ingrédients{servingsText(servings) ? ` · ${servingsText(servings)!.toLowerCase()}` : ""}
       </div>
-      <div>{recipe.ingredients.join(", ") || "—"}</div>
+      <div>{recipe.ingredients.map(ingredientText).join(", ") || "—"}</div>
       <div className={styles.meta} style={{ textTransform: "uppercase", paddingTop: 4 }}>
         Étapes
       </div>
@@ -48,16 +49,14 @@ function RecipeBody({ recipe }: { recipe: Recipe }) {
 }
 
 /** Liste de plats avec recette dépliable ; `all` déplie ou replie tout d'un coup. */
-export function RecipeList({ recipes, householdSize, title, showDays }: { recipes: Recipe[]; householdSize: number | null; title: string; showDays: boolean }) {
+export function RecipeList({ recipes, servings, title, showDays }: { recipes: Recipe[]; servings: number | null; title: string; showDays: boolean }) {
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [ref, setRef] = useState<HTMLDivElement | null>(null);
   const key = (r: Recipe) => `${r.kind}:${r.day}:${r.name}`;
   const allOpen = recipes.length > 0 && open.size === recipes.length;
-  const note = servingsNote(householdSize);
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, padding: "6px 0", flexWrap: "wrap" }}>
-        {note && <span style={{ fontSize: 12 }}>{note}</span>}
         <button type="button" className={styles.link} style={{ background: "none", border: "none", padding: "4px 0", marginLeft: "auto" }} onClick={() => setOpen(allOpen ? new Set() : new Set(recipes.map(key)))}>
           {allOpen ? "Replier toutes les recettes" : "Déplier toutes les recettes"}
         </button>
@@ -84,7 +83,7 @@ export function RecipeList({ recipes, householdSize, title, showDays }: { recipe
               </button>
               {isOpen && (
                 <div style={{ paddingBottom: 8 }}>
-                  <RecipeBody recipe={r} />
+                  <RecipeBody recipe={r} servings={servings} />
                 </div>
               )}
             </div>

@@ -145,3 +145,22 @@ describe("Console du catalogue : produits à référencer, base commune, réglag
     expect((await rejection(loadObject(c, "nimporte", q()))).code).toBe("not_found");
   });
 });
+
+describe("Console du catalogue : produit « placard » (CR-50, CR-51)", () => {
+  it("la liste montre le placard ; la modification d'une référence change la marque de son produit, pour toutes ses références", async () => {
+    const all = await loadObject(c, "references", q());
+    const pantryRow = all.rows.find((r) => r.cells.pantry === "oui")!;
+    expect(pantryRow).toBeDefined();
+    const sel = await loadObject(c, "references", q({}, String(all.rows.find((r) => r.cells.pantry === "non")!.cells.product)));
+    const row = sel.rows.find((r) => r.cells.pantry === "non")!;
+    const form = row.actions![0].fields!.find((f) => f.key === "pantry")!;
+    expect(form.value).toBe("non");
+    const fields = Object.fromEntries(row.actions![0].fields!.map((f) => [f.key, String(f.value ?? "")]));
+    await runAction(c, "references", "edit", row.id, { ...fields, pantry: "oui" });
+    const after = await loadObject(c, "references", q({}, String(row.cells.product)));
+    expect(after.rows.filter((r) => r.cells.product === row.cells.product).every((r) => r.cells.pantry === "oui")).toBe(true);
+    // retour à l'état de départ pour ne pas gêner les autres essais
+    await runAction(c, "references", "edit", row.id, { ...fields, pantry: "non" });
+    expect((await loadObject(c, "references", q({}, String(row.cells.product)))).rows.find((r) => r.id === row.id)!.cells.pantry).toBe("non");
+  });
+});

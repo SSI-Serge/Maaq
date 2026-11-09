@@ -1,4 +1,5 @@
-import { dishItems, findProd, type RefProduct } from "./products";
+import { dishItems, findProd, type PackageFormat, type RefProduct } from "./products";
+import { emptyNeed, packagesFor, singleMeasure, type Need } from "./quantities";
 import { has, norm } from "./text";
 import { isTotaled, perUnitOf, type PerUnitPrice, type PriceUnit } from "./unitprice";
 import type { Dish } from "./types";
@@ -46,8 +47,18 @@ export interface Choice {
   format?: string | null;
   /** Prix au kilo ou au litre, quand il existe (CR-39). */
   perUnit?: PerUnitPrice | null;
-  /** Unité du prix : par article (défaut), au kilo ou au litre. Un prix au kilo n'entre pas dans le total de la liste (CR-40). */
+  /** Unité du prix : par article (défaut), au kilo ou au litre. Un prix au kilo n'entre dans le total que si le poids du besoin est connu (CR-40, CR-50). */
   priceUnit?: PriceUnit;
+  /** Contenu d'une unité d'achat de cette référence : le besoin du menu est divisé par lui (CR-50). */
+  package?: PackageFormat | null;
+}
+
+/** Prix d'une enseigne pour le scénario « tout dans un magasin ». */
+export interface StorePriceEntry {
+  ref: string;
+  price: number | null;
+  priceUnit?: PriceUnit;
+  package?: PackageFormat | null;
 }
 
 export type ItemGroup = "menu" | "ajout" | "habituel" | "sante";
@@ -66,11 +77,17 @@ export interface ListItem {
   /** Choix du comparatif (références conformes, dernier équivalent acheté, base commune). */
   choices: Choice[];
   /** Prix de référence par enseigne : sert au scénario « tout dans un magasin ». */
-  storePrices: Map<string, { ref: string; price: number | null; priceUnit?: PriceUnit }>;
+  storePrices: Map<string, StorePriceEntry>;
   /** Produit issu d'une version allégée absent du catalogue : références de la version standard, à vérifier. */
   approx: boolean;
   /** « pas acheté la dernière fois » (CR-28). */
   notBoughtLastTime: boolean;
+  /** Besoin du menu pour ce produit, en kilos, litres, pièces (CR-50) ; vide pour un ajout à la main, l'historique, ou quand il n'est pas calculable. */
+  need: Need | null;
+  /** « Quantité à vérifier » : 1 unité, conversion impossible. */
+  toCheck: boolean;
+  /** Produit « placard » : décoché au départ, « Vous en avez peut-être déjà ». */
+  pantry: boolean;
 }
 
 export interface BuyRow {
@@ -80,6 +97,12 @@ export interface BuyRow {
   source: "menu" | "manuel" | "version allégée" | "rapport" | "report";
   status: "à acheter" | "différé" | "remplacé";
   notBoughtLastTime?: boolean;
+  /** Besoin du menu (g, ml ou pièce) lu en base (CR-50). */
+  needed?: { amount: number; unit: "g" | "ml" | "piece" } | null;
+  toCheck?: boolean;
+  pantry?: boolean;
+  /** Coché pour l'achat ; faux au départ pour un produit « placard ». */
+  selected?: boolean;
 }
 
 export interface HistoryPrice {
@@ -167,13 +190,13 @@ function inProximity(store: string, stores: string[]): boolean {
 }
 
 /** Construit les choix d'un produit (US-157 RF4) : références conformes, dernier équivalent acheté, moins cher de la base commune. */
-function buildChoices(name: string, input: ListInput): { choices: Choice[]; storePrices: Map<string, { ref: string; price: number | null; priceUnit?: PriceUnit }>; rayon: string | null } {
+function buildChoices(name: string, input: ListInput): { choices: Choice[]; storePrices: Map<string, StorePriceEntry>; rayon: string | null } {
   const { prods, stores, now } = input;
   const productName = findProd(prods, name);
   const product = productName ? prods.get(productName)! : null;
   const kws = keywordsOf(name, prods);
   const choices: Choice[] = [];
-  const storePrices = new Map<string, { ref: string; price: number | null; priceUnit?: PriceUnit }>();
+  const storePrices = new Map<string, StorePriceEntry>();
 
   if (product) {
     const refs = [...product.stores].filter(([store]) => inProximity(store, stores));
@@ -181,13 +204,13 @@ function buildChoices(name: string, input: ListInput): { choices: Choice[]; stor
       .map(([store, v]) => ({ store, v, age: v.price !== null ? priceAge(v.priceDate, now) : "unknown" as PriceAge | null }))
       .filter((x) => x.v.price !== null && x.age !== null);
     for (const x of priced) {
-      choices.push({ kind: "reference", ref: x.v.ref, price: x.v.price, store: x.store, city: null, age: x.age as PriceAge, labelCheck: x.v.labelCheck, format: x.v.format, priceUnit: x.v.priceUnit, perUnit: perUnitOf(x.v.price, x.v.priceUnit, x.v.perMeasure) });
-      storePrices.set(x.store, { ref: x.v.ref, price: x.v.price, priceUnit: x.v.priceUnit });
+      choices.push({ kind: "reference", ref: x.v.ref, price: x.v.price, store: x.store, city: null, age: x.age as PriceAge, labelCheck: x.v.labelCheck, format: x.v.format, priceUnit: x.v.priceUnit, perUnit: perUnitOf(x.v.price, x.v.priceUnit, x.v.perMeasure) , package: x.v.package });
+      storePrices.set(x.store, { ref: x.v.ref, price: x.v.price, priceUnit: x.v.priceUnit, package: x.v.package });
     }
     if (!priced.length && refs.length) {
       // références sans prix connu : on garde la première, le prix sera « N/A »
       const [store, v] = refs[0];
-      choices.push({ kind: "reference", ref: v.ref, price: null, store, city: null, age: "unknown", labelCheck: v.labelCheck, format: v.format, priceUnit: v.priceUnit });
+      choices.push({ kind: "reference", ref: v.ref, price: null, store, city: null, age: "unknown", labelCheck: v.labelCheck, format: v.format, priceUnit: v.priceUnit , package: v.package });
     }
   }
 
@@ -238,6 +261,16 @@ export function defaultChoice(choices: Choice[]): number | null {
  * Construit la liste de courses (US-157 RF1) à partir du menu validé, des produits ajoutés et de l'historique des 3 derniers mois,
  * avec les produits que les versions allégées retirent ou ajoutent. Reprend build_report de courses.py.
  */
+/** Besoin en base (g, ml, pièce) → kilos, litres, pièces. */
+function needOf(needed: BuyRow["needed"]): Need | null {
+  if (!needed) return null;
+  const need = emptyNeed();
+  if (needed.unit === "g") need.kg = needed.amount / 1000;
+  else if (needed.unit === "ml") need.l = needed.amount / 1000;
+  else need.piece = needed.amount;
+  return need;
+}
+
 export function buildListModel(input: ListInput): ListModel {
   const { dishes, prods, buy, history, light } = input;
   const items: ListItem[] = [];
@@ -263,6 +296,9 @@ export function buildListModel(input: ListInput): ListModel {
       storePrices: built.storePrices,
       approx: false,
       notBoughtLastTime: false,
+      need: null,
+      toCheck: false,
+      pantry: false,
       ...extra,
     };
     items.push(item);
@@ -277,8 +313,11 @@ export function buildListModel(input: ListInput): ListModel {
       pour: [...new Set(pour.get(k) ?? [])].sort(),
       by: r.by,
       qty: r.qty && r.qty > 0 ? r.qty : 1,
-      checked: r.status !== "différé" && r.status !== "remplacé",
+      checked: r.status !== "différé" && r.status !== "remplacé" && r.selected !== false,
       notBoughtLastTime: !!r.notBoughtLastTime,
+      need: needOf(r.needed),
+      toCheck: !!r.toCheck,
+      pantry: !!r.pantry,
       rayonHint: input.journalRayon?.get(r.name) ?? null,
     });
   }
@@ -344,9 +383,47 @@ export interface ListSelection {
   applied?: boolean;
 }
 
-function quantityOf(item: ListItem, sel: ListSelection): number {
+function overrideOf(item: ListItem, sel: ListSelection): number | undefined {
   const v = sel.qty?.get(item.id);
-  return v === undefined || Number.isNaN(v) ? item.qty : v;
+  return v === undefined || Number.isNaN(v) ? undefined : v;
+}
+
+/** Choix de prix d'une ligne : ce dont le calcul de quantité a besoin. */
+export interface LineChoice {
+  price: number | null;
+  priceUnit?: PriceUnit;
+  package?: PackageFormat | null;
+}
+
+export interface LineAmount {
+  /** Unités d'achat (paquets) ; 1 pour un produit au poids. */
+  qty: number;
+  /** Produit au poids : poids en kilos ou litres (celui du besoin, ou celui que le foyer a saisi) ; null s'il n'est pas connu. */
+  weight: number | null;
+  /** Montant de la ligne compté dans le total ; null quand il n'y en a pas (prix inconnu, produit au kilo sans poids connu). */
+  total: number | null;
+  /** « Quantité à vérifier » : 1 unité, conversion impossible. */
+  toCheck: boolean;
+}
+
+/**
+ * Quantité et montant d'une ligne pour une référence donnée (CR-50). Ordre : la quantité saisie par le foyer d'abord ; sinon le besoin du menu divisé par le format de la référence en
+ * arrondissant au paquet supérieur ; sinon 1 (produit ajouté à la main, historique). Un produit au poids dont le poids est connu compte poids × prix au kilo dans le total (modifie CR-40) ;
+ * sans poids connu, son prix au kilo n'est pas totalisé.
+ */
+export function lineAmount(item: ListItem, sel: ListSelection, choice: LineChoice | null): LineAmount {
+  const price = choice?.price ?? null;
+  const weighed = choice?.priceUnit === "kg" || choice?.priceUnit === "l";
+  const override = overrideOf(item, sel);
+  if (weighed) {
+    const measure = item.need ? singleMeasure(item.need) : null;
+    const known = measure && measure.unit === choice!.priceUnit && !item.toCheck ? measure.amount : null;
+    const weight = override ?? known;
+    return { qty: 1, weight, total: weight !== null && price !== null ? round2(weight * price) : null, toCheck: false };
+  }
+  if (override !== undefined) return { qty: override, weight: null, total: price !== null ? round2(price * override) : null, toCheck: false };
+  const packages = item.need || item.toCheck ? packagesFor(item.need, item.toCheck, choice?.package ?? null) : { qty: item.qty, check: false };
+  return { qty: packages.qty, weight: null, total: price !== null ? round2(price * packages.qty) : null, toCheck: packages.check };
 }
 
 /** Le produit est remplacé : tous les plats qui l'utilisent sont en version allégée et la retirent (un produit commun à deux plats reste). */
@@ -414,67 +491,91 @@ export interface ScenarioLine {
   age: PriceAge | null;
   labelCheck: boolean;
   format: string | null;
-  /** Unité du prix de la ligne : « kg » ou « l » = prix au kilo, non totalisé. */
+  /** Unité du prix de la ligne : « kg » ou « l » = prix au kilo (compté dans le total seulement si `weight` est connu). */
   priceUnit: PriceUnit;
+  /** Produit au poids : poids en kilos ou litres compté dans le total ; null s'il n'est pas connu (prix au kilo non totalisé). */
+  weight: number | null;
+  /** Montant de la ligne compté dans le total (quantité × prix, ou poids × prix au kilo) ; null sinon. */
+  lineTotal: number | null;
+  /** « Quantité à vérifier » : 1 unité, conversion impossible. */
+  toCheck: boolean;
+  /** Produit « placard » : « Vous en avez peut-être déjà ». */
+  pantry: boolean;
+  /** Coché pour l'achat : faux pour un produit « placard » que le foyer n'a pas coché (hors du total). */
+  checked: boolean;
+  /** Besoin du menu (pour afficher « 900 g pour le menu ») ; null pour un ajout à la main ou l'historique. */
+  need: { amount: number; unit: "kg" | "l" | "piece" } | null;
 }
 
 function round2(n: number): number {
   return Number(n.toFixed(2));
 }
 
-/** Les trois scénarios d'achat (US-157 RF6), recalculés à chaque changement. */
+/** Les trois scénarios d'achat (US-157 RF6), recalculés à chaque changement. Le nombre de paquets dépend de la référence de chaque scénario (CR-50). */
 export function computeScenarios(model: ListModel, sel: ListSelection, stores: string[]): Scenario[] {
   const list = currentItems(model, sel);
-  const q = (i: ListItem) => quantityOf(i, sel);
   const names = stores.length ? stores : [...new Set(list.flatMap((i) => [...i.storePrices.keys()]))];
   let best: { store: string; n: number; total: number; loose: number } | null = null;
   for (const store of names) {
     const priced = list.filter((i) => i.storePrices.get(store)?.price != null);
-    const totaled = priced.filter((i) => isTotaled(i.storePrices.get(store)!.priceUnit));
-    const total = totaled.reduce((s, i) => s + (i.storePrices.get(store)!.price as number) * q(i), 0);
-    if (!best || priced.length > best.n) best = { store, n: priced.length, total, loose: priced.length - totaled.length };
+    const amounts = priced.map((i) => lineAmount(i, sel, i.storePrices.get(store)!));
+    const total = amounts.reduce((sum, a) => sum + (a.total ?? 0), 0);
+    if (!best || priced.length > best.n) best = { store, n: priced.length, total, loose: amounts.filter((a) => a.total === null).length };
   }
   const out: Scenario[] = [];
   if (best) out.push({ id: 1, label: `Tout dans ${best.store}`, store: best.store, total: round2(best.total), withoutPrice: list.length - best.n, notTotaled: best.loose });
   const chosen = list.map((i) => selectedChoice(i, sel));
+  const chosenAmounts = chosen.map((c, k) => lineAmount(list[k], sel, c));
   out.push({
     id: 2,
     label: "Chaque référence choisie dans son magasin",
     store: null,
-    total: round2(chosen.reduce((s, c, k) => s + (c && isTotaled(c.priceUnit) ? (c.price ?? 0) * q(list[k]) : 0), 0)),
+    total: round2(chosenAmounts.reduce((sum, a) => sum + (a.total ?? 0), 0)),
     withoutPrice: chosen.filter((c) => c?.price == null).length,
-    notTotaled: chosen.filter((c) => c?.price != null && !isTotaled(c.priceUnit)).length,
+    notTotaled: chosen.filter((c, k) => c?.price != null && chosenAmounts[k].total === null).length,
   });
   const habitual = list.map((i) => i.choices.find((c) => c.kind === "history") ?? null);
+  const habitualAmounts = habitual.map((c, k) => lineAmount(list[k], sel, c));
   out.push({
     id: 3,
     label: "Mes produits habituels dans mes magasins",
     store: null,
-    total: round2(habitual.reduce((s, c, k) => s + (c && isTotaled(c.priceUnit) ? (c.price ?? 0) * q(list[k]) : 0), 0)),
+    total: round2(habitualAmounts.reduce((sum, a) => sum + (a.total ?? 0), 0)),
     withoutPrice: habitual.filter((c) => c?.price == null).length,
-    notTotaled: habitual.filter((c) => c?.price != null && !isTotaled(c.priceUnit)).length,
+    notTotaled: habitual.filter((c, k) => c?.price != null && habitualAmounts[k].total === null).length,
   });
   return out;
 }
 
 /** Les produits du scénario choisi (US-157 RF7), regroupés par magasin puis par rayon par l'écran. */
 export function scenarioLines(model: ListModel, sel: ListSelection, scenario: Scenario): ScenarioLine[] {
-  return currentItems(model, sel).map((i) => {
-    let choice: { ref: string; price: number | null; store: string | null; city: string | null; age: PriceAge | null; labelCheck?: boolean; format?: string | null; priceUnit?: PriceUnit } | null;
+  // les produits « placard » décochés figurent dans la liste du scénario (pour pouvoir les cocher) mais n'entrent pas dans les totaux (CR-50)
+  const current = currentItems(model, sel);
+  const unticked = model.items.filter((i) => i.pantry && !current.includes(i) && !sel.deleted?.has(i.id) && needed(i, model, sel) && !(sel.checked?.get(i.id) ?? i.checked) && i.group !== "habituel");
+  return [...current, ...unticked].map((i) => {
+    let choice: { ref: string; price: number | null; store: string | null; city: string | null; age: PriceAge | null; labelCheck?: boolean; format?: string | null; priceUnit?: PriceUnit; package?: PackageFormat | null } | null;
     if (scenario.id === 1) {
       const p = scenario.store ? i.storePrices.get(scenario.store) : undefined;
       const src = i.choices.find((c) => c.store === scenario.store && c.price !== null);
-      choice = p ? { ref: p.ref, price: p.price, store: scenario.store, city: src?.city ?? null, age: src?.age ?? null, labelCheck: src?.labelCheck, format: src?.format, priceUnit: p.priceUnit } : null;
+      choice = p ? { ref: p.ref, price: p.price, store: scenario.store, city: src?.city ?? null, age: src?.age ?? null, labelCheck: src?.labelCheck, format: src?.format, priceUnit: p.priceUnit, package: p.package } : null;
     } else if (scenario.id === 2) {
       choice = selectedChoice(i, sel);
     } else {
       choice = i.choices.find((c) => c.kind === "history") ?? null;
     }
+    const amount = lineAmount(i, sel, choice);
+    const measure = i.need ? singleMeasure(i.need) : null;
     return {
       itemId: i.id,
       name: i.name,
       rayon: i.rayon,
-      qty: quantityOf(i, sel),
+      qty: amount.qty,
+      weight: amount.weight,
+      lineTotal: amount.total,
+      toCheck: amount.toCheck,
+      pantry: i.pantry,
+      checked: current.includes(i),
+      need: measure && !i.toCheck ? { amount: measure.amount, unit: measure.unit } : null,
       store: choice?.store ?? null,
       ref: choice?.ref ?? null,
       city: choice?.city ?? null,

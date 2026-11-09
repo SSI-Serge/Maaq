@@ -1554,6 +1554,14 @@ export interface GroceryHouseholdStores {
 
 export interface GroceryListItems {
   account_id: string;
+  /** Besoin du menu pour ce produit (g, ml ou pièce), additionné sur tous les plats ; vide pour un ajout à la main ou l'historique. */
+  needed_amount: Numeric | null;
+  needed_unit: "g" | "ml" | "piece" | null;
+  /** Quantité non calculable : 1 unité, « Quantité à vérifier ». */
+  quantity_to_check: Generated<boolean>;
+  /** Produit « placard » : décoché par défaut. */
+  is_pantry: Generated<boolean>;
+  is_selected: Generated<boolean>;
   added_by_user_id: string | null;
   aisle_id: number | null;
   bought_at: Timestamp | null;
@@ -1646,6 +1654,8 @@ export interface GroceryProductReferences {
 }
 
 export interface GroceryProducts {
+  /** Produit « placard » (sel, huile, épices…) : décoché par défaut dans la liste. */
+  is_pantry: Generated<boolean>;
   aisle_id: number;
   created_at: Generated<Timestamp>;
   id: Generated<Int8>;
@@ -2104,6 +2114,18 @@ export interface MealMenuEntries {
   slot: number;
 }
 
+export interface VMealMenuNeeds {
+  account_id: string | null;
+  menu_id: string | null;
+  product_id: Int8 | null;
+  name_key: string | null;
+  base_unit: "g" | "ml" | "piece" | null;
+  total_quantity: Numeric | null;
+  ingredient_count: Int8 | null;
+  needs_check: boolean | null;
+  is_pantry: boolean | null;
+}
+
 export interface MealMenuDailyCounters {
   account_id: string;
   menu_count: Generated<number>;
@@ -2112,6 +2134,11 @@ export interface MealMenuDailyCounters {
 
 export interface MealMenuEntryIngredients {
   account_id: string;
+  /** Quantité écrite pour le foyer, dans l'unité `unit` ; vide en même temps que l'unité. */
+  quantity: Numeric | null;
+  unit: "g" | "kg" | "ml" | "cl" | "l" | "piece" | "spoon" | "pinch" | null;
+  base_unit: Generated<"g" | "ml" | "piece" | null>;
+  base_quantity: Generated<Numeric | null>;
   entry_id: Int8;
   id: Generated<Int8>;
   label: string;
@@ -2145,6 +2172,8 @@ export interface MealMenuSessionSteps {
 
 export interface MealMenus {
   account_id: string;
+  /** Nombre de personnes pour lequel les recettes et les quantités du menu sont écrites. */
+  servings: number | null;
   batch_week_id: Int8 | null;
   created_at: Generated<Timestamp>;
   id: Generated<string>;
@@ -2847,6 +2876,7 @@ export interface DB {
   meal_light_versions: MealLightVersions;
   meal_menu_entries: MealMenuEntries;
   meal_menu_daily_counters: MealMenuDailyCounters;
+  v_meal_menu_needs: VMealMenuNeeds;
   meal_menu_entry_ingredients: MealMenuEntryIngredients;
   meal_menu_entry_light_items: MealMenuEntryLightItems;
   meal_menu_session_steps: MealMenuSessionSteps;

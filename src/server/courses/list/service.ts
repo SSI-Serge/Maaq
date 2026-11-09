@@ -7,7 +7,7 @@ import { buildListModel, buildRefProducts, DAYS, dishItems, fmtMin, gapType, nor
 import { courseError, loadSettings, requireAccess, translateCourseError, type CourseAccess } from "../household/settings";
 import { loadEngineData } from "../menu/data";
 import { weekLabel } from "../menu/weeks";
-import { aiDishId, loadAiDishes, loadMenuEntries, loadSession, recipeSteps, type SessionView } from "../menu-ia/entries";
+import { aiDishId, loadAiDishes, loadEntryIngredients, loadMenuEntries, loadSession, recipeSteps, type SessionView } from "../menu-ia/entries";
 import { loadCommonPrices, loadHistory, loadLightVersions, loadReferences, type ExcludedReference, type References } from "./data";
 import { toDto, type ListModelDto } from "./dto";
 
@@ -35,7 +35,9 @@ export interface MenuSummary {
   session: { label: string; theme: string; estimated: boolean; overCap: boolean };
   express: { name: string; time: string }[];
   /** Recette de chaque dîner et plat express (pour 4 personnes) : ingrédients et étapes ; vide si la recette n'est pas renseignée (CR-46). */
-  recipes: { name: string; kind: "dinner" | "express"; day: string; time: string; ingredients: string[]; steps: string[] }[];
+  recipes: { name: string; kind: "dinner" | "express"; day: string; time: string; ingredients: { label: string; quantity: number | null; unit: string | null }[]; steps: string[] }[];
+  /** Nombre de personnes pour lequel les recettes et les quantités sont écrites (« Pour 6 personnes ») ; vide pour un menu validé avant CR-49. */
+  servings: number | null;
   /** Déroulé de la séance et conservation (CR-47). */
   batch: SessionView;
 }
@@ -119,7 +121,7 @@ export async function prepareList(ctx: Ctx, session: SessionContext): Promise<Li
     ctx.db
       .selectFrom("grocery_list_items as i")
       .leftJoin("users as u", "u.id", "i.added_by_user_id")
-      .select(["i.label", "i.quantity", "i.source", "i.not_bought_last_time", "u.first_name"])
+      .select(["i.label", "i.quantity", "i.source", "i.not_bought_last_time", "u.first_name", "i.needed_amount", "i.needed_unit", "i.quantity_to_check", "i.is_pantry", "i.is_selected"])
       .where("i.account_id", "=", who.accountId)
       .where("i.state", "in", ["preparing", "validated", "added_after_validation"])
       .orderBy("i.created_at")
@@ -159,7 +161,19 @@ export async function prepareList(ctx: Ctx, session: SessionContext): Promise<Li
   );
   for (const [id, version] of aiLoad.light) if (unique.some((d) => d.id === id)) light.set(id, version);
   const prods = buildRefProducts(refs.rows);
-  const buy: BuyRow[] = rows.map((r) => ({ name: r.label, qty: r.quantity, by: r.first_name ?? "", source: r.source === "menu" ? "menu" : "manuel", status: "à acheter", notBoughtLastTime: r.not_bought_last_time }));
+  const buy: BuyRow[] = rows.map((r) => ({
+    name: r.label,
+    qty: r.quantity,
+    by: r.first_name ?? "",
+    source: r.source === "menu" ? "menu" : "manuel",
+    status: "à acheter",
+    notBoughtLastTime: r.not_bought_last_time,
+    // quantités du menu (CR-50) : besoin, « Quantité à vérifier », placard décoché
+    needed: r.needed_amount !== null && r.needed_unit ? { amount: Number(r.needed_amount), unit: r.needed_unit } : null,
+    toCheck: r.quantity_to_check,
+    pantry: r.is_pantry,
+    selected: r.is_selected,
+  }));
   const model = buildListModel({ dishes: unique, prods, buy, history, light, stores: [...new Set(stores.map((s) => s.chain))], sharing: settings.sharePrices, common, now: ctx.now });
 
   const choices = await ctx.db.selectFrom("meal_light_choices").select(["dish_id", "choice"]).where("account_id", "=", who.accountId).execute();
@@ -174,6 +188,7 @@ export async function prepareList(ctx: Ctx, session: SessionContext): Promise<Li
   const inList = new Set(model.items.map((i) => norm(i.name)));
   const excluded = refs.excluded.filter((e) => inList.has(norm(e.product)) || model.items.some((i) => norm(i.name).includes(norm(e.product))));
 
+  const entryIngredients = await loadEntryIngredients(ctx.db, entries.map((e) => e.id));
   const minutesOf = (e: (typeof entries)[number]) => dishOf(e)?.minutes ?? e.duration_minutes ?? 0;
   const dishNames = new Map(entries.map((e) => [e.id, e.dish_name]));
   const batch = await loadSession(ctx.db, { id: menu.id, batch_week_id: menu.batch_week_id === null ? null : String(menu.batch_week_id) }, dishNames);
@@ -193,10 +208,12 @@ export async function prepareList(ctx: Ctx, session: SessionContext): Promise<Li
           kind: e.kind as "dinner" | "express",
           day: e.kind === "dinner" ? (DAYS[e.slot - 1] ?? "") : `Express ${e.slot}`,
           time: fmtMin(minutesOf(e)),
-          ingredients: (dish?.ing ?? "").split(",").map((x) => x.trim()).filter(Boolean),
-          steps: recipeSteps(dish?.recipe ?? ""),
+          // menu écrit pour le foyer (CR-49) : ingrédients avec quantités et recette de la ligne de menu ; sinon ceux du plat (menus validés avant)
+          ingredients: entryIngredients.get(e.id) ?? (dish?.ing ?? "").split(",").map((x) => x.trim()).filter(Boolean).map((label) => ({ label, quantity: null, unit: null })),
+          steps: recipeSteps(e.recipe ?? dish?.recipe ?? ""),
         };
       }),
+    servings: menu.servings,
     batch,
   };
   // une liste validée avant la dernière validation du menu est à refaire (CR-45) : la page se rouvre
@@ -346,6 +363,20 @@ export interface ValidateLine {
   priceUnit?: "unit" | "kg" | "l";
   /** D'où vient le produit : menu, ajouté, historique (pour une ligne qui n'existe pas encore en base). */
   source: "menu" | "added" | "habit";
+  /** Besoin du menu (kilos, litres ou pièces) et poids retenu pour un produit au poids : gardés pour afficher « 2 paquets · 900 g pour le menu » (CR-50). */
+  need?: { amount: number; unit: "kg" | "l" | "piece" } | null;
+  weight?: number | null;
+  toCheck?: boolean;
+  pantry?: boolean;
+}
+
+/** Besoin en kilos, litres ou pièces → grammes, millilitres ou pièces (unités de la base). */
+function neededOf(need: ValidateLine["need"], weight: number | null | undefined, priceUnit: string | undefined): { amount: string; unit: "g" | "ml" | "piece" } | null {
+  const amount = priceUnit === "kg" || priceUnit === "l" ? (weight ?? (need && need.unit === priceUnit ? need.amount : null)) : (need?.amount ?? null);
+  const unit = priceUnit === "kg" || priceUnit === "l" ? priceUnit : (need?.unit ?? null);
+  if (amount === null || unit === null || !(amount > 0)) return null;
+  const base = unit === "kg" ? { amount: amount * 1000, unit: "g" as const } : unit === "l" ? { amount: amount * 1000, unit: "ml" as const } : { amount, unit: "piece" as const };
+  return base.amount < 100_000_000 ? { amount: base.amount.toFixed(3), unit: base.unit } : null;
 }
 
 /** Valide le scénario choisi : chaque produit retenu prend son magasin, sa référence et son prix estimé ; la liste passe dans « Ma liste de courses ». */
@@ -371,7 +402,7 @@ export async function validateList(ctx: Ctx, session: SessionContext, input: { s
         done.add(key);
         const store = line.store && line.price !== null ? placeKey(line.store).slice(0, 80) : null;
         const price = store && line.price !== null && line.price > 0 && line.price <= 10000 ? Number(line.price.toFixed(2)) : null;
-        const fields = { state: "validated" as const, list_id: list.id, quantity: Math.min(Math.max(Math.round(line.qty) || 1, 1), 99), store_chain: price === null ? null : store, reference_name: price === null ? null : (line.ref ?? "").slice(0, 160) || null, unit_price: price === null ? null : String(price), price_unit: price === null ? null : (line.priceUnit ?? "unit"), updated_at: ctx.now };
+        const fields = { state: "validated" as const, list_id: list.id, quantity: Math.min(Math.max(Math.round(line.qty) || 1, 1), 99), store_chain: price === null ? null : store, reference_name: price === null ? null : (line.ref ?? "").slice(0, 160) || null, unit_price: price === null ? null : String(price), price_unit: price === null ? null : (line.priceUnit ?? "unit"), updated_at: ctx.now, ...(line.source === "menu" ? (() => { const n = neededOf(line.need, line.weight, line.priceUnit); return { needed_amount: n?.amount ?? null, needed_unit: n?.unit ?? null, quantity_to_check: !!line.toCheck, is_pantry: !!line.pantry, is_selected: true }; })() : {}) };
         const id = openId.get(key);
         if (id) {
           await trx.updateTable("grocery_list_items").set(fields).where("id", "=", id).execute();

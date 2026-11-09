@@ -6,7 +6,7 @@ import { Button } from "@/components/ui";
 import { fmtMin } from "@/server/courses/engine/text";
 import type { CardView } from "@/server/courses/menu-ia/cards";
 import type { ProposalDish } from "@/server/courses/menu-ia/proposal";
-import { DAY_LABELS, servingsNote, sessionText } from "./menu-text";
+import { DAY_LABELS, servingsText, sessionText } from "./menu-text";
 import styles from "./courses.module.css";
 
 const CARD_STYLE = { background: "var(--bg-raised)", border: "1px solid var(--line)", borderRadius: "var(--radius)", padding: "12px 14px", display: "flex", flexDirection: "column", gap: 2 } as const;
@@ -48,7 +48,7 @@ export function MenuCard({ card, busy, onValidate, onAdd }: { card: CardView; bu
   const [adding, setAdding] = useState(false);
   const [addDone, setAddDone] = useState<string[] | null>(null);
   const p = card.proposal;
-  const note = servingsNote(p.householdSize);
+  const note = servingsText(p.householdSize);
   const blocking = [...p.dinners, ...p.express].filter((d) => d.blockers.length).map((d) => d.name);
 
   return (
@@ -82,7 +82,7 @@ export function MenuCard({ card, busy, onValidate, onAdd }: { card: CardView; bu
         </div>
         <div style={{ fontSize: 13, lineHeight: 1.45 }}>{sessionText(p)}</div>
         {p.session.overCap && <div style={{ marginTop: 4, fontSize: 12, fontWeight: 700, background: "var(--warning-bg)", borderRadius: 6, padding: "6px 8px" }}>Séance au-dessus de {fmtMin(p.session.cap)}.</div>}
-        {note && <div style={{ marginTop: 4, fontSize: 12 }}>{note}</div>}
+        {note && <div style={{ marginTop: 4, fontSize: 12 }}>Recettes et quantités écrites pour {note.slice(5)}.</div>}
         <span className={styles.meta} style={{ paddingTop: 6, fontWeight: 700 }}>
           Pensez à vérifier les allergies du foyer avant de valider.
         </span>

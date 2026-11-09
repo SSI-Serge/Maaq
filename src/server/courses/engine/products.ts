@@ -22,6 +22,14 @@ export interface ReferenceRow {
   priceUnit?: PriceUnit;
   /** Prix au kilo ou au litre déduit par la base du format (vide si le format n'est pas compris). */
   perMeasure?: PerUnitPrice | null;
+  /** Quantité du format en kilos ou en litres (package_amount) : sert à calculer le nombre de paquets d'un besoin (CR-50). */
+  package?: PackageFormat | null;
+}
+
+/** Contenu d'une unité d'achat, en kilos ou en litres. */
+export interface PackageFormat {
+  amount: number;
+  unit: "kg" | "l";
 }
 
 export interface StorePrice {
@@ -32,6 +40,7 @@ export interface StorePrice {
   format: string | null;
   priceUnit: PriceUnit;
   perMeasure: PerUnitPrice | null;
+  package: PackageFormat | null;
 }
 
 export interface RefProduct {
@@ -55,7 +64,7 @@ export function buildRefProducts(rows: ReferenceRow[]): Map<string, RefProduct> 
       p = { name: r.product, rayon: r.rayon, used: r.used ?? "", stores: new Map(), kw: [], kwFull: [] };
       prods.set(r.product, p);
     }
-    if (r.conform) p.stores.set(r.store, { ref: r.ref, price: r.price, priceDate: r.priceDate, labelCheck: !!r.labelCheck, format: r.format ?? null, priceUnit: r.priceUnit ?? "unit", perMeasure: r.perMeasure ?? null });
+    if (r.conform) p.stores.set(r.store, { ref: r.ref, price: r.price, priceDate: r.priceDate, labelCheck: !!r.labelCheck, format: r.format ?? null, priceUnit: r.priceUnit ?? "unit", perMeasure: r.perMeasure ?? null , package: r.package ?? null });
   }
   for (const [name, p] of prods) {
     const alts = name

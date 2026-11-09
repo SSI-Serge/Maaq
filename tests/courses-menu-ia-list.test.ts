@@ -63,7 +63,7 @@ async function household(): Promise<Ctxt> {
   return { f, cuisine: cuisines[0].name, catalogDishes, ownDish: { id: `H:${own.id}`, name: own.name } };
 }
 
-const free = (name: string, cuisine: string, ingredients: string[], extra: Record<string, unknown> = {}) => ({ nom: name, cuisine, duree_minutes: 40, recette: "1. Cuire doucement. 2. Saler. 3. Servir.", ingredients, ...extra });
+const free = (name: string, cuisine: string, ingredients: string[], extra: Record<string, unknown> = {}) => ({ nom: name, cuisine, duree_minutes: 40, recette: "1. Cuire doucement. 2. Saler. 3. Servir.", ingredients: ingredients.map((nom) => ({ nom, quantite: 200, unite: "g" })), ...extra });
 
 function fullMenu(c: Ctxt, over: Record<string, unknown> = {}) {
   return {
@@ -135,7 +135,10 @@ describe("CR-42 : revalidation, liste, Mes plats (M4)", () => {
     expect(menu.days.map((d) => d.name)).toContain("Velouté de panais");
     expect(menu.days.find((d) => d.name === "Velouté de panais")!.time).toBe("40 min");
     const recipe = menu.recipes.find((r) => r.name === "Velouté de panais")!;
-    expect(recipe).toMatchObject({ kind: "dinner", ingredients: ["Panais", "Oignons", "Crème"], steps: ["Cuire doucement.", "Saler.", "Servir."] });
+    expect(recipe).toMatchObject({ kind: "dinner", steps: ["Cuire doucement.", "Saler.", "Servir."] });
+    expect(recipe.ingredients.map((i) => i.label)).toEqual(["Panais", "Oignons", "Crème"]);
+    expect(recipe.ingredients[0]).toMatchObject({ quantity: 200, unit: "g" });
+    expect(menu.servings).toBe(4);
     expect(menu.recipes.filter((r) => r.kind === "express")).toHaveLength(2);
     expect(menu.session).toMatchObject({ estimated: true, overCap: false });
     expect(menu.batch.steps.map((s) => s.position)).toEqual([1, 2, 3]);

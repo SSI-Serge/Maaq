@@ -6,7 +6,7 @@ import { useApiMutation, useApiQuery } from "@/client/hooks";
 import { AppShell } from "@/components/app/AppShell";
 import family from "@/components/family/family.module.css";
 import { Button, ButtonLink, Loading, Notice, RetryNotice } from "@/components/ui";
-import { AGE_LABEL, comparatif, computeScenarios, isReplaced, norm, scenarioLines, selectedChoice, type DishMode, type ListItem, type ListSelection, type Scenario, type ScenarioLine } from "@/server/courses/engine";
+import { AGE_LABEL, comparatif, computeScenarios, formatQuantity, isReplaced, norm, scenarioLines, selectedChoice, type DishMode, type ListItem, type ListSelection, type Scenario, type ScenarioLine } from "@/server/courses/engine";
 import { fromDto } from "@/server/courses/list/dto";
 import type { AddedLine, ListPrepared, ValidateLine } from "@/server/courses/list/service";
 import { BatchSession, RecipeList } from "./MenuRecipes";
@@ -168,6 +168,7 @@ function Preparation({ list, reload }: { list: ListPrepared; reload: () => void 
         picks={picks}
         onQty={(name, qty) => patch({ qty: { ...picks.qty, [norm(name)]: qty } })}
         onRemoved={(name, removed) => patch({ removed: { ...picks.removed, [norm(name)]: removed } })}
+        onPantry={(name, ticked) => patch({ checked: { ...picks.checked, [norm(name)]: ticked } })}
         onBack={() => setView(null)}
         pending={validate.pending}
         error={validate.error?.message}
@@ -200,9 +201,9 @@ function Preparation({ list, reload }: { list: ListPrepared; reload: () => void 
         </Button>
       </div>
 
-      {rub("Menu validé et recettes", false, <RecipeList recipes={summary.recipes.filter((r) => r.kind === "dinner")} householdSize={list.householdSize} title="Menu de la semaine : recettes" showDays />)}
+      {rub("Menu validé et recettes", false, <RecipeList recipes={summary.recipes.filter((r) => r.kind === "dinner")} servings={summary.servings} title="Menu de la semaine : recettes" showDays />)}
       {rub("Séance de batch", false, <BatchSession summary={summary} />)}
-      {rub("Plats express", false, <RecipeList recipes={summary.recipes.filter((r) => r.kind === "express")} householdSize={list.householdSize} title="Plats express : recettes" showDays={false} />)}
+      {rub("Plats express", false, <RecipeList recipes={summary.recipes.filter((r) => r.kind === "express")} servings={summary.servings} title="Plats express : recettes" showDays={false} />)}
 
       {rub("Version standard ou allégée", true, (
         <>
@@ -346,7 +347,7 @@ function Preparation({ list, reload }: { list: ListPrepared; reload: () => void 
             </button>
           ))}
           <p className={family.hint}>
-            Montants estimés : prix d&apos;une unité (paquet, boîte…) × la quantité. Recettes prévues pour 4 personnes ; votre foyer : {list.householdSize ?? 4}. Un prix inconnu affiche N/A.
+            Montants estimés : les quantités viennent des recettes écrites pour {list.menu?.servings ?? list.householdSize ?? 4} personnes, additionnées par produit et arrondies au paquet supérieur ; un produit au poids compte son poids × son prix au kilo. Les produits « placard » (sel, huile, épices…) sont décochés au départ. Un prix inconnu affiche N/A.
           </p>
         </>
       ))}
@@ -368,6 +369,7 @@ function ScenarioView({
   itemsByName,
   onQty,
   onRemoved,
+  onPantry,
   onBack,
   onValidate,
   pending,
@@ -380,6 +382,8 @@ function ScenarioView({
   itemsByName: Map<string, ListItem>;
   onQty: (name: string, qty: number) => void;
   onRemoved: (name: string, removed: boolean) => void;
+  /** Coche ou décoche un produit « placard » (décoché au départ, hors du total tant qu'il n'est pas coché). */
+  onPantry: (name: string, ticked: boolean) => void;
   onBack: () => void;
   onValidate: (lines: ValidateLine[]) => Promise<void>;
   pending: boolean;
@@ -389,11 +393,14 @@ function ScenarioView({
   const groups = new Map<string, ScenarioLine[]>();
   for (const l of lines) groups.set(l.store ?? "", [...(groups.get(l.store ?? "") ?? []), l]);
   const ordered = [...groups].sort(([a], [b]) => (a === "" ? 1 : b === "" ? -1 : a.localeCompare(b, "fr")));
-  const kept = lines.filter((l) => !picks.removed[norm(l.name)]);
-  // un article vendu au kilo ou au litre n'entre pas dans le total estimé (CR-40)
-  const total = kept.reduce((s, l) => s + (l.priceUnit === "unit" ? (l.price ?? 0) * l.qty : 0), 0);
+  // un produit « placard » est retiré du total tant que le foyer ne l'a pas coché ; les autres tant qu'il ne les a pas retirés
+  const isOut = (l: ScenarioLine) => (l.pantry ? !l.checked : !!picks.removed[norm(l.name)]);
+  const kept = lines.filter((l) => !isOut(l));
+  // montant de chaque ligne : quantité × prix, ou poids × prix au kilo quand le poids est connu (CR-50) ; un prix au kilo sans poids connu n'est pas totalisé
+  const total = kept.reduce((s, l) => s + (l.lineTotal ?? 0), 0);
   const without = kept.filter((l) => l.price === null).length;
-  const loose = kept.filter((l) => l.price !== null && l.priceUnit !== "unit").length;
+  const loose = kept.filter((l) => l.price !== null && l.lineTotal === null).length;
+  const toCheck = kept.filter((l) => l.toCheck).length;
 
   return (
     <>
@@ -403,7 +410,7 @@ function ScenarioView({
       <h2 className={styles.kick}>Scénario {scenario.id}</h2>
       <p className={styles.lead}>{scenarioTitle(scenario)}. Cochez, décochez et ajustez les quantités : le total suit.</p>
       {ordered.map(([store, rows]) => {
-        const sub = rows.filter((l) => !picks.removed[norm(l.name)]).reduce((s, l) => s + (l.price ?? 0) * l.qty, 0);
+        const sub = rows.filter((l) => !isOut(l)).reduce((s, l) => s + (l.lineTotal ?? 0), 0);
         const byRayon = [...rows.reduce((m, l) => m.set(l.rayon, [...(m.get(l.rayon) ?? []), l]), new Map<string, ScenarioLine[]>())];
         return (
           <section key={store || "none"}>
@@ -415,29 +422,53 @@ function ScenarioView({
               <div key={rayon}>
                 <h3 className={styles.kick}>{rayon}</h3>
                 {items.map((l) => {
-                  const removed = !!picks.removed[norm(l.name)];
+                  const removed = isOut(l);
+                  const origin = itemsByName.get(norm(l.name))?.group;
+                  const weighed = l.priceUnit !== "unit";
                   return (
                     <div key={l.itemId} className={`${styles.line} ${removed ? styles.struck : ""}`}>
-                      <button type="button" className={styles.toggleBox} aria-pressed={!removed} aria-label={removed ? `Remettre « ${l.name} »` : `Retirer « ${l.name} »`} onClick={() => onRemoved(l.name, !removed)}>
+                      <button type="button" className={styles.toggleBox} aria-pressed={!removed} aria-label={removed ? (l.pantry ? `Cocher « ${l.name} »` : `Remettre « ${l.name} »`) : `Retirer « ${l.name} »`} onClick={() => (l.pantry ? onPantry(l.name, removed) : onRemoved(l.name, !removed))}>
                         {removed ? "" : "✓"}
                       </button>
                       <div className={styles.lineMain}>
                         <div className={styles.lineName}>{l.name}</div>
                         <div className={styles.lineSub}>
-                          {l.price === null ? "Prix inconnu (N/A)" : l.priceUnit !== "unit" ? `${l.ref ?? ""} · prix au ${l.priceUnit === "kg" ? "kilo" : "litre"}, non totalisé` : `${l.ref ?? ""}${l.format ? ` (${l.format})` : ""}${l.age && AGE_LABEL[l.age] ? ` · ${AGE_LABEL[l.age]}` : ""}`}
+                          {l.price === null
+                            ? "Prix inconnu (N/A)"
+                            : weighed
+                              ? l.weight !== null
+                                ? `${l.ref ?? ""} · ${formatQuantity(l.weight, l.priceUnit === "kg" ? "kg" : "l")} × ${euroPer(l.price, l.priceUnit)} = ${euro(l.lineTotal ?? 0)}`
+                                : `${l.ref ?? ""} · ${euroPer(l.price, l.priceUnit)} · prix au ${l.priceUnit === "kg" ? "kilo" : "litre"}, non totalisé`
+                              : `${l.ref ?? ""}${l.format ? ` (${l.format})` : ""}${l.age && AGE_LABEL[l.age] ? ` · ${AGE_LABEL[l.age]}` : ""}`}
                           {l.labelCheck && " · Composition à vérifier sur l'étiquette"}
                         </div>
+                        {/* d'où vient la quantité (CR-50) */}
+                        <div className={styles.lineSub}>
+                          {l.need && !weighed
+                            ? `${l.qty} × ${l.format ?? "unité"} · ${formatQuantity(l.need.amount, l.need.unit === "piece" ? "piece" : l.need.unit)} pour le menu`
+                            : l.need && weighed && l.weight === null
+                              ? ""
+                              : origin === "ajout"
+                                ? `Ajouté à la main · ${l.qty}`
+                                : origin === "habituel"
+                                  ? `De votre historique · ${l.qty}`
+                                  : ""}
+                          {l.toCheck && <span className={styles.pillWarn}> Quantité à vérifier</span>}
+                          {l.pantry && <span className={styles.pillWarn}> Vous en avez peut-être déjà</span>}
+                        </div>
                       </div>
-                      <span className={styles.stepper}>
-                        <button type="button" aria-label="Moins" disabled={removed} onClick={() => onQty(l.name, Math.max(1, l.qty - 1))}>
-                          −
-                        </button>
-                        <span aria-live="polite">{l.qty}</span>
-                        <button type="button" aria-label="Plus" disabled={removed} onClick={() => onQty(l.name, Math.min(99, l.qty + 1))}>
-                          +
-                        </button>
-                      </span>
-                      <span className={styles.linePrice}>{l.price === null ? "N/A" : l.priceUnit !== "unit" ? euroPer(l.price, l.priceUnit) : euro(l.price * l.qty)}</span>
+                      {weighed && l.weight === null ? null : (
+                        <span className={styles.stepper}>
+                          <button type="button" aria-label="Moins" disabled={removed} onClick={() => onQty(l.name, weighed ? Math.max(0.2, Math.round(((l.weight ?? 0.2) - 0.2) * 10) / 10) : Math.max(1, l.qty - 1))}>
+                            −
+                          </button>
+                          <span aria-live="polite">{weighed ? formatQuantity(l.weight, l.priceUnit === "kg" ? "kg" : "l") : l.qty}</span>
+                          <button type="button" aria-label="Plus" disabled={removed} onClick={() => onQty(l.name, weighed ? Math.round(((l.weight ?? 0) + 0.2) * 10) / 10 : Math.min(99, l.qty + 1))}>
+                            +
+                          </button>
+                        </span>
+                      )}
+                      <span className={styles.linePrice}>{l.price === null ? "N/A" : l.lineTotal !== null ? euro(l.lineTotal) : euroPer(l.price, l.priceUnit)}</span>
                     </div>
                   );
                 })}
@@ -452,7 +483,8 @@ function ScenarioView({
       </div>
       <p className={family.hint}>
         {without === 0 ? "Montants estimés." : `${without} produit${without > 1 ? "s" : ""} sans prix : à payer en plus sur place.`}
-        {loose > 0 ? ` ${loose} produit${loose > 1 ? "s" : ""} vendu${loose > 1 ? "s" : ""} au kilo ou au litre : prix au kilo affiché, non totalisé.` : ""}
+        {loose > 0 ? ` ${loose} produit${loose > 1 ? "s" : ""} vendu${loose > 1 ? "s" : ""} au kilo ou au litre sans poids connu : prix au kilo affiché, non totalisé.` : ""}
+        {toCheck > 0 ? ` ${toCheck} quantité${toCheck > 1 ? "s" : ""} à vérifier : 1 unité par défaut.` : ""}
       </p>
       {error && <Notice tone="error">{error}</Notice>}
       <div className={styles.footer}>
@@ -469,6 +501,10 @@ function ScenarioView({
                 ref: l.ref,
                 price: l.price,
                 priceUnit: l.priceUnit,
+                need: l.need,
+                weight: l.weight,
+                toCheck: l.toCheck,
+                pantry: l.pantry,
                 source: ({ menu: "menu", sante: "menu", ajout: "added", habituel: "habit" } as const)[itemsByName.get(norm(l.name))?.group ?? "menu"],
               })),
             )

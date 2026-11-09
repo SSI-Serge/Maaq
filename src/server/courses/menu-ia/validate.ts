@@ -1,11 +1,13 @@
 import type { Ctx, SessionContext } from "@/server/auth/service";
 import { asProfile } from "@/server/assistant/outings/profile";
 import { nameKey } from "../catalog/seed";
-import { allowed, type Dish } from "../engine";
+import { allowed, buildRefProducts, findProd, type Dish, type QuantityUnit } from "../engine";
 import { courseError, loadSettings, requireAccess, translateCourseError } from "../household/settings";
+import { loadReferences } from "../list/data";
 import { seedListFromMenu } from "../list/service";
 import { loadEngineData } from "../menu/data";
 import { hasNewerCard, loadCard, markValidated } from "./cards";
+import { applyNeedsToItems } from "./needs";
 import type { MenuProposal, ProposalDish } from "./proposal";
 
 /**
@@ -25,7 +27,7 @@ export interface ValidatedMenuCard {
   addable: { slot: string; name: string }[];
 }
 
-const toDish = (d: ProposalDish): Dish => ({ id: d.engineId ?? "", cuisine: d.cuisine, name: d.name, ing: d.ingredients.join(", "), recipe: d.recipe, health: "", batch: "", time: "", minutes: d.minutes, tags: new Set() });
+const toDish = (d: ProposalDish): Dish => ({ id: d.engineId ?? "", cuisine: d.cuisine, name: d.name, ing: d.ingredients.map((i) => i.label).join(", "), recipe: d.recipe, health: "", batch: "", time: "", minutes: d.minutes, tags: new Set() });
 
 export async function validateMenuCard(ctx: Ctx, session: SessionContext, messageId: string): Promise<ValidatedMenuCard> {
   const who = await requireAccess(ctx, session, "couple");
@@ -69,10 +71,24 @@ async function reopenList(trx: Parameters<Parameters<typeof asProfile>[2]>[0], a
     .execute();
 }
 
+/** Une ligne par ingrédient (clé unique par plat) ; la quantité d'un doublon est additionnée quand l'unité est la même. */
+function dedupe(lines: { label: string; quantity: number | null; unit: QuantityUnit | null }[], keys: string[]): { line: (typeof lines)[number]; key: string; position: number }[] {
+  const out = new Map<string, { line: (typeof lines)[number]; key: string; position: number }>();
+  lines.forEach((line, k) => {
+    const key = keys[k];
+    const seen = out.get(key);
+    if (!seen) out.set(key, { line: { ...line }, key, position: out.size + 1 });
+    else if (seen.line.unit === line.unit && seen.line.quantity !== null && line.quantity !== null) seen.line.quantity = Math.round((seen.line.quantity + line.quantity) * 1000) / 1000;
+  });
+  return [...out.values()];
+}
+
 export async function saveValidatedMenu(ctx: Ctx, accountId: string, userId: string, proposal: MenuProposal, data: Awaited<ReturnType<typeof loadEngineData>>): Promise<ValidatedMenuCard> {
   const week = proposal.week;
   const batchWeekId = proposal.planId ? (data.weekIds.get(proposal.planId) ?? null) : null;
   const dishesForList: Dish[] = [];
+  // références du catalogue : un ingrédient écrit par l'IA est rapproché d'un produit comme le sont les produits de la liste (CR-50)
+  const prods = buildRefProducts((await loadReferences(ctx.db)).rows);
   try {
     const listed = await asProfile(ctx.db, userId, async (trx) => {
       // CR-45 : revalider une semaine déjà validée met à jour le MÊME menu (même identifiant) et remplace ses lignes, dans une transaction ; la liste de courses est refaite
@@ -85,6 +101,8 @@ export async function saveValidatedMenu(ctx: Ctx, accountId: string, userId: str
         session_minutes: Math.min(Math.max(proposal.session.minutes, 1), 1000),
         session_is_estimated: proposal.session.estimated,
         session_over_cap: proposal.session.overCap,
+        // nombre de personnes pour lequel les recettes et les quantités sont écrites (CR-49)
+        servings: proposal.householdSize,
       };
       let menu: { id: string };
       if (existing) {
@@ -121,7 +139,8 @@ export async function saveValidatedMenu(ctx: Ctx, accountId: string, userId: str
             dish_id: ref?.kind === "catalog" ? (ref.dishId as never) : null,
             household_dish_id: ref?.kind === "household" ? ref.dishId : null,
             cuisine_id: d.origin === "ai" ? d.cuisineId : null,
-            recipe: d.origin === "ai" ? d.recipe : null,
+            // la recette du menu est celle écrite pour le foyer, pour toute origine ; le plat d'origine n'est pas modifié (CR-49)
+            recipe: d.recipe || null,
             duration_minutes: d.origin === "ai" ? d.minutes : null,
             light_by_ai: !!d.light,
             light_text: d.light?.text ?? null,
@@ -129,15 +148,31 @@ export async function saveValidatedMenu(ctx: Ctx, accountId: string, userId: str
           .returning("id")
           .executeTakeFirstOrThrow();
         entryIds.set(`${kind}:${slot}`, String(inserted.id));
-        if (d.origin === "ai") {
-          const keys = d.ingredients.map((i) => nameKey(i).slice(0, 120));
-          const products = keys.length ? await trx.selectFrom("grocery_products").select(["id", "name_key"]).where("name_key", "in", keys).execute() : [];
-          const byKey = new Map(products.map((p) => [p.name_key, p.id]));
-          await trx
-            .insertInto("meal_menu_entry_ingredients")
-            .values(d.ingredients.map((label, position) => ({ entry_id: inserted.id, account_id: accountId, label: label.slice(0, 120), name_key: keys[position], product_id: byKey.get(keys[position]) ?? null, position: position + 1 })))
-            .execute();
-        }
+        // ingrédients de TOUT plat du menu, avec leur quantité pour le foyer : la base refuse un plat sans ingrédient (CR-49, CR-50)
+        const lines = d.ingredients.length ? d.ingredients : [{ label: d.name, quantity: null, unit: null }];
+        const keys = lines.map((i) => nameKey(i.label).slice(0, 120));
+        const productKey = (label: string, key: string): string => {
+          const found = findProd(prods, label);
+          return found ? nameKey(found).slice(0, 120) : key;
+        };
+        const lookup = [...new Set([...keys, ...lines.map((l, k) => productKey(l.label, keys[k]))])];
+        const products = await trx.selectFrom("grocery_products").select(["id", "name_key"]).where("name_key", "in", lookup).execute();
+        const byKey = new Map(products.map((pr) => [pr.name_key, pr.id]));
+        await trx
+          .insertInto("meal_menu_entry_ingredients")
+          .values(
+            dedupe(lines, keys).map(({ line, key, position }) => ({
+              entry_id: inserted.id,
+              account_id: accountId,
+              label: line.label.slice(0, 120),
+              name_key: key,
+              product_id: byKey.get(key) ?? byKey.get(productKey(line.label, key)) ?? null,
+              position,
+              quantity: line.quantity === null ? null : line.quantity.toFixed(3),
+              unit: line.quantity === null ? null : line.unit,
+            })),
+          )
+          .execute();
         if (d.light && (d.light.remove.length || d.light.add.length)) {
           const items = [...d.light.remove.map((label) => ({ kind: "remove" as const, label })), ...d.light.add.map((label) => ({ kind: "add" as const, label }))];
           const unique = new Map(items.map((i) => [`${i.kind}:${nameKey(i.label)}`, i]));
@@ -177,7 +212,10 @@ export async function saveValidatedMenu(ctx: Ctx, accountId: string, userId: str
           .execute();
       }
 
-      return seedListFromMenu(trx, accountId, userId, [...new Map(dishesForList.map((d) => [nameKey(d.name), d])).values()], { repeat });
+      const count = await seedListFromMenu(trx, accountId, userId, [...new Map(dishesForList.map((d) => [nameKey(d.name), d])).values()], { repeat });
+      // quantités du menu : le besoin de chaque produit, « Quantité à vérifier », placard décoché (CR-50)
+      await applyNeedsToItems(trx, accountId, menu.id);
+      return count;
     });
     return {
       week,

@@ -14,6 +14,7 @@ import { loadEngineData, type EngineData } from "../menu/data";
 
 export const MAX_OWN_DISHES = 150;
 const MAX_INGREDIENTS_SHOWN = 15;
+const MAX_RECIPE_SHOWN = 500;
 const MONTHS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
 const GOAL_TEXT: Record<string, string> = { time: "gagner du temps (batch cooking)", ownDishes: "mes plats", season: "plats de saison" };
 
@@ -44,7 +45,7 @@ export async function loadMenuContext(db: Kysely<DB>, accountId: string, setting
   const lines = [
     "<foyer>",
     `Mois en cours : ${MONTHS[now.getMonth()]}`,
-    `Nombre de personnes : ${settings.householdSize ?? "non renseigné"} (les recettes sont prévues pour 4)`,
+    `Nombre de personnes : ${settings.householdSize ?? "non renseigné"}. Écris les recettes et TOUTES les quantités des ingrédients pour ce nombre de personnes${settings.householdSize ? "" : " (4 à défaut)"}, pour chaque plat du menu, express compris.`,
     `Cuisines préférées : ${profile.preferredCuisines.join(", ") || "aucune préférence"}`,
     `Objectifs : ${goals.join(", ") || "aucun"}`,
     `Régimes : ${settings.diets.join(", ") || "aucun"}`,
@@ -52,8 +53,8 @@ export async function loadMenuContext(db: Kysely<DB>, accountId: string, setting
     `Séance de batch : au plus ${data.sessionCap} minutes`,
     `Cuisines du catalogue (pour les plats libres) : ${cuisines.map((c) => c.name).join(", ")}`,
     "",
-    `Mes plats (${own.length}) : id | nom | ingrédients`,
-    ...(own.length ? own.map((d) => `${d.id} | ${safe(d.name)} | ${safe(d.ing.split(",").slice(0, MAX_INGREDIENTS_SHOWN).join(","))}`) : ["(aucun plat)"]),
+    `Mes plats (${own.length}) : id | nom | ingrédients | recette (n'invente jamais de recette pour un plat de Mes plats qui n'en a pas : laisse « recette » vide)`,
+    ...(own.length ? own.map((d) => `${d.id} | ${safe(d.name)} | ${safe(d.ing.split(",").slice(0, MAX_INGREDIENTS_SHOWN).join(","))} | ${d.recipe.trim() ? safe(d.recipe.replace(/\s+/g, " ").slice(0, MAX_RECIPE_SHOWN)) : "(pas de recette)"}`) : ["(aucun plat)"]),
     "",
     `Plats servis ces ${profile.repetitionWeeks} dernières semaines (à ne pas répéter sans raison) : ${recent.map(safe).join(" ; ") || "aucun"}`,
     "",

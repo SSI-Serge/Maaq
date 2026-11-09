@@ -75,6 +75,12 @@ export const ALLERGENS: Record<string, string[]> = {
 const AISLE_ALIAS: Record<string, string> = { poissons: "Conserves et surgelés", "boissons (cuisine)": "Boissons" };
 export const canonicalAisle = (rayon: string): string => AISLE_ALIAS[norm(rayon)] ?? rayon;
 
+/**
+ * Produits « placard » (CR-50, CR-51) : sel, poivre, huiles, vinaigres, sucre, farine, levure, moutarde, bouillons, épices et herbes séchées, repérés dans le nom normalisé (sans accent) ;
+ * décochés par défaut dans la liste de courses. Marquage fait une fois au chargement ; la console le corrige produit par produit.
+ */
+export const PANTRY_WORDS = /(^| )(sel|poivre|huiles?|vinaigres?|sucre|farine|levure|moutarde|bouillons?|epices?|quatre epices|cumin|paprika|curry|cannelle|curcuma|muscade|herbes de provence|herbes sechees|herbes seches)( |$)/;
+
 /** Clé normalisée d'un nom : minuscules, accents retirés, espaces simples (CR-25). */
 export function nameKey(name: string): string {
   return norm(name).replace(/[\s-]+/g, " ").trim();
@@ -136,7 +142,7 @@ export async function seedWithin(trx: Transaction<DB>, data: SeedData, options: 
       const key = nameKey(name);
       const known = productId.get(key);
       if (known) return known;
-      const row = await trx.insertInto("grocery_products").values({ name: name.slice(0, 120), name_key: key.slice(0, 120), aisle_id: aisleOf(rayon) }).returning("id").executeTakeFirstOrThrow();
+      const row = await trx.insertInto("grocery_products").values({ name: name.slice(0, 120), name_key: key.slice(0, 120), aisle_id: aisleOf(rayon), is_pantry: PANTRY_WORDS.test(key) }).returning("id").executeTakeFirstOrThrow();
       productId.set(key, row.id);
       report.products += 1;
       return row.id;

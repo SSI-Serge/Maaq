@@ -7,7 +7,7 @@ import { getSettings, saveSettings } from "@/server/courses/household/settings";
 import { createDish, dishForm } from "@/server/courses/menu/dishes";
 import { menuInput, menuToolSchema } from "@/server/courses/menu-ia/contract";
 import { courseHome } from "@/server/courses/home";
-import { servingsNote, sessionText } from "@/components/courses/menu-text";
+import { servingsText, sessionText } from "@/components/courses/menu-text";
 import { validateMenuCard } from "@/server/courses/menu-ia/validate";
 import { minutesFromSteps, type ProposalStep } from "@/server/courses/menu-ia/proposal";
 import { ensureCatalog } from "./helpers/courses-catalog";
@@ -65,7 +65,7 @@ async function household(options: { allergens?: string[]; diets?: string[]; alle
   return { f, cuisine: cuisines[0].name, catalogDishes, ownDish: { id: `H:${own.id}`, name: own.name } };
 }
 
-const free = (name: string, cuisine: string, ingredients: string[], extra: Record<string, unknown> = {}) => ({ nom: name, cuisine, duree_minutes: 40, recette: "Cuire doucement, saler, servir.", ingredients, ...extra });
+const free = (name: string, cuisine: string, ingredients: string[], extra: Record<string, unknown> = {}) => ({ nom: name, cuisine, duree_minutes: 40, recette: "Cuire doucement, saler, servir.", ingredients: ingredients.map((nom) => ({ nom, quantite: 200, unite: "g" })), ...extra });
 
 /** Un menu complet : un plat de Mes plats, deux du catalogue, quatre plats libres, deux express libres. */
 function fullMenu(c: Ctxt, over: Record<string, unknown> = {}) {
@@ -338,14 +338,13 @@ describe("CR-42 : le menu dans le tchat (M3)", () => {
     expect(view).toEqual([["validated", true], ["open", true]]);
   });
 
-  it("textes de la carte : séance estimée ou semaine type, facteur pour plus de 4 personnes", () => {
+  it("textes de la carte : séance estimée ou semaine type, nombre de personnes", () => {
     const base = { planTheme: null, session: { minutes: 105, estimated: true, overCap: false, cap: 120, source: "formula" as const } };
     expect(sessionText(base)).toBe("Dimanche · environ 1 h 45 (durée estimée), pour les dîners du lundi au vendredi. Samedi et dimanche : hors séance.");
     expect(sessionText({ planTheme: "Sauce tomate & volaille", session: { ...base.session, minutes: 110, estimated: false, source: "plan" } })).toBe("Dimanche · 1 h 50 · semaine type « Sauce tomate & volaille », pour les dîners du lundi au vendredi. Samedi et dimanche : hors séance.");
-    expect(servingsNote(4)).toBeNull();
-    expect(servingsNote(null)).toBeNull();
-    expect(servingsNote(6)).toBe("Recettes pour 4 : multipliez par 1,5.");
-    expect(servingsNote(5)).toBe("Recettes pour 4 : multipliez par 1,25.");
+    expect(servingsText(null)).toBeNull();
+    expect(servingsText(1)).toBe("Pour 1 personne");
+    expect(servingsText(6)).toBe("Pour 6 personnes");
   });
 
   it("l'accueil dit si le menu se compose en conversation : parents du couple seulement, quand MENU_IA est ouvert", async () => {

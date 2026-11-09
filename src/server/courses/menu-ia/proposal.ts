@@ -1,4 +1,4 @@
-import { allowed, deriveDishTags, estimateMinutes, has, norm, type Dish, type Profile } from "../engine";
+import { allowed, deriveDishTags, estimateMinutes, has, norm, plausible, type Dish, type Profile, type QuantityUnit } from "../engine";
 import type { EngineData } from "../menu/data";
 import { resolveWeek, weekLabel } from "../menu/weeks";
 import { DINNER_COUNT, type DishInput, type MenuInput } from "./contract";
@@ -10,6 +10,13 @@ import { DINNER_COUNT, type DishInput, type MenuInput } from "./contract";
 
 export type DishOrigin = "catalog" | "household" | "ai";
 
+/** Un ingrédient d'un plat du menu : son nom et, quand le modèle l'a donnée et qu'elle est plausible, sa quantité pour le foyer (unités de la base : spoon, pinch). */
+export interface IngredientLine {
+  label: string;
+  quantity: number | null;
+  unit: QuantityUnit | null;
+}
+
 export interface ProposalDish {
   name: string;
   origin: DishOrigin;
@@ -18,8 +25,9 @@ export interface ProposalDish {
   cuisine: string;
   cuisineId: number | null;
   minutes: number;
+  /** Recette écrite pour le nombre de personnes du foyer ; vide pour un plat de Mes plats qui n'en a pas (« Recette non renseignée »). */
   recipe: string;
-  ingredients: string[];
+  ingredients: IngredientLine[];
   /** Version allégée proposée par l'IA (un plat du catalogue garde la sienne). */
   light: { text: string; remove: string[]; add: string[] } | null;
   /** « Contient peut-être … » : avertissement par mots-clés sur un plat libre, sans blocage (CR-44). */
@@ -82,7 +90,24 @@ export interface ProposalContext {
 
 const dayText = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 const addDays = (iso: string, n: number) => new Date(Date.parse(`${iso}T12:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
-const ingredientList = (text: string): string[] => text.split(",").map((s) => s.trim()).filter(Boolean);
+const ingredientList = (text: string): IngredientLine[] => text.split(",").map((s) => s.trim()).filter(Boolean).map((label) => ({ label, quantity: null, unit: null }));
+
+const UNIT_OF_INPUT: Record<string, QuantityUnit> = { g: "g", kg: "kg", ml: "ml", cl: "cl", l: "l", piece: "piece", cuillere: "spoon", pincee: "pinch" };
+
+/** Ingrédients écrits par le modèle : doublons retirés ; une quantité absente, sans unité ou hors des bornes plausibles pour le foyer devient « quantité à vérifier » (vide). */
+export function ingredientsOf(input: DishInput["ingredients"], servings: number | null): IngredientLine[] {
+  const seen = new Set<string>();
+  const out: IngredientLine[] = [];
+  for (const i of input ?? []) {
+    const key = norm(i.nom);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    const unit = i.unite ? UNIT_OF_INPUT[i.unite] : null;
+    const ok = i.quantite !== undefined && unit !== null && plausible(i.quantite, unit, servings ?? 4);
+    out.push({ label: i.nom.trim(), quantity: ok ? i.quantite! : null, unit: ok ? unit : null });
+  }
+  return out;
+}
 
 /** Allergies du foyer retrouvées par mots dans le nom et les ingrédients : pour un avertissement, jamais une certitude. */
 export function suspectedAllergies(dish: Pick<Dish, "name" | "ing" | "tags">, profile: Pick<Profile, "allergies" | "regimes">): string[] {
@@ -111,15 +136,19 @@ function resolveDish(input: DishInput, ctx: ProposalContext, week: string, error
     const refs = data.refs.get(known.id);
     const conflicts = data.allergenBlocked.has(known.id) || !allowed(known, data.profile);
     const suspects = suspectedAllergies(known, data.profile);
+    const origin = refs?.kind === "household" ? "household" : "catalog";
+    // CR-49 : la recette et les quantités sont réécrites pour le foyer, sans toucher au plat d'origine ; un plat de Mes plats sans recette reste « Recette non renseignée »
+    const written = ingredientsOf(input.ingredients, ctx.householdSize);
+    const recipe = origin === "household" && !known.recipe.trim() ? "" : (input.recette ?? known.recipe);
     return {
       name: known.name,
-      origin: refs?.kind === "household" ? "household" : "catalog",
+      origin,
       engineId: known.id,
       cuisine: known.cuisine,
       cuisineId: data.cuisineOf.get(known.id) ?? null,
       minutes: known.minutes,
-      recipe: known.recipe,
-      ingredients: ingredientList(known.ing),
+      recipe,
+      ingredients: written.length ? written : ingredientList(known.ing),
       light: null,
       warnings: [],
       blockers: conflicts ? [`Conflit d'allergie ou de régime${suspects.length ? ` (${suspects.join(", ")})` : ""} : ${known.name}`] : [],
@@ -132,13 +161,14 @@ function resolveDish(input: DishInput, ctx: ProposalContext, week: string, error
   if (!cuisine) missing.push(`« cuisine » (une de : ${ctx.cuisines.map((c) => c.name).join(", ")})`);
   if (!input.duree_minutes) missing.push("« duree_minutes »");
   if (!input.recette) missing.push("« recette »");
-  if (!input.ingredients?.length) missing.push("« ingredients »");
+  if (!input.ingredients?.length) missing.push("« ingredients » (avec quantite et unite)");
   if (missing.length) {
     errors.push(`${where} « ${input.nom} » : plat libre incomplet, il manque ${missing.join(", ")}.`);
     return null;
   }
-  const ingredients = [...new Map(input.ingredients!.map((i) => [norm(i), i.trim()])).values()];
-  const asDish: Dish = { id: "", cuisine: cuisine!.name, name: input.nom, ing: ingredients.join(", "), recipe: input.recette!, health: "", batch: "", time: "", minutes: input.duree_minutes!, tags: deriveDishTags(input.nom, ingredients.join(", ")) };
+  const ingredients = ingredientsOf(input.ingredients, ctx.householdSize);
+  const names = ingredients.map((i) => i.label).join(", ");
+  const asDish: Dish = { id: "", cuisine: cuisine!.name, name: input.nom, ing: names, recipe: input.recette!, health: "", batch: "", time: "", minutes: input.duree_minutes!, tags: deriveDishTags(input.nom, names) };
   const suspects = suspectedAllergies(asDish, data.profile);
   return {
     name: input.nom.trim(),

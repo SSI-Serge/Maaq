@@ -14,6 +14,10 @@ const line = z.object({
   price: z.number().min(0).max(10000).nullable(),
   priceUnit: z.enum(["unit", "kg", "l"]).optional(),
   source: z.enum(["menu", "added", "habit"]),
+  need: z.object({ amount: z.number().positive().max(1_000_000), unit: z.enum(["kg", "l", "piece"]) }).nullable().optional(),
+  weight: z.number().positive().max(1_000_000).nullable().optional(),
+  toCheck: z.boolean().optional(),
+  pantry: z.boolean().optional(),
 });
 
 /** Valide le scénario choisi : la liste passe dans « Ma liste de courses » (US-157 RF7, couple seulement). */

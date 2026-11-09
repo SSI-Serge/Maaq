@@ -30,7 +30,7 @@ export async function loadReferences(db: Kysely<DB>): Promise<References> {
     .selectFrom("v_grocery_product_references as r")
     .innerJoin("grocery_products as p", "p.id", "r.product_id")
     .innerJoin("grocery_aisles as a", "a.id", "p.aisle_id")
-    .select(["p.name as product", "a.name as rayon", "r.store_chain", "r.reference_name", "r.unit_price", "r.price_date", "r.is_compliant", "r.needs_label_check", "r.excluded_because", "r.compliance_status", "r.package_format", "r.price_unit", "r.measure_unit", "r.price_per_measure"])
+    .select(["p.name as product", "a.name as rayon", "r.store_chain", "r.reference_name", "r.unit_price", "r.price_date", "r.is_compliant", "r.needs_label_check", "r.excluded_because", "r.compliance_status", "r.package_format", "r.price_unit", "r.package_amount", "r.package_unit", "r.measure_unit", "r.price_per_measure"])
     .orderBy("p.name")
     .orderBy("r.store_chain")
     .execute();
@@ -57,6 +57,7 @@ export async function loadReferences(db: Kysely<DB>): Promise<References> {
       format: r.package_format,
       priceUnit: asPriceUnit(r.price_unit),
       perMeasure: r.price_per_measure !== null && (r.measure_unit === "kg" || r.measure_unit === "l") ? { value: Number(r.price_per_measure), unit: r.measure_unit } : null,
+      package: r.package_amount !== null && (r.package_unit === "kg" || r.package_unit === "l") && Number(r.package_amount) > 0 ? { amount: Number(r.package_amount), unit: r.package_unit } : null,
     });
   }
   return { rows: refs, excluded, aisles };

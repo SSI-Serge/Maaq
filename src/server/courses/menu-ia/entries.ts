@@ -24,6 +24,18 @@ export interface MenuEntryRow {
   light_chosen: boolean;
 }
 
+/** Ingrédients de chaque ligne d'un menu validé, quantité et unité comprises (CR-50). */
+export async function loadEntryIngredients(db: Kysely<DB>, entryIds: string[]): Promise<Map<string, { label: string; quantity: number | null; unit: string | null }[]>> {
+  const out = new Map<string, { label: string; quantity: number | null; unit: string | null }[]>();
+  if (!entryIds.length) return out;
+  const rows = await db.selectFrom("meal_menu_entry_ingredients").select(["entry_id", "label", "quantity", "unit"]).where("entry_id", "in", entryIds as never[]).orderBy("entry_id").orderBy("position").execute();
+  for (const r of rows) {
+    const key = String(r.entry_id);
+    out.set(key, [...(out.get(key) ?? []), { label: r.label, quantity: r.quantity === null ? null : Number(r.quantity), unit: r.unit }]);
+  }
+  return out;
+}
+
 export async function loadMenuEntries(db: Kysely<DB>, menuId: string): Promise<(MenuEntryRow & { dish_id: string | null; household_dish_id: string | null })[]> {
   const rows = await db
     .selectFrom("meal_menu_entries")

@@ -6252,10 +6252,13 @@ CREATE TABLE grocery_products (
   -- Nom normalisé par l'application : la base garde la clé et son unicité (CR-25)
   name_key    text NOT NULL UNIQUE CHECK (name_key <> '' AND name_key = grocery_norm(name_key)),
   aisle_id    integer NOT NULL REFERENCES grocery_aisles (id) ON DELETE RESTRICT,
+  -- Produit « placard » (sel, poivre, huile, épices…) : décoché par défaut dans la liste, « Vous en avez peut-être déjà » (CR-50) ; modifiable dans la console
+  is_pantry   boolean NOT NULL DEFAULT false,
   created_at  timestamptz NOT NULL DEFAULT now(),
   updated_at  timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_grocery_products_aisle_id ON grocery_products (aisle_id);
+COMMENT ON COLUMN grocery_products.is_pantry IS $$Produit « placard » (sel, poivre, huiles, vinaigres, épices, herbes séchées, bouillons en cube, sucre, farine, levure, moutarde…) : dans la liste de courses il est décoché par défaut avec « Vous en avez peut-être déjà » et ne compte dans le total que s'il est coché. Réglé produit par produit dans la console (US-166) ; une quantité en cuillère ou en pincée rend aussi un ingrédient « placard », quelle que soit cette valeur. [CR-50, CR-51]$$;
 COMMENT ON TABLE grocery_products IS $$Produit du catalogue commun (lait, riz basmati…) : nom, clé normalisée unique, rayon. Les ingrédients des plats, les références par enseigne, les prix partagés et le calendrier de saison s'y rattachent. [US-166 RF1]$$;
 COMMENT ON COLUMN grocery_products.name_key IS $$Nom normalisé du produit (minuscules, espaces simples) : clé d'unicité, calculée par l'application. Un produit sans ligne ici est « inconnu » (produits à référencer). [CR-25, US-173 RF1]$$;
 
@@ -6745,6 +6748,8 @@ CREATE TABLE meal_menus (
   session_minutes      smallint CHECK (session_minutes BETWEEN 1 AND 1000),
   session_is_estimated boolean NOT NULL DEFAULT false,
   session_over_cap     boolean NOT NULL DEFAULT false,
+  -- Nombre de personnes pour lequel les recettes et les quantités du menu sont écrites (réglage du foyer au moment de la validation, CR-49) ; vide pour un menu validé avant CR-49
+  servings             smallint CHECK (servings BETWEEN 1 AND 30),
   created_at           timestamptz NOT NULL DEFAULT now(),
   UNIQUE (account_id, week_start),
   UNIQUE (id, account_id),
@@ -6754,6 +6759,7 @@ CREATE INDEX idx_meal_menus_validated_by ON meal_menus (validated_by_user_id, ac
 CREATE INDEX idx_meal_menus_batch_week_id ON meal_menus (batch_week_id) WHERE batch_week_id IS NOT NULL;
 CREATE INDEX idx_meal_menus_validated_at ON meal_menus (validated_at);
 COMMENT ON TABLE meal_menus IS $$Menu validé d'un foyer pour une semaine (le menu proposé n'est pas gardé tant qu'il n'est pas validé) : semaine type utilisée, durée de la séance du dimanche, indication « estimée » ou « au-dessus du plafond ». Une validation par semaine. Conservé 12 mois (réglable), purgé par purge_expired_grocery_data(). [US-156 RF5, RF6, RF12, CR-23]$$;
+COMMENT ON COLUMN meal_menus.servings IS $$Nombre de personnes pour lequel l'IA a écrit les recettes et les quantités du menu (« Pour 6 personnes »), gardé avec le menu : le foyer peut changer ensuite. Vide pour un menu validé avant CR-49. [US-156 RF11, CR-49]$$;
 COMMENT ON COLUMN meal_menus.session_is_estimated IS $$Vrai si aucune semaine type n'était adaptée : la durée est estimée (le plat le plus long, plus 40 % des autres) et signalée comme telle. [US-156 RF6]$$;
 
 CREATE TABLE meal_menu_entries (
@@ -6771,7 +6777,7 @@ CREATE TABLE meal_menu_entries (
   dish_id            bigint REFERENCES meal_dishes (id) ON DELETE SET NULL,
   -- Plat de « Mes plats » : le plat choisi (origine household) ou la copie faite après la validation (origines ai et catalog, CR-42, CR-45)
   household_dish_id  uuid,
-  -- Contenu d'un plat libre, gardé avec le menu (CR-42) : cuisine, recette en texte, durée ; ses ingrédients sont dans meal_menu_entry_ingredients
+  -- Contenu gardé avec le menu : la cuisine et la durée d'un plat libre (CR-42) ; la recette écrite pour le nombre de personnes du foyer, pour TOUT plat (CR-49, le plat d'origine n'est pas modifié) ; les ingrédients sont dans meal_menu_entry_ingredients
   cuisine_id         integer REFERENCES meal_cuisines (id) ON DELETE RESTRICT,
   recipe             text,
   duration_minutes   smallint CHECK (duration_minutes BETWEEN 1 AND 600),
@@ -6788,7 +6794,7 @@ CREATE TABLE meal_menu_entries (
   UNIQUE (menu_id, kind, slot),
   CONSTRAINT ck_meal_menu_entries_slot CHECK (slot <= CASE kind WHEN 'pleasure' THEN 2 WHEN 'express' THEN 4 ELSE 7 END),
   CONSTRAINT ck_meal_menu_entries_origin CHECK (dish_origin = 'catalog' OR dish_id IS NULL),
-  CONSTRAINT ck_meal_menu_entries_free_dish CHECK ((dish_origin = 'ai' AND cuisine_id IS NOT NULL) OR (dish_origin <> 'ai' AND cuisine_id IS NULL AND recipe IS NULL AND duration_minutes IS NULL)),
+  CONSTRAINT ck_meal_menu_entries_free_dish CHECK ((dish_origin = 'ai' AND cuisine_id IS NOT NULL) OR (dish_origin <> 'ai' AND cuisine_id IS NULL AND duration_minutes IS NULL)),
   CONSTRAINT ck_meal_menu_entries_light CHECK (light_by_ai = (light_text IS NOT NULL) AND (light_by_ai OR NOT light_chosen)),
   CONSTRAINT fk_meal_menu_entries_menu FOREIGN KEY (menu_id, account_id) REFERENCES meal_menus (id, account_id) ON DELETE CASCADE,
   CONSTRAINT fk_meal_menu_entries_household_dish FOREIGN KEY (household_dish_id, account_id) REFERENCES meal_household_dishes (id, account_id) ON DELETE SET NULL (household_dish_id)
@@ -6801,7 +6807,7 @@ COMMENT ON TABLE meal_menu_entries IS $$Plats d'un menu validé : 7 dîners et p
 COMMENT ON COLUMN meal_menu_entries.dish_origin IS $$Origine du plat : catalog (plat du catalogue commun), household (plat de Mes plats) ou ai (plat libre composé par l'IA avec le foyer, avec ses ingrédients, jamais dans le catalogue). Renseignée par l'application, sans valeur par défaut ; les menus déjà validés avant CR-42 ont reçu household s'ils pointaient vers un plat personnel, sinon catalog. [CR-42]$$;
 COMMENT ON COLUMN meal_menu_entries.household_dish_id IS $$Plat de Mes plats : le plat choisi (origine household) ou, après « Ajouter à vos plats », la copie faite dans Mes plats d'un plat libre ou du catalogue (la ligne garde son contenu). Vide si le foyer a supprimé ce plat ensuite. [US-156 RF10, CR-42, CR-45]$$;
 COMMENT ON COLUMN meal_menu_entries.cuisine_id IS $$Cuisine d'un plat libre (origine ai, obligatoire) ; vide pour un plat du catalogue ou de Mes plats. [CR-42]$$;
-COMMENT ON COLUMN meal_menu_entries.recipe IS $$Recette en texte d'un plat libre ; vide pour un plat du catalogue ou de Mes plats. [CR-42]$$;
+COMMENT ON COLUMN meal_menu_entries.recipe IS $$Recette en texte, écrite par l'IA pour le nombre de personnes du foyer (meal_menus.servings), pour tout plat du menu : plat libre, plat du catalogue ou de Mes plats (le plat d'origine n'est pas modifié). Vide si le plat de Mes plats n'a pas de recette. [US-156 RF11, CR-42, CR-49]$$;
 COMMENT ON COLUMN meal_menu_entries.duration_minutes IS $$Durée d'un plat libre en minutes (1 à 600) ; vide pour un plat du catalogue ou de Mes plats. [CR-42]$$;
 COMMENT ON COLUMN meal_menu_entries.light_by_ai IS $$Vrai si une version allégée a été proposée par l'IA pour ce plat (texte dans light_text, adaptation de la liste dans meal_menu_entry_light_items) ; possible pour toute origine dont le plat n'a pas de version allégée dans le catalogue. [US-157 RF5, CR-42, CR-45]$$;
 COMMENT ON COLUMN meal_menu_entries.light_text IS $$Texte de la version allégée proposée par l'IA ; renseigné si et seulement si light_by_ai. [CR-42]$$;
@@ -6819,12 +6825,23 @@ CREATE TABLE meal_menu_entry_ingredients (
   -- Produit du catalogue reconnu par l'application ; vide si inconnu (la liste le prend sans prix, noté dans les produits à référencer)
   product_id  bigint REFERENCES grocery_products (id) ON DELETE SET NULL,
   position    smallint NOT NULL DEFAULT 1 CHECK (position >= 1),
+  -- Quantité écrite par l'IA pour le nombre de personnes du foyer (CR-50) ; vide si l'IA n'en a pas donné (la liste met 1 unité, « Quantité à vérifier »)
+  quantity    numeric(10,3) CHECK (quantity > 0),
+  unit        text CHECK (unit IN ('g', 'kg', 'ml', 'cl', 'l', 'piece', 'spoon', 'pinch')),
+  -- Quantité ramenée en g, ml ou pièce (kg x 1000, cl x 10, l x 1000) ; vide pour une cuillère, une pincée ou sans quantité
+  base_unit   text GENERATED ALWAYS AS (CASE unit WHEN 'g' THEN 'g' WHEN 'kg' THEN 'g' WHEN 'ml' THEN 'ml' WHEN 'cl' THEN 'ml' WHEN 'l' THEN 'ml' WHEN 'piece' THEN 'piece' END) STORED,
+  base_quantity numeric(14,3) GENERATED ALWAYS AS (CASE unit WHEN 'g' THEN quantity WHEN 'kg' THEN quantity * 1000 WHEN 'ml' THEN quantity WHEN 'cl' THEN quantity * 10 WHEN 'l' THEN quantity * 1000 WHEN 'piece' THEN quantity END) STORED,
   UNIQUE (entry_id, name_key),
+  CONSTRAINT ck_meal_menu_entry_ingredients_quantity CHECK ((quantity IS NULL) = (unit IS NULL)),
   CONSTRAINT fk_meal_menu_entry_ingredients_entry FOREIGN KEY (entry_id, account_id) REFERENCES meal_menu_entries (id, account_id) ON DELETE CASCADE
 );
 CREATE INDEX idx_meal_menu_entry_ingredients_account ON meal_menu_entry_ingredients (account_id);
 CREATE INDEX idx_meal_menu_entry_ingredients_product_id ON meal_menu_entry_ingredients (product_id) WHERE product_id IS NOT NULL;
-COMMENT ON TABLE meal_menu_entry_ingredients IS $$Ingrédients d'un plat libre d'un menu validé : nom saisi, clé normalisée, produit du catalogue s'il est reconnu (un ingrédient inconnu entre dans la liste sans prix et dans les produits à référencer). Aucune quantité par ingrédient. Un plat libre a au moins un ingrédient (contrôlé à la validation de la transaction). Jamais dans le catalogue commun ; conservé et purgé avec le menu. [US-156 RF8, RT4, CR-04, CR-42]$$;
+COMMENT ON TABLE meal_menu_entry_ingredients IS $$Ingrédients d'un plat d'un menu validé, de toute origine : nom, clé normalisée, produit du catalogue s'il est reconnu (un ingrédient inconnu entre dans la liste sans prix et dans les produits à référencer), quantité et unité écrites par l'IA pour le nombre de personnes du foyer (CR-50, qui remplace CR-25 pour les menus ; les plats du catalogue et de Mes plats ne changent pas). Tout plat du menu a au moins un ingrédient (contrôlé à la validation de la transaction). Les quantités, additionnées par produit (v_meal_menu_needs) puis divisées par le format de la référence, donnent le nombre d'unités à acheter. Jamais dans le catalogue commun ; conservé et purgé avec le menu. [US-156 RF8, RF11, RT3, RT4, US-157 RF7bis, CR-04, CR-42, CR-49, CR-50]$$;
+COMMENT ON COLUMN meal_menu_entry_ingredients.quantity IS $$Quantité de l'ingrédient pour le nombre de personnes du foyer, dans l'unité unit ; vide si l'IA n'en a pas donné (la liste met alors 1 unité, « Quantité à vérifier »). Vide en même temps que l'unité. [CR-50]$$;
+COMMENT ON COLUMN meal_menu_entry_ingredients.unit IS $$Unité de la quantité : g, kg, ml, cl, l, piece (pièce), spoon (cuillère) ou pinch (pincée). Une cuillère et une pincée rendent l'ingrédient « placard » et ne se convertissent pas. [CR-50, CR-51]$$;
+COMMENT ON COLUMN meal_menu_entry_ingredients.base_unit IS $$Unité de base calculée par la base : g (g, kg), ml (ml, cl, l) ou piece ; vide pour une cuillère, une pincée ou une quantité absente. [CR-50]$$;
+COMMENT ON COLUMN meal_menu_entry_ingredients.base_quantity IS $$Quantité ramenée en g, ml ou pièce (kg x 1000, cl x 10, l x 1000), calculée par la base ; vide en même temps que base_unit. [CR-50]$$;
 
 -- Adaptation de la liste pour la version allégée proposée par l'IA : produits à retirer ou à ajouter
 CREATE TABLE meal_menu_entry_light_items (
@@ -6934,9 +6951,9 @@ BEGIN
   ELSE
     v_entry := OLD.entry_id;
   END IF;
-  IF EXISTS (SELECT 1 FROM meal_menu_entries WHERE id = v_entry AND dish_origin = 'ai')
+  IF EXISTS (SELECT 1 FROM meal_menu_entries WHERE id = v_entry)
      AND NOT EXISTS (SELECT 1 FROM meal_menu_entry_ingredients WHERE entry_id = v_entry) THEN
-    RAISE EXCEPTION 'Un plat libre du menu a au moins un ingrédient' USING ERRCODE = 'check_violation';
+    RAISE EXCEPTION 'Un plat du menu a au moins un ingrédient' USING ERRCODE = 'check_violation';
   END IF;
   RETURN NULL;
 END $$;
@@ -6944,7 +6961,23 @@ CREATE CONSTRAINT TRIGGER trg_meal_menu_entries_ingredient AFTER INSERT OR UPDAT
   DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION meal_menu_entry_needs_ingredient();
 CREATE CONSTRAINT TRIGGER trg_meal_menu_entry_ingredients_delete AFTER DELETE ON meal_menu_entry_ingredients
   DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION meal_menu_entry_needs_ingredient();
-COMMENT ON FUNCTION meal_menu_entry_needs_ingredient() IS $$Contrôle différé : un plat libre d'un menu (origine ai) a au moins un ingrédient à la fin de la transaction. [US-156 RF8, RT3, CR-42]$$;
+COMMENT ON FUNCTION meal_menu_entry_needs_ingredient() IS $$Contrôle différé : tout plat d'un menu, de toute origine, a au moins un ingrédient à la fin de la transaction (les lignes de menus validés avant CR-49 ne sont pas revérifiées). [US-156 RF8, RT3, CR-42, CR-49, CR-51]$$;
+
+-- Besoins du menu par produit (CR-50, US-157 RF7bis) : les quantités des ingrédients de tous les plats du menu, plats express compris, additionnées par produit et par unité de base.
+-- L'application divise ensuite par le format de la référence choisie (package_amount, package_unit) et arrondit au paquet supérieur.
+CREATE VIEW v_meal_menu_needs WITH (security_invoker = true) AS
+SELECT e.menu_id, e.account_id, i.product_id,
+       CASE WHEN i.product_id IS NULL THEN i.name_key END AS name_key,
+       i.base_unit,
+       sum(i.base_quantity) AS total_quantity,
+       count(*) AS ingredient_count,
+       bool_or(i.quantity IS NULL) AS needs_check,
+       COALESCE(bool_or(p.is_pantry), false) OR COALESCE(bool_or(i.unit IN ('spoon', 'pinch')), false) AS is_pantry
+  FROM meal_menu_entry_ingredients i
+  JOIN meal_menu_entries e ON e.id = i.entry_id
+  LEFT JOIN grocery_products p ON p.id = i.product_id
+ GROUP BY e.menu_id, e.account_id, i.product_id, CASE WHEN i.product_id IS NULL THEN i.name_key END, i.base_unit;
+COMMENT ON VIEW v_meal_menu_needs IS $$Besoins d'un menu validé par produit (ou par nom d'ingrédient inconnu du catalogue) et par unité de base (g, ml, piece) : total des quantités, nombre d'ingrédients additionnés, needs_check (une quantité manque : 1 unité et « Quantité à vérifier »), is_pantry (produit « placard » ou quantité en cuillère ou en pincée : décoché par défaut). Les cuillères, pincées et quantités absentes ont une unité de base vide. L'application divise ensuite le total par le format de la référence choisie et arrondit au paquet supérieur. Vue à droits de l'appelant : la sécurité par ligne du couple s'applique. [US-157 RF7bis, CR-50]$$;
 
 -- Une adaptation de version allégée n'existe que pour un plat dont l'IA a proposé une version allégée
 CREATE FUNCTION meal_menu_entry_light_item_before_write() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -7012,6 +7045,14 @@ CREATE TABLE grocery_list_items (
   unit_price           numeric(8,2) CHECK (unit_price IS NULL OR unit_price > 0),
   -- Unité du prix, copiée de la référence à la validation : un article au kilo ou au litre n'entre pas dans le total estimé (CR-40)
   price_unit           varchar(4) CHECK (price_unit IS NULL OR price_unit IN ('unit', 'kg', 'l')),
+  -- Besoin du menu pour ce produit, en g, ml ou pièce (« 900 g pour le menu ») ; vide pour un produit ajouté à la main ou de l'historique (CR-50)
+  needed_amount        numeric(12,3) CHECK (needed_amount > 0),
+  needed_unit          text CHECK (needed_unit IN ('g', 'ml', 'piece')),
+  -- Conversion impossible (format de la référence inconnu, unité incompatible, quantité absente) : 1 unité et « Quantité à vérifier »
+  quantity_to_check    boolean NOT NULL DEFAULT false,
+  -- Produit « placard » : « Vous en avez peut-être déjà » ; is_selected = coché pour l'achat (décoché par défaut pour un produit « placard »)
+  is_pantry            boolean NOT NULL DEFAULT false,
+  is_selected          boolean NOT NULL DEFAULT true,
   bought_at            timestamptz,
   bought_by_user_id    uuid,
   created_at           timestamptz NOT NULL DEFAULT now(),
@@ -7024,7 +7065,8 @@ CREATE TABLE grocery_list_items (
   CONSTRAINT ck_grocery_list_items_list CHECK ((state = 'preparing') = (list_id IS NULL)),
   CONSTRAINT ck_grocery_list_items_no_store CHECK (state NOT IN ('preparing', 'added_after_validation') OR (store_chain IS NULL AND reference_name IS NULL AND unit_price IS NULL AND price_unit IS NULL)),
   CONSTRAINT ck_grocery_list_items_price_store CHECK (unit_price IS NULL OR store_chain IS NOT NULL),
-  CONSTRAINT ck_grocery_list_items_price_unit CHECK (price_unit IS NULL OR store_chain IS NOT NULL)
+  CONSTRAINT ck_grocery_list_items_price_unit CHECK (price_unit IS NULL OR store_chain IS NOT NULL),
+  CONSTRAINT ck_grocery_list_items_needed CHECK ((needed_amount IS NULL) = (needed_unit IS NULL))
 );
 -- Un produit déjà dans la liste n'est pas ajouté deux fois : sa quantité augmente (US-158 RF3)
 CREATE UNIQUE INDEX ux_grocery_list_items_open ON grocery_list_items (account_id, name_key) WHERE state <> 'bought';
@@ -7035,6 +7077,11 @@ CREATE INDEX idx_grocery_list_items_aisle_id ON grocery_list_items (aisle_id) WH
 CREATE INDEX idx_grocery_list_items_added_by ON grocery_list_items (added_by_user_id, account_id);
 CREATE INDEX idx_grocery_list_items_bought_by ON grocery_list_items (bought_by_user_id, account_id);
 COMMENT ON TABLE grocery_list_items IS $$Produit de la liste de courses du foyer, avec son état : en préparation, validé, ajouté depuis la validation (sans magasin ni prix, en tête de « Ma liste de courses »), acheté. Un produit n'est qu'une fois dans la liste ouverte (la quantité augmente). Les produits non achetés reviennent en préparation avec « pas acheté la dernière fois » (grocery_carry_over_unbought). Les produits achetés forment l'historique du foyer, conservé 3 mois (réglable). Le couple retire tout ; un invité secondaire ne retire que ses propres ajouts, n'augmente que les quantités et peut cocher « acheté » (CR-38), sans voir aucun prix (grocery_list_for). [US-157 RF3, RF9, US-158, US-162, CR-10, CR-27, CR-28]$$;
+COMMENT ON COLUMN grocery_list_items.needed_amount IS $$Besoin du menu pour ce produit, additionné sur tous les plats (plats express compris) pour le nombre de personnes du foyer, en g, ml ou pièce ; sert à afficher l'origine de la quantité (« 2 paquets · 900 g pour le menu »). Pour un produit au poids, poids x prix au kilo entre dans le total. Vide pour un produit ajouté à la main ou de l'historique (1 par défaut). [US-157 RF7bis, RF8, CR-50]$$;
+COMMENT ON COLUMN grocery_list_items.needed_unit IS $$Unité de needed_amount : g, ml ou piece. Vide en même temps que la quantité. [CR-50]$$;
+COMMENT ON COLUMN grocery_list_items.quantity_to_check IS $$Vrai quand la quantité n'a pas pu être calculée (format de la référence inconnu, unité incompatible comme « 2 pièces » pour une référence en grammes, quantité absente) : 1 unité, avec la mention « Quantité à vérifier ». [US-157 RF7bis, CR-50]$$;
+COMMENT ON COLUMN grocery_list_items.is_pantry IS $$Produit « placard » (étiquette du produit ou quantité en cuillère ou en pincée) : affiché avec « Vous en avez peut-être déjà ». [US-157 RF7bis, CR-50]$$;
+COMMENT ON COLUMN grocery_list_items.is_selected IS $$Coché pour l'achat. Un produit « placard » démarre décoché et ne compte dans le total que s'il est coché. [US-157 RF7bis, CR-50]$$;
 COMMENT ON COLUMN grocery_list_items.price_unit IS $$Unité de unit_price, copiée de la référence choisie à la validation : unit (ou vide) = par article, kg ou l = par kilo ou par litre. Un article au kilo ou au litre s'affiche « x,xx €/kg » avec la mention « prix au kilo, non totalisé » et n'entre pas dans le total estimé : l'application ne totalise que les articles dont price_unit est vide ou unit. Aucun poids n'est supposé. [CR-40]$$;
 COMMENT ON COLUMN grocery_list_items.state IS $$preparing = en préparation (aucun magasin, aucun prix) ; validated = dans la liste validée, avec son magasin, sa référence et son prix estimé ; added_after_validation = ajouté depuis la validation, sans magasin ni prix ; bought = acheté (date et profil). [US-157 RF9, US-158 RF3bis, CR-28]$$;
 
@@ -7071,25 +7118,27 @@ COMMENT ON FUNCTION grocery_list_item_before_write() IS $$Garde-fou de la liste 
 CREATE FUNCTION grocery_list_for(p_viewer uuid)
 RETURNS TABLE (id uuid, list_id uuid, state grocery_item_state, source text, label varchar, name_key text, product_id bigint, aisle_id integer, quantity smallint,
                added_by_user_id uuid, not_bought_last_time boolean, store_chain varchar, reference_name varchar, unit_price numeric, bought_at timestamptz,
-               bought_by_user_id uuid, package_format varchar, price_unit varchar)
+               bought_by_user_id uuid, package_format varchar, price_unit varchar, needed_amount numeric, needed_unit text, quantity_to_check boolean, is_pantry boolean,
+               is_selected boolean)
 LANGUAGE sql STABLE AS $$
   SELECT i.id, i.list_id, i.state, i.source, i.label, i.name_key, i.product_id, i.aisle_id, i.quantity, i.added_by_user_id, i.not_bought_last_time,
          i.store_chain, i.reference_name, CASE WHEN grocery_access(p_viewer) = 'couple' THEN i.unit_price END, i.bought_at, i.bought_by_user_id,
          (SELECT r.package_format FROM grocery_product_references r
            WHERE r.product_id = i.product_id AND r.store_chain = i.store_chain AND r.reference_name = i.reference_name),
-         i.price_unit
+         i.price_unit, i.needed_amount, i.needed_unit, i.quantity_to_check, i.is_pantry, i.is_selected
     FROM users v
     JOIN grocery_list_items i ON i.account_id = v.account_id
    WHERE v.id = p_viewer AND grocery_access(p_viewer) IS NOT NULL
 $$;
-COMMENT ON FUNCTION grocery_list_for(uuid) IS $$Articles de la liste de courses de la famille d'un profil, pour l'affichage : le prix estimé n'est rendu qu'au couple, l'invité secondaire ne voit aucun prix (il voit le magasin, la référence, le format du conditionnement et l'unité du prix, sans prix). L'application l'utilise pour lire la liste ; tant qu'elle se connecte avec un seul rôle, la protection effective des colonnes est cette fonction et le code (H150). [US-157 RF8, US-158, CR-10, CR-38, CR-40]$$;
+COMMENT ON FUNCTION grocery_list_for(uuid) IS $$Articles de la liste de courses de la famille d'un profil, pour l'affichage : le prix estimé n'est rendu qu'au couple, l'invité secondaire ne voit aucun prix (il voit le magasin, la référence, le format du conditionnement et l'unité du prix, sans prix). L'application l'utilise pour lire la liste ; tant qu'elle se connecte avec un seul rôle, la protection effective des colonnes est cette fonction et le code (H150). [US-157 RF7bis, RF8, US-158, CR-10, CR-38, CR-40, CR-50]$$;
 
 -- À la préparation de la liste suivante, les produits non achetés (liste validée et « ajoutés depuis la validation ») reviennent en préparation
 CREATE FUNCTION grocery_carry_over_unbought(p_account uuid) RETURNS integer LANGUAGE plpgsql AS $$
 DECLARE v_n integer;
 BEGIN
   UPDATE grocery_list_items
-     SET state = 'preparing', list_id = NULL, store_chain = NULL, reference_name = NULL, unit_price = NULL, price_unit = NULL, not_bought_last_time = true
+     SET state = 'preparing', list_id = NULL, store_chain = NULL, reference_name = NULL, unit_price = NULL, price_unit = NULL, not_bought_last_time = true,
+         needed_amount = NULL, needed_unit = NULL, quantity_to_check = false, is_pantry = false, is_selected = true
    WHERE account_id = p_account AND state IN ('validated', 'added_after_validation');
   GET DIAGNOSTICS v_n = ROW_COUNT;
   RETURN v_n;

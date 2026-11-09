@@ -23,6 +23,10 @@ export interface MyLine {
   price: number | null;
   /** Article vendu au kilo ou au litre : prix au kilo ou au litre, non totalisé (CR-40). Vide pour l'invité secondaire. */
   perMeasure: { value: number; unit: "kg" | "l" } | null;
+  /** Produit au poids dont le poids est connu (besoin du menu ou poids saisi) : en kilos ou en litres ; son montant, poids × prix au kilo, entre dans le total (CR-50). */
+  weight: number | null;
+  /** Besoin du menu (« 2 paquets · 900 g pour le menu ») : visible aussi de l'invité secondaire, sans prix. */
+  need: { amount: number; unit: "g" | "ml" | "piece" } | null;
 }
 
 export interface MyStore {
@@ -48,6 +52,23 @@ export interface MyList {
 }
 
 const round2 = (n: number) => Number(n.toFixed(2));
+
+/** Poids (kilos ou litres) d'un produit au poids, d'après le besoin du menu gardé à la validation ; null si inconnu. */
+function weightOf(r: { price_unit: string | null; needed_amount: string | null; needed_unit: "g" | "ml" | "piece" | null }): number | null {
+  if (r.needed_amount === null) return null;
+  const amount = Number(r.needed_amount);
+  if (r.price_unit === "kg" && r.needed_unit === "g") return Math.round(amount) / 1000;
+  if (r.price_unit === "l" && r.needed_unit === "ml") return Math.round(amount) / 1000;
+  return null;
+}
+
+/** Montant d'une ligne : quantité × prix d'un article, ou poids × prix au kilo quand le poids est connu ; null sinon (prix au kilo sans poids : non totalisé, CR-40). */
+function lineTotal(r: { unit_price: string | null; price_unit: string | null; quantity: number; needed_amount: string | null; needed_unit: "g" | "ml" | "piece" | null }): number | null {
+  if (r.unit_price === null) return null;
+  if (!r.price_unit || r.price_unit === "unit") return round2(Number(r.unit_price) * r.quantity);
+  const weight = weightOf(r);
+  return weight === null ? null : round2(weight * Number(r.unit_price));
+}
 const isoDay = (value: Date | string) => (typeof value === "string" ? value.slice(0, 10) : `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`);
 
 export async function myList(ctx: Ctx, session: SessionContext): Promise<MyList> {
@@ -60,8 +81,8 @@ export async function myList(ctx: Ctx, session: SessionContext): Promise<MyList>
 
   const [rows, added, aisles] = await Promise.all([
     // lecture par grocery_list_for : le prix estimé n'est rendu qu'au couple (CR-38), le magasin et la référence restent visibles pour l'invité secondaire
-    sql<{ name_key: string; label: string; quantity: number; state: string; store_chain: string | null; reference_name: string | null; unit_price: string | null; aisle_id: number | null; created_at: Date; package_format: string | null; price_unit: string | null }>`
-      select name_key, label, quantity, state, store_chain, reference_name, unit_price, aisle_id, bought_at as created_at, package_format, price_unit
+    sql<{ name_key: string; label: string; quantity: number; state: string; store_chain: string | null; reference_name: string | null; unit_price: string | null; aisle_id: number | null; created_at: Date; package_format: string | null; price_unit: string | null; needed_amount: string | null; needed_unit: "g" | "ml" | "piece" | null }>`
+      select name_key, label, quantity, state, store_chain, reference_name, unit_price, aisle_id, bought_at as created_at, package_format, price_unit, needed_amount, needed_unit
         from grocery_list_for(${who.userId}::uuid)
        where list_id = ${list.id}::uuid and state = 'validated'
        order by label`.execute(ctx.db).then((r) => r.rows),
@@ -90,14 +111,16 @@ export async function myList(ctx: Ctx, session: SessionContext): Promise<MyList>
             reference: r.reference_name,
             format: r.package_format,
             qty: r.quantity,
-            price: showPrices && r.unit_price !== null && (!r.price_unit || r.price_unit === "unit") ? round2(Number(r.unit_price) * r.quantity) : null,
+            price: showPrices ? lineTotal(r) : null,
+            weight: weightOf(r),
+            need: r.needed_amount !== null && r.needed_unit ? { amount: Number(r.needed_amount), unit: r.needed_unit } : null,
             perMeasure: showPrices && r.unit_price !== null && (r.price_unit === "kg" || r.price_unit === "l") ? { value: Number(r.unit_price), unit: r.price_unit === "kg" ? ("kg" as const) : ("l" as const) } : null,
           })),
         }));
-      const sum = items.reduce((s, r) => s + (r.unit_price !== null && (!r.price_unit || r.price_unit === "unit") ? Number(r.unit_price) * r.quantity : 0), 0);
+      const sum = items.reduce((s, r) => s + (lineTotal(r) ?? 0), 0);
       return { name: chain ? displayPlace(chain) : "À trouver sur place", city: chain ? cityOf(chain) : null, subtotal: showPrices && chain ? round2(sum) : null, aisles: aisleList };
     });
-  const remaining = showPrices ? round2(rows.reduce((s, r) => s + (r.unit_price !== null && (!r.price_unit || r.price_unit === "unit") ? Number(r.unit_price) * r.quantity : 0), 0)) : null;
+  const remaining = showPrices ? round2(rows.reduce((s, r) => s + (lineTotal(r) ?? 0), 0)) : null;
   const late = added.filter((a) => a.late);
   return { ...base, empty: false, late, stores, remaining, allBought: rows.length === 0 && late.length === 0 };
 }

@@ -32,7 +32,7 @@ async function list(c: ConsoleContext, query: ConsoleQuery) {
     .selectFrom("v_grocery_product_references as r")
     .innerJoin("grocery_products as p", "p.id", "r.product_id")
     .innerJoin("grocery_aisles as a", "a.id", "p.aisle_id")
-    .select(["r.reference_id", "p.name as product", "a.name as aisle", "p.aisle_id", "r.store_chain", "r.reference_name", "r.unit_price", "r.price_date", "r.is_compliant", "r.excluded_because", "r.compliance_status", "r.composition_text", "r.package_format", "r.package_amount", "r.package_unit", "r.price_unit", "r.price_per_measure", "r.measure_unit"])
+    .select(["r.reference_id", "r.product_id", "p.is_pantry", "p.name as product", "a.name as aisle", "p.aisle_id", "r.store_chain", "r.reference_name", "r.unit_price", "r.price_date", "r.is_compliant", "r.excluded_because", "r.compliance_status", "r.composition_text", "r.package_format", "r.package_amount", "r.package_unit", "r.price_unit", "r.price_per_measure", "r.measure_unit"])
     .select((eb) => eb.selectFrom("grocery_product_references as x").select("x.additives").whereRef("x.id", "=", "r.reference_id").as("additives"))
     .orderBy("p.name")
     .orderBy("r.store_chain");
@@ -62,6 +62,7 @@ export const references: ConsoleObject = {
         { key: "store", label: "Enseigne" },
         { key: "ref", label: "Référence" },
         { key: "format", label: "Format" },
+        { key: "pantry", label: "Placard" },
         { key: "price", label: "Prix", align: "right" },
         { key: "perMeasure", label: "Au kilo / au litre", align: "right" },
         { key: "date", label: "Date du prix" },
@@ -76,6 +77,7 @@ export const references: ConsoleObject = {
           store: displayPlace(r.store_chain ?? ""),
           ref: r.reference_name ?? "",
           format: r.package_format ?? "—",
+          pantry: r.is_pantry ? "oui" : "non",
           price: r.unit_price !== null && r.price_unit !== "unit" ? `${euro(r.unit_price)}/${r.price_unit === "kg" ? "kg" : "L"}` : euro(r.unit_price),
           perMeasure: r.price_per_measure !== null && r.measure_unit ? `${euro(r.price_per_measure)}/${r.measure_unit === "kg" ? "kg" : "L"}` : "—",
           date: dateFr(r.price_date as Date | string | null) || "—",
@@ -88,6 +90,7 @@ export const references: ConsoleObject = {
             fields: [
               { key: "ref", label: "Référence", type: "text" as const, value: r.reference_name, required: true },
               { key: "format", label: "Format (« 1 kg », vide si inconnu)", type: "text" as const, value: r.package_format ?? "" },
+              { key: "pantry", label: "Produit « placard » (sel, huile, épices… : décoché par défaut dans la liste ; vaut pour toutes les références du produit)", type: "select" as const, value: r.is_pantry ? "oui" : "non", options: [{ value: "non", label: "Non" }, { value: "oui", label: "Oui, placard" }] },
               { key: "unitPrice", label: "Le prix est exprimé", type: "select" as const, value: r.price_unit, options: [{ value: "unit", label: "Par article (paquet, boîte…)" }, { value: "kg", label: "Au kilo (produit vendu au poids)" }, { value: "l", label: "Au litre" }] },
               { key: "price", label: "Prix unitaire (€, vide = N/A)", type: "text" as const, value: r.unit_price === null ? "" : String(r.unit_price) },
               { key: "date", label: "Date du prix (AAAA-MM-JJ, vide si pas de prix)", type: "text" as const, value: r.price_date ? isoDate(r.price_date as Date | string) : "" },
@@ -124,6 +127,11 @@ export const references: ConsoleObject = {
       .set({ reference_name: reference, ...(values.unitPrice ? { price_unit: oneOfPriceUnit(values.unitPrice) } : {}), package_format: (values.format ?? "").trim().slice(0, 80) || null, unit_price: price === null ? null : price.toFixed(2), price_date: price === null ? null : (date as never), compliance_status: status, updated_at: now })
       .where("id", "=", id)
       .execute();
+    // « placard » est une marque du produit : elle vaut pour toutes ses références (CR-50, CR-51)
+    if (values.pantry === "oui" || values.pantry === "non") {
+      const row = await db.selectFrom("grocery_product_references").select("product_id").where("id", "=", id).executeTakeFirst();
+      if (row) await db.updateTable("grocery_products").set({ is_pantry: values.pantry === "oui", updated_at: now }).where("id", "=", row.product_id).execute();
+    }
     await logAdminAction(db, { adminId: c.adminId, action: "grocery_catalog_changed", entityType: "grocery_reference", entityId: id, details: { action }, now });
   },
 

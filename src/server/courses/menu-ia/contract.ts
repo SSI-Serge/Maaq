@@ -11,6 +11,16 @@ export const MAX_STEPS = 30;
 
 const text = (max: number) => z.string().trim().min(1).max(max);
 
+/** Unités d'un ingrédient dans le format du menu ; « cuillere » et « pincee » deviennent spoon et pinch en base (CR-50). */
+export const INGREDIENT_UNITS = ["g", "kg", "ml", "cl", "l", "piece", "cuillere", "pincee"] as const;
+
+export const ingredientInput = z.strictObject({
+  nom: text(120),
+  /** Quantité pour le NOMBRE DE PERSONNES DU FOYER (pas pour 4), dans l'unité `unite`. */
+  quantite: z.number().positive().max(100_000).optional(),
+  unite: z.enum(INGREDIENT_UNITS).optional(),
+});
+
 export const dishInput = z.strictObject({
   /** Identifiant d'un plat de « Mes plats » donné dans le contexte (« H:… ») ; sinon le plat est reconnu par son nom, ou c'est un plat libre. */
   plat_id: z.string().trim().max(60).optional(),
@@ -18,9 +28,10 @@ export const dishInput = z.strictObject({
   /** Cuisine du plat (une de celles du contexte) : obligatoire pour un plat libre. */
   cuisine: z.string().trim().max(60).optional(),
   duree_minutes: z.number().int().min(1).max(600).optional(),
+  /** Recette écrite pour le nombre de personnes du foyer (CR-49), pour TOUT plat : libre, de Mes plats ou du catalogue. */
   recette: z.string().trim().max(4000).optional(),
-  /** Ingrédients d'un plat libre, un produit par entrée, sans quantité. */
-  ingredients: z.array(text(120)).max(40).optional(),
+  /** Ingrédients de TOUT plat du menu, un produit par entrée, avec leur quantité pour le foyer (CR-50). */
+  ingredients: z.array(ingredientInput).max(40).optional(),
   version_allegee: z
     .strictObject({
       texte: text(1000),
@@ -56,6 +67,7 @@ export const menuInput = z.strictObject({
 
 export type MenuInput = z.infer<typeof menuInput>;
 export type DishInput = z.infer<typeof dishInput>;
+export type IngredientInput = z.infer<typeof ingredientInput>;
 export type StepInput = z.infer<typeof stepInput>;
 
 /** Schéma JSON de l'outil, tiré du schéma ci-dessus (une seule source). */
@@ -81,7 +93,7 @@ export const MENU_TOOLS = [
   {
     name: "proposer_menu",
     description:
-      "Rend le menu de la semaine à MAAQ, qui l'affiche en carte dans le tchat avec le bouton « Valider le menu ». 7 dîners (lundi à dimanche) et 4 plats express, tous respectant les régimes et allergies du foyer. Les cinq premiers dîners forment la séance de batch : donne leur déroulé dans `etapes`. Rappelle l'outil avec le menu COMPLET à chaque correction demandée. Réservé aux parents du couple.",
+      "Rend le menu de la semaine à MAAQ, qui l'affiche en carte dans le tchat avec le bouton « Valider le menu ». 7 dîners (lundi à dimanche) et 4 plats express, tous respectant les régimes et allergies du foyer. POUR CHAQUE plat, express compris, y compris ceux de « Mes plats » et du catalogue : la recette ET la liste des ingrédients avec leur quantité et leur unité, écrites pour le NOMBRE DE PERSONNES du foyer (900 g de blanc de poulet pour 6, pas pour 4). Les cinq premiers dîners forment la séance de batch : donne leur déroulé dans `etapes`. Rappelle l'outil avec le menu COMPLET à chaque correction demandée. Réservé aux parents du couple.",
     input_schema: menuToolSchema(),
   },
 ] as const;
