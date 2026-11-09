@@ -21,6 +21,7 @@ const schema = z.object({
   replacementSource: z.enum(["own", "cuisine"]).optional(),
   replacementCuisineId: z.number().int().nullable().optional(),
   budgetDay: z.number().int().min(1).max(31).optional(),
+  monthlyBudget: z.number().min(1).max(99999).nullable().optional(),
   cuisineIds: z.array(z.number().int()).max(50).optional(),
   stores: z.array(z.object({ chain: z.string().max(80), city: z.string().max(80) })).max(30).optional(),
   diets: z.array(z.string().max(80)).max(20).optional(),

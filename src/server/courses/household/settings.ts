@@ -49,6 +49,8 @@ export interface SettingsView {
   replacementSource: "own" | "cuisine";
   replacementCuisineId: number | null;
   budgetDay: number;
+  /** Budget mensuel des repas en euros (hors restaurant, boissons et réceptions) : le menu du mois dans le budget le compare au coût de 4 semaines (CR-59) ; vide tant qu'il n'est pas renseigné. */
+  monthlyBudget: number | null;
   sharePrices: boolean;
   cuisineIds: number[];
   stores: { chain: string; city: string }[];
@@ -141,6 +143,7 @@ export async function loadSettings(db: Kysely<DB>, accountId: string): Promise<S
     replacementSource: (row?.replacement_source as "own" | "cuisine" | undefined) ?? "own",
     replacementCuisineId: row?.replacement_cuisine_id ?? null,
     budgetDay: row?.budget_day ?? 1,
+    monthlyBudget: row?.monthly_meal_budget === null || row?.monthly_meal_budget === undefined ? null : Number(row.monthly_meal_budget),
     sharePrices: row?.share_prices ?? false,
     cuisineIds: cuisines.map((c) => c.cuisine_id).sort((a, b) => a - b),
     stores: stores.map((s) => ({ chain: displayPlace(s.store_chain), city: displayPlace(s.store_city) })),
@@ -163,6 +166,7 @@ export interface SettingsInput {
   replacementSource?: "own" | "cuisine";
   replacementCuisineId?: number | null;
   budgetDay?: number;
+  monthlyBudget?: number | null;
   cuisineIds?: number[];
   stores?: { chain: string; city: string }[];
   diets?: string[];
@@ -192,6 +196,7 @@ export async function saveSettings(ctx: Ctx, session: SessionContext, input: Set
   if (input.shoppingDays && input.shoppingDays.some((d) => !Number.isInteger(d) || d < 1 || d > 7)) throw courseError("invalid_days", "Jours de courses non valides.", 422);
   if (input.budgetDay !== undefined && (!Number.isInteger(input.budgetDay) || input.budgetDay < 1 || input.budgetDay > 31)) throw courseError("invalid_budget_day", "Le jour du budget va de 1 à 31.", 422);
   if (input.repeatWeeks !== undefined && input.repeatWeeks !== null && (input.repeatWeeks < 1 || input.repeatWeeks > 4)) throw courseError("invalid_repeat", "Un plat ne revient pas avant 1 à 4 semaines.", 422);
+  if (input.monthlyBudget !== undefined && input.monthlyBudget !== null && (!Number.isFinite(input.monthlyBudget) || input.monthlyBudget < 1 || input.monthlyBudget > 99999)) throw courseError("invalid_budget", "Le budget mensuel va de 1 à 99 999 €.", 422);
   if (input.stores && input.stores.length > MAX_STORES) throw courseError("too_many_stores", `Au plus ${MAX_STORES} enseignes.`, 422);
   const source = input.replacementSource;
   if (source === "cuisine" && !input.replacementCuisineId) throw courseError("cuisine_required", "Choisissez la cuisine des remplacements.", 422);
@@ -213,6 +218,7 @@ export async function saveSettings(ctx: Ctx, session: SessionContext, input: Set
         set.replacement_cuisine_id = source === "cuisine" ? (input.replacementCuisineId ?? null) : null;
       }
       if (input.budgetDay !== undefined) set.budget_day = input.budgetDay;
+      if (input.monthlyBudget !== undefined) set.monthly_meal_budget = input.monthlyBudget === null ? null : input.monthlyBudget.toFixed(2);
       await trx
         .insertInto("grocery_household_settings")
         .values({ account_id: who.accountId, ...set } as never)

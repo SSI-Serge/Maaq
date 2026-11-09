@@ -32,6 +32,8 @@ interface Form {
   source: "own" | "cuisine";
   sourceCuisine: number | null;
   budgetDay: number;
+  /** Budget mensuel des repas, en euros (texte saisi) ; vide tant qu'il n'est pas renseigné. */
+  monthlyBudget: string;
   stores: { chain: string; city: string }[];
 }
 
@@ -49,6 +51,7 @@ function fromView(v: SettingsView): Form {
     source: v.replacementSource,
     sourceCuisine: v.replacementCuisineId,
     budgetDay: v.budgetDay,
+    monthlyBudget: v.monthlyBudget === null ? "" : String(v.monthlyBudget),
     stores: v.stores,
   };
 }
@@ -99,6 +102,7 @@ function SettingsForm({ initial }: { initial: SettingsView }) {
         replacementSource: form.source,
         replacementCuisineId: form.source === "cuisine" ? form.sourceCuisine : null,
         budgetDay: form.budgetDay,
+        monthlyBudget: form.monthlyBudget.trim() ? Number(form.monthlyBudget.replace(",", ".")) : null,
         cuisineIds: form.cuisines,
         stores: form.stores,
         diets: form.diets,
@@ -289,6 +293,10 @@ function SettingsForm({ initial }: { initial: SettingsView }) {
                   </option>
                 ))}
               </select>
+              <label className={family.settingType} htmlFor="cr-month-budget">
+                Budget mensuel des repas (€, hors restaurant, boissons et réceptions)
+              </label>
+              <input id="cr-month-budget" className={family.input} inputMode="decimal" placeholder="Par exemple 420" aria-label="Budget mensuel des repas" value={form.monthlyBudget} onChange={(e) => patch({ monthlyBudget: e.target.value.replace(/[^0-9.,]/g, "").slice(0, 7) })} />
             </div>
 
             <div className={family.settingRow} style={{ borderColor: "var(--secondary)" }}>

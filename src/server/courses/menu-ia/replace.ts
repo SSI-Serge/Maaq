@@ -51,15 +51,19 @@ async function ownCandidates(ctx: Ctx, accountId: string, proposal: MenuProposal
   return data.dishes.filter((d) => d.mine && !inMenu.has(norm(d.name))).map((d) => ({ id: d.id, name: d.name }));
 }
 
+/** Plats que « Remplacer » propose pour un plat d'une proposition (carte du menu ou du menu du mois). */
+export async function optionsForProposal(ctx: Ctx, accountId: string, p: MenuProposal, kind: ReplaceKind, index: number): Promise<ReplaceOptions> {
+  position(p, kind, index);
+  return {
+    express: kind === "dinner" ? p.express.map((d, i) => ({ index: i, name: d.name })) : [],
+    dinners: p.dinners.map((d, i) => ({ index: i, name: d.name })).filter((d) => !(kind === "dinner" && d.index === index)),
+    own: await ownCandidates(ctx, accountId, p),
+  };
+}
+
 export async function replaceOptions(ctx: Ctx, session: SessionContext, input: { messageId: string; kind: ReplaceKind; index: number }): Promise<ReplaceOptions> {
   const { who, card } = await openCard(ctx, session, input.messageId);
-  const p = card.envelope.proposal;
-  position(p, input.kind, input.index);
-  return {
-    express: input.kind === "dinner" ? p.express.map((d, index) => ({ index, name: d.name })) : [],
-    dinners: p.dinners.map((d, index) => ({ index, name: d.name })).filter((d) => !(input.kind === "dinner" && d.index === input.index)),
-    own: await ownCandidates(ctx, who.accountId, p),
-  };
+  return optionsForProposal(ctx, who.accountId, card.envelope.proposal, input.kind, input.index);
 }
 
 /** Quantités d'un plat de « Mes plats » : celles de son dernier menu validé, ramenées au foyer ; vide si aucun menu validé ne les donne. */
@@ -84,29 +88,27 @@ export async function lastOwnQuantities(db: Kysely<DB>, accountId: string, house
   });
 }
 
-export async function replaceDish(ctx: Ctx, session: SessionContext, input: { messageId: string; kind: ReplaceKind; index: number; choice: ReplaceChoice }): Promise<CardView> {
-  const { who, card } = await openCard(ctx, session, input.messageId);
-  const p = card.envelope.proposal;
+/** Remplace un plat d'une proposition (carte du menu ou carte du menu du mois) sans IA : rend la proposition mise à jour (contrôles, durée, déroulé à mettre à jour). */
+export async function replaceInProposal(ctx: Ctx, accountId: string, p: MenuProposal, kind: ReplaceKind, index: number, c: ReplaceChoice): Promise<MenuProposal> {
+  const who = { accountId };
   const dinners = [...p.dinners];
   const express = [...p.express];
-  const old = position(p, input.kind, input.index);
-  const c = input.choice;
-
+  const old = position(p, kind, index);
   if (c.group === "express") {
-    if (input.kind !== "dinner") throw courseError("invalid_choice", "Un plat express ne se remplace pas par un plat express.", 422);
+    if (kind !== "dinner") throw courseError("invalid_choice", "Un plat express ne se remplace pas par un plat express.", 422);
     const other = express[c.index];
     if (!other) throw courseError("invalid_dish", "Ce plat express n'existe plus dans le menu.", 422);
-    dinners[input.index] = other;
+    dinners[index] = other;
     express[c.index] = old;
   } else if (c.group === "dinners") {
     const other = dinners[c.index];
-    if (!other || (input.kind === "dinner" && c.index === input.index)) throw courseError("invalid_dish", "Ce dîner n'existe plus dans le menu.", 422);
-    if (input.kind === "dinner") {
-      dinners[input.index] = other;
+    if (!other || (kind === "dinner" && c.index === index)) throw courseError("invalid_dish", "Ce dîner n'existe plus dans le menu.", 422);
+    if (kind === "dinner") {
+      dinners[index] = other;
       dinners[c.index] = old;
     } else {
       dinners[c.index] = old;
-      express[input.index] = other;
+      express[index] = other;
     }
   } else {
     const settings = await loadSettings(ctx.db, who.accountId);
@@ -120,11 +122,16 @@ export async function replaceDish(ctx: Ctx, session: SessionContext, input: { me
     const errors: string[] = [];
     const resolved = resolveDish({ plat_id: known.id, nom: known.name, ingredients: quantities.length ? quantities : undefined } as never, { data, cuisines, householdSize: settings.householdSize, now: ctx.now, newId: randomUUID }, p.week, errors, "Plat");
     if (!resolved) throw courseError("invalid_dish", errors.join(" "), 422);
-    if (input.kind === "dinner") dinners[input.index] = resolved;
-    else express[input.index] = resolved;
+    if (kind === "dinner") dinners[index] = resolved;
+    else express[index] = resolved;
   }
 
-  const next = refreshProposal(p, dinners, express);
+  return refreshProposal(p, dinners, express);
+}
+
+export async function replaceDish(ctx: Ctx, session: SessionContext, input: { messageId: string; kind: ReplaceKind; index: number; choice: ReplaceChoice }): Promise<CardView> {
+  const { who, card } = await openCard(ctx, session, input.messageId);
+  const next = await replaceInProposal(ctx, who.accountId, card.envelope.proposal, input.kind, input.index, input.choice);
   await updateCardProposal(ctx.db, card.id, card.envelope, next);
   const replacesValidated = (await validatedWeeks(ctx.db, who.accountId, [next.week])).size > 0;
   return cardView(card.id, { ...card.envelope, proposal: next }, false, replacesValidated);
