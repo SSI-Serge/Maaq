@@ -1,3 +1,4 @@
+import { sql } from "kysely";
 import type { Ctx, SessionContext } from "@/server/auth/service";
 import { asProfile } from "@/server/assistant/outings/profile";
 import { nameKey } from "../catalog/seed";
@@ -109,8 +110,12 @@ export async function insertMenuEntry(
   d: ProposalDish,
   refs: Map<string, { kind: "catalog"; dishId: string } | { kind: "household"; dishId: string }>,
   prods: ReturnType<typeof buildRefProducts>,
+  /** Le choix des plats de saison est déjà compté (revalidation d'une semaine : les anciennes lignes sont supprimées avant, le compteur ne doit pas monter deux fois). */
+  counted = false,
 ): Promise<string> {
   const ref = d.engineId ? refs.get(d.engineId) : undefined;
+  // plat de la base commune des plats de saison : le compteur de choix monte une seule fois par foyer et par plat, AVANT d'écrire la ligne qui porte season_dish_id (CR-61)
+  if (d.seasonDishId && !counted) await sql`select choose_season_dish(${accountId}::uuid, ${d.seasonDishId}::bigint)`.execute(trx);
   const inserted = await trx
     .insertInto("meal_menu_entries")
     .values({
@@ -128,6 +133,7 @@ export async function insertMenuEntry(
       duration_minutes: d.origin === "ai" ? d.minutes : null,
       light_by_ai: !!d.light,
       light_text: d.light?.text ?? null,
+      season_dish_id: (d.seasonDishId ?? null) as never,
     })
     .returning("id")
     .executeTakeFirstOrThrow();
@@ -191,6 +197,8 @@ export async function saveValidatedMenu(ctx: Ctx, accountId: string, userId: str
         // nombre de personnes pour lequel les recettes et les quantités sont écrites (CR-49)
         servings: proposal.householdSize,
       };
+      // plats de saison de la base commune : le choix est compté AVANT que les anciennes lignes de cette semaine soient supprimées, une seule fois par foyer et par plat (CR-61)
+      for (const id of new Set([...proposal.dinners, ...proposal.express].map((d) => d.seasonDishId).filter((x): x is string => !!x))) await sql`select choose_season_dish(${accountId}::uuid, ${id}::bigint)`.execute(trx);
       let menu: { id: string };
       if (existing) {
         menu = existing;
@@ -213,7 +221,7 @@ export async function saveValidatedMenu(ctx: Ctx, accountId: string, userId: str
         ...proposal.express.map((d, i) => ({ kind: "express" as const, slot: i + 1, d })),
       ];
       for (const { kind, slot, d } of rows) {
-        entryIds.set(`${kind}:${slot}`, await insertMenuEntry(trx, accountId, menu.id, kind, slot, d, data.refs, prods));
+        entryIds.set(`${kind}:${slot}`, await insertMenuEntry(trx, accountId, menu.id, kind, slot, d, data.refs, prods, true));
         dishesForList.push(toDish(d));
       }
 

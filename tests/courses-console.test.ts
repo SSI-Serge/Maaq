@@ -179,3 +179,37 @@ describe("Console du catalogue : produit « placard » (CR-50, CR-51)", () => {
     expect((await loadObject(c, "references", q({}, String(row.cells.product)))).rows.find((r) => r.id === row.id)!.cells.pantry).toBe("non");
   });
 });
+
+describe("Console : plats de saison de la base commune (CR-61)", () => {
+  it("la liste montre le plat, ses mois, ses étiquettes et ses choix ; masquer le retire de la recherche, le réafficher le remet ; corriger les mois et les étiquettes est inscrit au journal", async () => {
+    const { shareSeasonDishes } = await import("@/server/courses/season/base");
+    const cuisine = (await db.selectFrom("meal_cuisines").select("id").orderBy("id").executeTakeFirstOrThrow()).id;
+    const name = `Plat console ${uid()}`;
+    const [id] = await shareSeasonDishes(db, [{ name, cuisineId: cuisine, servings: 4, recipe: "Cuire.", minutes: 30, months: [11, 12], tagIds: [], ingredients: [{ label: "Courgettes", quantity: 500, unit: "g" }] }]);
+    const row = () => loadObject(c, "plats-de-saison", q({}, name)).then((t) => t.rows.find((r) => r.id === id));
+    expect((await row())!.cells).toMatchObject({ name, months: "novembre → décembre", chosen: 0, state: "Visible" });
+    expect((await row())!.actions.map((a) => a.key)).toEqual(["edit", "hide"]);
+
+    await runAction(c, "plats-de-saison", "hide", id, {});
+    expect((await row())!.cells.state).toBe("Masqué");
+    expect((await loadObject(c, "plats-de-saison", q({ state: "hidden" }, name))).rows.map((r) => r.id)).toContain(id);
+    expect((await loadObject(c, "plats-de-saison", q({ state: "visible" }, name))).rows).toEqual([]);
+    await runAction(c, "plats-de-saison", "show", id, {});
+    expect((await row())!.cells.state).toBe("Visible");
+
+    // corriger les mois (mars à mai) et une étiquette de régime existante
+    const tag = await db.selectFrom("meal_dish_tags").select("name").where("kind", "=", "diet").orderBy("id").executeTakeFirst();
+    await runAction(c, "plats-de-saison", "edit", id, { from: "3", to: "5", tags: tag?.name ?? "" });
+    const after = await row();
+    expect(after!.cells.months).toBe("mars → mai");
+    if (tag) expect(after!.cells.tags).toBe(tag.name);
+    expect((await rejection(runAction(c, "plats-de-saison", "edit", id, { from: "3", to: "5", tags: "Étiquette inventée" }))).code).toBe("unknown_tag");
+    expect((await rejection(runAction(c, "plats-de-saison", "hide", "999999999", {}))).code).toBe("not_found");
+    const log = await db.selectFrom("admin_audit_log").select("action_type").where("entity_id", "=", id).where("entity_type", "=", "meal_season_dish").execute();
+    expect(log.length).toBe(3);
+    expect(log.every((l) => l.action_type === "seasonal_dish_changed")).toBe(true);
+    // les réglages de console du module
+    const settings = await loadObject(c, "reglages", q());
+    expect(settings.rows.map((r) => r.id)).toEqual(expect.arrayContaining(["meal_season_dishes_count", "meal_season_dishes_max"]));
+  });
+});

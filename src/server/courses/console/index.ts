@@ -8,6 +8,7 @@ import { prices } from "./objects/prices";
 import { references } from "./objects/references";
 import { taxonomy } from "./objects/taxonomy";
 import { seasons } from "./objects/seasons";
+import { seasonDishes } from "./objects/season-dishes";
 import { unreferenced } from "./objects/unreferenced";
 import { versions } from "./objects/versions";
 import { OBJECT_KEYS, type ConsoleContext, type ConsoleSummary, type ConsoleObject, type ConsoleQuery, type ObjectKey } from "./types";
@@ -28,6 +29,7 @@ const OBJECTS: Partial<Record<ObjectKey, ConsoleObject>> = {
   rayons: aisles,
   "a-referencer": unreferenced,
   "base-commune": prices,
+  "plats-de-saison": seasonDishes,
   reglages: moduleSettings,
 };
 
@@ -43,6 +45,7 @@ export const NAV: { key: ObjectKey; label: string }[] = [
   { key: "versions", label: "Versions allégées" },
   { key: "a-referencer", label: "Produits à référencer" },
   { key: "base-commune", label: "Base commune des prix" },
+  { key: "plats-de-saison", label: "Plats de saison" },
   { key: "reglages", label: "Réglages du module" },
 ];
 

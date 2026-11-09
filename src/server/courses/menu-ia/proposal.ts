@@ -34,6 +34,8 @@ export interface ProposalDish {
   warnings: string[];
   /** Conflit d'allergie ou de régime sur un plat connu : bloque la validation. */
   blockers: string[];
+  /** Plat de la base commune des plats de saison (CR-61) : son identifiant, pour compter son choix à la validation et le retrouver dans Mes plats. */
+  seasonDishId?: string | null;
   /** « 14/10 » : jour où ce plat a déjà été servi dans les semaines récentes ; on peut le garder. */
   servedOn: string | null;
 }

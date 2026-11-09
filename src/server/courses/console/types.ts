@@ -5,7 +5,7 @@ import type { Ctx } from "@/server/auth/service";
  * Les écrans de la console sont tous bâtis sur ces types, pour qu'un nouvel objet ne demande qu'un module serveur.
  */
 
-export const OBJECT_KEYS = ["plats", "cuisines", "references", "additifs", "saisons", "rayons", "plannings", "correspondances", "versions", "a-referencer", "base-commune", "reglages"] as const;
+export const OBJECT_KEYS = ["plats", "cuisines", "references", "additifs", "saisons", "rayons", "plannings", "correspondances", "versions", "a-referencer", "base-commune", "plats-de-saison", "reglages"] as const;
 export type ObjectKey = (typeof OBJECT_KEYS)[number];
 
 export interface ConsoleColumn {
