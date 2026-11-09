@@ -62,6 +62,21 @@ describe("Console du catalogue : cuisines, rayons, additifs", () => {
     expect((await loadObject(c, "cuisines", q())).rows.find((r) => r.id === row.id)!.cells.state).toBe("Masquée");
   });
 
+  it("un rayon se marque « Rayon frais » ou non, depuis la console (US-169 RF2bis)", async () => {
+    const name = `Rayon ${uid()}`;
+    await runAction(c, "rayons", "add", "", { name });
+    const row = (await loadObject(c, "rayons", q())).rows.find((r) => r.cells.name === name)!;
+    expect(row.cells.fresh).toBe("Non");
+    expect(row.actions.map((x) => x.label)).toContain("Marquer rayon frais");
+    await runAction(c, "rayons", "fresh", row.id, {});
+    expect((await db.selectFrom("grocery_aisles").select("is_fresh").where("id", "=", Number(row.id)).executeTakeFirstOrThrow()).is_fresh).toBe(true);
+    const again = (await loadObject(c, "rayons", q())).rows.find((r) => r.cells.name === name)!;
+    expect(again.cells.fresh).toBe("Oui");
+    expect(again.actions.map((x) => x.label)).toContain("Retirer des rayons frais");
+    await runAction(c, "rayons", "fresh", row.id, {});
+    expect((await db.selectFrom("grocery_aisles").select("is_fresh").where("id", "=", Number(row.id)).executeTakeFirstOrThrow()).is_fresh).toBe(false);
+  });
+
   it("un rayon se renomme et se fusionne : les produits suivent", async () => {
     const a = `Rayon A ${uid()}`;
     const b = `Rayon B ${uid()}`;

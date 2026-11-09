@@ -11,7 +11,8 @@ import type { MyList, MyStore } from "@/server/courses/list/mine";
 import type { AddedLine } from "@/server/courses/list/service";
 import { formatQuantity } from "@/server/courses/engine/quantities";
 import { euro, euroPer } from "./ListScreen";
-import { DeleteWeek, WeekSelector, weekFromLocation } from "./WeekTools";
+import { DeleteWeek, WeekSelector, scopeFromLocation, weekFromLocation } from "./WeekTools";
+import family2 from "@/components/family/family.module.css";
 import styles from "./courses.module.css";
 
 const BACK = { href: "/courses", label: "Courses et repas" };
@@ -21,7 +22,9 @@ const UNDO_MS = 8000;
 export function CoursesMyListScreen() {
   // semaine affichée (CR-54) : celle de l'adresse (?week=), sinon la semaine en cours si elle a une liste, puis la suivante
   const [week, setWeek] = useState<string | null>(weekFromLocation);
-  const query = useApiQuery<{ list: MyList }>(`/api/courses/list/mine${week ? `?week=${week}` : ""}`);
+  // liste du mois (CR-56) : « Liste du mois » additionne les semaines regroupées, « Cette semaine seule » montre la liste de la semaine
+  const [scope, setScope] = useState<"week" | "group">(scopeFromLocation);
+  const query = useApiQuery<{ list: MyList }>(`/api/courses/list/mine?${[week ? `week=${week}` : "", scope === "group" ? "scope=group" : ""].filter(Boolean).join("&")}`);
   const [printing, setPrinting] = useState(false);
   const forbidden = query.error?.body?.code === "forbidden";
 
@@ -36,7 +39,7 @@ export function CoursesMyListScreen() {
       {query.loading && !query.data && <Loading slow={query.slow} />}
       {forbidden && <Notice tone="info">La liste de courses n&apos;est pas disponible pour ce profil.</Notice>}
       {query.error && !forbidden && <RetryNotice message={query.error.message} onRetry={query.reload} />}
-      {query.data && <Content key={query.data.list.week ?? "none"} list={query.data.list} reload={query.reload} onPrint={print} printing={printing} onWeek={setWeek} />}
+      {query.data && <Content key={query.data.list.week ?? "none"} list={query.data.list} reload={query.reload} onPrint={print} printing={printing} onWeek={setWeek} onScope={setScope} />}
     </>
   );
   if (printing) return <div style={{ padding: 16, background: "#fff", color: "#000" }}>{body}</div>;
@@ -47,7 +50,7 @@ export function CoursesMyListScreen() {
   );
 }
 
-function Content({ list, reload, onPrint, printing, onWeek }: { list: MyList; reload: () => void; onPrint: () => void; printing: boolean; onWeek: (week: string) => void }) {
+function Content({ list, reload, onPrint, printing, onWeek, onScope }: { list: MyList; reload: () => void; onPrint: () => void; printing: boolean; onWeek: (week: string) => void; onScope: (scope: "week" | "group") => void }) {
   const bought = useApiMutation();
   const add = useApiMutation();
   const drop = useApiMutation();
@@ -101,6 +104,17 @@ function Content({ list, reload, onPrint, printing, onWeek }: { list: MyList; re
   // le sélecteur n'apparaît que si les deux semaines ont une liste (CR-54)
   // le sélecteur porte sur les semaines qui ont une liste (CR-56)
   const withList = list.weeks.filter((w) => w.hasList);
+  const scopes =
+    !printing && list.group ? (
+      <div className={family.wrapRow} role="group" aria-label="Affichage">
+        <button type="button" className={family.chipToggle} aria-pressed={list.scope === "week"} onClick={() => onScope("week")}>
+          Cette semaine seule
+        </button>
+        <button type="button" className={family.chipToggle} aria-pressed={list.scope === "group"} onClick={() => onScope("group")}>
+          Liste du mois ({list.group.weeks.length} semaines)
+        </button>
+      </div>
+    ) : null;
   const selector = !printing && withList.length > 1 ? <WeekSelector weeks={withList} week={list.week} onChange={onWeek} /> : null;
   const weekText = `de la semaine ${list.weeks.find((w) => w.week === list.week)?.range ?? ""}`;
   const remover = !printing && couple && list.week && list.hasMenu ? <DeleteWeek week={list.week} weekText={weekText} hasList={!list.empty} onDone={reload} /> : null;
@@ -109,6 +123,7 @@ function Content({ list, reload, onPrint, printing, onWeek }: { list: MyList; re
     return (
       <>
         {selector}
+        {scopes}
         <p className={styles.empty}>
           Aucune liste validée {list.week ? "pour cette semaine" : "cette semaine"}. <Link href={list.hasMenu ? `/courses/liste${list.week ? `?week=${list.week}` : ""}` : "/courses?menu=1"}>{list.hasMenu ? "Préparer la liste ›" : "Préparer le menu ›"}</Link>
         </p>
@@ -126,6 +141,7 @@ function Content({ list, reload, onPrint, printing, onWeek }: { list: MyList; re
   return (
     <>
       {selector}
+      {scopes}
       {!printing && (
         <div className={styles.tools}>
           <Button variant="ghost" onClick={onPrint}>
@@ -152,6 +168,15 @@ function Content({ list, reload, onPrint, printing, onWeek }: { list: MyList; re
         )}
       </section>
 
+      {list.later.map((l) => (
+        <section key={l.week} className={styles.dayCard} aria-label={`À acheter plus tard (${l.label})`}>
+          <div className={styles.dayHead}>
+            <span className={styles.dayName}>À acheter plus tard ({l.label})</span>
+            <span className={styles.meta}>{l.names.length} produit{l.names.length > 1 ? "s" : ""}</span>
+          </div>
+          <span className={styles.meta}>Produits frais de la semaine suivante : décochés, hors du reste à acheter. {l.names.join(" · ")}</span>
+        </section>
+      ))}
       {!printing && <p className={family.hint}>Cochez au fur et à mesure : un produit acheté sort de la liste et rejoint votre historique.</p>}
       {stores.map((s) => (
         <StoreBlock key={s.name} store={s} couple={couple} printing={printing} onTick={(key, name) => void tick(key, name, false)} />

@@ -27,6 +27,12 @@ export function weekFromLocation(): string | null {
   return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
 }
 
+/** « scope=group » dans l'adresse : Ma liste s'ouvre sur la liste du mois (CR-56). */
+export function scopeFromLocation(): "week" | "group" {
+  if (typeof window === "undefined") return "week";
+  return new URLSearchParams(window.location.search).get("scope") === "group" ? "group" : "week";
+}
+
 /**
  * « Supprimer… » (couple seulement) : supprime définitivement le menu de la semaine (avec sa liste) ou seulement sa liste, après confirmation. Les tickets, les prix, « Mes plats »
  * et le plafond de menus du jour ne sont pas touchés.

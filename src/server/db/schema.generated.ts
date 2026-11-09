@@ -23,7 +23,7 @@ export type ArrayTypeImpl<T> = T extends ColumnType<infer S, infer I, infer U>
   ? ColumnType<S[], I[], U[]>
   : T[];
 
-export type AuditAction = "account_created" | "account_updated" | "activation_link_resent" | "agent_blocked" | "agent_published" | "agent_reactivated" | "agent_restored" | "agent_retired" | "contract_analysis_decided" | "contract_archived" | "contract_created" | "contract_document_field_changed" | "contract_field_changed" | "contract_review_viewed" | "contract_updated" | "device_revoked_by_admin" | "grocery_catalog_changed" | "grocery_price_moderated" | "meal_catalog_changed" | "meal_planning_changed" | "presentation_updated";
+export type AuditAction = "account_created" | "account_updated" | "activation_link_resent" | "agent_blocked" | "agent_published" | "agent_reactivated" | "agent_restored" | "agent_retired" | "contract_analysis_decided" | "contract_archived" | "contract_created" | "contract_document_field_changed" | "contract_field_changed" | "contract_review_viewed" | "contract_updated" | "device_revoked_by_admin" | "grocery_catalog_changed" | "grocery_price_moderated" | "meal_catalog_changed" | "meal_planning_changed" | "presentation_updated" | "seasonal_dish_changed";
 
 export type ChangeScope = "all" | "following" | "this";
 
@@ -1489,6 +1489,10 @@ export interface GroceryAisles {
   name: string;
   sort_order: Generated<number>;
   updated_at: Generated<Timestamp>;
+  /**
+   * Rayon frais (Fruits et légumes, Crémerie, Boucherie, Poissonnerie, Volaille, Charcuterie au départ), réglable dans la console. Dans la liste du mois, les produits d'un rayon frais des semaines après la première sont « À acheter plus tard », décochés et hors total ; ce marquage se lit à la lecture. Un produit sans rayon n'est pas frais. [US-169 RF2bis, US-157 RF9ter, CR-56]
+   */
+  is_fresh: Generated<boolean>;
 }
 
 export interface GroceryCitySharing {
@@ -1542,6 +1546,10 @@ export interface GroceryHouseholdSettings {
   shopping_days: number[] | null;
   updated_at: Generated<Timestamp>;
   updated_by_user_id: string | null;
+  /**
+   * Budget mensuel des repas du foyer, en euros (de 1 à 99 999), hors restaurant, boissons et réceptions. Sert au menu du mois dans le budget ; vide tant que le foyer ne l'a pas renseigné. [US-153, US-178, CR-59]
+   */
+  monthly_meal_budget: Numeric | null;
 }
 
 export interface GroceryHouseholdStores {
@@ -1589,6 +1597,15 @@ export interface GroceryListItems {
   updated_at: Generated<Timestamp>;
 }
 
+export interface GroceryListGroups {
+  account_id: string;
+  created_at: Generated<Timestamp>;
+  id: Generated<string>;
+  scenario: number;
+  validated_at: Generated<Timestamp>;
+  validated_by_user_id: string | null;
+}
+
 export interface GroceryLists {
   account_id: string;
   created_at: Generated<Timestamp>;
@@ -1597,6 +1614,10 @@ export interface GroceryLists {
   scenario: number;
   validated_at: Generated<Timestamp>;
   validated_by_user_id: string | null;
+  /**
+   * Liste du mois (grocery_list_groups) à laquelle cette semaine est regroupée ; vide = liste de la semaine seule. Son scénario d'achat est celui du regroupement (vérifié). Repasse à vide si le regroupement disparaît. [US-157 RF9ter, CR-56]
+   */
+  group_id: string | null;
 }
 
 export interface GroceryPriceSharingEvents {
@@ -2114,6 +2135,10 @@ export interface MealMenuEntries {
   planning_match_to_confirm: Generated<boolean>;
   recipe: string | null;
   slot: number;
+  /**
+   * Plat de la base commune des plats de saison d'où vient ce plat libre (origine ai), quand il a été choisi parmi eux (CR-61) ; repasse à vide si le plat est supprimé de la base. Sert à n'écarter ni ne compter deux fois un plat déjà présent dans les menus du foyer : le compteur de la base commune ne monte qu'une fois par foyer et par plat. [US-178 RF2bis, CR-61, CR-62]
+   */
+  season_dish_id: Int8 | null;
 }
 
 export interface VMealMenuNeeds {
@@ -2188,6 +2213,64 @@ export interface MealMenus {
   validated_at: Generated<Timestamp>;
   validated_by_user_id: string | null;
   week_start: Timestamp;
+}
+
+export interface MealSeasonDishes {
+  /**
+   * Nombre de foyers qui ont choisi ce plat dans un menu validé : une fois par foyer et par plat (choose_season_dish, vérifié par les lignes de menu du foyer), sans rien garder du foyer. Ne redescend pas après une suppression ou une purge de menu. Les plus choisis sont proposés en premier. [CR-61, CR-62]
+   */
+  chosen_count: Generated<number>;
+  cuisine_id: number;
+  duration_minutes: number | null;
+  /**
+   * Lundi de la semaine d'entrée du plat dans la base (jamais le jour : un jour précis, rapproché d'un foyer, permettrait de deviner qui l'a obtenu). [CR-61]
+   */
+  entered_week: Generated<Timestamp>;
+  /**
+   * Date à laquelle l'administrateur a masqué le plat (il n'est plus proposé) ; vide = visible. [CR-61]
+   */
+  hidden_at: Timestamp | null;
+  hidden_by_user_id: string | null;
+  id: Generated<Int8>;
+  name: string;
+  name_key: string;
+  recipe: string | null;
+  /**
+   * Nombre de personnes pour lequel les quantités des ingrédients sont écrites ; l'application met à l'échelle le foyer. [CR-61]
+   */
+  servings: number;
+}
+
+export interface MealSeasonDishIngredients {
+  base_quantity: Generated<Numeric | null>;
+  base_unit: Generated<string | null>;
+  dish_id: Int8;
+  id: Generated<Int8>;
+  label: string;
+  name_key: string;
+  position: Generated<number>;
+  product_id: Int8 | null;
+  quantity: Numeric | null;
+  unit: string | null;
+}
+
+export interface MealSeasonDishMonths {
+  dish_id: Int8;
+  season_month: number;
+}
+
+export interface MealSeasonDishTagLinks {
+  dish_id: Int8;
+  tag_id: number;
+}
+
+export interface MealSeasonHouseholdDishes {
+  account_id: string;
+  dish_id: Int8;
+  /**
+   * Premier jour du mois civil de la sélection, calculé par l'application à l'heure du foyer. [CR-60]
+   */
+  season_month: Timestamp;
 }
 
 export interface OutingCriteria {
@@ -2553,6 +2636,23 @@ export interface VDashboardAgents {
   user_id: string | null;
 }
 
+export interface VMealSeasonDishes {
+  chosen_count: number | null;
+  cuisine_id: number | null;
+  dish_id: Int8 | null;
+  duration_minutes: number | null;
+  entered_week: Timestamp | null;
+  hidden_at: Timestamp | null;
+  hidden_by_user_id: string | null;
+  ingredient_count: Int8 | null;
+  is_hidden: boolean | null;
+  months: number[] | null;
+  name: string | null;
+  name_key: string | null;
+  servings: number | null;
+  tag_ids: number[] | null;
+}
+
 export interface VerificationCodes {
   agent_connection_id: Int8 | null;
   /**
@@ -2834,6 +2934,7 @@ export interface DB {
   grocery_household_dietary: GroceryHouseholdDietary;
   grocery_household_settings: GroceryHouseholdSettings;
   grocery_household_stores: GroceryHouseholdStores;
+  grocery_list_groups: GroceryListGroups;
   grocery_list_items: GroceryListItems;
   grocery_lists: GroceryLists;
   grocery_price_sharing_events: GroceryPriceSharingEvents;
@@ -2876,13 +2977,17 @@ export interface DB {
   meal_light_choices: MealLightChoices;
   meal_light_version_items: MealLightVersionItems;
   meal_light_versions: MealLightVersions;
-  meal_menu_entries: MealMenuEntries;
   meal_menu_daily_counters: MealMenuDailyCounters;
-  v_meal_menu_needs: VMealMenuNeeds;
+  meal_menu_entries: MealMenuEntries;
   meal_menu_entry_ingredients: MealMenuEntryIngredients;
   meal_menu_entry_light_items: MealMenuEntryLightItems;
   meal_menu_session_steps: MealMenuSessionSteps;
   meal_menus: MealMenus;
+  meal_season_dish_ingredients: MealSeasonDishIngredients;
+  meal_season_dish_months: MealSeasonDishMonths;
+  meal_season_dish_tag_links: MealSeasonDishTagLinks;
+  meal_season_dishes: MealSeasonDishes;
+  meal_season_household_dishes: MealSeasonHouseholdDishes;
   outing_criteria: OutingCriteria;
   outing_criteria_themes: OutingCriteriaThemes;
   outing_offer_memory: OutingOfferMemory;
@@ -2917,6 +3022,8 @@ export interface DB {
   v_meal_batch_week_days: VMealBatchWeekDays;
   v_meal_batch_weeks: VMealBatchWeeks;
   v_meal_dishes_console: VMealDishesConsole;
+  v_meal_menu_needs: VMealMenuNeeds;
+  v_meal_season_dishes: VMealSeasonDishes;
   v_never_activated_purge_candidates: VNeverActivatedPurgeCandidates;
   v_profile_agent_missing_items: VProfileAgentMissingItems;
   verification_codes: VerificationCodes;

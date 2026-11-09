@@ -24,14 +24,16 @@ const priceText = (value: number | null) => (value === null ? "N/A" : euro(value
 export function CoursesListScreen() {
   // semaine affichée (CR-54) : celle de l'adresse (?week=), sinon celle que choisit le serveur (en cours, puis suivante)
   const [week, setWeek] = useState<string | null>(weekFromLocation);
-  const query = useApiQuery<{ list: ListPrepared }>(`/api/courses/list${week ? `?week=${week}` : ""}`);
+  // liste du mois (CR-56) : les semaines regroupées, ou aucune
+  const [group, setGroup] = useState<string[] | null>(null);
+  const query = useApiQuery<{ list: ListPrepared }>(group ? `/api/courses/list?group=${group.join(",")}` : `/api/courses/list${week ? `?week=${week}` : ""}`);
   const forbidden = query.error?.body?.code === "forbidden";
   return (
     <AppShell title="Liste de courses" eyebrow="Courses et repas" back={BACK}>
       {query.loading && !query.data && <Loading slow={query.slow} />}
       {forbidden && <Notice tone="info">La liste de courses n&apos;est pas disponible pour ce profil.</Notice>}
       {query.error && !forbidden && <RetryNotice message={query.error.message} onRetry={query.reload} />}
-      {query.data && <ListFlow key={query.data.list.week ?? "none"} list={query.data.list} reload={query.reload} onWeek={setWeek} />}
+      {query.data && <ListFlow key={`${query.data.list.week ?? "none"}|${query.data.list.group?.weeks.join(",") ?? ""}`} list={query.data.list} reload={query.reload} onWeek={(w) => { setGroup(null); setWeek(w); }} onGroup={setGroup} />}
     </AppShell>
   );
 }
@@ -43,7 +45,44 @@ function Weeks({ list, onWeek }: { list: ListPrepared; onWeek: (week: string) =>
   return list.access === "couple" && shown.length > 1 ? <WeekSelector weeks={shown} week={list.week} onChange={onWeek} /> : null;
 }
 
-function ListFlow({ list, reload, onWeek }: { list: ListPrepared; reload: () => void; onWeek: (week: string) => void }) {
+/** « Regrouper en une liste » (CR-56) : quand au moins deux semaines ont un menu validé, on choisit les semaines à regrouper (cases à cocher, semaines datées). */
+function GroupPicker({ list, onGroup }: { list: ListPrepared; onGroup: (weeks: string[]) => void }) {
+  const withMenu = list.weeks.filter((w) => w.hasMenu);
+  const [open, setOpen] = useState(false);
+  const [picked, setPicked] = useState<string[]>(() => withMenu.slice(0, 2).map((w) => w.week));
+  if (list.access !== "couple" || withMenu.length < 2) return null;
+  if (!open) {
+    return (
+      <div className={styles.tools}>
+        <Button variant="ghost" onClick={() => setOpen(true)}>
+          Regrouper en une liste
+        </Button>
+      </div>
+    );
+  }
+  return (
+    <section className={styles.dayCard} aria-label="Regrouper en une liste">
+      <div className={styles.dayHead}>
+        <span className={styles.dayName}>Liste du mois</span>
+        <button type="button" className={styles.link} onClick={() => setOpen(false)}>
+          Fermer
+        </button>
+      </div>
+      <p className={family.hint}>Les besoins de chaque produit sont additionnés sur les semaines choisies, arrondis au paquet supérieur sur le total. Les produits frais des semaines suivantes sont à acheter plus tard.</p>
+      {withMenu.map((w) => (
+        <label key={w.week} className={styles.choice}>
+          <input type="checkbox" checked={picked.includes(w.week)} onChange={(e) => setPicked(e.target.checked ? [...picked, w.week] : picked.filter((x) => x !== w.week))} />
+          <span>Semaine {w.range}{w.hasList ? " · liste validée" : ""}</span>
+        </label>
+      ))}
+      <Button disabled={picked.length < 2} onClick={() => onGroup([...picked].sort())}>
+        Regrouper {picked.length >= 2 ? `ces ${picked.length} semaines` : "(choisissez 2 semaines)"}
+      </Button>
+    </section>
+  );
+}
+
+function ListFlow({ list, reload, onWeek, onGroup }: { list: ListPrepared; reload: () => void; onWeek: (week: string) => void; onGroup: (weeks: string[] | null) => void }) {
   if (list.access === "list") return <GuestView list={list} reload={reload} />;
   if (!list.menu || !list.model) {
     return (
@@ -57,7 +96,19 @@ function ListFlow({ list, reload, onWeek }: { list: ListPrepared; reload: () => 
   }
   return (
     <>
-      <Weeks list={list} onWeek={onWeek} />
+      {list.group ? (
+        <div className={styles.tools}>
+          <span className={family.hint}>Liste du mois · semaines du {list.group.weeks.map((w) => list.weeks.find((x) => x.week === w)?.range.replace(/^du /, "") ?? w).join(" · ")}</span>
+          <button type="button" className={styles.link} onClick={() => onGroup(null)}>
+            Quitter la liste du mois
+          </button>
+        </div>
+      ) : (
+        <>
+          <Weeks list={list} onWeek={onWeek} />
+          <GroupPicker list={list} onGroup={onGroup} />
+        </>
+      )}
       <Preparation list={list} reload={reload} />
     </>
   );
@@ -98,8 +149,8 @@ function AddedSection({ added, access, week, reload, leftoverTicked, onLeftover 
     setText("");
     reload();
   }
-  async function drop(key: string) {
-    if (await remove.run("/api/courses/list/products", { method: "DELETE", body: { key, week: week ?? undefined } })) reload();
+  async function drop(key: string, lineWeek?: string | null) {
+    if (await remove.run("/api/courses/list/products", { method: "DELETE", body: { key, week: lineWeek ?? week ?? undefined } })) reload();
   }
 
   return (
@@ -119,7 +170,7 @@ function AddedSection({ added, access, week, reload, leftoverTicked, onLeftover 
           </div>
           <span className={styles.meta}>×{a.qty}</span>
           {!a.leftoverOf && (access === "couple" || a.mine) && (
-            <button type="button" className={styles.link} onClick={() => void drop(a.key)} aria-label={`Retirer ${a.name}`}>
+            <button type="button" className={styles.link} onClick={() => void drop(a.key, a.week)} aria-label={`Retirer ${a.name}`}>
               Retirer
             </button>
           )}
@@ -178,7 +229,7 @@ function Preparation({ list, reload }: { list: ListPrepared; reload: () => void 
     </Rub>
   );
 
-  if (done) return <Done />;
+  if (done) return <Done group={list.group} />;
 
   if (view) {
     const scenario = scenarios.find((s) => s.id === view)!;
@@ -192,10 +243,11 @@ function Preparation({ list, reload }: { list: ListPrepared; reload: () => void 
         onRemoved={(name, removed) => patch({ removed: { ...picks.removed, [norm(name)]: removed } })}
         onPantry={(name, ticked) => patch({ checked: { ...picks.checked, [norm(name)]: ticked } })}
         onBack={() => setView(null)}
+        month={!!list.group}
         pending={validate.pending}
         error={validate.error?.message}
         onValidate={async (lines) => {
-          const result = await validate.run("/api/courses/list/validate", { method: "POST", body: { scenario: view, lines, week: list.week ?? undefined } });
+          const result = await validate.run("/api/courses/list/validate", { method: "POST", body: list.group ? { scenario: view, lines, weeks: list.group.weeks } : { scenario: view, lines, week: list.week ?? undefined } });
           if (result) setDone(true);
         }}
         itemsByName={new Map(model.items.map((i) => [norm(i.name), i]))}
@@ -216,19 +268,19 @@ function Preparation({ list, reload }: { list: ListPrepared; reload: () => void 
 
   return (
     <>
-      <p className={family.hint}>Semaine du {summary.weekLabel}</p>
-      {list.access === "couple" && list.week && <DeleteWeek week={list.week} weekText={`de la semaine ${list.weeks.find((w) => w.week === list.week)?.range ?? ""}`} hasList={!!list.weeks.find((w) => w.week === list.week)?.hasList} onDone={reload} />}
+      {!list.group && <p className={family.hint}>Semaine du {summary.weekLabel}</p>}
+      {!list.group && list.access === "couple" && list.week && <DeleteWeek week={list.week} weekText={`de la semaine ${list.weeks.find((w) => w.week === list.week)?.range ?? ""}`} hasList={!!list.weeks.find((w) => w.week === list.week)?.hasList} onDone={reload} />}
       <div className={styles.tools}>
         <Button variant="ghost" onClick={() => setOpened({ all: true, key: opened.key + 1 })}>
           Tout déplier
         </Button>
       </div>
 
-      {rub("Menu validé et recettes", false, <RecipeList recipes={summary.recipes.filter((r) => r.kind === "dinner")} servings={summary.servings} title="Menu de la semaine : recettes" showDays />)}
-      {rub("Séance de batch", false, <BatchSession summary={summary} onWritten={reload} />)}
-      {rub("Plats express", false, <RecipeList recipes={summary.recipes.filter((r) => r.kind === "express")} servings={summary.servings} title="Plats express : recettes" showDays={false} />)}
+      {!list.group && rub("Menu validé et recettes", false, <RecipeList recipes={summary.recipes.filter((r) => r.kind === "dinner")} servings={summary.servings} title="Menu de la semaine : recettes" showDays />)}
+      {!list.group && rub("Séance de batch", false, <BatchSession summary={summary} onWritten={reload} />)}
+      {!list.group && rub("Plats express", false, <RecipeList recipes={summary.recipes.filter((r) => r.kind === "express")} servings={summary.servings} title="Plats express : recettes" showDays={false} />)}
 
-      {rub("Version standard ou allégée", true, (
+      {!list.group && rub("Version standard ou allégée", true, (
         <>
           {model.dishes.map((d) => {
             const mode = picks.modes[d.name] ?? "standard";
@@ -259,7 +311,7 @@ function Preparation({ list, reload }: { list: ListPrepared; reload: () => void 
         </>
       ))}
 
-      {rub("Ingrédients du menu", false, (
+      {!list.group && rub("Ingrédients du menu", false, (
         <>
           <p className={family.hint}>Pour information : ce que demandent les plats de la semaine.</p>
           {menuItems.map((i) => {
@@ -277,6 +329,21 @@ function Preparation({ list, reload }: { list: ListPrepared; reload: () => void 
       ))}
 
       <AddedSection added={list.added} access={list.access} week={list.week} reload={reload} leftoverTicked={(name) => sel.checked?.get(model.items.find((i) => norm(i.name) === norm(name))?.id ?? -1) ?? false} onLeftover={(name, ticked) => patch({ checked: { ...picks.checked, [norm(name)]: ticked } })} />
+
+      {list.group && list.group.later.length > 0 && rub("À acheter plus tard", true, (
+        <>
+          <p className={family.hint}>Produits frais des semaines suivantes : décochés et hors du total, à acheter la semaine venue.</p>
+          {list.group.later.map((l) => (
+            <div key={l.week} className={styles.dayCard}>
+              <div className={styles.dayHead}>
+                <span className={styles.dayName}>À acheter plus tard ({l.label})</span>
+                <span className={styles.meta}>{l.subtotal !== null ? `sous-total estimé ${euro(l.subtotal)}` : "sans prix connu"}</span>
+              </div>
+              <span className={styles.meta}>{l.names.join(" · ")}</span>
+            </div>
+          ))}
+        </>
+      ))}
 
       {rub("Produits de mon historique", true, (
         <>
@@ -395,6 +462,7 @@ function ScenarioView({
   onPantry,
   onBack,
   onValidate,
+  month,
   pending,
   error,
 }: {
@@ -409,6 +477,8 @@ function ScenarioView({
   onPantry: (name: string, ticked: boolean) => void;
   onBack: () => void;
   onValidate: (lines: ValidateLine[]) => Promise<void>;
+  /** Liste du mois : « Valider la liste du mois » (CR-56). */
+  month: boolean;
   pending: boolean;
   error?: string;
 }) {
@@ -533,14 +603,14 @@ function ScenarioView({
             )
           }
         >
-          Valider ma liste
+          {month ? "Valider la liste du mois" : "Valider ma liste"}
         </Button>
       </div>
     </>
   );
 }
 
-function Done() {
+function Done({ group }: { group?: { weeks: string[] } | null }) {
   return (
     <div className={styles.done} role="status">
       <span className={styles.tick} aria-hidden="true">
@@ -548,7 +618,7 @@ function Done() {
       </span>
       <div className={styles.doneTitle}>Votre liste est prête</div>
       <p className={styles.lead}>Consultez-la en magasin dans « Ma liste de courses ». Vos choix seront repris la prochaine fois.</p>
-      <ButtonLink href="/courses/ma-liste">Ouvrir Ma liste de courses</ButtonLink>
+      <ButtonLink href={group ? `/courses/ma-liste?week=${group.weeks[0]}&scope=group` : "/courses/ma-liste"}>Ouvrir Ma liste de courses</ButtonLink>
     </div>
   );
 }

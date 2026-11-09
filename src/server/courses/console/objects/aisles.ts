@@ -17,18 +17,20 @@ export const aisles: ConsoleObject = {
     return {
       object: "rayons",
       title: "Rayons",
-      intro: "Les mêmes partout, pour les tickets et le budget. Un rayon utilisé ne peut pas être supprimé : renommez-le ou fusionnez-le.",
+      intro: "Les mêmes partout, pour les tickets et le budget. Un rayon utilisé ne peut pas être supprimé : renommez-le ou fusionnez-le. « Rayon frais » sert à la liste du mois : les produits de ces rayons des semaines suivantes sont à acheter plus tard.",
       info: null,
       columns: [
         { key: "name", label: "Rayon" },
+        { key: "fresh", label: "Rayon frais" },
         { key: "products", label: "Produits", align: "right" },
         { key: "lines", label: "Lignes de tickets", align: "right" },
       ],
       rows: list.map((a) => ({
         id: String(a.id),
         tone: a.is_hidden ? ("muted" as const) : undefined,
-        cells: { name: a.name, products: products.filter((p) => p.aisle_id === a.id).length, lines: lines.filter((l) => l.aisle_id === a.id).length },
+        cells: { name: a.name, fresh: a.is_fresh ? "Oui" : "Non", products: products.filter((p) => p.aisle_id === a.id).length, lines: lines.filter((l) => l.aisle_id === a.id).length },
         actions: [
+          { key: "fresh", label: a.is_fresh ? "Retirer des rayons frais" : "Marquer rayon frais" },
           { key: "rename", label: "Renommer", fields: [{ key: "name", label: "Nom du rayon", type: "text" as const, value: a.name, required: true }] },
           {
             key: "merge",
@@ -54,6 +56,11 @@ export const aisles: ConsoleObject = {
         await db.insertInto("grocery_aisles").values({ name: text(values, "name", "le nom du rayon", 60), sort_order: Number(max.m) + 10 }).execute();
       } else if (action === "rename") {
         await db.updateTable("grocery_aisles").set({ name: text(values, "name", "le nom du rayon", 60), updated_at: now }).where("id", "=", Number(id)).execute();
+      } else if (action === "fresh") {
+        // « Rayon frais » (US-169 RF2bis) : dans la liste du mois, les produits de ces rayons des semaines suivantes sont « À acheter plus tard »
+        const current = await db.selectFrom("grocery_aisles").select("is_fresh").where("id", "=", Number(id)).executeTakeFirst();
+        if (!current) throw courseError("not_found", "Ce rayon n'existe plus.", 404);
+        await db.updateTable("grocery_aisles").set({ is_fresh: !current.is_fresh, updated_at: now }).where("id", "=", Number(id)).execute();
       } else if (action === "merge") {
         const into = whole(values, "into", "le rayon conservé", 1, 1000000);
         await sql`select merge_grocery_aisles(${Number(id)}::integer, ${into}::integer)`.execute(db);

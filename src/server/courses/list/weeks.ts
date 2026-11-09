@@ -184,3 +184,31 @@ export async function leftoversFor(db: Kysely<DB>, viewerId: string, menuId: str
     isPantry: r.is_pantry,
   }));
 }
+
+/** Les menus des semaines regroupées (liste du mois, CR-56) : au moins deux semaines différentes, chacune de la fenêtre et avec un menu validé ; rendus de la plus proche à la plus lointaine. */
+export async function groupMenusOf(db: Kysely<DB>, accountId: string, weeks: string[], now: Date): Promise<WeekMenu[]> {
+  const unique = [...new Set(weeks.map((w) => checkWeek(w, now)).filter((w): w is string => !!w))].sort();
+  if (unique.length < 2) throw courseError("invalid_group", "Choisissez au moins deux semaines à regrouper.", 422);
+  const menus: WeekMenu[] = [];
+  for (const week of unique) {
+    const menu = await menuOfWeek(db, accountId, week);
+    if (!menu) throw courseError("no_menu", `Il n'y a pas de menu pour la semaine ${weekRange(week)}.`, 404);
+    menus.push(menu);
+  }
+  return menus;
+}
+
+/** Liste du mois à laquelle une semaine est regroupée : son identifiant et les lundis de toutes ses semaines. */
+export async function groupOfMenu(db: Kysely<DB>, accountId: string, menuId: string): Promise<{ id: string; weeks: string[] } | null> {
+  const own = await db.selectFrom("grocery_lists").select("group_id").where("account_id", "=", accountId).where("menu_id", "=", menuId).executeTakeFirst();
+  if (!own?.group_id) return null;
+  const rows = await db
+    .selectFrom("grocery_lists as l")
+    .innerJoin("meal_menus as m", "m.id", "l.menu_id")
+    .select("m.week_start")
+    .where("l.account_id", "=", accountId)
+    .where("l.group_id", "=", own.group_id)
+    .orderBy("m.week_start")
+    .execute();
+  return { id: own.group_id, weeks: rows.map((r) => (typeof r.week_start === "string" ? (r.week_start as string).slice(0, 10) : isoDate(r.week_start as Date))) };
+}
