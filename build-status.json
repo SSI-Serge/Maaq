@@ -3,8 +3,16 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-09T10:40:00.000Z",
+  "updated": "2026-11-09T12:00:00.000Z",
   "deploys": [
+    {
+      "at": "2026-11-09T12:00:00.000Z",
+      "env": "preview",
+      "what": "Courses et repas, liste du mois : regrouper plusieurs semaines en une liste (besoins additionnés, paquet supérieur sur le total, produits frais des semaines suivantes « À acheter plus tard »), valider la liste du mois en une fois, Ma liste en vue liste du mois ou semaine seule ; case « Rayon frais » en console — rév. 00094. Base de test : rattrapage « mois » (mois_1 f438e2be, mois_2 050778da) appliqué avec accord direct du PO, après sauvegarde 2026-11-09T09-28-42.",
+      "storyIds": [
+        "f21c4"
+      ]
+    },
     {
       "at": "2026-11-09T10:40:00.000Z",
       "env": "preview",
