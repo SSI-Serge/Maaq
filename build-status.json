@@ -3,8 +3,16 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-10T15:00:00.000Z",
+  "updated": "2026-11-10T16:00:00.000Z",
   "deploys": [
+    {
+      "at": "2026-11-10T16:00:00.000Z",
+      "env": "preview",
+      "what": "Console Courses et repas : consigne de saisie sous le champ « Code ou nom » des additifs — rév. 00102. Suite complète verte (1308 essais). Pas de changement de base. Menu IA fermé en production.",
+      "storyIds": [
+        "f21c4"
+      ]
+    },
     {
       "at": "2026-11-10T15:00:00.000Z",
       "env": "preview",
