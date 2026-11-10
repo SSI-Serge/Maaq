@@ -350,7 +350,7 @@ function Preparation({ list, reload }: { list: ListPrepared; reload: () => void 
 
       {rub("Produits de mon historique", true, (
         <>
-          <p className={family.hint}>Achetés ces 3 derniers mois. Cochez ce qu&apos;il vous faut cette semaine : le produit entre dans les scénarios.</p>
+          <p className={family.hint}>Achetés ces 3 derniers mois, en plus des repas. Cochez ce qu&apos;il vous faut cette semaine : le produit entre dans les scénarios.</p>
           {habit.length === 0 && <p className={styles.empty}>Rien pour l&apos;instant : les produits achetés en plus des repas (tickets, cases cochées en magasin) apparaissent ici.</p>}
           {habitByRayon.map(([rayon, items]) => (
             <div key={rayon}>
@@ -365,14 +365,18 @@ function Preparation({ list, reload }: { list: ListPrepared; reload: () => void 
           ))}
           {dailyByRayon.length > 0 && (
             <>
-              <h3 className={styles.kick} style={{ marginTop: 12 }}>Pensez aussi à :</h3>
+              <h3 className={styles.kick} style={{ marginTop: 12 }}>Votre historique est encore court. Pensez aussi à :</h3>
+              <p className={family.hint}>Des produits courants, décochés : cochez ceux qu&apos;il vous faut.</p>
               {dailyByRayon.map(([rayon, items]) => (
                 <div key={`q-${rayon}`}>
                   <h3 className={styles.kick}>{rayon}</h3>
                   {items.map((i) => (
                     <label key={i.id} className={styles.choice}>
                       <input type="checkbox" checked={sel.checked?.get(i.id) ?? i.checked} onChange={(e) => patch({ checked: { ...picks.checked, [norm(i.name)]: e.target.checked } })} />
-                      <span>{i.name}</span>
+                      <span>
+                        {i.name}
+                        {i.choices.every((ch) => ch.price === null) && <span className={styles.meta}> · N/A · hors total</span>}
+                      </span>
                     </label>
                   ))}
                 </div>

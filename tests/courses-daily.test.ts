@@ -1,4 +1,7 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { ListFlow } from "@/components/courses/ListScreen";
 import type { Ctx } from "@/server/auth/service";
 import { nameKey } from "@/server/courses/catalog/seed";
 import { loadObject, runAction, type ConsoleContext } from "@/server/courses/console";
@@ -68,50 +71,76 @@ afterAll(async () => {
 });
 
 describe("Console « Produits du quotidien » (US-169 RF3, CA 3.1)", () => {
-  it("ajouter, relier à un produit du catalogue, modifier, retirer et proposer de nouveau ; le seuil se règle sur la même page, dans ses bornes ; tout est au journal", async () => {
+  it("ajouter (tous les rayons proposés), renommer, relier et délier, ranger avec ↑ et ↓, retirer et proposer de nouveau ; le seuil se règle sur la même page, dans ses bornes ; tout est au journal", async () => {
     const empty = await loadObject(c, "quotidien", q);
     expect(empty.title).toBe("Produits du quotidien");
-    expect(empty.rows[0]).toMatchObject({ id: "seuil", cells: { position: 10 } });
     expect(empty.rows).toHaveLength(1);
+    expect(empty.rows[0]).toMatchObject({ id: "seuil", cells: { name: "Compléter l'historique d'un foyer quand il compte moins de 10 produits" } });
+    // l'ajout propose tous les rayons de la console
+    const all = await db.selectFrom("grocery_aisles").select("id").execute();
+    expect(empty.tools.add!.fields.find((x) => x.key === "aisle")!.options).toHaveLength(all.length);
 
-    await runAction(c, "quotidien", "add", "", { name: "Liquide vaisselle", aisle: String(aisles[0].id), product: "", position: "1" });
-    await runAction(c, "quotidien", "add", "", { name: "Essuie-tout", aisle: String(aisles[0].id), product: "", position: "2" });
     const product = await db.selectFrom("grocery_products").select(["name", "name_key"]).orderBy("id").executeTakeFirstOrThrow();
-    await runAction(c, "quotidien", "add", "", { name: "Mon produit relié", aisle: String(aisles[1].id), product: product.name, position: "1" });
-    const rows = (await loadObject(c, "quotidien", q)).rows.slice(1);
-    expect(rows.map((r) => r.cells.name)).toEqual(expect.arrayContaining(["Liquide vaisselle", "Essuie-tout", "Mon produit relié"]));
-    expect(rows.find((r) => r.cells.name === "Mon produit relié")!.cells.product).toBe(product.name);
-    expect(rows.find((r) => r.cells.name === "Liquide vaisselle")!.cells).toMatchObject({ aisle: aisles[0].name, product: "—", state: "Proposé" });
+    await runAction(c, "quotidien", "add", "", { name: "Liquide vaisselle", aisle: String(aisles[0].id) });
+    await runAction(c, "quotidien", "add", "", { name: "Essuie-tout", aisle: String(aisles[0].id) });
+    await runAction(c, "quotidien", "add", "", { name: "Mon produit relié", aisle: String(aisles[1].id) });
+    const row = async (name: string) => (await loadObject(c, "quotidien", q)).rows.find((r) => r.cells.name === name)!;
+    const order = async () => (await loadObject(c, "quotidien", q)).rows.filter((r) => r.cells.aisle === aisles[0].name && r.cells.state === "Proposé").map((r) => r.cells.name);
+    expect(await order()).toEqual(["Liquide vaisselle", "Essuie-tout"]);
+    expect((await row("Liquide vaisselle")).cells).toMatchObject({ aisle: aisles[0].name, link: "Non relié : affiché N/A, hors total", state: "Proposé" });
     // la clé est celle de l'application (tiret réduit à un espace)
     expect((await db.selectFrom("grocery_daily_products").select("name_key").where("name", "=", "Essuie-tout").executeTakeFirstOrThrow()).name_key).toBe("essuie tout");
 
-    expect((await rejection(runAction(c, "quotidien", "add", "", { name: "liquide  vaisselle", aisle: String(aisles[0].id), product: "", position: "3" }))).code).toBe("duplicate");
-    expect((await rejection(runAction(c, "quotidien", "add", "", { name: "Autre", aisle: String(aisles[0].id), product: "Produit qui n'existe pas", position: "3" }))).code).toBe("unknown_product");
-    expect((await rejection(runAction(c, "quotidien", "add", "", { name: "", aisle: String(aisles[0].id), product: "", position: "3" }))).code).toBe("missing_field");
+    // relier par le nom exact d'un produit du catalogue, puis délier
+    const linked = await row("Mon produit relié");
+    expect((await rejection(runAction(c, "quotidien", "link", linked.id, { product: "Produit qui n'existe pas" }))).code).toBe("unknown_product");
+    await runAction(c, "quotidien", "link", linked.id, { product: product.name });
+    expect((await row("Mon produit relié")).cells.link).toBe(`Relié : ${product.name}`);
+    expect((await row("Mon produit relié")).actions!.map((a) => a.key)).toContain("unlink");
+    await runAction(c, "quotidien", "unlink", linked.id, {});
+    expect((await row("Mon produit relié")).cells.link).toBe("Non relié : affiché N/A, hors total");
+    await runAction(c, "quotidien", "link", linked.id, { product: product.name });
+    // un produit ajouté dont le nom est celui d'un produit du catalogue est relié d'office
+    await runAction(c, "quotidien", "add", "", { name: product.name, aisle: String(aisles[1].id) });
+    expect((await row(product.name)).cells.link).toBe(`Relié : ${product.name}`);
+    await db.deleteFrom("grocery_daily_products").where("name", "=", product.name).execute();
 
-    const row = rows.find((r) => r.cells.name === "Essuie-tout")!;
-    await runAction(c, "quotidien", "edit", row.id, { name: "Essuie-tout", aisle: String(aisles[1].id), product: "", position: "5" });
-    expect((await loadObject(c, "quotidien", q)).rows.find((r) => r.id === row.id)!.cells).toMatchObject({ aisle: aisles[1].name, position: 5 });
-    await runAction(c, "quotidien", "retire", row.id, {});
-    expect((await loadObject(c, "quotidien", q)).rows.find((r) => r.id === row.id)!.cells.state).toBe("Retiré");
+    expect((await rejection(runAction(c, "quotidien", "add", "", { name: "liquide  vaisselle", aisle: String(aisles[0].id) }))).code).toBe("duplicate");
+    expect((await rejection(runAction(c, "quotidien", "add", "", { name: "", aisle: String(aisles[0].id) }))).code).toBe("missing_field");
+
+    // ↑ et ↓
+    const essuie = await row("Essuie-tout");
+    await runAction(c, "quotidien", "up", essuie.id, {});
+    expect(await order()).toEqual(["Essuie-tout", "Liquide vaisselle"]);
+    await runAction(c, "quotidien", "up", essuie.id, {});
+    expect(await order()).toEqual(["Essuie-tout", "Liquide vaisselle"]);
+    await runAction(c, "quotidien", "down", essuie.id, {});
+    expect(await order()).toEqual(["Liquide vaisselle", "Essuie-tout"]);
+
+    // renommer, retirer, proposer de nouveau
+    await runAction(c, "quotidien", "rename", essuie.id, { name: "Essuie tout XL" });
+    expect((await db.selectFrom("grocery_daily_products").select("name_key").where("id", "=", Number(essuie.id)).executeTakeFirstOrThrow()).name_key).toBe("essuie tout xl");
+    await runAction(c, "quotidien", "rename", essuie.id, { name: "Essuie-tout" });
+    await runAction(c, "quotidien", "retire", essuie.id, {});
+    expect((await row("Essuie-tout")).cells.state).toBe("Retiré");
+    expect((await row("Essuie-tout")).actions!.map((a) => a.key)).toEqual(["restore"]);
     // l'ajouter de nouveau le fait revenir, sans doublon
-    await runAction(c, "quotidien", "add", "", { name: "Essuie-tout", aisle: String(aisles[0].id), product: "", position: "2" });
-    const back = (await loadObject(c, "quotidien", q)).rows.filter((r) => r.cells.name === "Essuie-tout");
-    expect(back).toHaveLength(1);
-    expect(back[0].cells.state).toBe("Proposé");
-    await runAction(c, "quotidien", "retire", row.id, {});
-    await runAction(c, "quotidien", "restore", row.id, {});
+    await runAction(c, "quotidien", "add", "", { name: "Essuie-tout", aisle: String(aisles[0].id) });
+    expect((await loadObject(c, "quotidien", q)).rows.filter((r) => r.cells.name === "Essuie-tout")).toHaveLength(1);
+    expect((await row("Essuie-tout")).cells.state).toBe("Proposé");
+    await runAction(c, "quotidien", "retire", essuie.id, {});
+    await runAction(c, "quotidien", "restore", essuie.id, {});
 
     // seuil : de 1 à 50
     await runAction(c, "quotidien", "threshold", "seuil", { value: "4" });
-    expect((await loadObject(c, "quotidien", q)).rows[0].cells.position).toBe(4);
+    expect((await loadObject(c, "quotidien", q)).rows[0].cells.name).toContain("moins de 4 produits");
     await expect(runAction(c, "quotidien", "threshold", "seuil", { value: "0" })).rejects.toBeTruthy();
     await expect(runAction(c, "quotidien", "threshold", "seuil", { value: "51" })).rejects.toBeTruthy();
-    expect((await loadObject(c, "quotidien", q)).rows[0].cells.position).toBe(4);
+    expect((await loadObject(c, "quotidien", q)).rows[0].cells.name).toContain("moins de 4 produits");
     await runAction(c, "quotidien", "threshold", "seuil", { value: "10" });
 
     const log = await db.selectFrom("admin_audit_log").select("id").where("action_type", "=", "daily_product_changed").where("admin_user_id", "=", c.adminId).execute();
-    expect(log.length).toBeGreaterThanOrEqual(6);
+    expect(log.length).toBeGreaterThanOrEqual(10);
     expect((await rejection(runAction(c, "quotidien", "retire", "999999", {}))).code).toBe("not_found");
   });
 });
@@ -131,6 +160,17 @@ describe("« Pensez aussi à : » dans « Produits de mon historique » (US-157 
     // sans produit du catalogue relié : aucun prix
     expect(daily.find((i) => i.name === "Liquide vaisselle")!.choices).toEqual([]);
 
+    // à l'écran (maquette v77) : l'introduction, le bloc sous l'historique, par rayon, « N/A · hors total » sans produit relié
+    const markup = renderToStaticMarkup(createElement(ListFlow, { list, reload: () => {}, onWeek: () => {}, onGroup: () => {} }));
+    const rubric = markup.slice(markup.indexOf("Produits de mon historique"), markup.indexOf("Ingrédients / additifs exclus"));
+    expect(rubric).toContain("Achetés ces 3 derniers mois, en plus des repas.");
+    expect(rubric).toContain("Votre historique est encore court. Pensez aussi à :");
+    expect(rubric).toContain("Des produits courants, décochés : cochez ceux qu&#x27;il vous faut.");
+    expect(rubric.indexOf(aisles[0].name)).toBeGreaterThan(rubric.indexOf("Pensez aussi à :"));
+    expect(rubric).toContain("Liquide vaisselle");
+    expect(rubric).toContain("N/A · hors total");
+    expect(rubric).not.toContain('checked=""');
+
     // un produit ajouté à la main n'est pas proposé une deuxième fois
     await addProduct(at(), f.sophie, { name: "Liquide vaisselle", week: W0 });
     const afterAdd = await prepareList(at(), f.sophie, W0);
@@ -139,7 +179,7 @@ describe("« Pensez aussi à : » dans « Produits de mon historique » (US-157 
 
     // un produit du quotidien qui est un ingrédient du menu affiché n'est pas proposé
     const ingredient = groupNames(afterAdd, "menu")[0];
-    await runAction(c, "quotidien", "add", "", { name: ingredient, aisle: String(aisles[0].id), product: "", position: "9" });
+    await runAction(c, "quotidien", "add", "", { name: ingredient, aisle: String(aisles[0].id) });
     expect(groupNames(await prepareList(at(), f.sophie, W0), "quotidien")).not.toContain(ingredient);
 
     // retiré en console : plus proposé
@@ -156,6 +196,7 @@ describe("« Pensez aussi à : » dans « Produits de mon historique » (US-157 
     const full = await prepareList(at(), f.sophie, W0);
     expect(groupNames(full, "habituel")).toEqual(["Liquide vaisselle"]);
     expect(groupNames(full, "quotidien")).toEqual([]);
+    expect(renderToStaticMarkup(createElement(ListFlow, { list: full, reload: () => {}, onWeek: () => {}, onGroup: () => {} }))).not.toContain("Pensez aussi à :");
     await setThreshold(10);
     // de nouveau sous le seuil : la rubrique est complétée, sans le produit déjà dans l'historique
     const again = await prepareList(at(), f.sophie, W0);
