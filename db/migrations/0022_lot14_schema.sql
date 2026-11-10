@@ -106,6 +106,23 @@ CREATE TABLE grocery_product_references (
   CONSTRAINT ck_grocery_product_references_price CHECK ((unit_price IS NULL) = (price_date IS NULL)),
   CONSTRAINT ck_grocery_product_references_package CHECK ((package_amount IS NULL) = (package_unit IS NULL))
 );
+-- Produits du quotidien (CR-66, CR-67, US-169 RF3) : liste tenue en console, par rayon, qui complète la rubrique « Produits de mon historique » quand elle compte moins de produits que le seuil
+-- (réglage de console grocery_history_min_products). Commune à tous les foyers, sans donnée de foyer, lisible par tous les profils (comme les rayons), écrite par la console seulement. Le rapprochement avec
+-- l'historique, le menu et les produits ajoutés se fait dans l'application : par le produit du catalogue (product_id), puis par la clé normalisée (name_key).
+CREATE TABLE grocery_daily_products (
+  id          integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  name        varchar(120) NOT NULL CHECK (btrim(name) <> ''),
+  -- Clé normalisée calculée par l'application (minuscules, « œ » en « oe », accents retirés, espaces et tirets réduits à un espace), comme grocery_products.name_key ; la base garde la clé et son unicité
+  name_key    text NOT NULL UNIQUE CHECK (name_key <> '' AND name_key = grocery_norm(name_key)),
+  aisle_id    integer NOT NULL REFERENCES grocery_aisles (id) ON DELETE RESTRICT,
+  -- Produit du catalogue correspondant, facultatif ; repasse à vide s'il est supprimé
+  product_id  bigint REFERENCES grocery_products (id) ON DELETE SET NULL,
+  position    smallint NOT NULL DEFAULT 100 CHECK (position >= 1),
+  -- Retiré par la console : n'est plus proposé (vide = actif)
+  retired_at  timestamptz,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  updated_at  timestamptz NOT NULL DEFAULT now()
+);
 CREATE TABLE grocery_additive_criteria (
   id          integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   label       varchar(80) NOT NULL CHECK (btrim(label) <> ''),
@@ -1197,7 +1214,7 @@ LANGUAGE sql STABLE AS $$
    WHERE v.id = p_viewer AND grocery_access(p_viewer) = 'couple'
    GROUP BY l.aisle_id, date_trunc('month', r.purchased_on)
 $$;
--- Fusion de deux rayons (US-169 RF2) : les produits, lignes de tickets, produits de liste et notes de l'ancien rayon passent au rayon conservé, puis l'ancien disparaît
+-- Fusion de deux rayons (US-169 RF2) : les produits, lignes de tickets, produits de liste, produits du quotidien et notes de l'ancien rayon passent au rayon conservé, puis l'ancien disparaît
 CREATE FUNCTION merge_grocery_aisles(p_from integer, p_into integer) RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 BEGIN
   IF p_from = p_into THEN
@@ -1210,6 +1227,7 @@ BEGIN
   UPDATE grocery_receipt_lines SET aisle_id = p_into WHERE aisle_id = p_from;
   UPDATE grocery_list_items SET aisle_id = p_into WHERE aisle_id = p_from;
   UPDATE grocery_unreferenced_events SET aisle_id = p_into WHERE aisle_id = p_from;
+  UPDATE grocery_daily_products SET aisle_id = p_into, updated_at = now() WHERE aisle_id = p_from;
   DELETE FROM grocery_aisles WHERE id = p_from;
 END $$;
 -- Un agent retiré (CR-34) est invisible du catalogue et des tableaux de bord : on ne peut plus l'ajouter à un dashboard
@@ -1370,6 +1388,10 @@ CREATE UNIQUE INDEX ux_meal_dish_categories_name ON meal_dish_categories (grocer
 CREATE UNIQUE INDEX ux_meal_dish_tags_name ON meal_dish_tags (kind, grocery_norm(name));
 CREATE UNIQUE INDEX ux_grocery_aisles_name ON grocery_aisles (grocery_norm(name));
 CREATE INDEX idx_grocery_products_aisle_id ON grocery_products (aisle_id);
+-- Le nom est aussi unique tel qu'affiché (après grocery_norm : minuscules et espaces simples)
+CREATE UNIQUE INDEX ux_grocery_daily_products_name ON grocery_daily_products (grocery_norm(name));
+CREATE INDEX idx_grocery_daily_products_aisle ON grocery_daily_products (aisle_id, position);
+CREATE INDEX idx_grocery_daily_products_product_id ON grocery_daily_products (product_id) WHERE product_id IS NOT NULL;
 CREATE UNIQUE INDEX ux_grocery_additive_criteria_label ON grocery_additive_criteria (grocery_norm(label));
 CREATE INDEX idx_meal_dishes_cuisine_id ON meal_dishes (cuisine_id);
 CREATE INDEX idx_meal_dish_category_links_category_id ON meal_dish_category_links (category_id);
@@ -1606,6 +1628,15 @@ INSERT INTO grocery_aisles (name, sort_order) VALUES
   ('Légumineuses', 7), ('Charcuterie', 8), ('Conserves et surgelés', 9), ('Épicerie sucrée', 10), ('Boucherie', 11), ('Poissonnerie', 12),
   ('Volaille', 13), ('Sauces tomate', 14), ('Boissons', 15), ('Entretien', 16), ('Soins du corps', 17), ('Petit-déjeuner', 18), ('Autres', 19);
 UPDATE grocery_aisles SET is_fresh = true WHERE name IN ('Fruits et légumes', 'Crémerie', 'Boucherie', 'Poissonnerie', 'Volaille', 'Charcuterie');
+-- Liste de départ (décision du PO, CR-67), rattachée aux rayons par leur nom ; clés calculées comme le fait l'application
+INSERT INTO grocery_daily_products (name, name_key, aisle_id, position)
+SELECT v.name, v.name_key, a.id, v.position
+  FROM (VALUES ('Liquide vaisselle', 'liquide vaisselle', 'Entretien', 1), ('Éponges', 'eponges', 'Entretien', 2), ('Lessive', 'lessive', 'Entretien', 3), ('Sacs poubelle', 'sacs poubelle', 'Entretien', 4),
+               ('Papier toilette', 'papier toilette', 'Entretien', 5), ('Essuie-tout', 'essuie tout', 'Entretien', 6),
+               ('Brosse à dents', 'brosse a dents', 'Soins du corps', 1), ('Dentifrice', 'dentifrice', 'Soins du corps', 2), ('Gel douche', 'gel douche', 'Soins du corps', 3),
+               ('Shampoing', 'shampoing', 'Soins du corps', 4), ('Déodorant', 'deodorant', 'Soins du corps', 5),
+               ('Lait', 'lait', 'Crémerie', 1), ('Beurre', 'beurre', 'Crémerie', 2), ('Œufs', 'oeufs', 'Crémerie', 3), ('Yaourts', 'yaourts', 'Crémerie', 4)) AS v(name, name_key, aisle, position)
+  JOIN grocery_aisles a ON a.name = v.aisle;
 INSERT INTO legal_document_versions (document_type, version_label, content, published_at) VALUES
   ('grocery_price_sharing_consent', '1.0', 'Les prix de vos tickets sont ajoutés, sans votre nom, à une base commune. En échange, vous voyez les prix relevés par les autres foyers.', now());
 -- L'Assistant Famille a une tuile fixe : il n'est jamais listé dans le catalogue
@@ -1632,6 +1663,7 @@ Partagez vos prix pour voir ceux des foyers proches.', 'available');
 -- (en centimes pour les bornes absolues), durées de conservation
 INSERT INTO platform_settings (setting_key, value_type, value_text, min_value, max_value, description) VALUES
   ('meal_session_cap_minutes',          'integer', '120',   30, 600,      $$Plafond de la séance de batch cooking du dimanche, en minutes ; avec l'objectif « temps », seules les semaines sous ce plafond sont retenues, sinon l'alerte « Séance au-dessus de 2 h » (US-156 RF5, RT3)$$),
+  ('grocery_history_min_products',      'integer', '10',    1,  50,       $$Nombre minimum de produits de la rubrique « Produits de mon historique » : en dessous, elle est complétée par les produits du quotidien de la console (US-157 RF3ter, CR-66)$$),
   ('meal_season_dishes_count',          'integer', '10',    1,  100,      $$Nombre de plats de saison demandés pour le menu du mois (US-178 RF2, CR-60)$$),
   ('meal_season_dishes_max',            'integer', '44',    1,  200,      $$Nombre maximum de plats de saison retenus pour le foyer quand ses plats ne suffisent pas à remplir les quatre semaines (US-178 RF2, CR-62)$$),
   ('meal_menu_daily_cap',               'integer', '10',    1,  100,      $$Nombre maximum de menus complets composés par un foyer et par jour, corrections comprises ; au-delà, l'agent invite à reprendre le lendemain (US-156 RF12ter, CR-44)$$),
@@ -1685,6 +1717,11 @@ COMMENT ON COLUMN grocery_product_references.composition_text IS $$Résumé de l
 COMMENT ON COLUMN grocery_product_references.additives IS $$Additifs de la référence (codes comme E250 ou noms), normalisés par l'application ; comparés aux critères actifs de grocery_additive_criteria$$;
 COMMENT ON FUNCTION grocery_parse_package(text) IS $$Lit un format de conditionnement et rend sa quantité en kg ou en litres : « 1 kg », « 500 g », « 1,5 l », « 75 cl », « sachet de 250 g », « 6 x 33 cl » (= 1,98 l). Rend des valeurs vides quand le format n'est pas compris (« 6 œufs », « 1 pièce », « barquette ») : rien n'est deviné, aucun poids moyen par pièce. [CR-39]$$;
 COMMENT ON FUNCTION grocery_product_reference_package_before_write() IS $$Remplit package_amount et package_unit d'après package_format quand ils ne sont pas fournis. Un changement de format seul refait la déduction si les valeurs actuelles étaient celles du format précédent ; des valeurs fournies par l'import (différentes de la déduction) ne sont pas écrasées. [CR-39]$$;
+COMMENT ON TABLE grocery_daily_products IS $$Produits du quotidien tenus en console (liquide vaisselle, éponges, lessive, brosse à dents, lait, beurre…), par rayon : ils complètent « Produits de mon historique » sous le titre « Pensez aussi à : » quand la rubrique compte moins de produits que le seuil de la console (grocery_history_min_products), décochés par défaut, sans ceux déjà dans l'historique, le menu ou les produits ajoutés. Commune à tous les foyers, sans donnée de foyer, lisible par tous les profils, écrite par la console seulement (journal d'administration : daily_product_changed). Nom et clé normalisée uniques ; retirer un produit le masque sans le supprimer. [US-157 RF3ter, US-169 RF3, CR-66, CR-67]$$;
+COMMENT ON COLUMN grocery_daily_products.name_key IS $$Nom normalisé calculé par l'application, comme grocery_products.name_key (minuscules, « œ » en « oe », accents retirés, suites d'espaces et de tirets réduites à un espace, bords retirés ; les pluriels ne sont pas touchés) : sert au rapprochement par le nom quand le produit n'est pas lié au catalogue. La base garde la clé et son unicité. [US-157 RT2bis, CR-66]$$;
+COMMENT ON COLUMN grocery_daily_products.product_id IS $$Produit du catalogue correspondant, facultatif : quand il est renseigné, l'application reconnaît le produit du quotidien dans l'historique, le menu et les produits ajoutés par ce produit, sinon par name_key. Repasse à vide si le produit est supprimé. [US-157 RT2bis, CR-66]$$;
+COMMENT ON COLUMN grocery_daily_products.position IS $$Ordre d'affichage dans le rayon, à partir de 1. [US-169 RF3, CR-66]$$;
+COMMENT ON COLUMN grocery_daily_products.retired_at IS $$Date à laquelle la console a retiré le produit (il n'est plus proposé) ; vide = actif. [US-169 RF3, CR-66]$$;
 COMMENT ON TABLE grocery_additive_criteria IS $$Additifs à éviter (code ou nom, raison courte). Affichés aux foyers dans « Critères additifs appliqués » ; une référence qui en contient un actif n'est pas proposée et figure dans « Ingrédients exclus des références proposées ». [US-167 RF1, RF2]$$;
 COMMENT ON TABLE grocery_product_seasons IS $$Mois de saison d'un fruit ou d'un légume. Avec l'objectif « saison », les plats dont les ingrédients sont de saison passent devant. [US-168 RF1, RF2]$$;
 COMMENT ON TABLE meal_dishes IS $$Plat du catalogue commun (60 au départ, chargés depuis le classeur actuel) : identifiant, nom, cuisine, recette, durée, durée active en batch. Les catégories, étiquettes (régimes, viandes, allergènes) et ingrédients sont dans des tables de liens. Un plat retiré n'est plus proposé mais reste dans les menus déjà validés. Les plats personnels d'un foyer sont à part (meal_household_dishes). [US-164 RF1, RF3, CR-04]$$;
@@ -1808,7 +1845,7 @@ COMMENT ON FUNCTION grocery_shared_prices_for(uuid) IS $$Prix des autres foyers 
 COMMENT ON FUNCTION note_grocery_unreferenced(uuid, text, grocery_unreferenced_kind, grocery_unreferenced_source, integer, text, text, numeric, text) IS $$Note un produit sans référence conforme (liste, menu validé ou ticket), sans rien demander au foyer et sans garder le foyer. La ville, la référence vue, le prix vu et le magasin ne sont gardés que si le foyer partage ses prix et que les quatre sont donnés ; sinon ils restent vides. Exécutée avec les droits du propriétaire. [US-173 RF1, RF3, CA 3.1]$$;
 COMMENT ON FUNCTION grocery_reference_marks_referenced() IS $$À l'ajout d'une référence, passe au statut « référencé » le produit du même nom normalisé dans la liste des produits à référencer, qui sort alors de la liste des foyers. [US-173 RF5, US-174 RF2]$$;
 COMMENT ON FUNCTION grocery_monthly_spend_for(uuid) IS $$Dépenses d'un foyer par rayon et par mois, d'après ses tickets enregistrés seulement (sans ticket, aucun prix : le budget n'en tient pas compte). Aucune ligne pour un invité secondaire : il n'a pas accès au budget. [US-163 RF1, RF2, RF4, CR-10]$$;
-COMMENT ON FUNCTION merge_grocery_aisles(integer, integer) IS $$Fusionne le premier rayon dans le second : produits, lignes de tickets (donc budget passé), produits de liste et produits à référencer sont rangés dans le rayon conservé, puis le premier rayon est supprimé. Exécutée avec les droits du propriétaire (touche les données de tous les foyers). [US-169 RF2, CA 2.1]$$;
+COMMENT ON FUNCTION merge_grocery_aisles(integer, integer) IS $$Fusionne le premier rayon dans le second : produits, lignes de tickets (donc budget passé), produits de liste, produits à référencer et produits du quotidien sont rangés dans le rayon conservé, puis le premier rayon est supprimé. Exécutée avec les droits du propriétaire (touche les données de tous les foyers). [US-169 RF2, CA 2.1]$$;
 COMMENT ON FUNCTION profile_agent_not_retired() IS $$Refuse l'ajout (ou le ré-ajout) d'un agent retiré à un dashboard. Un agent retiré est réversible et invisible du catalogue et des tableaux de bord. [CR-34]$$;
 COMMENT ON VIEW v_grocery_product_references IS $$Références par enseigne avec leur ancienneté (fresh / aging / NULL au-delà de 12 mois ou sans prix ; has_price les distingue : sans prix, « N/A ») et leur conformité, recalculée à chaque lecture : non conforme si le statut déclaré est « aucun conforme trouvé » (none_found) ou si un additif correspond à un critère actif, quel que soit le statut (excluded_because liste alors les critères). Une référence non conforme n'est jamais proposée et sert à la rubrique « Ingrédients exclus des références proposées ». needs_label_check : référence proposée avec la mention « Composition à vérifier sur l'étiquette » (statut « à vérifier »). package_format : format du conditionnement. package_amount, package_unit : sa quantité en kg ou en litres. price_unit : le prix est par article, par kg ou par litre. measure_unit, price_per_measure : prix au kilo ou au litre, calculé (le prix tel quel s'il est déjà au kilo, sinon le prix divisé par la quantité du format) ; vide sans prix ou sans quantité connue, jamais estimé. [US-157 RF1, RF8, US-166 RF3, US-167 RF2, CA 1.1, CR-36, CR-37, CR-39]$$;
 COMMENT ON VIEW v_meal_batch_week_days IS $$Plats de planning avec leur statut de correspondance (sure / to_confirm / absent, d'après les seuils de la console), le plat du catalogue effectivement utilisé (le plat confirmé, sinon le plat suggéré tant que la correspondance est sûre par son pourcentage ou à confirmer) et s'ils bloquent leur semaine (« absent »). Alimente la liste des correspondances à corriger. [US-171 RF1, RF2, CA 1.1]$$;

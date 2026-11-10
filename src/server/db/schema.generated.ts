@@ -23,7 +23,7 @@ export type ArrayTypeImpl<T> = T extends ColumnType<infer S, infer I, infer U>
   ? ColumnType<S[], I[], U[]>
   : T[];
 
-export type AuditAction = "account_created" | "account_updated" | "activation_link_resent" | "agent_blocked" | "agent_published" | "agent_reactivated" | "agent_restored" | "agent_retired" | "contract_analysis_decided" | "contract_archived" | "contract_created" | "contract_document_field_changed" | "contract_field_changed" | "contract_review_viewed" | "contract_updated" | "device_revoked_by_admin" | "grocery_catalog_changed" | "grocery_price_moderated" | "meal_catalog_changed" | "meal_planning_changed" | "presentation_updated" | "seasonal_dish_changed";
+export type AuditAction = "account_created" | "account_updated" | "activation_link_resent" | "agent_blocked" | "agent_published" | "agent_reactivated" | "agent_restored" | "agent_retired" | "contract_analysis_decided" | "contract_archived" | "contract_created" | "contract_document_field_changed" | "contract_field_changed" | "contract_review_viewed" | "contract_updated" | "device_revoked_by_admin" | "grocery_catalog_changed" | "grocery_price_moderated" | "meal_catalog_changed" | "meal_planning_changed" | "presentation_updated" | "seasonal_dish_changed" | "daily_product_changed";
 
 export type ChangeScope = "all" | "following" | "this";
 
@@ -1482,6 +1482,21 @@ export interface GroceryAdditiveCriteria {
   updated_at: Generated<Timestamp>;
 }
 
+/** Produits du quotidien tenus en console, par rayon : complètent « Produits de mon historique » sous « Pensez aussi à : ». [US-157 RF3ter, US-169 RF3, CR-66] */
+export interface GroceryDailyProducts {
+  aisle_id: number;
+  created_at: Generated<Timestamp>;
+  id: Generated<number>;
+  name: string;
+  /** Nom normalisé calculé par l'application (nameKey). */
+  name_key: string;
+  position: Generated<number>;
+  product_id: Int8 | null;
+  /** Retiré par la console : n'est plus proposé (vide = actif). */
+  retired_at: Timestamp | null;
+  updated_at: Generated<Timestamp>;
+}
+
 export interface GroceryAisles {
   created_at: Generated<Timestamp>;
   id: Generated<number>;
@@ -2932,6 +2947,7 @@ export interface DB {
   forwarding_mailboxes: ForwardingMailboxes;
   grocery_additive_criteria: GroceryAdditiveCriteria;
   grocery_aisles: GroceryAisles;
+  grocery_daily_products: GroceryDailyProducts;
   grocery_city_sharing: GroceryCitySharing;
   grocery_household_city_sharing: GroceryHouseholdCitySharing;
   grocery_household_cuisines: GroceryHouseholdCuisines;

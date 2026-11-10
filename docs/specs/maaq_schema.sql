@@ -76,7 +76,7 @@ CREATE TYPE audit_action           AS ENUM ('account_created', 'account_updated'
                                             'agent_reactivated', 'contract_created', 'contract_updated', 'contract_archived',
                                             'contract_field_changed', 'device_revoked_by_admin', 'catalog_loaded', 'contract_document_field_changed', 'contract_analysis_decided',
                                             'contract_review_viewed', 'presentation_updated', 'agent_retired', 'agent_restored',
-                                            'meal_catalog_changed', 'meal_planning_changed', 'grocery_catalog_changed', 'grocery_price_moderated', 'seasonal_dish_changed');
+                                            'meal_catalog_changed', 'meal_planning_changed', 'grocery_catalog_changed', 'grocery_price_moderated', 'seasonal_dish_changed', 'daily_product_changed');
 
 -- Assistant Famille (RDV & tâches)
 CREATE TYPE agent_platform         AS ENUM ('digitorn', 'anthropic', 'vertex');
@@ -6346,6 +6346,42 @@ CREATE TRIGGER trg_grocery_product_references_package BEFORE INSERT OR UPDATE ON
   FOR EACH ROW EXECUTE FUNCTION grocery_product_reference_package_before_write();
 COMMENT ON FUNCTION grocery_product_reference_package_before_write() IS $$Remplit package_amount et package_unit d'après package_format quand ils ne sont pas fournis. Un changement de format seul refait la déduction si les valeurs actuelles étaient celles du format précédent ; des valeurs fournies par l'import (différentes de la déduction) ne sont pas écrasées. [CR-39]$$;
 
+-- Produits du quotidien (CR-66, CR-67, US-169 RF3) : liste tenue en console, par rayon, qui complète la rubrique « Produits de mon historique » quand elle compte moins de produits que le seuil
+-- (réglage de console grocery_history_min_products). Commune à tous les foyers, sans donnée de foyer, lisible par tous les profils (comme les rayons), écrite par la console seulement. Le rapprochement avec
+-- l'historique, le menu et les produits ajoutés se fait dans l'application : par le produit du catalogue (product_id), puis par la clé normalisée (name_key).
+CREATE TABLE grocery_daily_products (
+  id          integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  name        varchar(120) NOT NULL CHECK (btrim(name) <> ''),
+  -- Clé normalisée calculée par l'application (minuscules, « œ » en « oe », accents retirés, espaces et tirets réduits à un espace), comme grocery_products.name_key ; la base garde la clé et son unicité
+  name_key    text NOT NULL UNIQUE CHECK (name_key <> '' AND name_key = grocery_norm(name_key)),
+  aisle_id    integer NOT NULL REFERENCES grocery_aisles (id) ON DELETE RESTRICT,
+  -- Produit du catalogue correspondant, facultatif ; repasse à vide s'il est supprimé
+  product_id  bigint REFERENCES grocery_products (id) ON DELETE SET NULL,
+  position    smallint NOT NULL DEFAULT 100 CHECK (position >= 1),
+  -- Retiré par la console : n'est plus proposé (vide = actif)
+  retired_at  timestamptz,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  updated_at  timestamptz NOT NULL DEFAULT now()
+);
+-- Le nom est aussi unique tel qu'affiché (après grocery_norm : minuscules et espaces simples)
+CREATE UNIQUE INDEX ux_grocery_daily_products_name ON grocery_daily_products (grocery_norm(name));
+CREATE INDEX idx_grocery_daily_products_aisle ON grocery_daily_products (aisle_id, position);
+CREATE INDEX idx_grocery_daily_products_product_id ON grocery_daily_products (product_id) WHERE product_id IS NOT NULL;
+COMMENT ON TABLE grocery_daily_products IS $$Produits du quotidien tenus en console (liquide vaisselle, éponges, lessive, brosse à dents, lait, beurre…), par rayon : ils complètent « Produits de mon historique » sous le titre « Pensez aussi à : » quand la rubrique compte moins de produits que le seuil de la console (grocery_history_min_products), décochés par défaut, sans ceux déjà dans l'historique, le menu ou les produits ajoutés. Commune à tous les foyers, sans donnée de foyer, lisible par tous les profils, écrite par la console seulement (journal d'administration : daily_product_changed). Nom et clé normalisée uniques ; retirer un produit le masque sans le supprimer. [US-157 RF3ter, US-169 RF3, CR-66, CR-67]$$;
+COMMENT ON COLUMN grocery_daily_products.name_key IS $$Nom normalisé calculé par l'application, comme grocery_products.name_key (minuscules, « œ » en « oe », accents retirés, suites d'espaces et de tirets réduites à un espace, bords retirés ; les pluriels ne sont pas touchés) : sert au rapprochement par le nom quand le produit n'est pas lié au catalogue. La base garde la clé et son unicité. [US-157 RT2bis, CR-66]$$;
+COMMENT ON COLUMN grocery_daily_products.product_id IS $$Produit du catalogue correspondant, facultatif : quand il est renseigné, l'application reconnaît le produit du quotidien dans l'historique, le menu et les produits ajoutés par ce produit, sinon par name_key. Repasse à vide si le produit est supprimé. [US-157 RT2bis, CR-66]$$;
+COMMENT ON COLUMN grocery_daily_products.position IS $$Ordre d'affichage dans le rayon, à partir de 1. [US-169 RF3, CR-66]$$;
+COMMENT ON COLUMN grocery_daily_products.retired_at IS $$Date à laquelle la console a retiré le produit (il n'est plus proposé) ; vide = actif. [US-169 RF3, CR-66]$$;
+-- Liste de départ (décision du PO, CR-67), rattachée aux rayons par leur nom ; clés calculées comme le fait l'application
+INSERT INTO grocery_daily_products (name, name_key, aisle_id, position)
+SELECT v.name, v.name_key, a.id, v.position
+  FROM (VALUES ('Liquide vaisselle', 'liquide vaisselle', 'Entretien', 1), ('Éponges', 'eponges', 'Entretien', 2), ('Lessive', 'lessive', 'Entretien', 3), ('Sacs poubelle', 'sacs poubelle', 'Entretien', 4),
+               ('Papier toilette', 'papier toilette', 'Entretien', 5), ('Essuie-tout', 'essuie tout', 'Entretien', 6),
+               ('Brosse à dents', 'brosse a dents', 'Soins du corps', 1), ('Dentifrice', 'dentifrice', 'Soins du corps', 2), ('Gel douche', 'gel douche', 'Soins du corps', 3),
+               ('Shampoing', 'shampoing', 'Soins du corps', 4), ('Déodorant', 'deodorant', 'Soins du corps', 5),
+               ('Lait', 'lait', 'Crémerie', 1), ('Beurre', 'beurre', 'Crémerie', 2), ('Œufs', 'oeufs', 'Crémerie', 3), ('Yaourts', 'yaourts', 'Crémerie', 4)) AS v(name, name_key, aisle, position)
+  JOIN grocery_aisles a ON a.name = v.aisle;
+
 CREATE TABLE grocery_additive_criteria (
   id          integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   label       varchar(80) NOT NULL CHECK (btrim(label) <> ''),
@@ -7674,7 +7710,7 @@ LANGUAGE sql STABLE AS $$
 $$;
 COMMENT ON FUNCTION grocery_monthly_spend_for(uuid) IS $$Dépenses d'un foyer par rayon et par mois, d'après ses tickets enregistrés seulement (sans ticket, aucun prix : le budget n'en tient pas compte). Aucune ligne pour un invité secondaire : il n'a pas accès au budget. [US-163 RF1, RF2, RF4, CR-10]$$;
 
--- Fusion de deux rayons (US-169 RF2) : les produits, lignes de tickets, produits de liste et notes de l'ancien rayon passent au rayon conservé, puis l'ancien disparaît
+-- Fusion de deux rayons (US-169 RF2) : les produits, lignes de tickets, produits de liste, produits du quotidien et notes de l'ancien rayon passent au rayon conservé, puis l'ancien disparaît
 CREATE FUNCTION merge_grocery_aisles(p_from integer, p_into integer) RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 BEGIN
   IF p_from = p_into THEN
@@ -7687,9 +7723,10 @@ BEGIN
   UPDATE grocery_receipt_lines SET aisle_id = p_into WHERE aisle_id = p_from;
   UPDATE grocery_list_items SET aisle_id = p_into WHERE aisle_id = p_from;
   UPDATE grocery_unreferenced_events SET aisle_id = p_into WHERE aisle_id = p_from;
+  UPDATE grocery_daily_products SET aisle_id = p_into, updated_at = now() WHERE aisle_id = p_from;
   DELETE FROM grocery_aisles WHERE id = p_from;
 END $$;
-COMMENT ON FUNCTION merge_grocery_aisles(integer, integer) IS $$Fusionne le premier rayon dans le second : produits, lignes de tickets (donc budget passé), produits de liste et produits à référencer sont rangés dans le rayon conservé, puis le premier rayon est supprimé. Exécutée avec les droits du propriétaire (touche les données de tous les foyers). [US-169 RF2, CA 2.1]$$;
+COMMENT ON FUNCTION merge_grocery_aisles(integer, integer) IS $$Fusionne le premier rayon dans le second : produits, lignes de tickets (donc budget passé), produits de liste, produits à référencer et produits du quotidien sont rangés dans le rayon conservé, puis le premier rayon est supprimé. Exécutée avec les droits du propriétaire (touche les données de tous les foyers). [US-169 RF2, CA 2.1]$$;
 
 -- Un agent retiré (CR-34) est invisible du catalogue et des tableaux de bord : on ne peut plus l'ajouter à un dashboard
 CREATE FUNCTION profile_agent_not_retired() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -7961,6 +7998,7 @@ ALTER TABLE grocery_shared_prices ENABLE ROW LEVEL SECURITY;
 -- (en centimes pour les bornes absolues), durées de conservation
 INSERT INTO platform_settings (setting_key, value_type, value_text, min_value, max_value, description) VALUES
   ('meal_session_cap_minutes',          'integer', '120',   30, 600,      $$Plafond de la séance de batch cooking du dimanche, en minutes ; avec l'objectif « temps », seules les semaines sous ce plafond sont retenues, sinon l'alerte « Séance au-dessus de 2 h » (US-156 RF5, RT3)$$),
+  ('grocery_history_min_products',      'integer', '10',    1,  50,       $$Nombre minimum de produits de la rubrique « Produits de mon historique » : en dessous, elle est complétée par les produits du quotidien de la console (US-157 RF3ter, CR-66)$$),
   ('meal_season_dishes_count',          'integer', '10',    1,  100,      $$Nombre de plats de saison demandés pour le menu du mois (US-178 RF2, CR-60)$$),
   ('meal_season_dishes_max',            'integer', '44',    1,  200,      $$Nombre maximum de plats de saison retenus pour le foyer quand ses plats ne suffisent pas à remplir les quatre semaines (US-178 RF2, CR-62)$$),
   ('meal_menu_daily_cap',               'integer', '10',    1,  100,      $$Nombre maximum de menus complets composés par un foyer et par jour, corrections comprises ; au-delà, l'agent invite à reprendre le lendemain (US-156 RF12ter, CR-44)$$),
