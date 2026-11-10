@@ -92,7 +92,7 @@ function ObjectView({ object, onChanged }: { object: ObjectKey; onChanged: () =>
 
   function start(row: ConsoleRow, action: RowAction) {
     setDone(null);
-    if (action.fields || action.confirm) setDialog({ row, action });
+    if (action.fields || action.confirm || action.readOnly) setDialog({ row, action });
     else void run(action.key, row.id, {});
   }
 
@@ -192,6 +192,7 @@ function ObjectView({ object, onChanged }: { object: ObjectKey; onChanged: () =>
           title={dialog.action.label}
           confirm={dialog.action.confirm}
           fields={dialog.action.fields ?? []}
+          readOnly={dialog.action.readOnly}
           pending={act.pending}
           error={act.error?.message}
           onCancel={() => setDialog(null)}
@@ -205,7 +206,7 @@ function ObjectView({ object, onChanged }: { object: ObjectKey; onChanged: () =>
   );
 }
 
-function FormDialog({ title, confirm, fields, pending, error, onCancel, onSubmit }: { title: string; confirm?: string; fields: FormField[]; pending: boolean; error?: string; onCancel: () => void; onSubmit: (values: Record<string, string>) => void }) {
+function FormDialog({ title, confirm, fields, pending, error, readOnly, onCancel, onSubmit }: { title: string; confirm?: string; fields: FormField[]; pending: boolean; error?: string; readOnly?: boolean; onCancel: () => void; onSubmit: (values: Record<string, string>) => void }) {
   const [values, setValues] = useState<Record<string, string>>(() => Object.fromEntries(fields.map((f) => [f.key, f.value === null || f.value === undefined ? (f.options?.[0]?.value ?? "") : String(f.value)])));
   return (
     <div className={styles.backdrop}>
@@ -221,7 +222,34 @@ function FormDialog({ title, confirm, fields, pending, error, onCancel, onSubmit
       >
         <h2 className={styles.dialogTitle}>{title}</h2>
         {confirm && <p style={{ margin: 0 }}>{confirm}</p>}
-        {fields.map((f) => (
+        {fields.map((f) =>
+          f.type === "info" ? (
+            <div key={f.key} className={styles.label}>
+              {f.label}
+              <div style={{ whiteSpace: "pre-wrap", fontWeight: 400, fontSize: 13, lineHeight: 1.5 }}>{String(f.value ?? "")}</div>
+            </div>
+          ) : f.type === "chips" ? (
+            <div key={f.key} className={styles.label} role="group" aria-label={f.label}>
+              {f.label}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, paddingTop: 4 }}>
+                {f.options?.map((o) => {
+                  const picked = (values[f.key] ?? "").split(",").filter(Boolean);
+                  const on = picked.includes(o.value);
+                  return (
+                    <button
+                      key={o.value}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => setValues({ ...values, [f.key]: (on ? picked.filter((x) => x !== o.value) : [...picked, o.value]).join(",") })}
+                      style={{ minHeight: 30, padding: "0 12px", borderRadius: 100, fontSize: 12, fontWeight: 700, border: `1px solid ${on ? "var(--primary)" : "var(--line)"}`, background: on ? "var(--primary)" : "var(--bg-raised)", color: on ? "var(--primary-ink)" : "var(--ink)", cursor: "pointer" }}
+                    >
+                      {o.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
           <label key={f.key} className={styles.label}>
             {f.label}
             {f.type === "select" ? (
@@ -238,15 +266,18 @@ function FormDialog({ title, confirm, fields, pending, error, onCancel, onSubmit
               <input type={f.type === "number" ? "number" : "text"} value={values[f.key]} required={f.required} onChange={(e) => setValues({ ...values, [f.key]: e.target.value })} style={{ width: "100%", padding: 8 }} />
             )}
           </label>
-        ))}
+          ),
+        )}
         {error && <Notice tone="error">{error}</Notice>}
         <div className={styles.actions}>
           <Button variant="ghost" type="button" onClick={onCancel}>
-            Annuler
+            {readOnly ? "Fermer" : "Annuler"}
           </Button>
-          <Button type="submit" loading={pending}>
-            {fields.length || !confirm ? "Enregistrer" : "Confirmer"}
-          </Button>
+          {!readOnly && (
+            <Button type="submit" loading={pending}>
+              {fields.length || !confirm ? "Enregistrer" : "Confirmer"}
+            </Button>
+          )}
         </div>
       </form>
     </div>

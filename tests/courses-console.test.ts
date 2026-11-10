@@ -181,14 +181,28 @@ describe("Console du catalogue : produit « placard » (CR-50, CR-51)", () => {
 });
 
 describe("Console : plats de saison de la base commune (CR-61)", () => {
-  it("la liste montre le plat, ses mois, ses étiquettes et ses choix ; masquer le retire de la recherche, le réafficher le remet ; corriger les mois et les étiquettes est inscrit au journal", async () => {
+  it("la liste montre le plat, ses mois, ses étiquettes et ses choix, avec les compteurs ; Voir est en lecture seule ; masquer le retire de la recherche, le réafficher le remet ; corriger par pastilles est inscrit au journal", async () => {
     const { shareSeasonDishes } = await import("@/server/courses/season/base");
     const cuisine = (await db.selectFrom("meal_cuisines").select("id").orderBy("id").executeTakeFirstOrThrow()).id;
     const name = `Plat console ${uid()}`;
-    const [id] = await shareSeasonDishes(db, [{ name, cuisineId: cuisine, servings: 4, recipe: "Cuire.", minutes: 30, months: [11, 12], tagIds: [], ingredients: [{ label: "Courgettes", quantity: 500, unit: "g" }] }]);
-    const row = () => loadObject(c, "plats-de-saison", q({}, name)).then((t) => t.rows.find((r) => r.id === id));
-    expect((await row())!.cells).toMatchObject({ name, months: "novembre → décembre", chosen: 0, state: "Visible" });
-    expect((await row())!.actions.map((a) => a.key)).toEqual(["edit", "hide"]);
+    const [id] = await shareSeasonDishes(db, [{ name, cuisineId: cuisine, servings: 2, recipe: "Cuire doucement.", minutes: 30, months: [11, 12], tagIds: [], ingredients: [{ label: "Courgettes", quantity: 250, unit: "g" }, { label: "Oignons", quantity: 1, unit: "piece" }] }]);
+    const table = () => loadObject(c, "plats-de-saison", q({}, name));
+    const row = () => table().then((t) => t.rows.find((r) => r.id === id));
+    expect((await row())!.cells).toMatchObject({ name, months: "nov. → déc.", chosen: 0, state: "Visible" });
+    expect((await table()).columns.map((x) => x.label)).toEqual(["Plat", "Cuisine", "Mois de saison", "Étiquettes", "Choisi", "Entré la semaine du", "État"]);
+    expect((await table()).info).toMatch(/^\d+ plats? · \d+ entrés? ce mois-ci · \d+ masqués?$/);
+    expect((await row())!.actions.map((a) => a.key)).toEqual(["view", "edit", "hide"]);
+    // « Voir » : ingrédients ramenés à 4 personnes et recette, en lecture seule
+    const view = (await row())!.actions.find((a) => a.key === "view")!;
+    expect(view.readOnly).toBe(true);
+    expect(view.fields!.map((f) => f.type)).toEqual(["info", "info"]);
+    expect(String(view.fields![0].value)).toContain("500 g de Courgettes");
+    expect(String(view.fields![0].value)).toContain("2 Oignons");
+    expect(view.fields![1].value).toBe("Cuire doucement.");
+    expect(view.confirm).toMatch(/masquez-le/);
+    // filtre « Nombre de choix »
+    expect((await loadObject(c, "plats-de-saison", q({ choices: "none" }, name))).rows.map((r) => r.id)).toContain(id);
+    expect((await loadObject(c, "plats-de-saison", q({ choices: "many" }, name))).rows).toEqual([]);
 
     await runAction(c, "plats-de-saison", "hide", id, {});
     expect((await row())!.cells.state).toBe("Masqué");
@@ -197,13 +211,18 @@ describe("Console : plats de saison de la base commune (CR-61)", () => {
     await runAction(c, "plats-de-saison", "show", id, {});
     expect((await row())!.cells.state).toBe("Visible");
 
-    // corriger les mois (mars à mai) et une étiquette de régime existante
-    const tag = await db.selectFrom("meal_dish_tags").select("name").where("kind", "=", "diet").orderBy("id").executeTakeFirst();
-    await runAction(c, "plats-de-saison", "edit", id, { from: "3", to: "5", tags: tag?.name ?? "" });
+    // corriger par pastilles : mois (mars, avril, mai, septembre) et une étiquette de régime
+    const tag = await db.selectFrom("meal_dish_tags").select(["id", "name"]).where("kind", "=", "diet").orderBy("id").executeTakeFirst();
+    const edit = (await row())!.actions.find((a) => a.key === "edit")!;
+    expect(edit.fields!.map((f) => [f.key, f.type])).toEqual([["tags", "chips"], ["months", "chips"]]);
+    expect(edit.fields![1].options).toHaveLength(12);
+    await runAction(c, "plats-de-saison", "edit", id, { months: "3,4,5,9", tags: tag ? String(tag.id) : "" });
     const after = await row();
-    expect(after!.cells.months).toBe("mars → mai");
+    expect(after!.cells.months).toBe("mars, avril, mai, sept.");
     if (tag) expect(after!.cells.tags).toBe(tag.name);
-    expect((await rejection(runAction(c, "plats-de-saison", "edit", id, { from: "3", to: "5", tags: "Étiquette inventée" }))).code).toBe("unknown_tag");
+    expect((await rejection(runAction(c, "plats-de-saison", "edit", id, { months: "", tags: "" }))).code).toBe("invalid_months");
+    expect((await rejection(runAction(c, "plats-de-saison", "edit", id, { months: "13", tags: "" }))).code).toBe("invalid_months");
+    expect((await rejection(runAction(c, "plats-de-saison", "edit", id, { months: "3", tags: "Étiquette inventée" }))).code).toBe("unknown_tag");
     expect((await rejection(runAction(c, "plats-de-saison", "hide", "999999999", {}))).code).toBe("not_found");
     const log = await db.selectFrom("admin_audit_log").select("action_type").where("entity_id", "=", id).where("entity_type", "=", "meal_season_dish").execute();
     expect(log.length).toBe(3);

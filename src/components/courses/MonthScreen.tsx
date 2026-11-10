@@ -31,6 +31,9 @@ export function MonthScreen() {
   );
 }
 
+/** Euros entiers pour les totaux du mois (« 386 € pour 4 semaines »). */
+const euro0 = (n: number) => `${Math.round(n)} €`;
+
 const rangeOf = (week: string, last = false) => {
   const d = new Date(`${week}T12:00:00`);
   const end = new Date(d.getTime() + 6 * 86_400_000);
@@ -52,6 +55,8 @@ function Month({ status, reload }: { status: MonthStatus; reload: () => void }) 
   const [ticked, setTicked] = useState<string[]>([]);
   const adding = useApiMutation();
   const [added, setAdded] = useState<string[] | null>(null);
+  const writing = useApiMutation();
+  const [writingWeek, setWritingWeek] = useState<string | null>(null);
 
   if (!status.ready) {
     return (
@@ -130,10 +135,19 @@ function Month({ status, reload }: { status: MonthStatus; reload: () => void }) 
     const validatedText = done.validated.map((w) => rangeOf(w)).join(" ; ");
     return (
       <>
-        <p className={styles.banner} role="status">
-          ✓ {done.validated.length} menu{done.validated.length > 1 ? "s" : ""} enregistré{done.validated.length > 1 ? "s" : ""} ({validatedText}), avec {done.validated.length > 1 ? "leurs listes" : "sa liste"} de courses.
-          {done.kept.length ? ` Non validée${done.kept.length > 1 ? "s" : ""} (menu existant gardé ou semaine laissée de côté) : ${done.kept.map((w) => rangeOf(w)).join(" ; ")}.` : ""}
-        </p>
+        <div className={styles.banner} role="status">
+          <div style={{ fontWeight: 700 }}>
+            ✓ {done.validated.length} menu{done.validated.length > 1 ? "s" : ""} enregistré{done.validated.length > 1 ? "s" : ""}
+          </div>
+          <div>
+            Du {rangeOf(done.validated[0]).replace(/^du /, "").split(" au ")[0]} au {rangeOf(done.validated[done.validated.length - 1]).split(" au ")[1]}, pour {euro0(done.total)}. {done.validated.length > 1 ? "Leurs listes de courses sont prêtes." : "Sa liste de courses est prête."}
+          </div>
+          {done.kept.length > 0 && (
+            <div>
+              {done.kept.every((w) => card.existing.includes(w)) ? "Menu existant gardé" : "Non validée"} pour la semaine {done.kept.map((w) => rangeOf(w)).join(" ; ")}. Total recalculé : {euro0(done.total)} pour {done.validated.length} semaine{done.validated.length > 1 ? "s" : ""}.
+            </div>
+          )}
+        </div>
         {done.groupWeeks.length >= 2 && (
           <Link href={`/courses/liste?group=${done.groupWeeks.join(",")}`} className={styles.scenarioCard} style={{ minHeight: 44, borderColor: "var(--primary)", color: "var(--primary)" }}>
             <span>Regrouper en une liste du mois</span>
@@ -211,12 +225,12 @@ function Month({ status, reload }: { status: MonthStatus; reload: () => void }) 
     <>
       <div className={styles.dayCard} role="status">
         <span className={styles.dayName}>
-          {euro(card.total)} pour 4 semaines · budget {euro(card.budget)}
+          {euro0(card.total)} pour 4 semaines · budget {euro0(card.budget)}
         </span>
         {card.overBy !== null ? (
           <>
-            <span style={{ fontWeight: 700, fontSize: 13 }}>Dépasse votre budget de {euro(card.overBy)}</span>
-            {card.expensive.length > 0 && <span className={styles.meta}>Les plats qui coûtent le plus, à remplacer : {card.expensive.map((e) => `${e.name} (${euro(e.cost)})`).join(" · ")}.</span>}
+            <span style={{ fontWeight: 700, fontSize: 13 }}>Dépasse votre budget de {euro0(card.overBy)}</span>
+            {card.expensive.length > 0 && <span className={styles.meta}>Les {card.expensive.length} plats les plus chers sont signalés : remplacez-les.</span>}
           </>
         ) : (
           <span className={styles.meta}>Dans votre budget.</span>
@@ -244,13 +258,35 @@ function Month({ status, reload }: { status: MonthStatus; reload: () => void }) 
           </div>
           {!w.proposal.complete && <span style={{ fontSize: 12, fontWeight: 700 }}>Semaine incomplète : {7 - w.proposal.dinners.length} dîner{7 - w.proposal.dinners.length > 1 ? "s" : ""} à choisir ; elle ne se valide pas avec les autres.</span>}
           {w.proposal.dinners.map((d, i) => (
-            <DishRow key={`${w.week}-d${i}-${d.name}`} day={DAY_LABELS[i] ?? ""} dish={d} kind="dinner" index={i} replacing={{ api: replaceApiOf(card, w.week), allowed: true }} />
+            <DishRow key={`${w.week}-d${i}-${d.name}`} day={DAY_LABELS[i] ?? ""} dish={d} kind="dinner" index={i} replacing={{ api: replaceApiOf(card, w.week), allowed: true }} flag={card.overBy !== null && card.expensive.some((e) => e.name === d.name) ? "Parmi les plus chers" : undefined} />
           ))}
           {w.proposal.express.length > 0 && <span className={styles.meta} style={{ textTransform: "uppercase", paddingTop: 6 }}>Plats express</span>}
           {w.proposal.express.map((d, i) => (
-            <DishRow key={`${w.week}-x${i}-${d.name}`} day="Exp." dish={d} kind="express" index={i} replacing={{ api: replaceApiOf(card, w.week), allowed: true }} />
+            <DishRow key={`${w.week}-x${i}-${d.name}`} day="Exp." dish={d} kind="express" index={i} replacing={{ api: replaceApiOf(card, w.week), allowed: true }} flag={card.overBy !== null && card.expensive.some((e) => e.name === d.name) ? "Parmi les plus chers" : undefined} />
           ))}
-          <span className={styles.meta}>{sessionText(w.proposal)} Pas de déroulé pour l&apos;instant : « Rédiger le déroulé » est proposé après la validation.</span>
+          <span className={styles.meta}>
+            {sessionText(w.proposal)}
+            {w.proposal.steps.length > 0 ? " Déroulé rédigé." : ""}
+          </span>
+          {status.seasonIa && w.proposal.complete && w.proposal.steps.length === 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-start" }}>
+              <button
+                type="button"
+                disabled={writing.pending}
+                className={styles.link}
+                style={{ border: "1px solid var(--line)", borderRadius: 7, background: "transparent", minHeight: 32, padding: "0 10px", fontWeight: 700 }}
+                onClick={async () => {
+                  setWritingWeek(w.week);
+                  const result = await writing.run<{ card: MonthView }>("/api/courses/month", { method: "POST", body: { action: "steps", messageId: card.messageId, week: w.week }, timeoutMs: COMPOSE_TIMEOUT_MS });
+                  setWritingWeek(null);
+                  if (result) setCard(result.card);
+                }}
+              >
+                {writing.pending && writingWeek === w.week ? "Je rédige le déroulé…" : "Rédiger le déroulé"}
+              </button>
+              <span className={styles.meta}>Facultatif : l&apos;IA écrit le déroulé de la séance (compté dans la limite de menus).</span>
+            </div>
+          )}
           {!w.proposal.complete && !card.existing.includes(w.week) && (
             <div className={family.wrapRow}>
               <button type="button" className={family.chipToggle} aria-pressed={decisions[w.week] === "keep"} onClick={() => setDecisions((d) => ({ ...d, [w.week]: d[w.week] === "keep" ? "replace" : "keep" }))}>
@@ -271,7 +307,7 @@ function Month({ status, reload }: { status: MonthStatus; reload: () => void }) 
         </section>
       ))}
 
-      {(compose.error || replace.error || validate.error) && <Notice tone="error">{(compose.error ?? replace.error ?? validate.error)!.message}</Notice>}
+      {(compose.error || replace.error || validate.error || writing.error) && <Notice tone="error">{(compose.error ?? replace.error ?? validate.error ?? writing.error)!.message}</Notice>}
       {pendingWhat && <p className={styles.meta}>{pendingWhat === "more" && status.seasonIa ? "Je cherche des plats de saison…" : "Je compose le menu du mois…"}</p>}
       <div className={family.wrapRow}>
         <Button variant="ghost" disabled={compose.pending} onClick={() => void run({ action: "compose", startWeek: card.startWeek, variant: card.variant + 1, previous: card.messageId }, "next")}>

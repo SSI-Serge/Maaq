@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireProfile } from "@/server/auth/http";
-import { composeMonth, monthReplace, monthReplaceOptions, monthStatus, monthValidate } from "@/server/courses/month/service";
+import { composeMonth, monthReplace, monthReplaceOptions, monthStatus, monthValidate, monthWriteSteps } from "@/server/courses/month/service";
 import { handler, parseBody } from "@/server/http";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +20,7 @@ const schema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("compose"), startWeek: week.nullable().optional(), variant: z.number().int().min(0).max(50).optional(), previous: id.nullable().optional(), more: z.boolean().optional() }),
   z.object({ action: z.literal("options"), messageId: id, week, kind, index: z.number().int().min(0).max(10) }),
   z.object({ action: z.literal("replace"), messageId: id, week, kind, index: z.number().int().min(0).max(10), choice }),
+  z.object({ action: z.literal("steps"), messageId: id, week }),
   z.object({ action: z.literal("validate"), messageId: id, keep: z.array(week).max(4).optional() }),
 ]);
 
@@ -36,5 +37,6 @@ export const POST = handler(async (request: Request) => {
   if (body.action === "compose") return NextResponse.json({ card: await composeMonth(ctx, session, body) });
   if (body.action === "options") return NextResponse.json({ options: await monthReplaceOptions(ctx, session, body) });
   if (body.action === "replace") return NextResponse.json({ card: await monthReplace(ctx, session, body) });
+  if (body.action === "steps") return NextResponse.json({ card: await monthWriteSteps(ctx, session, body) });
   return NextResponse.json({ result: await monthValidate(ctx, session, body) });
 });

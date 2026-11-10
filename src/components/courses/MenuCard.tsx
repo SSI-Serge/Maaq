@@ -86,7 +86,7 @@ function ReplacePanel({ kind, options, busy, onPick, onClose }: { kind: ReplaceK
   );
 }
 
-export function DishRow({ day, dish, kind, index, replacing }: { day: string; dish: ProposalDish; kind: ReplaceKind; index: number; replacing: { api: ReplaceApi; allowed: boolean } }) {
+export function DishRow({ day, dish, kind, index, replacing, flag }: { day: string; dish: ProposalDish; kind: ReplaceKind; index: number; replacing: { api: ReplaceApi; allowed: boolean }; flag?: string }) {
   const [open, setOpen] = useState(false);
   const [options, setOptions] = useState<ReplaceOptions | null>(null);
   const [loading, setLoading] = useState(false);
@@ -106,6 +106,7 @@ export function DishRow({ day, dish, kind, index, replacing }: { day: string; di
         <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} style={{ display: "block", textAlign: "left", background: "none", border: "none", padding: 0, fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>
           {dish.name} <span aria-hidden="true" className={styles.meta}>{open ? "⌃" : "⌄"}</span>
         </button>
+        {flag && <span style={{ ...TAG, background: "var(--warning-bg)", color: "var(--ink)", border: "1px solid var(--warning)", marginRight: 4 }}>{flag}</span>}
         {dish.servedOn && <span style={{ ...TAG, background: "var(--secondary-soft)", color: "var(--ink)" }}>Déjà servi le {dish.servedOn} · vous pouvez le garder</span>}
         {dish.warnings.map((w) => (
           <span key={w} style={{ ...TAG, background: "var(--warning-bg)", color: "var(--ink)", border: "1px solid var(--warning)" }}>

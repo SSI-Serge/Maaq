@@ -3,7 +3,7 @@ import type { AssistantModel, ModelRequest, ModelResponse } from "@/server/assis
 import type { Ctx } from "@/server/auth/service";
 import { getSettings, saveSettings } from "@/server/courses/household/settings";
 import { loadEngineData } from "@/server/courses/menu/data";
-import { composeMonth, monthReplace, monthReplaceOptions, monthStatus, monthValidate, MIN_MENUS } from "@/server/courses/month/service";
+import { composeMonth, monthReplace, monthReplaceOptions, monthStatus, monthValidate, monthWriteSteps, MIN_MENUS } from "@/server/courses/month/service";
 import { loadSettings } from "@/server/courses/household/settings";
 import { ensureCatalog } from "./helpers/courses-catalog";
 import { coupleFamily, type CoupleFamily } from "./helpers/couple";
@@ -149,6 +149,45 @@ describe("Menu du mois : proposition, autre proposition, remplacement, validatio
     } else {
       // historique trop court pour une semaine complète : elle ne se valide pas
       expect((await rejection(monthValidate(at(), h.f.sophie, { messageId: card.messageId }))).code).toBe("menu_incomplete");
+    }
+  });
+});
+
+describe("Menu du mois : « Rédiger le déroulé » et total recalculé (US-178 RF9, RF10)", () => {
+  it("le déroulé d'une semaine se rédige avant la validation (compté 1 dans la limite), il est enregistré avec le menu ; le total validé est recalculé quand une semaine est gardée", async () => {
+    const h = await household(MIN_MENUS);
+    const card = await composeMonth(at(), h.f.sophie, { startWeek: START }, { model: seasonModel(h.cuisine) });
+    const w = card.weeks.find((x) => x.proposal.complete)!;
+    expect(w).toBeTruthy();
+    const names = w.proposal.dinners.slice(0, 5).map((d) => d.name);
+    const counter = async () => (await db.selectFrom("meal_menu_daily_counters").select("menu_count").where("account_id", "=", h.f.accountId).execute()).reduce((sum, r) => sum + r.menu_count, 0);
+    const before = await counter();
+    const steps = [
+      { texte: "Préparer les légumes.", duree_minutes: 40 },
+      { texte: "Cuire le premier plat.", plat: names[0], duree_minutes: 160 },
+      { texte: "Ranger le premier plat.", plat: names[0], duree_minutes: 5, conservation: "frigo", jour_sortie: 2 },
+    ];
+    const model: AssistantModel & { seen: ModelRequest[] } = { id: "faux", seen: [], send: async (request) => (model.seen.push(structuredClone(request)), { content: [{ type: "tool_use", id: "t", name: "proposer_deroule", input: { etapes: steps } }], stopReason: "tool_use", usage, requestId: null }) };
+    const written = await monthWriteSteps(at(), h.f.sophie, { messageId: card.messageId, week: w.week }, { model });
+    const after = written.weeks.find((x) => x.week === w.week)!.proposal;
+    expect(after.steps).toHaveLength(3);
+    expect(after.session).toMatchObject({ source: "steps", minutes: 205, estimated: true });
+    expect(await counter()).toBe(before + 1);
+    expect(JSON.stringify(model.seen[0].messages)).not.toMatch(/€|Lidl|Sophie|Nantes/);
+    expect((await rejection(monthWriteSteps(at(), h.f.sophie, { messageId: card.messageId, week: "2027-01-04" }, { model }))).code).toBe("invalid_week");
+    expect((await rejection(monthWriteSteps(at(), h.f.elodie, { messageId: card.messageId, week: w.week }, { model }))).status).toBe(403);
+    // une réponse invalide ne change rien
+    const bad: AssistantModel = { id: "faux", send: async () => ({ content: [{ type: "text", text: "Désolé." }], stopReason: "end_turn", usage, requestId: null }) };
+    expect((await rejection(monthWriteSteps(at(), h.f.sophie, { messageId: card.messageId, week: card.weeks.find((x) => x.week !== w.week && x.proposal.complete)?.week ?? w.week }, { model: bad }))).code).toBe("steps_failed");
+
+    if (card.weeks.every((x) => x.proposal.complete)) {
+      const kept = card.weeks.find((x) => x.week !== w.week)!.week;
+      const done = await monthValidate(at(), h.f.sophie, { messageId: card.messageId, keep: [kept] });
+      expect(done.total).toBeGreaterThan(0);
+      expect(done.total).toBeLessThanOrEqual(card.total + 0.01);
+      const menu = await db.selectFrom("meal_menus").select(["id", "session_minutes"]).where("account_id", "=", h.f.accountId).where("week_start", "=", w.week as never).executeTakeFirstOrThrow();
+      expect(menu.session_minutes).toBe(205);
+      expect(await db.selectFrom("meal_menu_session_steps").select("id").where("menu_id", "=", menu.id).execute()).toHaveLength(3);
     }
   });
 });

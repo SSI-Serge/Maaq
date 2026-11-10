@@ -18,11 +18,13 @@ import { saveValidatedMenu } from "../menu-ia/validate";
 import { weekLabel } from "../menu/weeks";
 import type { MenuProposal, ProposalContext, ProposalDish } from "../menu-ia/proposal";
 import { findSeasonDishes, seenSeasonDishes, type SeasonCandidate } from "../season/base";
-import { gatherSeasonDishes, monthStart } from "../season";
+import { gatherSeasonDishes, monthStart, registerMenuRequest } from "../season";
 import { buildPool, historyPool, productsOfEntries, poolForSolver, type PoolEntry } from "./pool";
 import { loadBook, poolDishOf, type Book } from "./pricing";
 import { costOf, mostExpensive, solve, type PoolDish, type Solution } from "./solver";
 import { buildRefProducts } from "../engine";
+import { draftSteps } from "../menu-ia/steps";
+import { minutesFromSteps } from "../menu-ia/proposal";
 import { loadReferences } from "../list/data";
 
 /**
@@ -361,6 +363,8 @@ export async function monthReplace(ctx: Ctx, session: SessionContext, input: { m
 
 export interface MonthValidated {
   validated: string[];
+  /** Coût des semaines validées (le total est recalculé quand une semaine est gardée ou laissée de côté). */
+  total: number;
   kept: string[];
   /** Plats à proposer pour « Ajouter ces plats à vos plats ? », par semaine. */
   addable: { week: string; slot: string; name: string }[];
@@ -390,10 +394,36 @@ export async function monthValidate(ctx: Ctx, session: SessionContext, input: { 
   } catch (error) {
     throw translateCourseError(error);
   }
+  const rest = await recost(ctx, who.accountId, who.userId, settings, { ...e, weeks: e.weeks.filter((w) => done.includes(w.week)) });
   await saveMonth(ctx.db, card.id, { ...e, status: "validated", validated: done });
   const addable: MonthValidated["addable"] = [];
   for (const week of done) for (const a of await addableDishes(ctx.db, who.accountId, week)) addable.push({ week, ...a });
-  return { validated: done, kept: [...keep], addable, groupWeeks: done.length >= 2 ? done : [] };
+  return { validated: done, total: rest.total, kept: [...keep], addable, groupWeeks: done.length >= 2 ? done : [] };
+}
+
+/**
+ * « Rédiger le déroulé » d'une semaine du menu du mois (US-178 RF9) : facultatif, appel IA compté 1 dans la limite de menus, même interrupteur que le menu par l'IA. Si l'IA échoue, rien ne change.
+ * Le déroulé et la durée recalculée sont gardés dans la proposition et enregistrés avec le menu à la validation.
+ */
+export async function monthWriteSteps(ctx: Ctx, session: SessionContext, input: { messageId: string; week: string }, deps: MonthDeps = {}): Promise<MonthView> {
+  const { who, card } = await openMonth(ctx, session, input.messageId);
+  const w = weekOf(card.envelope, input.week);
+  if (w.proposal.dinners.length < 2) throw courseError("not_enough_dishes", "Il faut au moins deux dîners pour rédiger le déroulé.", 422);
+  let model = deps.model;
+  if (!model) {
+    if (env().MENU_IA !== "live") throw courseError("assistant_unavailable", "La rédaction du déroulé n'est pas ouverte.", 409);
+    model = (await import("../chat/service")).courseModel();
+  }
+  if (!(await registerMenuRequest(ctx, who.accountId, who.userId))) throw courseError("limit_reached", "Vous avez atteint la limite de menus pour aujourd'hui : vous pourrez reprendre demain.", 429);
+  const first = w.proposal.dinners.slice(0, 5);
+  const dishes = first.map((d) => ({ name: d.name, minutes: d.minutes, ingredients: d.ingredients.map((i) => i.label) }));
+  const steps = await draftSteps(model, dishes);
+  const minutes = steps ? minutesFromSteps(steps, Math.max(0, ...dishes.map((d) => d.minutes))) : null;
+  if (!steps || minutes === null) throw courseError("steps_failed", "Je n'ai pas réussi à rédiger le déroulé pour le moment. Vous pouvez réessayer.", 502);
+  const proposal: MenuProposal = { ...w.proposal, steps, stepsStale: false, session: { ...w.proposal.session, minutes, estimated: true, overCap: minutes > w.proposal.session.cap, source: "steps" } };
+  const envelope: MonthEnvelope = { ...card.envelope, weeks: card.envelope.weeks.map((x) => (x.week === input.week ? { ...x, proposal } : x)) };
+  await saveMonth(ctx.db, card.id, envelope);
+  return asView(card.id, envelope, await existingWeeks(ctx.db, who.accountId, envelope.weeks.map((x) => x.week)));
 }
 
 export { checkWeek, nextMonday, historyPool };

@@ -17,7 +17,8 @@ export interface ConsoleColumn {
 export interface FormField {
   key: string;
   label: string;
-  type: "text" | "number" | "textarea" | "select";
+  /** « chips » : pastilles à cocher (plusieurs valeurs, rendues en liste séparée par des virgules) ; « info » : texte en lecture seule. */
+  type: "text" | "number" | "textarea" | "select" | "chips" | "info";
   value?: string | number | null;
   options?: { value: string; label: string }[];
   required?: boolean;
@@ -30,6 +31,8 @@ export interface RowAction {
   confirm?: string;
   /** Champs à renseigner avant d'agir (modifier, renommer, fusionner…). */
   fields?: FormField[];
+  /** Fenêtre en lecture seule (« Voir ») : le seul bouton est « Fermer », rien n'est envoyé. */
+  readOnly?: boolean;
 }
 
 export interface ConsoleRow {
