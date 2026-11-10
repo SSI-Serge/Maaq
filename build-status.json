@@ -3,8 +3,16 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-10T16:00:00.000Z",
+  "updated": "2026-11-10T18:30:00.000Z",
   "deploys": [
+    {
+      "at": "2026-11-10T18:30:00.000Z",
+      "env": "preview",
+      "what": "Courses et repas, CR-66 et CR-67 : « Produits de mon historique » sans les ingrédients des repas, complétée par « Pensez aussi à : » (produits du quotidien de la console, sous le seuil) ; console « Produits du quotidien » avec le seuil. Rattrapage « quotidien » appliqué sur la base de test avec l'accord du PO, après sauvegarde. Suite complète verte (1313 essais). Menu IA fermé en production.",
+      "storyIds": [
+        "f21c4"
+      ]
+    },
     {
       "at": "2026-11-10T16:00:00.000Z",
       "env": "preview",
