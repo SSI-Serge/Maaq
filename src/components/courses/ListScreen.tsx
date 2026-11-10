@@ -82,7 +82,7 @@ function GroupPicker({ list, onGroup }: { list: ListPrepared; onGroup: (weeks: s
   );
 }
 
-function ListFlow({ list, reload, onWeek, onGroup }: { list: ListPrepared; reload: () => void; onWeek: (week: string) => void; onGroup: (weeks: string[] | null) => void }) {
+export function ListFlow({ list, reload, onWeek, onGroup }: { list: ListPrepared; reload: () => void; onWeek: (week: string) => void; onGroup: (weeks: string[] | null) => void }) {
   if (list.access === "list") return <GuestView list={list} reload={reload} />;
   if (!list.menu || !list.model) {
     return (
@@ -363,9 +363,10 @@ function Preparation({ list, reload }: { list: ListPrepared; reload: () => void 
         </>
       ))}
 
-      {rub("Ingrédients exclus des références proposées", false, (
+      {/* toujours affichée, entre « Produits de mon historique » et « Comparatif des prix » ; dépliée quand une référence est écartée (US-157 RF1, CR-37) */}
+      {rub("Ingrédients exclus des références proposées", list.excluded.length > 0, (
         <>
-          {list.excluded.length === 0 && <p className={styles.empty}>Aucune référence écartée pour cette liste.</p>}
+          {list.excluded.length === 0 && <p className={styles.empty}>{list.group ? "Aucun ingrédient exclu pour ces menus." : "Aucun ingrédient exclu pour ce menu."}</p>}
           {list.excluded.map((e) => (
             <p key={`${e.product}|${e.store}|${e.reference}`} style={{ margin: "0 0 8px" }}>
               {e.reference} ({e.store}) : {e.because.length ? `contient ${e.because.join(", ")}. La référence suivante, conforme, est proposée.` : "aucune référence conforme trouvée pour le moment."}
