@@ -178,6 +178,34 @@ describe("US-158 : Ma liste de courses", () => {
     return { f, lines };
   }
 
+  it("CR-66 : « Produits de mon historique » ne propose que les achats faits en plus des repas ; un produit qui a été ingrédient d'un menu validé du foyer n'y revient pas, même une autre semaine, tant que ce menu existe", async () => {
+    const { f } = await readyWithMenu();
+    await addProduct(at(), f.sophie, { name: "Liquide vaisselle" });
+    const list = await prepareList(at(), f.sophie);
+    const model = fromDto(list.model!);
+    const scenario = computeScenarios(model, {}, list.stores.map((s) => s.chain))[0];
+    const lines = scenarioLines(model, {}, scenario).map((l) => ({ name: l.name, qty: l.qty, store: l.store, ref: l.ref, price: l.price, source: (l.name === "Liquide vaisselle" ? "added" : "menu") as "added" | "menu" }));
+    expect(lines.some((l) => l.name === "Liquide vaisselle")).toBe(true);
+    await validateList(at(), f.sophie, { scenario: 1, lines });
+    const ingredient = lines.find((l) => l.name !== "Liquide vaisselle")!;
+    await setBought(at(), f.sophie, { key: nameKey(ingredient.name), bought: true, late: false });
+    await setBought(at(), f.sophie, { key: nameKey("Liquide vaisselle"), bought: true, late: false });
+
+    // même semaine : l'achat en plus des repas est proposé, l'ingrédient non
+    const same = (await prepareList(at(), f.sophie)).model!.items.filter((i) => i.group === "habituel").map((i) => i.name);
+    expect(same).toContain("Liquide vaisselle");
+    expect(same).not.toContain(ingredient.name);
+
+    // semaine suivante, avec un autre menu : l'ingrédient de l'ancien menu ne revient pas dans l'historique
+    const data = (await prepareList(at(), f.sophie)).menu!;
+    await validateTestMenu(db, f, { picks: [], week: "2026-11-16", now: at().now });
+    const next = await prepareList(at(), f.sophie, "2026-11-16");
+    expect(next.menu!.weekLabel).not.toBe(data.weekLabel);
+    const habits = next.model!.items.filter((i) => i.group === "habituel").map((i) => i.name);
+    expect(habits).toContain("Liquide vaisselle");
+    expect(habits).not.toContain(ingredient.name);
+  });
+
   it("avant la validation, la liste est vide ; après, elle est rangée par magasin puis par rayon avec un reste à acheter", async () => {
     const { f, lines } = await validated();
     const mine = await myList(at(), f.sophie);
@@ -201,9 +229,9 @@ describe("US-158 : Ma liste de courses", () => {
     expect(after.stores.flatMap((s) => s.aisles.flatMap((a) => a.lines)).some((l) => l.key === key)).toBe(false);
     const row = await db.selectFrom("grocery_list_items").select(["state", "bought_by_user_id"]).where("account_id", "=", f.accountId).where("name_key", "=", key).executeTakeFirstOrThrow();
     expect(row).toMatchObject({ state: "bought", bought_by_user_id: f.userIds.sophie });
-    // il apparaît dans le pense-bête « produits de mon historique » de la préparation suivante
+    // c'est un ingrédient du menu validé : il rejoint l'historique des prix mais n'est plus proposé dans « Produits de mon historique » (CR-66)
     const prep = await prepareList(at(), f.sophie);
-    expect(prep.model!.items.some((i) => i.group === "habituel" && i.name === first.name)).toBe(true);
+    expect(prep.model!.items.some((i) => i.group === "habituel" && i.name === first.name)).toBe(false);
     await setBought(at(), f.sophie, { key, bought: false, late: false });
     expect((await myList(at(), f.sophie)).stores.flatMap((s) => s.aisles.flatMap((a) => a.lines)).some((l) => l.key === key)).toBe(true);
     expect((await rejection(setBought(at(), f.sophie, { key, bought: false, late: false }))).code).toBe("not_bought");

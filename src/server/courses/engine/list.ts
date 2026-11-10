@@ -159,6 +159,8 @@ export interface ListInput {
   now: Date;
   /** Durée de l'historique proposé en pense-bête, en mois (3, CR-27). */
   historyMonths?: number;
+  /** Noms normalisés des produits déjà ingrédients d'un menu validé du foyer : jamais proposés dans « Produits de mon historique » (CR-66). Leurs prix d'historique restent utilisés. */
+  historySkip?: Set<string>;
 }
 
 export interface DishLight {
@@ -334,6 +336,7 @@ export function buildListModel(input: ListInput): ListModel {
     const k = norm(h.product);
     if (seen.has(k) || parseDay(h.date) < since) continue;
     seen.add(k);
+    if (input.historySkip?.has(k)) continue;
     make(h.product, "habituel", { rayonHint: input.journalRayon?.get(h.product) ?? null });
   }
 

@@ -4,7 +4,7 @@ import type { Ctx, SessionContext } from "@/server/auth/service";
 import type { DB } from "@/server/db/schema.generated";
 import { env } from "@/server/env";
 import { nameKey, placeKey } from "../catalog/seed";
-import { buildListModel, buildRefProducts, computeScenarios, DAYS, dishItems, fmtMin, gapType, norm, type BuyRow, type Dish, type DishMode } from "../engine";
+import { buildListModel, buildRefProducts, computeScenarios, DAYS, dishItems, findProd, fmtMin, gapType, norm, type BuyRow, type Dish, type DishMode } from "../engine";
 import { courseError, loadSettings, requireAccess, translateCourseError, type CourseAccess } from "../household/settings";
 import { loadEngineData } from "../menu/data";
 import { weekLabel } from "../menu/weeks";
@@ -157,6 +157,8 @@ export async function prepareList(ctx: Ctx, session: SessionContext, requestedWe
   const pricedNames = new Set(history.map((h) => norm(h.product)));
   for (const b of boughtItems) if (b.bought_at && !pricedNames.has(norm(b.label))) history.push({ product: b.label, ref: b.label, unitPrice: null, store: "", date: isoDay(b.bought_at) });
 
+  const historySkip = await ingredientNames(ctx.db, who.accountId, history.map((h) => h.product), prods0(refs));
+
   const byId = new Map(data.dishes.map((d) => [d.id, d]));
   const codeOf = (e: { dish_id: string | null; household_dish_id: string | null }) => {
     if (e.household_dish_id) return `H:${e.household_dish_id}`;
@@ -201,7 +203,7 @@ export async function prepareList(ctx: Ctx, session: SessionContext, requestedWe
     });
   }
   const chains = [...new Set(stores.map((s) => s.chain))];
-  const model = buildListModel({ dishes: unique, prods, buy, history, light, stores: chains, sharing: settings.sharePrices, common, now: ctx.now });
+  const model = buildListModel({ dishes: unique, prods, buy, history, historySkip, light, stores: chains, sharing: settings.sharePrices, common, now: ctx.now });
   // « À acheter plus tard (semaine du 23 nov.) » : produits frais des semaines suivantes, décochés et hors total, avec leur sous-total estimé
   const laterGroups: NonNullable<ListPrepared["group"]>["later"] = [];
   if (split && groupMenus) {
@@ -571,3 +573,47 @@ export async function validateGroup(ctx: Ctx, session: SessionContext, input: { 
 }
 
 export type { References };
+
+const prods0 = (refs: References) => buildRefProducts(refs.rows);
+
+/**
+ * Produits de l'historique qui ont déjà été ingrédients d'un menu validé du foyer, encore enregistré (CR-66, US-157 RF3 et RT2bis) : ils ne sont plus proposés dans « Produits de mon historique ».
+ * Un produit est reconnu s'il correspond au même produit du catalogue qu'un ingrédient ; sans produit du catalogue, on compare le nom normalisé. Rend les noms normalisés à écarter.
+ */
+export async function ingredientNames(db: Kysely<DB>, accountId: string, labels: string[], prods: ReturnType<typeof buildRefProducts>): Promise<Set<string>> {
+  const out = new Set<string>();
+  if (!labels.length) return out;
+  const ingredients = await db
+    .selectFrom("meal_menu_entry_ingredients as i")
+    .leftJoin("grocery_products as p", "p.id", "i.product_id")
+    .select(["i.name_key", "i.label", "p.name as product"])
+    .where("i.account_id", "=", accountId)
+    .execute();
+  const keys = new Set<string>();
+  const products = new Set<string>();
+  for (const i of ingredients) {
+    keys.add(i.name_key);
+    keys.add(nameKey(i.label));
+    const product = i.product ?? findProd(prods, i.label);
+    if (product) products.add(norm(product));
+  }
+  // les produits que la liste a tirés d'un menu (un ingrédient écrit autrement que le produit du catalogue y est déjà rapproché)
+  const fromMenus = await db.selectFrom("grocery_list_items").select(["label", "name_key"]).where("account_id", "=", accountId).where("source", "=", "menu").where("menu_id", "is not", null).execute();
+  for (const m of fromMenus) {
+    keys.add(m.name_key);
+    products.add(norm(m.label));
+  }
+  // lignes de ticket et produits cochés : le produit du catalogue auquel la base les a reliés
+  const [lines, bought] = await Promise.all([
+    db.selectFrom("grocery_receipt_lines as l").innerJoin("grocery_products as p", "p.id", "l.product_id").select(["l.label", "p.name as product"]).where("l.account_id", "=", accountId).execute(),
+    db.selectFrom("grocery_list_items as l").innerJoin("grocery_products as p", "p.id", "l.product_id").select(["l.label", "p.name as product"]).where("l.account_id", "=", accountId).where("l.state", "=", "bought").execute(),
+  ]);
+  const linked = new Map<string, string>();
+  for (const l of [...lines, ...bought]) linked.set(norm(l.label), norm(l.product));
+  for (const label of labels) {
+    const k = norm(label);
+    const product = linked.get(k) ?? (findProd(prods, label) ? norm(findProd(prods, label) as string) : null);
+    if ((product && products.has(product)) || keys.has(nameKey(label)) || products.has(k)) out.add(k);
+  }
+  return out;
+}
