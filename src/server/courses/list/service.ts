@@ -11,7 +11,7 @@ import { weekLabel } from "../menu/weeks";
 import { aiDishId, loadAiDishes, loadEntryIngredients, loadMenuEntries, loadSession, recipeSteps, type SessionView } from "../menu-ia/entries";
 import { groupMenusOf, groupOfMenu, leftoversFor, listOfMenu, pickMenu, weekChoices, weekStartLabel, type Leftover, type WeekChoice, type WeekMenu } from "./weeks";
 import { allocate, mergeRows, splitGroupRows, toBuyRow, type GroupRow } from "./group";
-import { loadCommonPrices, loadHistory, loadLightVersions, loadReferences, type ExcludedReference, type References } from "./data";
+import { loadCommonPrices, loadHistory, loadLightVersions, loadReferences, type References } from "./data";
 import { toDto, type ListModelDto } from "./dto";
 
 /**
@@ -68,7 +68,7 @@ export interface ListPrepared {
   sharing: boolean;
   householdSize: number | null;
   added: AddedLine[];
-  excluded: ExcludedReference[];
+  /** Additifs exclus par MAAQ : les critères actifs de la console, les mêmes pour tous les foyers (CR-65). */
   criteria: { label: string; reason: string }[];
   now: string;
 }
@@ -120,12 +120,12 @@ export async function prepareList(ctx: Ctx, session: SessionContext, requestedWe
   }
   const week = menu?.week_start ?? null;
   if (who.access === "list") {
-    return { access: "list", menu: null, week, weeks, validated: false, group: null, model: null, modes: {}, stores: [], sharing: false, householdSize: null, added, excluded: [], criteria: [], now: ctx.now.toISOString() };
+    return { access: "list", menu: null, week, weeks, validated: false, group: null, model: null, modes: {}, stores: [], sharing: false, householdSize: null, added, criteria: [], now: ctx.now.toISOString() };
   }
   const settings = await loadSettings(ctx.db, who.accountId);
   const stores = settings.stores;
   const base = { access: who.access, stores, sharing: settings.sharePrices, householdSize: settings.householdSize, added, week, weeks, now: ctx.now.toISOString() };
-  if (!menu) return { ...base, menu: null, validated: false, group: null, model: null, modes: {}, excluded: [], criteria: [] };
+  if (!menu) return { ...base, menu: null, validated: false, group: null, model: null, modes: {}, criteria: [] };
   const menus = groupMenus ?? [menu];
 
   const [data, refs, history, entries, rows, criteria, list] = await Promise.all([
@@ -223,9 +223,6 @@ export async function prepareList(ctx: Ctx, session: SessionContext, requestedWe
     if (aiLoad.chosenLight.has(d.name)) modes[d.name] = "light";
   }
 
-  const inList = new Set(model.items.map((i) => norm(i.name)));
-  const excluded = refs.excluded.filter((e) => inList.has(norm(e.product)) || model.items.some((i) => norm(i.name).includes(norm(e.product))));
-
   const entryIngredients = await loadEntryIngredients(ctx.db, entries.map((e) => e.id));
   const minutesOf = (e: (typeof entries)[number]) => dishOf(e)?.minutes ?? e.duration_minutes ?? 0;
   const dishNames = new Map(entries.map((e) => [e.id, e.dish_name]));
@@ -264,7 +261,7 @@ export async function prepareList(ctx: Ctx, session: SessionContext, requestedWe
     validated = groups.every((g) => !!g.list && g.list.validated_at >= g.m.validated_at && g.group?.id === groups[0].group?.id) && !!groups[0].group;
     stale = !validated;
   }
-  return { ...base, menu: summary, validated, group: groupMenus ? { weeks: groupMenus.map((m) => m.week_start), later: laterGroups } : null, model: toDto(model), modes, excluded, criteria };
+  return { ...base, menu: summary, validated, group: groupMenus ? { weeks: groupMenus.map((m) => m.week_start), later: laterGroups } : null, model: toDto(model), modes, criteria };
 }
 
 /**

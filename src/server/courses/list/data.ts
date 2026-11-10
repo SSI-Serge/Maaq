@@ -9,18 +9,8 @@ const isoDay = (value: Date | string) => (typeof value === "string" ? value.slic
 
 const asPriceUnit = (value: string | null | undefined): PriceUnit => (value === "kg" || value === "l" ? value : "unit");
 
-export interface ExcludedReference {
-  product: string;
-  store: string;
-  reference: string;
-  /** Critères d'additifs qui excluent la référence ; vide quand le catalogue d'origine n'a trouvé aucune référence conforme. */
-  because: string[];
-}
-
 export interface References {
   rows: ReferenceRow[];
-  /** Références écartées (additif d'un critère actif, ou « aucun conforme trouvé »), pour la rubrique « Ingrédients exclus ». */
-  excluded: ExcludedReference[];
   /** Rayon de chaque produit du catalogue (nom du produit → rayon). */
   aisles: Map<string, string>;
 }
@@ -36,14 +26,11 @@ export async function loadReferences(db: Kysely<DB>): Promise<References> {
     .execute();
   const aisles = new Map<string, string>();
   const refs: ReferenceRow[] = [];
-  const excluded: ExcludedReference[] = [];
   for (const r of rows) {
     if (!r.product || !r.rayon || !r.store_chain || !r.reference_name) continue;
     aisles.set(r.product, r.rayon);
-    if (r.is_compliant === false) {
-      excluded.push({ product: r.product, store: displayPlace(r.store_chain), reference: r.reference_name, because: r.excluded_because ?? [] });
-      continue;
-    }
+    // une référence écartée (additif d'un critère actif, ou « aucun conforme trouvé ») n'est jamais proposée ni citée (CR-65)
+    if (r.is_compliant === false) continue;
     refs.push({
       product: r.product,
       rayon: r.rayon,
@@ -60,7 +47,7 @@ export async function loadReferences(db: Kysely<DB>): Promise<References> {
       package: r.package_amount !== null && (r.package_unit === "kg" || r.package_unit === "l") && Number(r.package_amount) > 0 ? { amount: Number(r.package_amount), unit: r.package_unit } : null,
     });
   }
-  return { rows: refs, excluded, aisles };
+  return { rows: refs, aisles };
 }
 
 /** Prix des tickets du foyer (12 mois) : le « dernier acheté » du comparatif et le pense-bête des 3 derniers mois. */

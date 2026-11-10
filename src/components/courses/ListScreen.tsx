@@ -363,23 +363,18 @@ function Preparation({ list, reload }: { list: ListPrepared; reload: () => void 
         </>
       ))}
 
-      {/* toujours affichée, entre « Produits de mon historique » et « Comparatif des prix » ; dépliée quand une référence est écartée (US-157 RF1, CR-37) */}
-      {rub("Ingrédients exclus des références proposées", list.excluded.length > 0, (
+      {/* toujours affichée, entre « Produits de mon historique » et « Comparatif des prix » ; la même liste pour tous les foyers, sans produit ni référence ni enseigne (US-157 RF1quater, US-167 RF1, CR-65) */}
+      {rub("Ingrédients / additifs exclus des références proposées", false, (
         <>
-          {list.excluded.length === 0 && <p className={styles.empty}>{list.group ? "Aucun ingrédient exclu pour ces menus." : "Aucun ingrédient exclu pour ce menu."}</p>}
-          {list.excluded.map((e) => (
-            <p key={`${e.product}|${e.store}|${e.reference}`} style={{ margin: "0 0 8px" }}>
-              {e.because.length ? e.reference : e.product} ({e.store}) : {e.because.length ? `contient ${e.because.join(", ")}. La référence suivante, conforme, est proposée.` : "aucune référence conforme trouvée pour le moment."}
-            </p>
-          ))}
-          {list.criteria.length > 0 && (
+          {list.criteria.length === 0 ? (
+            <p className={styles.empty}>Aucun additif exclu pour le moment.</p>
+          ) : (
             <>
-              <h3 className={styles.kick}>Critères additifs appliqués</h3>
+              <p className={styles.note}>MAAQ ne vous propose aucune référence qui contient l&apos;un de ces additifs.</p>
               {list.criteria.map((c) => (
-                <div key={c.label} className={styles.line}>
-                  <span className={styles.lineName}>{c.label}</span>
-                  <span className={styles.lineSub}>{c.reason}</span>
-                </div>
+                <p key={c.label} style={{ margin: "0 0 6px" }}>
+                  {c.label} — {c.reason}
+                </p>
               ))}
             </>
           )}
