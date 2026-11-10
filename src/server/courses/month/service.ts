@@ -22,6 +22,8 @@ import { gatherSeasonDishes, monthStart, registerMenuRequest } from "../season";
 import { buildPool, historyPool, productsOfEntries, poolForSolver, type PoolEntry } from "./pool";
 import { loadBook, poolDishOf, type Book } from "./pricing";
 import { costOf, mostExpensive, solve, type PoolDish, type Solution } from "./solver";
+import { applyBundles, loadBundles, type WeekReuse } from "./reuse";
+import { nameKey } from "../catalog/seed";
 import { buildRefProducts } from "../engine";
 import { draftSteps } from "../menu-ia/steps";
 import { minutesFromSteps } from "../menu-ia/proposal";
@@ -166,10 +168,24 @@ export async function monthStatus(ctx: Ctx, session: SessionContext): Promise<Mo
 }
 
 /** Proposition d'une semaine : 7 dîners et 4 plats express, durée de la séance estimée par la formule (sans déroulé : « Rédiger le déroulé » reste facultatif après la validation). */
-function weekProposal(week: string, dinners: ProposalDish[], express: ProposalDish[], settings: SettingsView, data: EngineData): MenuProposal {
+function weekProposal(week: string, dinners: ProposalDish[], express: ProposalDish[], settings: SettingsView, data: EngineData, reuse: WeekReuse = null): MenuProposal {
   const first = dinners.slice(0, 5);
   const minutes = Math.round(estimateMinutes(first));
   const all = [...dinners, ...express];
+  const base = weekBase(week, dinners, express, settings, data, all, minutes);
+  if (!reuse || first.length < 5) return base;
+  const cap = data.sessionCap;
+  // US-178 RF9 : la séance correspond à une semaine type ou à une séance déjà faite : son déroulé et sa durée sont repris, sans IA
+  if (reuse.kind === "plan") {
+    return { ...base, planId: reuse.planId ?? null, planTheme: reuse.theme ?? null, planSteps: reuse.planSteps ?? [], steps: [], reused: "plan", session: { minutes: reuse.minutes, estimated: false, overCap: reuse.minutes > cap, cap, source: "plan" } };
+  }
+  const nameByKey = new Map(first.map((d) => [nameKey(d.name), d.name]));
+  const steps = (reuse.steps ?? []).map((s) => ({ ...s, dish: s.dish ? (nameByKey.get(nameKey(s.dish)) ?? null) : null }));
+  const worked = minutesFromSteps(steps, Math.max(0, ...first.map((d) => d.minutes))) ?? reuse.minutes;
+  return { ...base, steps, reused: "session", session: { minutes: worked, estimated: true, overCap: worked > cap, cap, source: "steps" } };
+}
+
+function weekBase(week: string, dinners: ProposalDish[], express: ProposalDish[], settings: SettingsView, data: EngineData, all: ProposalDish[], minutes: number): MenuProposal {
   return {
     id: randomUUID(),
     week,
@@ -244,17 +260,20 @@ export async function composeMonth(ctx: Ctx, session: SessionContext, input: Com
     const pool = await buildPool(ctx.db, who.accountId, settings, data, proposalCtx, start, candidates);
     const book = await loadBook(ctx.db, who.accountId, who.userId, settings, productsOfEntries(pool.entries, references), ctx.now);
     const { pool: poolDishes, byKey } = poolForSolver(pool.entries, book);
-    const solution = solve(poolDishes, book.price, {
+    const sessionCap = settings.goals.time ? data.sessionCap : null;
+    const solved = solve(poolDishes, book.price, {
       weeks: WEEKS,
       dinnersPerWeek: DINNER_COUNT,
       expressPerWeek: 4,
-      sessionCap: settings.goals.time ? data.sessionCap : null,
+      sessionCap,
       budget: settings.monthlyBudget,
       seed: seedOf(`${who.accountId}|${start}|${variant}`),
       avoid,
       iterations: 25_000,
     });
-    return { solution, byKey, book, unusedOwn: pool.unusedOwn };
+    // US-178 RF9 : une séance qui correspond à une semaine type ou à une séance déjà faite reprend son déroulé (sans IA)
+    const { solution, reuse } = applyBundles(solved, poolDishes, await loadBundles(ctx.db, who.accountId, data), book.price, { budget: settings.monthlyBudget, sessionCap });
+    return { solution, byKey, book, unusedOwn: pool.unusedOwn, reuse };
   };
   let run = await solveWith(season);
   // 2. historique trop court : plus de plats de saison, jusqu'au plafond de la console (base commune puis une seule demande à l'IA, par lots)
@@ -265,7 +284,7 @@ export async function composeMonth(ctx: Ctx, session: SessionContext, input: Com
     season = more.dishes;
     run = await solveWith(season);
   }
-  const envelope = buildEnvelope(who.accountId, start, run.solution, run.byKey, run.book, settings, data, variant, avoid, { unusedOwn: run.unusedOwn, seasonAsked, seasonUnavailable });
+  const envelope = buildEnvelope(who.accountId, start, run.solution, run.byKey, run.book, settings, data, variant, avoid, { unusedOwn: run.unusedOwn, seasonAsked, seasonUnavailable }, run.reuse);
   const conversation = await (await import("../chat/service")).conversationOf(ctx.db, who.accountId, who.userId, ctx.now);
   const row = await ctx.db
     .insertInto("agent_conversation_messages")
@@ -275,7 +294,7 @@ export async function composeMonth(ctx: Ctx, session: SessionContext, input: Com
   return asView(String(row.id), envelope, await existingWeeks(ctx.db, who.accountId, envelope.weeks.map((w) => w.week)));
 }
 
-function buildEnvelope(accountId: string, start: string, solution: Solution, byKey: Map<string, ProposalDish>, book: Book, settings: SettingsView, data: EngineData, variant: number, avoid: Set<string>, notes: { unusedOwn: number; seasonAsked: boolean; seasonUnavailable: boolean }): MonthEnvelope {
+function buildEnvelope(accountId: string, start: string, solution: Solution, byKey: Map<string, ProposalDish>, book: Book, settings: SettingsView, data: EngineData, variant: number, avoid: Set<string>, notes: { unusedOwn: number; seasonAsked: boolean; seasonUnavailable: boolean }, reuse: WeekReuse[] = []): MonthEnvelope {
   const budget = settings.monthlyBudget as number;
   const dishOf = (d: PoolDish | null): ProposalDish | null => (d ? (byKey.get(d.key) ?? null) : null);
   const weeks: MonthWeek[] = solution.weeks.map((w, i) => {
@@ -283,7 +302,7 @@ function buildEnvelope(accountId: string, start: string, solution: Solution, byK
     return {
       week,
       weekLabel: weekLabel(week),
-      proposal: weekProposal(week, w.dinners.map(dishOf).filter((d): d is ProposalDish => !!d), w.express.map(dishOf).filter((d): d is ProposalDish => !!d), settings, data),
+      proposal: weekProposal(week, w.dinners.map(dishOf).filter((d): d is ProposalDish => !!d), w.express.map(dishOf).filter((d): d is ProposalDish => !!d), settings, data, reuse[i] ?? null),
       cost: solution.weekCosts[i] ?? 0,
     };
   });
@@ -352,7 +371,9 @@ export async function monthReplace(ctx: Ctx, session: SessionContext, input: { m
   const { who, card } = await openMonth(ctx, session, input.messageId);
   const settings = await loadSettings(ctx.db, who.accountId);
   const w = weekOf(card.envelope, input.week);
-  const next = await replaceInProposal(ctx, who.accountId, w.proposal, input.kind, input.index, input.choice);
+  const replaced = await replaceInProposal(ctx, who.accountId, w.proposal, input.kind, input.index, input.choice);
+  // un des cinq dîners de la séance a changé : le déroulé repris (ou rédigé) ne correspond plus, la durée est celle de la formule et « Rédiger le déroulé » redevient proposé
+  const next: MenuProposal = replaced.stepsStale ? { ...replaced, steps: [], planSteps: [], stepsStale: false, reused: undefined } : replaced;
   const taken = card.envelope.weeks.filter((x) => x.week !== input.week).flatMap((x) => [...x.proposal.dinners, ...x.proposal.express].map((d) => norm(d.name)));
   if ([...next.dinners, ...next.express].some((d) => taken.includes(norm(d.name)))) throw courseError("duplicate_dish", "Ce plat est déjà dans une autre semaine du mois.", 422);
   const weeks = card.envelope.weeks.map((x) => (x.week === input.week ? { ...x, proposal: next } : x));
@@ -420,7 +441,7 @@ export async function monthWriteSteps(ctx: Ctx, session: SessionContext, input: 
   const steps = await draftSteps(model, dishes);
   const minutes = steps ? minutesFromSteps(steps, Math.max(0, ...dishes.map((d) => d.minutes))) : null;
   if (!steps || minutes === null) throw courseError("steps_failed", "Je n'ai pas réussi à rédiger le déroulé pour le moment. Vous pouvez réessayer.", 502);
-  const proposal: MenuProposal = { ...w.proposal, steps, stepsStale: false, session: { ...w.proposal.session, minutes, estimated: true, overCap: minutes > w.proposal.session.cap, source: "steps" } };
+  const proposal: MenuProposal = { ...w.proposal, steps, planId: null, planTheme: null, planSteps: [], reused: undefined, stepsStale: false, session: { ...w.proposal.session, minutes, estimated: true, overCap: minutes > w.proposal.session.cap, source: "steps" } };
   const envelope: MonthEnvelope = { ...card.envelope, weeks: card.envelope.weeks.map((x) => (x.week === input.week ? { ...x, proposal } : x)) };
   await saveMonth(ctx.db, card.id, envelope);
   return asView(card.id, envelope, await existingWeeks(ctx.db, who.accountId, envelope.weeks.map((x) => x.week)));

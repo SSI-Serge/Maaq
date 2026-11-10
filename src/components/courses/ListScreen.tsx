@@ -369,7 +369,7 @@ function Preparation({ list, reload }: { list: ListPrepared; reload: () => void 
           {list.excluded.length === 0 && <p className={styles.empty}>{list.group ? "Aucun ingrédient exclu pour ces menus." : "Aucun ingrédient exclu pour ce menu."}</p>}
           {list.excluded.map((e) => (
             <p key={`${e.product}|${e.store}|${e.reference}`} style={{ margin: "0 0 8px" }}>
-              {e.reference} ({e.store}) : {e.because.length ? `contient ${e.because.join(", ")}. La référence suivante, conforme, est proposée.` : "aucune référence conforme trouvée pour le moment."}
+              {e.because.length ? e.reference : e.product} ({e.store}) : {e.because.length ? `contient ${e.because.join(", ")}. La référence suivante, conforme, est proposée.` : "aucune référence conforme trouvée pour le moment."}
             </p>
           ))}
           {list.criteria.length > 0 && (

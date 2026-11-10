@@ -82,6 +82,8 @@ export interface MenuProposal {
   blocked: boolean;
   /** Un plat de la séance a été remplacé (CR-57) : le déroulé affiché n'est plus à jour ; l'IA le réécrit une fois à la validation. */
   stepsStale?: boolean;
+  /** Menu du mois (US-178 RF9) : le déroulé et la durée viennent d'une semaine type ou d'une séance déjà faite par le foyer, sans IA. */
+  reused?: "plan" | "session";
 }
 
 export interface ProposalContext {

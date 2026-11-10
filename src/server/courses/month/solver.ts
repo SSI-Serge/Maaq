@@ -253,9 +253,17 @@ export function solve(pool: PoolDish[], price: PriceFn, o: SolveOptions): Soluti
     dinners: dinners.slice(w * o.dinnersPerWeek, (w + 1) * o.dinnersPerWeek),
     express: express.slice(w * o.expressPerWeek, (w + 1) * o.expressPerWeek),
   }));
+  return summarize(weeks, price, Math.round(total * 100) / 100, unpriced);
+}
+
+/** Solution complète (coûts par semaine, places manquantes) à partir des semaines choisies. Sans total donné, il est recalculé. */
+export function summarize(weeks: Solution["weeks"], price: PriceFn, knownTotal?: number, knownUnpriced?: number): Solution {
+  const everything = weeks.flatMap((w) => [...w.dinners, ...w.express]).filter((d): d is PoolDish => !!d);
+  const computed = knownTotal === undefined || knownUnpriced === undefined ? costOf(everything, price) : null;
+  const roundedTotal = knownTotal ?? computed!.total;
+  const unpriced = knownUnpriced ?? computed!.unpricedProducts;
   const alone = weeks.map((w) => costOf([...w.dinners, ...w.express].filter((d): d is PoolDish => !!d), price).total);
   const sumAlone = alone.reduce((s, x) => s + x, 0);
-  const roundedTotal = Math.round(total * 100) / 100;
   const weekCosts = alone.map((c) => (sumAlone > 0 ? Math.round(((c / sumAlone) * roundedTotal) * 100) / 100 : 0));
   // l'arrondi ne doit pas faire perdre un centime au total
   if (weekCosts.length) weekCosts[weekCosts.length - 1] = Math.round((roundedTotal - weekCosts.slice(0, -1).reduce((s, x) => s + x, 0)) * 100) / 100;
@@ -264,8 +272,8 @@ export function solve(pool: PoolDish[], price: PriceFn, o: SolveOptions): Soluti
     total: roundedTotal,
     unpricedProducts: unpriced,
     weekCosts,
-    missingDinners: dinners.filter((d) => !d).length,
-    missingExpress: express.filter((d) => !d).length,
+    missingDinners: weeks.reduce((n, w) => n + w.dinners.filter((d) => !d).length, 0),
+    missingExpress: weeks.reduce((n, w) => n + w.express.filter((d) => !d).length, 0),
   };
 }
 

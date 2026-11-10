@@ -266,9 +266,15 @@ function Month({ status, reload }: { status: MonthStatus; reload: () => void }) 
           ))}
           <span className={styles.meta}>
             {sessionText(w.proposal)}
-            {w.proposal.steps.length > 0 ? " Déroulé rédigé." : ""}
+            {w.proposal.reused === "plan"
+              ? ` Déroulé repris de la semaine type « ${w.proposal.planTheme ?? ""} ».`
+              : w.proposal.reused === "session"
+                ? " Déroulé repris d'une séance que vous avez déjà faite."
+                : w.proposal.steps.length > 0
+                  ? " Déroulé rédigé."
+                  : ""}
           </span>
-          {status.seasonIa && w.proposal.complete && w.proposal.steps.length === 0 && (
+          {status.seasonIa && w.proposal.complete && w.proposal.steps.length === 0 && !w.proposal.planId && (
             <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-start" }}>
               <button
                 type="button"

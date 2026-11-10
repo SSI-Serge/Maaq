@@ -49,7 +49,9 @@ describe("Rubrique « Ingrédients exclus des références proposées »", () =>
       ],
     });
     expect(withExcluded).toContain("Pâtes aux œufs (Lidl) : contient Dioxyde de titane.");
-    expect(withExcluded).toContain("aucune référence conforme trouvée");
+    // sans référence conforme, c'est le nom du produit qui s'affiche (pas le tiret de la référence absente)
+    expect(withExcluded).toContain("Riz (E.Leclerc) : aucune référence conforme trouvée pour le moment.");
+    expect(withExcluded).not.toContain("Riz express");
     expect(withExcluded).not.toContain("Aucun ingrédient exclu");
 
     // liste du mois : la rubrique y est aussi
