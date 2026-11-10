@@ -3,8 +3,16 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-09T15:00:00.000Z",
+  "updated": "2026-11-10T13:00:00.000Z",
   "deploys": [
+    {
+      "at": "2026-11-10T13:00:00.000Z",
+      "env": "preview",
+      "what": "Courses et repas : reprise du déroulé dans le menu du mois (une séance qui correspond à une semaine type ou à une séance déjà faite reprend son déroulé et sa durée, sans IA) et nom du produit dans « Ingrédients exclus » quand aucune référence conforme n'est trouvée — rév. 00100. Pas de changement de base. Menu IA fermé en production.",
+      "storyIds": [
+        "f21c4"
+      ]
+    },
     {
       "at": "2026-11-09T15:00:00.000Z",
       "env": "preview",
