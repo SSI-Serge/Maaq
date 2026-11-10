@@ -61,7 +61,8 @@ export interface StorePriceEntry {
   package?: PackageFormat | null;
 }
 
-export type ItemGroup = "menu" | "ajout" | "habituel" | "sante";
+/** « quotidien » : produit du quotidien de la console, proposé sous « Pensez aussi à : » (CR-66). */
+export type ItemGroup = "menu" | "ajout" | "habituel" | "sante" | "quotidien";
 
 export interface ListItem {
   id: number;
@@ -161,6 +162,16 @@ export interface ListInput {
   historyMonths?: number;
   /** Noms normalisés des produits déjà ingrédients d'un menu validé du foyer : jamais proposés dans « Produits de mon historique » (CR-66). Leurs prix d'historique restent utilisés. */
   historySkip?: Set<string>;
+  /** Produits du quotidien de la console, dans l'ordre (rayon puis position) : proposés sous « Pensez aussi à : » quand l'historique compte moins de `dailyMin` produits (US-157 RF3ter, CR-66). */
+  daily?: DailyProduct[];
+  dailyMin?: number;
+}
+
+export interface DailyProduct {
+  name: string;
+  rayon: string;
+  /** Produit du catalogue relié par la console (il donne le prix) ; vide : pas de prix. */
+  product: string | null;
 }
 
 export interface DishLight {
@@ -287,8 +298,8 @@ export function buildListModel(input: ListInput): ListModel {
     for (const n of [...found, ...free]) pour.set(norm(n), [...(pour.get(norm(n)) ?? []), d.name]);
   }
 
-  const make = (name: string, group: ItemGroup, extra: Partial<ListItem> & { rayonHint?: string | null }): ListItem => {
-    const built = buildChoices(name, input);
+  const make = (name: string, group: ItemGroup, extra: Partial<ListItem> & { rayonHint?: string | null; pricedAs?: string | null }): ListItem => {
+    const built = extra.pricedAs === null ? { rayon: null, choices: [], storePrices: new Map<string, StorePriceEntry>() } : buildChoices(extra.pricedAs ?? name, input);
     const item: ListItem = {
       id: items.length,
       name,
@@ -330,14 +341,32 @@ export function buildListModel(input: ListInput): ListModel {
   }
 
   // produits de l'historique du foyer (3 derniers mois), à cocher comme pense-bête
+  const skipped = new Set<string>();
   const months = input.historyMonths ?? 3;
   const since = addMonths(input.now, -months);
   for (const h of history) {
     const k = norm(h.product);
     if (seen.has(k) || parseDay(h.date) < since) continue;
     seen.add(k);
-    if (input.historySkip?.has(k)) continue;
+    if (input.historySkip?.has(k)) {
+      skipped.add(k);
+      continue;
+    }
     make(h.product, "habituel", { rayonHint: input.journalRayon?.get(h.product) ?? null });
+  }
+
+  // « Pensez aussi à : » : sous le seuil, les produits du quotidien de la console, sans doublon avec l'historique affiché, le menu et les produits ajoutés (CR-66)
+  if (input.daily && items.filter((i) => i.group === "habituel").length < (input.dailyMin ?? 0)) {
+    const taken = new Set([...seen].filter((k) => !skipped.has(k)));
+    for (const d of input.daily) {
+      const k = norm(d.name);
+      const viaProduct = d.product ? norm(d.product) : null;
+      if (taken.has(k) || (viaProduct && taken.has(viaProduct))) continue;
+      taken.add(k);
+      seen.add(k);
+      // sans produit du catalogue relié : pas de prix (N/A, hors total)
+      make(d.name, "quotidien", { rayonHint: d.rayon, pricedAs: d.product });
+    }
   }
 
   // versions allégées : produits retirés (déjà dans la liste) et ajoutés, par plat
@@ -559,7 +588,7 @@ export function computeScenarios(model: ListModel, sel: ListSelection, stores: s
 export function scenarioLines(model: ListModel, sel: ListSelection, scenario: Scenario): ScenarioLine[] {
   // les produits « placard » décochés figurent dans la liste du scénario (pour pouvoir les cocher) mais n'entrent pas dans les totaux (CR-50)
   const current = currentItems(model, sel);
-  const unticked = model.items.filter((i) => i.pantry && !current.includes(i) && !sel.deleted?.has(i.id) && needed(i, model, sel) && !(sel.checked?.get(i.id) ?? i.checked) && i.group !== "habituel");
+  const unticked = model.items.filter((i) => i.pantry && !current.includes(i) && !sel.deleted?.has(i.id) && needed(i, model, sel) && !(sel.checked?.get(i.id) ?? i.checked) && i.group !== "habituel" && i.group !== "quotidien");
   return [...current, ...unticked].map((i) => {
     let choice: { ref: string; price: number | null; store: string | null; city: string | null; age: PriceAge | null; labelCheck?: boolean; format?: string | null; priceUnit?: PriceUnit; package?: PackageFormat | null } | null;
     if (scenario.id === 1) {

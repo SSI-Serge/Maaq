@@ -259,7 +259,10 @@ function Preparation({ list, reload }: { list: ListPrepared; reload: () => void 
   const habit = model.items.filter((i) => i.group === "habituel");
   const compared = comparatif(model, sel);
   const summary = list.menu!;
-  const habitByRayon = [...habit.reduce((m, i) => m.set(i.rayon, [...(m.get(i.rayon) ?? []), i]), new Map<string, ListItem[]>())];
+  const byRayon = (list: ListItem[]) => [...list.reduce((m, i) => m.set(i.rayon, [...(m.get(i.rayon) ?? []), i]), new Map<string, ListItem[]>())];
+  const habitByRayon = byRayon(habit);
+  // « Pensez aussi à : » : produits du quotidien de la console, quand l'historique est court (CR-66)
+  const dailyByRayon = byRayon(model.items.filter((i) => i.group === "quotidien"));
 
   async function apply() {
     patch({ applied: true });
@@ -348,7 +351,7 @@ function Preparation({ list, reload }: { list: ListPrepared; reload: () => void 
       {rub("Produits de mon historique", true, (
         <>
           <p className={family.hint}>Achetés ces 3 derniers mois. Cochez ce qu&apos;il vous faut cette semaine : le produit entre dans les scénarios.</p>
-          {habit.length === 0 && <p className={styles.empty}>Rien pour l&apos;instant : les produits achetés (tickets, cases cochées en magasin) apparaissent ici.</p>}
+          {habit.length === 0 && <p className={styles.empty}>Rien pour l&apos;instant : les produits achetés en plus des repas (tickets, cases cochées en magasin) apparaissent ici.</p>}
           {habitByRayon.map(([rayon, items]) => (
             <div key={rayon}>
               <h3 className={styles.kick}>{rayon}</h3>
@@ -360,6 +363,22 @@ function Preparation({ list, reload }: { list: ListPrepared; reload: () => void 
               ))}
             </div>
           ))}
+          {dailyByRayon.length > 0 && (
+            <>
+              <h3 className={styles.kick} style={{ marginTop: 12 }}>Pensez aussi à :</h3>
+              {dailyByRayon.map(([rayon, items]) => (
+                <div key={`q-${rayon}`}>
+                  <h3 className={styles.kick}>{rayon}</h3>
+                  {items.map((i) => (
+                    <label key={i.id} className={styles.choice}>
+                      <input type="checkbox" checked={sel.checked?.get(i.id) ?? i.checked} onChange={(e) => patch({ checked: { ...picks.checked, [norm(i.name)]: e.target.checked } })} />
+                      <span>{i.name}</span>
+                    </label>
+                  ))}
+                </div>
+              ))}
+            </>
+          )}
         </>
       ))}
 
@@ -539,6 +558,8 @@ function ScenarioView({
                               ? ""
                               : origin === "ajout"
                                 ? `Ajouté à la main · ${l.qty}`
+                                : origin === "quotidien"
+                                  ? `Produit du quotidien · ${l.qty}`
                                 : origin === "habituel"
                                   ? `De votre historique · ${l.qty}`
                                   : ""}
@@ -594,7 +615,7 @@ function ScenarioView({
                 weight: l.weight,
                 toCheck: l.toCheck,
                 pantry: l.pantry,
-                source: ({ menu: "menu", sante: "menu", ajout: "added", habituel: "habit" } as const)[itemsByName.get(norm(l.name))?.group ?? "menu"],
+                source: ({ menu: "menu", sante: "menu", ajout: "added", habituel: "habit", quotidien: "added" } as const)[itemsByName.get(norm(l.name))?.group ?? "menu"],
               })),
             )
           }

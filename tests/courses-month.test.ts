@@ -94,7 +94,7 @@ async function groupLines(f: CoupleFamily, weeks: string[]): Promise<ValidateLin
     weight: l.weight,
     toCheck: l.toCheck,
     pantry: l.pantry,
-    source: ({ menu: "menu", sante: "menu", ajout: "added", habituel: "habit" } as const)[byName.get(norm(l.name))?.group ?? "menu"],
+    source: ({ menu: "menu", sante: "menu", ajout: "added", habituel: "habit", quotidien: "added" } as const)[byName.get(norm(l.name))?.group ?? "menu"],
   }));
 }
 

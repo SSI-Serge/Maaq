@@ -3,6 +3,7 @@ import { asProfile } from "@/server/assistant/outings/profile";
 import type { Ctx, SessionContext } from "@/server/auth/service";
 import type { DB } from "@/server/db/schema.generated";
 import { env } from "@/server/env";
+import { integerSetting } from "@/server/settings";
 import { nameKey, placeKey } from "../catalog/seed";
 import { buildListModel, buildRefProducts, computeScenarios, DAYS, dishItems, findProd, fmtMin, gapType, norm, type BuyRow, type Dish, type DishMode } from "../engine";
 import { courseError, loadSettings, requireAccess, translateCourseError, type CourseAccess } from "../household/settings";
@@ -157,6 +158,19 @@ export async function prepareList(ctx: Ctx, session: SessionContext, requestedWe
   const pricedNames = new Set(history.map((h) => norm(h.product)));
   for (const b of boughtItems) if (b.bought_at && !pricedNames.has(norm(b.label))) history.push({ product: b.label, ref: b.label, unitPrice: null, store: "", date: isoDay(b.bought_at) });
 
+  const [dailyRows, dailyMin] = await Promise.all([
+    ctx.db
+      .selectFrom("grocery_daily_products as d")
+      .innerJoin("grocery_aisles as a", "a.id", "d.aisle_id")
+      .leftJoin("grocery_products as p", "p.id", "d.product_id")
+      .select(["d.name", "a.name as rayon", "p.name as product"])
+      .where("d.retired_at", "is", null)
+      .orderBy("a.sort_order")
+      .orderBy("d.position")
+      .orderBy("d.id")
+      .execute(),
+    integerSetting(ctx.db, "grocery_history_min_products", 10),
+  ]);
   const historySkip = await ingredientNames(ctx.db, who.accountId, history.map((h) => h.product), prods0(refs));
 
   const byId = new Map(data.dishes.map((d) => [d.id, d]));
@@ -203,7 +217,7 @@ export async function prepareList(ctx: Ctx, session: SessionContext, requestedWe
     });
   }
   const chains = [...new Set(stores.map((s) => s.chain))];
-  const model = buildListModel({ dishes: unique, prods, buy, history, historySkip, light, stores: chains, sharing: settings.sharePrices, common, now: ctx.now });
+  const model = buildListModel({ dishes: unique, prods, buy, history, historySkip, daily: dailyRows, dailyMin, light, stores: chains, sharing: settings.sharePrices, common, now: ctx.now });
   // « À acheter plus tard (semaine du 23 nov.) » : produits frais des semaines suivantes, décochés et hors total, avec leur sous-total estimé
   const laterGroups: NonNullable<ListPrepared["group"]>["later"] = [];
   if (split && groupMenus) {
@@ -335,7 +349,7 @@ export async function addProduct(ctx: Ctx, session: SessionContext, input: { nam
       }
       // une liste déjà validée pour le menu en cours : le produit est « ajouté depuis la validation », sans magasin ni prix (CR-28)
       const list = menu ? await listOfMenu(trx, who.accountId, menu.id) : null;
-      const product = await trx.selectFrom("grocery_products").select(["id", "aisle_id"]).where("name_key", "=", key).executeTakeFirst();
+      const product = (await trx.selectFrom("grocery_products").select(["id", "aisle_id"]).where("name_key", "=", key).executeTakeFirst()) ?? (await dailyAisle(trx, key));
       await trx
         .insertInto("grocery_list_items")
         .values({
@@ -458,7 +472,7 @@ export async function validateList(ctx: Ctx, session: SessionContext, input: { s
         if (id) {
           await trx.updateTable("grocery_list_items").set(fields).where("id", "=", id).execute();
         } else {
-          const product = await trx.selectFrom("grocery_products").select(["id", "aisle_id"]).where("name_key", "=", key).executeTakeFirst();
+          const product = (await trx.selectFrom("grocery_products").select(["id", "aisle_id"]).where("name_key", "=", key).executeTakeFirst()) ?? (await dailyAisle(trx, key));
           await trx
             .insertInto("grocery_list_items")
             .values({ account_id: who.accountId, menu_id: menu.id, source: line.source, label: line.name.trim().slice(0, 120), name_key: key, product_id: product?.id ?? null, aisle_id: product?.aisle_id ?? null, added_by_user_id: who.userId, ...fields })
@@ -525,7 +539,7 @@ export async function validateGroup(ctx: Ctx, session: SessionContext, input: { 
         const rows = (byKey.get(key) ?? []).sort((a, b) => (order.get(a.menu_id ?? "") ?? 0) - (order.get(b.menu_id ?? "") ?? 0));
         if (!rows.length) {
           // produit ajouté à la liste du mois (pense-bête coché, historique) : il entre dans la première semaine
-          const product = await trx.selectFrom("grocery_products").select(["id", "aisle_id"]).where("name_key", "=", key).executeTakeFirst();
+          const product = (await trx.selectFrom("grocery_products").select(["id", "aisle_id"]).where("name_key", "=", key).executeTakeFirst()) ?? (await dailyAisle(trx, key));
           await trx
             .insertInto("grocery_list_items")
             .values({ account_id: who.accountId, menu_id: first.id, source: line.source, label: line.name.trim().slice(0, 120), name_key: key, product_id: product?.id ?? null, aisle_id: product?.aisle_id ?? null, added_by_user_id: who.userId, state: "validated", list_id: listOf.get(first.id)!, quantity: Math.min(Math.max(Math.round(line.qty) || 1, 1), 99), ...priced })
@@ -616,4 +630,10 @@ export async function ingredientNames(db: Kysely<DB>, accountId: string, labels:
     if ((product && products.has(product)) || keys.has(nameKey(label)) || products.has(k)) out.add(k);
   }
   return out;
+}
+
+/** Un produit du quotidien de la console qui n'est pas au catalogue garde son rayon (et son produit relié, s'il en a un) quand il entre dans la liste (CR-66). */
+async function dailyAisle(db: Kysely<DB>, key: string): Promise<{ id: string | null; aisle_id: number } | undefined> {
+  const row = await db.selectFrom("grocery_daily_products").select(["product_id", "aisle_id"]).where("name_key", "=", key).where("retired_at", "is", null).executeTakeFirst();
+  return row ? { id: row.product_id === null ? null : String(row.product_id), aisle_id: row.aisle_id } : undefined;
 }

@@ -1,5 +1,6 @@
 import { courseError } from "../household/settings";
 import { additives } from "./objects/additives";
+import { dailyProducts } from "./objects/daily-products";
 import { aisles } from "./objects/aisles";
 import { dishes } from "./objects/dishes";
 import { moduleSettings } from "./objects/module-settings";
@@ -30,6 +31,7 @@ const OBJECTS: Partial<Record<ObjectKey, ConsoleObject>> = {
   "a-referencer": unreferenced,
   "base-commune": prices,
   "plats-de-saison": seasonDishes,
+  quotidien: dailyProducts,
   reglages: moduleSettings,
 };
 
@@ -46,6 +48,7 @@ export const NAV: { key: ObjectKey; label: string }[] = [
   { key: "a-referencer", label: "Produits à référencer" },
   { key: "base-commune", label: "Base commune des prix" },
   { key: "plats-de-saison", label: "Plats de saison" },
+  { key: "quotidien", label: "Produits du quotidien" },
   { key: "reglages", label: "Réglages du module" },
 ];
 

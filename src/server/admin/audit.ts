@@ -9,7 +9,7 @@ export async function logAdminAction(
   entry: {
     adminId: string;
     action: AuditAction;
-    entityType: "agent" | "account" | "contract" | "contract_field" | "contract_document_field" | "contract_analysis_review" | "presentation" | "meal_dish" | "meal_taxonomy" | "meal_planning" | "grocery_aisle" | "grocery_additive" | "grocery_reference" | "grocery_unreferenced" | "grocery_shared_price" | "grocery_season" | "meal_season_dish";
+    entityType: "agent" | "account" | "contract" | "contract_field" | "contract_document_field" | "contract_analysis_review" | "presentation" | "meal_dish" | "meal_taxonomy" | "meal_planning" | "grocery_aisle" | "grocery_additive" | "grocery_reference" | "grocery_unreferenced" | "grocery_shared_price" | "grocery_season" | "meal_season_dish" | "grocery_daily_product";
     entityId: string;
     details?: Record<string, unknown>;
     now: Date;
