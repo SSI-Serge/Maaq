@@ -98,6 +98,10 @@ describe("Console du catalogue : cuisines, rayons, additifs", () => {
     const label = `E${900 + Math.floor(Math.random() * 99)}x${uid()}`;
     await runAction(c, "additifs", "add", "", { label, reason: "Test" });
     const row = (await loadObject(c, "additifs", q())).rows.find((r) => r.cells.label === label)!;
+    // consigne de saisie sous le champ « Code ou nom » : le code seul, le nom chimique dans la raison (US-167 RF1)
+    const loaded = await loadObject(c, "additifs", q());
+    for (const field of [...(loaded.tools?.add?.fields ?? []), ...(row.actions?.find((x) => x.key === "edit")?.fields ?? [])].filter((f) => f.key === "label")) expect(field.help).toContain("Le code seul");
+    expect((loaded.tools?.add?.fields ?? []).find((f) => f.key === "reason")?.help).toBeUndefined();
     expect(row.cells.excluded).toBe(0);
     await runAction(c, "additifs", "remove", row.id, {});
     expect((await loadObject(c, "additifs", q())).rows.some((r) => r.id === row.id)).toBe(false);

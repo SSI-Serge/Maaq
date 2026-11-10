@@ -22,6 +22,8 @@ export interface FormField {
   value?: string | number | null;
   options?: { value: string; label: string }[];
   required?: boolean;
+  /** Aide affichée sous le champ (consigne de saisie). */
+  help?: string;
 }
 
 export interface RowAction {

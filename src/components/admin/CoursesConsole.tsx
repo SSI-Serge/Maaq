@@ -265,6 +265,7 @@ function FormDialog({ title, confirm, fields, pending, error, readOnly, onCancel
             ) : (
               <input type={f.type === "number" ? "number" : "text"} value={values[f.key]} required={f.required} onChange={(e) => setValues({ ...values, [f.key]: e.target.value })} style={{ width: "100%", padding: 8 }} />
             )}
+            {f.help && <span style={{ display: "block", fontWeight: 400, fontSize: 12, lineHeight: 1.4, color: "var(--ink-soft)", paddingTop: 2 }}>{f.help}</span>}
           </label>
           ),
         )}

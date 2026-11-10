@@ -4,7 +4,10 @@ import { courseError } from "../../household/settings";
 import type { ConsoleObject } from "../types";
 import { text } from "../util";
 
-/** Additifs à éviter (US-167) : affichés aux foyers dans « Critères additifs appliqués ». La conformité des références se recalcule à chaque lecture. */
+/** Consigne de saisie du champ « Code ou nom » (US-167 RF1) : le code seul, le nom chimique va dans la raison. */
+const LABEL_HELP = "Le code seul (« E250 »), ou le nom s'il n'y a pas de code. Le nom chimique va dans « Raison courte ».";
+
+/** Additifs à éviter (US-167) : affichés aux foyers dans la rubrique « Ingrédients / additifs exclus des références proposées » (la même liste pour tous). La conformité des références se recalcule à chaque lecture. */
 
 export const additives: ConsoleObject = {
   async load(c) {
@@ -38,7 +41,7 @@ export const additives: ConsoleObject = {
             key: "edit",
             label: "Modifier",
             fields: [
-              { key: "label", label: "Code ou nom", type: "text" as const, value: k.label, required: true },
+              { key: "label", label: "Code ou nom", type: "text" as const, value: k.label, required: true, help: LABEL_HELP },
               { key: "reason", label: "Raison courte", type: "text" as const, value: k.reason, required: true },
             ],
           },
@@ -53,7 +56,7 @@ export const additives: ConsoleObject = {
         add: {
           label: "Ajouter un additif",
           fields: [
-            { key: "label", label: "Code ou nom", type: "text", required: true },
+            { key: "label", label: "Code ou nom", type: "text", required: true, help: LABEL_HELP },
             { key: "reason", label: "Raison courte", type: "text", required: true },
           ],
         },
