@@ -255,3 +255,58 @@ describe("Historique sans les ingrédients des repas (US-157 RF3, CR-66)", () =>
     expect(groupNames(after, "habituel")).toContain("Café moulu");
   });
 });
+
+describe("CR-68 : « Produits ajoutés » ne montre que les ajouts à la main ; les rappels vont dans l'historique (US-157 RF3bis et RF3quater)", () => {
+  it("seuls les produits ajoutés par le foyer (à la main ou cochés dans l'historique) et non achetés sont rappelés, dans « Produits de mon historique », décochés, avec « Pas encore acheté (semaine du …) » ; ils comptent dans le seuil ; les ingrédients du menu précédent ne sont plus rappelés", async () => {
+    const f = await household();
+    await addProduct(at(), f.sophie, { name: "Piles", week: W0 });
+    await validateAll(f, ["Piles"]);
+    const W1 = "2026-11-09";
+    await validateTestMenu(db, f, { picks: ["A14"], week: W1, now: NOW });
+    const unbought = await db.selectFrom("grocery_list_items as i").innerJoin("meal_menus as m", "m.id", "i.menu_id").select(["i.name_key", "i.source"]).where("i.account_id", "=", f.accountId).where("m.week_start", "=", W0 as never).where("i.state", "=", "validated").execute();
+    expect(unbought.filter((i) => i.source === "menu").length).toBeGreaterThan(5);
+
+    const next = await prepareList(at(), f.sophie, W1);
+    const reminders = next.model!.items.filter((i) => i.leftoverWeek);
+    expect(reminders.map((i) => [i.name, i.group, i.checked, i.rayon, i.leftoverWeek])).toEqual([["Piles", "habituel", false, "Autres", W0]]);
+    // « Produits ajoutés » : rien sans une action d'un membre du foyer cette semaine
+    expect(next.added).toEqual([]);
+    // décoché : hors des scénarios
+    const model = fromDto(next.model!);
+    expect(scenarioLines(model, {}, computeScenarios(model, {}, [])[0]).map((l) => l.name)).not.toContain("Piles");
+
+    // à l'écran : dans l'historique avec sa mention, pas dans « Produits ajoutés »
+    const markup = renderToStaticMarkup(createElement(ListFlow, { list: next, reload: () => {}, onWeek: () => {}, onGroup: () => {} }));
+    const addedPart = markup.slice(markup.indexOf("Produits ajoutés"), markup.indexOf("Produits de mon historique"));
+    const historyPart = markup.slice(markup.indexOf("Produits de mon historique"), markup.indexOf("Ingrédients / additifs exclus"));
+    expect(addedPart).toContain("Aucun produit ajouté.");
+    expect(addedPart).not.toContain("Pas encore acheté");
+    expect(historyPart).toContain("Piles");
+    expect(historyPart).toContain("Pas encore acheté (semaine du 2 nov.)");
+
+    // le rappel compte dans le seuil : avec un seuil de 1, « Pensez aussi à : » n'est plus proposé
+    await setThreshold(1);
+    expect(groupNames(await prepareList(at(), f.sophie, W1), "quotidien")).toEqual([]);
+    await setThreshold(10);
+    expect(groupNames(await prepareList(at(), f.sophie, W1), "quotidien").length).toBeGreaterThan(0);
+
+    // un produit de l'historique coché et non acheté est rappelé aussi ; une ligne du menu ne l'est jamais
+    const row = db.updateTable("grocery_list_items").where("account_id", "=", f.accountId).where("name_key", "=", "piles");
+    await row.set({ source: "habit" }).execute();
+    expect((await prepareList(at(), f.sophie, W1)).model!.items.filter((i) => i.leftoverWeek).map((i) => i.name)).toEqual(["Piles"]);
+    await row.set({ source: "menu" }).execute();
+    expect((await prepareList(at(), f.sophie, W1)).model!.items.filter((i) => i.leftoverWeek)).toEqual([]);
+    await row.set({ source: "added" }).execute();
+
+    // coché puis validé : il devient un produit ajouté de la nouvelle semaine, et n'est plus rappelé
+    const list = await prepareList(at(), f.sophie, W1);
+    const m = fromDto(list.model!);
+    const sel = { checked: new Map([[m.items.find((i) => i.name === "Piles")!.id, true]]) };
+    const lines = scenarioLines(m, sel, computeScenarios(m, sel, list.stores.map((s) => s.chain))[0]).map((l) => ({ name: l.name, qty: l.qty, store: l.store, ref: l.ref, price: l.price, source: (l.name === "Piles" ? "added" : "menu") as "added" | "menu" }));
+    expect(lines.some((l) => l.name === "Piles")).toBe(true);
+    await validateList(at(), f.sophie, { scenario: 1, lines, week: W1 });
+    const after = await prepareList(at(), f.sophie, W1);
+    expect(after.model!.items.filter((i) => i.leftoverWeek)).toEqual([]);
+    expect(after.model!.items.find((i) => i.name === "Piles")!.group).toBe("ajout");
+  });
+});

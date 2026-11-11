@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { sql } from "kysely";
+import { weekStartLabel } from "@/server/courses/list/weeks";
 import { describe, expect, it } from "vitest";
 import type { AssistantModel, ModelRequest, ModelResponse } from "@/server/assistant/model";
 import { asProfile } from "@/server/assistant/outings/profile";
@@ -65,6 +66,10 @@ async function validate(f: CoupleFamily, week: string, ctx: Ctx = at(), extra: {
   await validateList(ctx, f.sophie, { scenario: 2, lines: [...lines, ...extra.map((e) => ({ name: e.name, qty: 1, store: null, ref: null, price: null, source: e.source }))], week });
   return lines;
 }
+
+/** Rappels « Pas encore acheté » d'une liste : ils sont dans « Produits de mon historique » (CR-68), jamais dans « Produits ajoutés ». */
+const reminders = (list: Awaited<ReturnType<typeof prepareList>>) =>
+  (list.model?.items ?? []).filter((i) => i.leftoverWeek).map((i) => ({ key: nameKey(i.name), name: i.name, group: i.group, checked: i.checked, leftoverOf: `semaine du ${weekStartLabel(i.leftoverWeek as string)}` }));
 
 describe("CR-54 : deux semaines, chacune avec son menu et sa liste", () => {
   it("chaque semaine a son menu et sa liste ; valider ou refaire l'une ne touche pas l'autre ; seules cette semaine et la suivante existent", async () => {
@@ -180,7 +185,7 @@ describe("CR-54 : deux semaines, chacune avec son menu et sa liste", () => {
     await menu(f, W0);
     await addProduct(at(), f.sophie, { name: "Café", week: W0 });
     await addProduct(at(), f.sophie, { name: "Thé", week: W1 });
-    const names = async (week: string) => (await prepareList(at(), f.sophie, week)).added.filter((a) => !a.leftoverOf).map((a) => a.name).sort();
+    const names = async (week: string) => (await prepareList(at(), f.sophie, week)).added.map((a) => a.name).sort();
     expect(await names(W0)).toEqual(["Café"]);
     expect(await names(W1)).toEqual(["Lessive", "Thé"]);
   });
@@ -248,20 +253,24 @@ describe("CR-55 : produits « pas encore acheté » de la liste d'avant", () => 
     const f = await ready();
     // aucune liste avant la première : rien
     await menu(f, W0);
-    expect((await prepareList(at(), f.sophie, W0)).added.filter((a) => a.leftoverOf)).toEqual([]);
+    expect(reminders(await prepareList(at(), f.sophie, W0))).toEqual([]);
 
     await validate(f, W0);
     await addProduct(at(), f.sophie, { name: "Essuie-tout", week: W0 });
     await menu(f, W1, NOW, []);
     const w1keys = new Set((await items(f, W1)).map((i) => i.name_key));
     const origin = (await items(f, W0)).filter((i) => ["validated", "added_after_validation"].includes(i.state));
-    const expected = origin.filter((i) => !w1keys.has(i.name_key)).map((i) => i.name_key).sort();
-    expect(expected).toContain("essuie tout");
+    // CR-68 : seuls les ajouts à la main sont rappelés, plus les ingrédients du menu précédent
+    const expected = ["essuie tout"];
+    expect(origin.filter((i) => !w1keys.has(i.name_key)).length).toBeGreaterThan(1);
 
     const next = await prepareList(at(), f.sophie, W1);
-    const left = next.added.filter((a) => a.leftoverOf);
+    const left = reminders(next);
     expect(left.map((a) => a.key).sort()).toEqual(expected);
     expect(left.every((a) => a.leftoverOf === "semaine du 2 nov.")).toBe(true);
+    // ils sont dans « Produits de mon historique », décochés ; « Produits ajoutés » n'en contient aucun
+    expect(left.every((a) => a.group === "habituel" && !a.checked)).toBe(true);
+    expect(next.added.some((a) => a.key === "essuie tout")).toBe(false);
     // décochés et hors des scénarios tant qu'ils ne sont pas cochés
     const model = fromDto(next.model!);
     const leftoverItem = model.items.find((i) => nameKey(i.name) === "essuie tout")!;
@@ -274,16 +283,16 @@ describe("CR-55 : produits « pas encore acheté » de la liste d'avant", () => 
 
     // acheté sur la semaine d'origine : le pense-bête disparaît ; annulé, il revient
     await setBought(at(), f.sophie, { key: "essuie tout", bought: true, late: true, week: W0 });
-    expect((await prepareList(at(), f.sophie, W1)).added.some((a) => a.key === "essuie tout")).toBe(false);
+    expect(reminders(await prepareList(at(), f.sophie, W1)).some((a) => a.key === "essuie tout")).toBe(false);
     await setBought(at(), f.sophie, { key: "essuie tout", bought: false, late: true, week: W0 });
-    expect((await prepareList(at(), f.sophie, W1)).added.some((a) => a.key === "essuie tout")).toBe(true);
+    expect(reminders(await prepareList(at(), f.sophie, W1)).some((a) => a.key === "essuie tout")).toBe(true);
 
     // coché : il devient un produit de la nouvelle semaine ; l'origine ne bouge pas
     await validate(f, W1, at(), [{ name: "Essuie-tout", source: "added" }]);
     const copied = (await items(f, W1)).find((i) => i.name_key === "essuie tout")!;
     expect(copied).toMatchObject({ state: "validated", source: "added" });
     expect((await items(f, W0)).find((i) => i.name_key === "essuie tout")!.state).toBe("added_after_validation");
-    expect((await prepareList(at(), f.sophie, W1)).added.some((a) => a.leftoverOf && a.key === "essuie tout")).toBe(false);
+    expect(reminders(await prepareList(at(), f.sophie, W1)).some((a) => a.key === "essuie tout")).toBe(false);
 
     // la liste de la semaine suivante est supprimée : le produit copié part avec elle et revient, décoché, depuis la liste d'origine ; les ajouts à la main de la semaine partent aussi
     await addProduct(at(), f.sophie, { name: "Piles", week: W1 });
@@ -293,7 +302,7 @@ describe("CR-55 : produits « pas encore acheté » de la liste d'avant", () => 
     const rebuilt = await prepareList(at(), f.sophie, W1);
     expect(rebuilt.validated).toBe(false);
     expect(rebuilt.menu).not.toBeNull();
-    expect(rebuilt.added.filter((a) => a.leftoverOf).map((a) => a.key).sort()).toEqual(expected);
+    expect(reminders(rebuilt).map((a) => a.key).sort()).toEqual(expected);
     expect((await items(f, W1)).filter((i) => i.state === "preparing").length).toBeGreaterThan(5);
     expect(rebuilt.weeks.slice(0, 2).map((w) => [w.hasMenu, w.hasList])).toEqual([[true, true], [true, false]]);
   });
@@ -307,8 +316,8 @@ describe("CR-55 : produits « pas encore acheté » de la liste d'avant", () => 
     await validate(f, "2026-10-19", oldCtx);
     await addProduct(oldCtx, f.sophie, { name: "Sacs poubelle", week: "2026-10-19" });
     await menu(f, W0);
-    const shown = (await prepareList(at(), f.sophie, W0)).added.filter((a) => a.leftoverOf);
-    expect(shown.length).toBeGreaterThan(0);
+    const shown = reminders(await prepareList(at(), f.sophie, W0));
+    expect(shown.map((a) => a.key)).toEqual(["sacs poubelle"]);
     expect(shown.every((a) => a.leftoverOf === "semaine du 19 oct.")).toBe(true);
     expect(shown.some((a) => a.key === "sacs poubelle")).toBe(true);
 
@@ -317,7 +326,7 @@ describe("CR-55 : produits « pas encore acheté » de la liste d'avant", () => 
     await menu(f, "2026-10-26", mid);
     await validate(f, "2026-10-26", { db, now: mid });
     await addProduct({ db, now: mid }, f.sophie, { name: "Éponges", week: "2026-10-26" });
-    const recent = (await prepareList(at(), f.sophie, W0)).added.filter((a) => a.leftoverOf);
+    const recent = reminders(await prepareList(at(), f.sophie, W0));
     expect(recent.every((a) => a.leftoverOf === "semaine du 26 oct.")).toBe(true);
     expect(recent.some((a) => a.key === "eponges")).toBe(true);
     expect(recent.some((a) => a.key === "sacs poubelle")).toBe(false);
@@ -326,12 +335,12 @@ describe("CR-55 : produits « pas encore acheté » de la liste d'avant", () => 
     await asProfile(db, f.userIds.sophie, async (trx) => {
       await sql`select delete_grocery_list(${await menuId(f, "2026-10-26")}::uuid)`.execute(trx);
     });
-    expect((await prepareList(at(), f.sophie, W0)).added.filter((a) => a.leftoverOf).every((a) => a.leftoverOf === "semaine du 19 oct.")).toBe(true);
+    expect(reminders(await prepareList(at(), f.sophie, W0)).every((a) => a.leftoverOf === "semaine du 19 oct.")).toBe(true);
     // les deux listes supprimées : rien
     await asProfile(db, f.userIds.sophie, async (trx) => {
       await sql`select delete_grocery_list(${await menuId(f, "2026-10-19")}::uuid)`.execute(trx);
     });
-    expect((await prepareList(at(), f.sophie, W0)).added.filter((a) => a.leftoverOf)).toEqual([]);
+    expect(reminders(await prepareList(at(), f.sophie, W0))).toEqual([]);
   });
 });
 

@@ -217,7 +217,7 @@ const isoIso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padSt
 /** Produits ajoutés depuis la validation, de une ou plusieurs semaines (liste du mois) ; un produit de même nom n'est montré qu'une fois. */
 async function addedLines(ctx: Ctx, who: { accountId: string; userId: string }, menus: { id: string; week: string }[]): Promise<AddedLine[]> {
   const out: AddedLine[] = [];
-  for (const m of menus) for (const a of await addedLinesOf(ctx.db, who.accountId, who.userId, m.id, [], m.week)) if (!out.some((x) => x.key === a.key)) out.push(a);
+  for (const m of menus) for (const a of await addedLinesOf(ctx.db, who.accountId, who.userId, m.id, m.week)) if (!out.some((x) => x.key === a.key)) out.push(a);
   return out;
 }
 

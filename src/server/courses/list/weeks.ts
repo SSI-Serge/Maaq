@@ -152,6 +152,8 @@ export interface Leftover {
   label: string;
   nameKey: string;
   productId: string | null;
+  /** Rayon de la ligne d'origine (nom) ; vide : « Autres ». */
+  aisle: string | null;
   aisleId: number | null;
   quantity: number;
   storeChain: string | null;
@@ -170,8 +172,14 @@ export async function leftoversFor(db: Kysely<DB>, viewerId: string, menuId: str
       select source_item_id, origin_week_start, label, name_key, product_id::text as product_id, aisle_id, quantity, store_chain, reference_name, unit_price, price_unit, needed_amount, needed_unit, quantity_to_check, is_pantry
         from grocery_leftovers_for(${viewerId}::uuid, ${menuId}::uuid) order by label`.execute(db)
   ).rows;
-  return rows.map((r) => ({
+  // CR-68 (US-157 RF3bis) : seuls les produits ajoutés par un membre du foyer (à la main, ou cochés dans l'historique) sont rappelés ; les ingrédients du menu précédent ne le sont plus
+  const kept = rows.length
+    ? new Set((await db.selectFrom("grocery_list_items").select("id").where("id", "in", rows.map((r) => r.source_item_id)).where("source", "in", ["added", "habit"]).execute()).map((r) => String(r.id)))
+    : new Set<string>();
+  const aisles = rows.length ? new Map((await db.selectFrom("grocery_aisles").select(["id", "name"]).execute()).map((a) => [a.id, a.name])) : new Map<number, string>();
+  return rows.filter((r) => kept.has(String(r.source_item_id))).map((r) => ({
     sourceItemId: r.source_item_id,
+    aisle: r.aisle_id === null ? null : (aisles.get(r.aisle_id) ?? null),
     originWeek: typeof r.origin_week_start === "string" ? r.origin_week_start.slice(0, 10) : isoDate(r.origin_week_start),
     label: r.label,
     nameKey: r.name_key,

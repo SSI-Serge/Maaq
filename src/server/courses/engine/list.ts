@@ -102,6 +102,8 @@ export interface BuyRow {
   notBoughtLastTime?: boolean;
   /** Pense-bête « Pas encore acheté » : lundi de la semaine de la liste d'origine (CR-55). */
   leftoverWeek?: string;
+  /** Rayon connu de la ligne (rappel d'une liste précédente). */
+  rayon?: string | null;
   /** Besoin du menu (g, ml ou pièce) lu en base (CR-50). */
   needed?: { amount: number; unit: "g" | "ml" | "piece" } | null;
   toCheck?: boolean;
@@ -326,7 +328,8 @@ export function buildListModel(input: ListInput): ListModel {
     const k = norm(r.name);
     if (seen.has(k) || r.source === "version allégée") continue;
     seen.add(k);
-    make(r.name, pour.has(k) || r.source === "menu" ? "menu" : "ajout", {
+    // un rappel « Pas encore acheté » va dans « Produits de mon historique », en tête de son rayon, décoché (CR-68)
+    make(r.name, r.leftoverWeek ? "habituel" : pour.has(k) || r.source === "menu" ? "menu" : "ajout", {
       pour: [...new Set(pour.get(k) ?? [])].sort(),
       by: r.by,
       qty: r.qty && r.qty > 0 ? r.qty : 1,
@@ -336,7 +339,7 @@ export function buildListModel(input: ListInput): ListModel {
       need: needOf(r.needed),
       toCheck: !!r.toCheck,
       pantry: !!r.pantry,
-      rayonHint: input.journalRayon?.get(r.name) ?? null,
+      rayonHint: r.leftoverWeek ? (r.rayon ?? "Autres") : (input.journalRayon?.get(r.name) ?? null),
     });
   }
 

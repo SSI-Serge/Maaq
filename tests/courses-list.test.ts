@@ -124,7 +124,7 @@ describe("US-156/157 : liste de courses issue du menu", () => {
     expect((await prepareList(at(), f.sophie)).validated).toBe(true);
   });
 
-  it("au menu suivant, les produits non achetés restent sur leur liste et reviennent en pense-bête « Pas encore acheté » ; le journal des produits à référencer ne garde aucun foyer", async () => {
+  it("au menu suivant, les produits non achetés restent sur leur liste et ; seuls les ajouts à la main reviennent en rappel « Pas encore acheté » dans l'historique ; le journal des produits à référencer ne garde aucun foyer", async () => {
     const { f, dinners } = await readyWithMenu();
     const list = await prepareList(at(), f.sophie);
     const model = fromDto(list.model!);
@@ -139,7 +139,10 @@ describe("US-156/157 : liste de courses issue du menu", () => {
     expect(kept.every((r) => r.state === "validated" || r.state === "added_after_validation")).toBe(true);
     const after = await prepareList(later, f.sophie, "2026-11-16");
     expect(after.menu!.week).toBe("2026-11-16");
-    expect(after.added.find((a) => a.name === "Essuie-tout")?.leftoverOf).toBe("semaine du 9 nov.");
+    // CR-68 : seul le produit ajouté à la main est rappelé, dans « Produits de mon historique » ; les ingrédients du menu précédent ne le sont pas et « Produits ajoutés » reste vide
+    const reminders = after.model!.items.filter((i) => i.leftoverWeek);
+    expect(reminders.map((i) => [i.name, i.group, i.checked, i.leftoverWeek])).toEqual([["Essuie-tout", "habituel", false, "2026-11-09"]]);
+    expect(after.added).toEqual([]);
     const columns = await db.selectFrom("grocery_unreferenced_events").selectAll().limit(1).execute();
     expect(Object.keys(columns[0] ?? {}).some((c) => /account|user|household/.test(c))).toBe(false);
   });

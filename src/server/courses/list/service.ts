@@ -10,7 +10,7 @@ import { courseError, loadSettings, requireAccess, translateCourseError, type Co
 import { loadEngineData } from "../menu/data";
 import { weekLabel } from "../menu/weeks";
 import { aiDishId, loadAiDishes, loadEntryIngredients, loadMenuEntries, loadSession, recipeSteps, type SessionView } from "../menu-ia/entries";
-import { groupMenusOf, groupOfMenu, leftoversFor, listOfMenu, pickMenu, weekChoices, weekStartLabel, type Leftover, type WeekChoice, type WeekMenu } from "./weeks";
+import { groupMenusOf, groupOfMenu, leftoversFor, listOfMenu, pickMenu, weekChoices, weekStartLabel, type WeekChoice, type WeekMenu } from "./weeks";
 import { allocate, mergeRows, splitGroupRows, toBuyRow, type GroupRow } from "./group";
 import { loadCommonPrices, loadHistory, loadLightVersions, loadReferences, type References } from "./data";
 import { toDto, type ListModelDto } from "./dto";
@@ -77,10 +77,10 @@ export interface ListPrepared {
 const isoDay = (value: Date | string) => (typeof value === "string" ? value.slice(0, 10) : `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`);
 
 /**
- * Produits ajoutés à la main de la semaine affichée (CR-54) et, avec `leftovers`, pense-bêtes « Pas encore acheté (semaine du …) » de la liste précédente, décochés (CR-55).
+ * Produits ajoutés à la main de la semaine affichée (CR-54, CR-68) : rien n'y entre sans une action d'un membre du foyer. Les rappels « Pas encore acheté » de la liste précédente sont dans « Produits de mon historique ».
  * Sans menu, ce sont les ajouts faits avant tout menu : le premier menu validé les reprend.
  */
-export async function addedLinesOf(db: Kysely<DB>, accountId: string, userId: string, menuId: string | null, leftovers: Leftover[] = [], week: string | null = null): Promise<AddedLine[]> {
+export async function addedLinesOf(db: Kysely<DB>, accountId: string, userId: string, menuId: string | null, week: string | null = null): Promise<AddedLine[]> {
   let q = db
     .selectFrom("grocery_list_items as i")
     .leftJoin("users as u", "u.id", "i.added_by_user_id")
@@ -101,7 +101,6 @@ export async function addedLinesOf(db: Kysely<DB>, accountId: string, userId: st
     leftoverOf: null,
     week,
   }));
-  for (const l of leftovers) lines.push({ key: l.nameKey, name: l.label, by: "", qty: l.quantity, notBoughtLastTime: false, mine: false, late: false, leftoverOf: `semaine du ${weekStartLabel(l.originWeek)}` });
   return lines;
 }
 
@@ -113,10 +112,10 @@ export async function prepareList(ctx: Ctx, session: SessionContext, requestedWe
   const menu = groupMenus ? groupMenus[0] : await pickMenu(ctx.db, who.accountId, ctx.now, requestedWeek);
   const weeks = await weekChoices(ctx.db, who.accountId, ctx.now);
   const leftovers = menu ? await leftoversFor(ctx.db, who.userId, menu.id) : [];
-  const added = await addedLinesOf(ctx.db, who.accountId, who.userId, menu?.id ?? null, who.access === "couple" ? leftovers : [], menu?.week_start ?? null);
+  const added = await addedLinesOf(ctx.db, who.accountId, who.userId, menu?.id ?? null, menu?.week_start ?? null);
   if (groupMenus) {
     for (const m of groupMenus.slice(1)) {
-      for (const a of await addedLinesOf(ctx.db, who.accountId, who.userId, m.id, [], m.week_start)) if (!added.some((x) => !x.leftoverOf && x.key === a.key)) added.push(a);
+      for (const a of await addedLinesOf(ctx.db, who.accountId, who.userId, m.id, m.week_start)) if (!added.some((x) => x.key === a.key)) added.push(a);
     }
   }
   const week = menu?.week_start ?? null;
@@ -201,7 +200,7 @@ export async function prepareList(ctx: Ctx, session: SessionContext, requestedWe
   const split = groupMenus ? splitGroupRows(rows as GroupRow[], menu.id, freshAisles) : null;
   // quantités du menu (CR-50) : besoin, « Quantité à vérifier », placard décoché
   const buy: BuyRow[] = split ? mergeRows(split.main) : (rows as GroupRow[]).map(toBuyRow);
-  // pense-bêtes de la liste précédente (CR-55) : décochés, hors total et scénarios tant qu'ils ne sont pas cochés ; ils restent sur leur liste d'origine
+  // rappels de la liste précédente (CR-55, CR-68) : les ajouts à la main non achetés, dans « Produits de mon historique », décochés, hors total et scénarios tant qu'ils ne sont pas cochés ; ils restent sur leur liste d'origine
   for (const l of leftovers) {
     buy.push({
       name: l.label,
@@ -210,6 +209,7 @@ export async function prepareList(ctx: Ctx, session: SessionContext, requestedWe
       source: "manuel",
       status: "différé",
       leftoverWeek: l.originWeek,
+      rayon: l.aisle,
       needed: l.neededAmount !== null && l.neededUnit ? { amount: l.neededAmount, unit: l.neededUnit } : null,
       toCheck: l.quantityToCheck,
       pantry: l.isPantry,

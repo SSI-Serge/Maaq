@@ -18,6 +18,8 @@ const BACK = { href: "/courses", label: "Courses et repas" };
 export const euro = (value: number) => `${value.toFixed(2).replace(".", ",")} €`;
 /** « 1,49 €/kg » : prix au kilo ou au litre. */
 export const euroPer = (value: number, unit: "kg" | "l" | "unit") => `${euro(value)}${unit === "unit" ? "" : unit === "kg" ? "/kg" : "/L"}`;
+/** « 9 nov. » : le lundi de la semaine d'origine d'un rappel. */
+const shortDay = (iso: string) => new Date(`${iso}T12:00:00`).toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
 const priceText = (value: number | null) => (value === null ? "N/A" : euro(value));
 
 /** « Liste de courses » (US-157, US-158) : préparation après la validation du menu, comparatif des prix, trois scénarios d'achat, validation. */
@@ -135,7 +137,7 @@ function Rub({ title, open = false, children }: { title: string; open?: boolean;
   );
 }
 
-function AddedSection({ added, access, week, reload, leftoverTicked, onLeftover }: { added: AddedLine[]; access: "couple" | "list"; week: string | null; reload: () => void; leftoverTicked?: (name: string) => boolean; onLeftover?: (name: string, ticked: boolean) => void }) {
+function AddedSection({ added, access, week, reload }: { added: AddedLine[]; access: "couple" | "list"; week: string | null; reload: () => void }) {
   const add = useApiMutation();
   const remove = useApiMutation();
   const [text, setText] = useState("");
@@ -157,19 +159,15 @@ function AddedSection({ added, access, week, reload, leftoverTicked, onLeftover 
     <Rub title="Produits ajoutés" open>
       {added.length === 0 && <p className={styles.empty}>Aucun produit ajouté.</p>}
       {added.map((a) => (
-        <div key={`${a.leftoverOf ?? ""}${a.key}`} className={styles.line}>
-          {/* pense-bête de la liste d'avant (CR-55) : décoché, hors du total ; coché, il devient un produit de cette semaine */}
-          {a.leftoverOf && onLeftover && leftoverTicked && (
-            <input type="checkbox" aria-label={`Prendre « ${a.name} » cette semaine`} checked={leftoverTicked(a.name)} onChange={(e) => onLeftover(a.name, e.target.checked)} />
-          )}
+        <div key={a.key} className={styles.line}>
           <div className={styles.lineMain}>
             <div className={styles.lineName}>{a.name}</div>
             <div className={styles.lineSub}>
-              {a.leftoverOf ? <span className={styles.pillWarn}>Pas encore acheté ({a.leftoverOf})</span> : a.by ? `ajouté par ${a.by}` : "ajouté"}
+              {a.by ? `ajouté par ${a.by}` : "ajouté"}
             </div>
           </div>
           <span className={styles.meta}>×{a.qty}</span>
-          {!a.leftoverOf && (access === "couple" || a.mine) && (
+          {(access === "couple" || a.mine) && (
             <button type="button" className={styles.link} onClick={() => void drop(a.key, a.week)} aria-label={`Retirer ${a.name}`}>
               Retirer
             </button>
@@ -331,7 +329,7 @@ function Preparation({ list, reload }: { list: ListPrepared; reload: () => void 
         </>
       ))}
 
-      <AddedSection added={list.added} access={list.access} week={list.week} reload={reload} leftoverTicked={(name) => sel.checked?.get(model.items.find((i) => norm(i.name) === norm(name))?.id ?? -1) ?? false} onLeftover={(name, ticked) => patch({ checked: { ...picks.checked, [norm(name)]: ticked } })} />
+      <AddedSection added={list.added} access={list.access} week={list.week} reload={reload} />
 
       {list.group && list.group.later.length > 0 && rub("À acheter plus tard", true, (
         <>
@@ -358,7 +356,10 @@ function Preparation({ list, reload }: { list: ListPrepared; reload: () => void 
               {items.map((i) => (
                 <label key={i.id} className={styles.choice}>
                   <input type="checkbox" checked={sel.checked?.get(i.id) ?? i.checked} onChange={(e) => patch({ checked: { ...picks.checked, [norm(i.name)]: e.target.checked } })} />
-                  <span>{i.name}</span>
+                  <span>
+                    {i.name}
+                    {i.leftoverWeek && <span className={styles.pillWarn}> Pas encore acheté (semaine du {shortDay(i.leftoverWeek)})</span>}
+                  </span>
                 </label>
               ))}
             </div>
@@ -564,6 +565,8 @@ function ScenarioView({
                                 ? `Ajouté à la main · ${l.qty}`
                                 : origin === "quotidien"
                                   ? `Produit du quotidien · ${l.qty}`
+                                : origin === "habituel" && itemsByName.get(norm(l.name))?.leftoverWeek
+                                  ? `Pas encore acheté · ${l.qty}`
                                 : origin === "habituel"
                                   ? `De votre historique · ${l.qty}`
                                   : ""}
@@ -619,7 +622,8 @@ function ScenarioView({
                 weight: l.weight,
                 toCheck: l.toCheck,
                 pantry: l.pantry,
-                source: ({ menu: "menu", sante: "menu", ajout: "added", habituel: "habit", quotidien: "added" } as const)[itemsByName.get(norm(l.name))?.group ?? "menu"],
+                // un rappel coché devient un produit ajouté de cette semaine (CR-55, CR-68)
+                source: itemsByName.get(norm(l.name))?.leftoverWeek ? ("added" as const) : ({ menu: "menu", sante: "menu", ajout: "added", habituel: "habit", quotidien: "added" } as const)[itemsByName.get(norm(l.name))?.group ?? "menu"],
               })),
             )
           }
