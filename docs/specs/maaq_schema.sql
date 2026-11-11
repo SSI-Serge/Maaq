@@ -128,6 +128,9 @@ CREATE TYPE outing_proposal_status AS ENUM ('ready', 'dismissed', 'added');
 CREATE TYPE outing_idea_section   AS ENUM ('in_budget', 'novelty');
 CREATE TYPE outing_idea_status    AS ENUM ('proposed', 'dismissed', 'added');
 CREATE TYPE homework_level        AS ENUM ('cp', 'ce1', 'ce2', 'cm1', 'cm2');
+-- Formes de question des pages d'exercices créées à partir d'une leçon (US-180 RF3, D72 S-42) : liste fermée
+CREATE TYPE homework_question_form AS ENUM ('multiple_choice', 'true_false', 'true_false_correction', 'equations_to_complete', 'fill_in_blanks',
+                                           'matching', 'ordering', 'problem', 'written_answer');
 CREATE TYPE homework_activity_category AS ENUM ('nature', 'philosophy', 'stem', 'art', 'imagination', 'games_projects');
 
 -- Contrats V2 (lot 11, US-122 à US-138)
@@ -2733,6 +2736,22 @@ CREATE FUNCTION find_family_event_conflicts(
 $$;
 COMMENT ON FUNCTION find_family_event_conflicts(uuid, uuid[], boolean, timestamptz, timestamptz, uuid) IS $$RDV en conflit avec un créneau donné (même membre ou toute la famille, statuts confirmé et provisoire). [US-74]$$;
 
+-- D73 (S-38, S-39) : le membre d'un profil est sa fiche « autre » (créée avec lui), SAUF pour l'invité secondaire relié à une fiche enfant
+-- (family_members.child_profile_user_id) : son membre est alors la fiche enfant, et sa fiche « autre » est masquée. En plpgsql : la colonne est
+-- ajoutée plus bas, au lot 10.
+CREATE FUNCTION family_member_of_profile(p_user uuid) RETURNS uuid LANGUAGE plpgsql STABLE AS $$
+BEGIN
+  RETURN COALESCE((SELECT c.id FROM family_members c WHERE c.child_profile_user_id = p_user),
+                  (SELECT m.id FROM family_members m WHERE m.user_id = p_user));
+END $$;
+COMMENT ON FUNCTION family_member_of_profile(uuid) IS $$Membre d'un profil : la fiche enfant à laquelle il est relié (family_members.child_profile_user_id) s'il est le profil d'un enfant, sinon sa propre fiche (créée avec lui). Règle unique pour la visibilité des RDV et des tâches, le droit de cocher et les destinataires des notifications. NULL si le profil n'a pas de fiche. [US-92, D73 S-38, S-39]$$;
+
+CREATE FUNCTION profile_is_child_linked(p_user uuid) RETURNS boolean LANGUAGE plpgsql STABLE AS $$
+BEGIN
+  RETURN EXISTS (SELECT 1 FROM family_members c WHERE c.child_profile_user_id = p_user);
+END $$;
+COMMENT ON FUNCTION profile_is_child_linked(uuid) IS $$Vrai si le profil est celui d'un enfant (relié à une fiche enfant). Ce profil ne voit pas les RDV de toute la famille, ne coche pas la tâche des devoirs, ne modifie pas ses éléments de devoirs et n'a pas le tchat de l'Assistant Famille (ce dernier point est tenu par l'application). [D73 S-38, S-40, S-45, S-47]$$;
+
 -- RDV visibles par un profil (D26) : parents = tous ; invité secondaire = RDV dont il est un membre concerné,
 -- RDV « toute la famille » et RDV issus de ses propres demandes. Les RDV annulés et ignorés ne s'affichent pas.
 CREATE FUNCTION family_events_visible_to(p_viewer uuid) RETURNS SETOF family_events
@@ -2742,12 +2761,12 @@ LANGUAGE sql STABLE AS $$
     JOIN users v ON v.id = p_viewer AND v.account_id = e.account_id
    WHERE e.status IN ('provisional', 'set_aside', 'confirmed')
      AND ( v.role = 'primary_user' OR v.guest_rank = 'core'
-        OR e.whole_family
+        OR (e.whole_family AND NOT profile_is_child_linked(v.id))
         OR e.requested_by_user_id = v.id
-        OR EXISTS (SELECT 1 FROM family_event_members m JOIN family_members fm ON fm.id = m.member_id
-                    WHERE m.event_id = e.id AND fm.user_id = v.id) )
+        OR EXISTS (SELECT 1 FROM family_event_members m
+                    WHERE m.event_id = e.id AND m.member_id = family_member_of_profile(v.id)) )
 $$;
-COMMENT ON FUNCTION family_events_visible_to(uuid) IS $$RDV visibles par un profil selon son rang (décision D26). [US-78, 79]$$;
+COMMENT ON FUNCTION family_events_visible_to(uuid) IS $$RDV visibles par un profil selon son rang (décision D26). Un profil relié à une fiche enfant ne voit que les RDV dont la fiche enfant est participante, jamais ceux de toute la famille (D73 S-45). [US-78, 79]$$;
 
 -- Droit de confirmer, modifier, ignorer ou annuler : parents = tous les RDV ; invité secondaire = ses propres demandes (D26)
 CREATE FUNCTION can_manage_family_event(p_user_id uuid, p_event_id uuid) RETURNS boolean
@@ -3273,11 +3292,14 @@ DECLARE v_task family_tasks%ROWTYPE; v_member uuid;
 BEGIN
   SELECT * INTO v_task FROM family_tasks WHERE id = p_task_id FOR UPDATE;
   IF NOT FOUND THEN RETURN false; END IF;
+  IF v_task.source = 'homework_prep' AND profile_is_child_linked(p_user_id) THEN
+    RAISE EXCEPTION 'Le profil d''un enfant ne change pas l''état de la tâche des devoirs' USING ERRCODE = 'insufficient_privilege';
+  END IF;
   IF p_expected_version IS NOT NULL AND v_task.version <> p_expected_version THEN RETURN false; END IF;
   IF NOT family_task_transition_allowed(v_task.status, p_to) THEN RETURN false; END IF;
   IF p_to = 'done' THEN
-    SELECT id INTO v_member FROM family_members WHERE user_id = p_user_id AND account_id = v_task.account_id;
-    IF NOT FOUND THEN
+    v_member := family_member_of_profile(p_user_id);
+    IF v_member IS NULL OR NOT EXISTS (SELECT 1 FROM family_members WHERE id = v_member AND account_id = v_task.account_id) THEN
       RAISE EXCEPTION 'Ce profil n''a pas de membre : impossible de cocher la tâche' USING ERRCODE = 'check_violation';
     END IF;
   END IF;
@@ -3290,7 +3312,7 @@ BEGIN
    WHERE id = p_task_id;
   RETURN true;
 END $$;
-COMMENT ON FUNCTION change_family_task_status(uuid, task_status, uuid, integer, task_cancel_reason) IS $$Change le statut d'une tâche de façon atomique (transition permise, version attendue) ; « faite par » = membre du profil. false = introuvable, modifiée ou transition interdite. [US-110 RF7, AT-1]$$;
+COMMENT ON FUNCTION change_family_task_status(uuid, task_status, uuid, integer, task_cancel_reason) IS $$Change le statut d'une tâche de façon atomique (transition permise, version attendue) ; « faite par » = membre du profil (la fiche enfant pour un enfant). false = introuvable, modifiée ou transition interdite. Le profil d'un enfant ne change jamais l'état de la tâche « Préparer les devoirs » (erreur insufficient_privilege, D73 S-40). [US-110 RF7, AT-1]$$;
 
 -- Termine une tâche récurrente (« Toutes », ou fin de la règle) : les occurrences à faire à partir d'aujourd'hui sont annulées.
 -- Retourne le nombre d'occurrences annulées.
@@ -3314,10 +3336,22 @@ CREATE FUNCTION family_event_retired_task_count(p_event_id uuid) RETURNS integer
 $$;
 COMMENT ON FUNCTION family_event_retired_task_count(uuid) IS $$Nombre de tâches annulées avec leur RDV (annulation ou abandon), pour la notification aux parents. [US-95 RF7]$$;
 
+-- D71, D73 (S-31) : la tâche « Préparer les devoirs » (source homework_prep) est vue du profil d'un enfant (relié à une fiche enfant qui a un âge des devoirs),
+-- tant que l'aide Devoirs est activée pour le foyer. En plpgsql : les tables Devoirs sont créées plus bas, au lot 10.
+CREATE FUNCTION homework_prep_task_visible_to(p_user uuid, p_account uuid) RETURNS boolean LANGUAGE plpgsql STABLE AS $$
+BEGIN
+  RETURN EXISTS (SELECT 1 FROM family_members c
+                   JOIN homework_children hc ON hc.member_id = c.id AND hc.account_id = c.account_id
+                   JOIN family_settings st ON st.account_id = c.account_id AND st.homework_help_enabled
+                  WHERE c.child_profile_user_id = p_user AND c.account_id = p_account);
+END $$;
+COMMENT ON FUNCTION homework_prep_task_visible_to(uuid, uuid) IS $$Vrai si le profil est celui d'un enfant (relié à une fiche enfant) qui a un âge des devoirs et que l'aide Devoirs est activée pour le foyer : il voit alors la tâche « Préparer les devoirs » sans qu'elle lui soit assignée. [US-119 RF1 et RT1, D71 S-31, D73]$$;
+
 -- Droits sur les tâches (AT-2, D26) : parents = toutes ; invité secondaire = celles qu'il a créées, celles qui lui sont assignées
 -- et celles des RDV qu'il voit. Les tâches annulées ne s'affichent pas ; une tâche proposée n'est vue que des parents et du demandeur du RDV.
 CREATE FUNCTION family_tasks_visible_to(p_viewer uuid) RETURNS SETOF family_tasks
 LANGUAGE sql STABLE AS $$
+  -- D71, D73 : membre du profil = fiche enfant pour un enfant ; la tâche des devoirs est vue de son profil (homework_prep_task_visible_to)
   SELECT t.*
     FROM family_tasks t
     JOIN users v ON v.id = p_viewer AND v.account_id = t.account_id
@@ -3325,12 +3359,13 @@ LANGUAGE sql STABLE AS $$
      AND ( v.role = 'primary_user' OR v.guest_rank = 'core'
         OR ( t.status <> 'proposed'
              AND ( t.created_by_user_id = v.id
-                OR EXISTS (SELECT 1 FROM family_members fm WHERE fm.id = t.assigned_member_id AND fm.user_id = v.id)
-                OR t.event_id IN (SELECT id FROM family_events_visible_to(p_viewer)) ) )
+                OR t.assigned_member_id = family_member_of_profile(v.id)
+                OR t.event_id IN (SELECT id FROM family_events_visible_to(p_viewer))
+                OR ( t.source = 'homework_prep' AND homework_prep_task_visible_to(v.id, t.account_id) ) ) )
         OR ( t.status = 'proposed'
              AND EXISTS (SELECT 1 FROM family_events e WHERE e.id = t.event_id AND e.requested_by_user_id = v.id) ) )
 $$;
-COMMENT ON FUNCTION family_tasks_visible_to(uuid) IS $$Tâches visibles par un profil selon son rang (décision D26, AT-2). [US-110, US-96]$$;
+COMMENT ON FUNCTION family_tasks_visible_to(uuid) IS $$Tâches visibles par un profil selon son rang (décision D26, AT-2). Les tâches assignées sont celles de la fiche du profil (la fiche enfant pour un enfant). Exception D71 : la tâche « Préparer les devoirs » est visible du profil d'un enfant qui a un âge des devoirs, tant que l'aide Devoirs est activée. [US-110, US-96, US-119 RF1 et RT1, D71 S-31, D73]$$;
 
 -- Droit de modifier, assigner ou annuler : parents = toutes ; invité secondaire = les tâches qu'il a créées
 CREATE FUNCTION can_manage_family_task(p_user_id uuid, p_task_id uuid) RETURNS boolean
@@ -3345,11 +3380,11 @@ COMMENT ON FUNCTION can_manage_family_task(uuid, uuid) IS $$Vrai si le profil pe
 -- Droit de cocher : le droit de gérer, plus les tâches assignées à son propre membre
 CREATE FUNCTION can_check_family_task(p_user_id uuid, p_task_id uuid) RETURNS boolean
 LANGUAGE sql STABLE AS $$
-  SELECT can_manage_family_task(p_user_id, p_task_id)
-      OR EXISTS (SELECT 1 FROM family_tasks t JOIN family_members fm ON fm.id = t.assigned_member_id
-                  WHERE t.id = p_task_id AND fm.user_id = p_user_id)
+  SELECT (can_manage_family_task(p_user_id, p_task_id)
+          OR EXISTS (SELECT 1 FROM family_tasks t WHERE t.id = p_task_id AND t.assigned_member_id = family_member_of_profile(p_user_id)))
+     AND NOT EXISTS (SELECT 1 FROM family_tasks t WHERE t.id = p_task_id AND t.source = 'homework_prep' AND profile_is_child_linked(p_user_id))
 $$;
-COMMENT ON FUNCTION can_check_family_task(uuid, uuid) IS $$Vrai si le profil peut cocher cette tâche (parents : toutes ; invité secondaire : ses créations et les tâches qui lui sont assignées). [AT-2]$$;
+COMMENT ON FUNCTION can_check_family_task(uuid, uuid) IS $$Vrai si le profil peut cocher cette tâche (parents : toutes ; invité secondaire : ses créations et les tâches qui lui sont assignées, celles de la fiche enfant pour un enfant). Le profil d'un enfant ne coche jamais la tâche « Préparer les devoirs » (D73 S-40) mais garde ses tâches à lui (S-46). [AT-2]$$;
 
 -- « En retard » n'est pas un statut mais un affichage : tâche à faire dont l'échéance est passée, dans le fuseau de la famille (AT-1)
 CREATE VIEW v_family_tasks AS
@@ -4064,8 +4099,8 @@ BEGIN
              OR (NOT v_e.auto_confirmed AND v_e.confirmed_at <= v_e.created_at + make_interval(mins => v_delay))
            ELSE
              p_kind = 'event_added'
-             AND EXISTS (SELECT 1 FROM family_event_members m JOIN family_members fm ON fm.id = m.member_id
-                          WHERE m.event_id = v_e.id AND fm.user_id = u.id)
+             AND EXISTS (SELECT 1 FROM family_event_members m
+                          WHERE m.event_id = v_e.id AND m.member_id = family_member_of_profile(u.id))
          END;
 END $$;
 COMMENT ON FUNCTION family_event_notice_recipients(uuid, notification_kind) IS $$Destinataires d'une notification « RDV ajouté » ou « RDV à confirmer » avec leur canal (appareil autorisé ou non) : jamais le demandeur ni celui qui confirme, seulement après la date de mise en service, réglage personnel respecté ; invité secondaire seulement pour « ajouté » ; jamais pour un RDV créé depuis une idée de sortie (source « outing »). [US-113 RF1 à RF11, RF14, US-120 RF5]$$;
@@ -4684,10 +4719,20 @@ ALTER TABLE family_settings
   ADD CONSTRAINT ck_family_settings_homework CHECK (NOT homework_help_enabled OR (homework_help_first_enabled_at IS NOT NULL AND homework_help_disabled_at IS NULL));
 COMMENT ON COLUMN family_settings.homework_help_enabled IS $$Aide Devoirs activée pour toute la famille (faux par défaut). Ne s'active que si la famille compte au moins un membre enfant ; désactiver arrête l'aide sans effacer les plannings ni les progrès. [US-118 RF1, RF2, RF5, D64]$$;
 COMMENT ON COLUMN family_settings.homework_help_first_enabled_at IS $$Date de la première activation, posée automatiquement : vide = la présentation en trois lignes n'a jamais été montrée (US-118 RF3)$$;
+-- D71 (S-30) : jours de devoirs du foyer, de 1 (lundi) à 7 (dimanche) ; lundi, mardi, jeudi et vendredi au départ ; au moins un jour. La tâche « Préparer les devoirs » revient ces jours-là.
+ALTER TABLE family_settings
+  ADD COLUMN homework_days smallint[] NOT NULL DEFAULT ARRAY[1, 2, 4, 5]::smallint[];
+ALTER TABLE family_settings
+  ADD CONSTRAINT ck_family_settings_homework_days CHECK (iso_weekdays_valid(homework_days));
+COMMENT ON COLUMN family_settings.homework_days IS $$Jours de devoirs du foyer (1 = lundi … 7 = dimanche, sans doublon, au moins un) : lundi, mardi, jeudi et vendredi au départ. Réglage familial, modifiable par les deux parents, lisible en lecture seule par les invités secondaires. La tâche « Préparer les devoirs » revient ces jours-là : la base aligne les jours de sa série sur ce réglage (trigger) et retire les occurrences à venir des jours décochés dès le lendemain. Stocké trié. [US-118 RF7, US-119 RF1, D71 S-30]$$;
 COMMENT ON COLUMN family_settings.homework_help_disabled_at IS $$Date de la dernière désactivation de l'aide, posée automatiquement quand elle passe de vraie à fausse et remise à vide à la réactivation. Les exercices validés sont gardés jusqu'à homework_validation_grace_days (30) après cette date : une réactivation pendant ce délai les retrouve (D65)$$;
 
 CREATE FUNCTION family_settings_homework_before_write() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
+  -- Jours de devoirs rangés dans l'ordre (la validité est contrôlée par ck_family_settings_homework_days)
+  IF NEW.homework_days IS NOT NULL THEN
+    NEW.homework_days := ARRAY(SELECT d FROM unnest(NEW.homework_days) d ORDER BY d);
+  END IF;
   IF TG_OP = 'UPDATE' AND OLD.homework_help_enabled AND NOT NEW.homework_help_enabled THEN
     NEW.homework_help_disabled_at := now();
   END IF;
@@ -4862,7 +4907,7 @@ ALTER TABLE family_event_series
   ADD CONSTRAINT ck_event_series_yearly CHECK (repeat_unit <> 'yearly' OR NOT skip_school_holidays);
 ALTER TABLE family_task_series
   ADD CONSTRAINT ck_task_series_unit CHECK (repeat_unit IS DISTINCT FROM 'yearly');
-COMMENT ON COLUMN family_tasks.homework_week_id IS $$Semaine de devoirs à l'origine de la tâche « Devoirs — [prénom] (N éléments) » (source « homework ») : une tâche par enfant et par jour de travail ; supprimée avec la semaine. [US-119 RF4]$$;
+COMMENT ON COLUMN family_tasks.homework_week_id IS $$Semaine de devoirs à l'origine de la tâche « Devoirs — [prénom] (N éléments) » (source « homework ») : une tâche par enfant et par jour de travail ; supprimée avec la semaine. Ces tâches ne sont plus créées depuis D71 (S-33) : préparer une semaine n'en crée plus, le planning du jour s'ouvre depuis la tâche « Préparer les devoirs » ; celles qui existent restent jusqu'à leur échéance. [US-119 RF4, D71]$$;
 
 -- L'âge des devoirs ne concerne qu'un membre enfant actif
 CREATE FUNCTION homework_child_before_write() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -4951,40 +4996,44 @@ CREATE FUNCTION erase_member_homework_data(p_member_id uuid, p_keep_age boolean 
 BEGIN
   DELETE FROM family_tasks WHERE source = 'homework' AND assigned_member_id = p_member_id;
   DELETE FROM homework_week_items WHERE member_id = p_member_id;
+  DELETE FROM homework_exercise_pages WHERE member_id = p_member_id;
   DELETE FROM homework_week_foreign_books WHERE member_id = p_member_id;
   DELETE FROM homework_exercise_validations WHERE member_id = p_member_id;
   IF NOT p_keep_age THEN
     DELETE FROM homework_children WHERE member_id = p_member_id;
   END IF;
 END $$;
-COMMENT ON FUNCTION erase_member_homework_data(uuid, boolean) IS $$Supprime les données Devoirs d'un enfant : tâches « Devoirs », éléments prévus, manuels proposés, exercices validés et, sauf demande contraire, l'âge des devoirs. Appelée au retrait et à l'effacement du membre. [US-93, US-119 RT5]$$;
+COMMENT ON FUNCTION erase_member_homework_data(uuid, boolean) IS $$Supprime les données Devoirs d'un enfant : tâches « Devoirs », éléments prévus, pages d'exercices (avec leur fiche réponse), manuels proposés, exercices validés et, sauf demande contraire, l'âge des devoirs. Appelée au retrait et à l'effacement du membre. [US-93, US-119 RT5, US-180 RT5]$$;
 
 -- Bouton « Effacer les progrès de Devoirs » (US-118 RF5) : supprime les semaines préparées (avec éléments et tâches), les exercices validés et,
 -- si p_keep_ages est faux, l'âge des devoirs des enfants. Retourne le nombre de semaines, de validations et de tâches supprimées.
 CREATE FUNCTION erase_family_homework_progress(p_account_id uuid, p_keep_ages boolean DEFAULT true) RETURNS bigint LANGUAGE plpgsql AS $$
-DECLARE v_tasks bigint; v_weeks bigint; v_valid bigint;
+DECLARE v_tasks bigint; v_weeks bigint; v_valid bigint; v_pages bigint;
 BEGIN
   DELETE FROM family_tasks WHERE account_id = p_account_id AND source = 'homework';
   GET DIAGNOSTICS v_tasks = ROW_COUNT;
   DELETE FROM homework_weeks WHERE account_id = p_account_id;
   GET DIAGNOSTICS v_weeks = ROW_COUNT;
+  DELETE FROM homework_exercise_pages WHERE account_id = p_account_id;
+  GET DIAGNOSTICS v_pages = ROW_COUNT;
   DELETE FROM homework_exercise_validations v USING homework_children c WHERE c.member_id = v.member_id AND c.account_id = p_account_id;
   GET DIAGNOSTICS v_valid = ROW_COUNT;
   IF NOT p_keep_ages THEN
     DELETE FROM homework_children WHERE account_id = p_account_id;
   END IF;
-  RETURN v_tasks + v_weeks + v_valid;
+  RETURN v_tasks + v_weeks + v_valid + v_pages;
 END $$;
-COMMENT ON FUNCTION erase_family_homework_progress(uuid, boolean) IS $$Efface les plannings et les progrès Devoirs d'une famille : semaines préparées (avec éléments et tâches « Devoirs »), exercices validés et, si demandé, l'âge des devoirs (conservé par défaut : c'est le comportement de l'écran, D65). Retourne le nombre de lignes supprimées. [US-118 RF5, US-119 RT5]$$;
+COMMENT ON FUNCTION erase_family_homework_progress(uuid, boolean) IS $$Efface les plannings et les progrès Devoirs d'une famille : semaines préparées (avec éléments et tâches « Devoirs »), pages d'exercices (avec leur fiche réponse), exercices validés et, si demandé, l'âge des devoirs (conservé par défaut : c'est le comportement de l'écran, D65). Retourne le nombre de lignes supprimées. [US-118 RF5, US-119 RT5, US-180 RT5]$$;
 
 -- Purge Devoirs (D65, à valider par le DPO et à écrire dans l'AIPD) : semaines préparées et leurs éléments supprimés 12 mois après la semaine
 -- (avec les manuels proposés et les tâches « Devoirs » liées) ; exercices validés gardés tant que l'aide est active pour la famille de l'enfant,
 -- puis encore 30 jours après sa désactivation (délai de grâce : une réactivation les retrouve). Retourne le nombre de semaines et de validations supprimées.
 CREATE FUNCTION purge_expired_homework_data() RETURNS bigint LANGUAGE plpgsql AS $$
-DECLARE v_months integer; v_grace integer; v_a bigint; v_b bigint;
+DECLARE v_months integer; v_grace integer; v_pages integer; v_a bigint; v_b bigint; v_c bigint;
 BEGIN
   SELECT value_text::integer INTO v_months FROM platform_settings WHERE setting_key = 'homework_week_retention_months';
   SELECT value_text::integer INTO v_grace FROM platform_settings WHERE setting_key = 'homework_validation_grace_days';
+  SELECT value_text::integer INTO v_pages FROM platform_settings WHERE setting_key = 'homework_page_retention_months';
   DELETE FROM homework_weeks WHERE week_start + 6 < current_date - make_interval(months => COALESCE(v_months, 12));
   GET DIAGNOSTICS v_a = ROW_COUNT;
   DELETE FROM homework_exercise_validations v USING homework_children c
@@ -4994,9 +5043,11 @@ BEGIN
                         AND (st.homework_help_enabled
                              OR st.homework_help_disabled_at >= now() - make_interval(days => COALESCE(v_grace, 30))));
   GET DIAGNOSTICS v_b = ROW_COUNT;
-  RETURN v_a + v_b;
+  DELETE FROM homework_exercise_pages WHERE created_at < now() - make_interval(months => COALESCE(v_pages, 12));
+  GET DIAGNOSTICS v_c = ROW_COUNT;
+  RETURN v_a + v_b + v_c;
 END $$;
-COMMENT ON FUNCTION purge_expired_homework_data() IS $$Supprime les semaines de devoirs (avec éléments, manuels proposés et tâches « Devoirs ») 12 mois après la semaine, et les exercices validés des enfants dont la famille n'a plus l'aide Devoirs active depuis plus de 30 jours (homework_validation_grace_days). À planifier chaque jour. [US-119 RT5, D65]$$;
+COMMENT ON FUNCTION purge_expired_homework_data() IS $$Supprime les semaines de devoirs (avec éléments, manuels proposés et tâches « Devoirs ») 12 mois après la semaine, les pages d'exercices (avec leur fiche réponse) 12 mois après leur création (homework_page_retention_months), et les exercices validés des enfants dont la famille n'a plus l'aide Devoirs active depuis plus de 30 jours (homework_validation_grace_days). À planifier chaque jour. [US-119 RT5, D65, US-180 RT5]$$;
 
 -- Un membre qui n'est plus enfant n'est plus suivi par l'aide Devoirs
 CREATE FUNCTION family_member_homework_role_changed() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -5006,6 +5057,283 @@ BEGIN
 END $$;
 CREATE TRIGGER trg_family_members_homework_role AFTER UPDATE OF role ON family_members
   FOR EACH ROW WHEN (OLD.role = 'child' AND NEW.role <> 'child') EXECUTE FUNCTION family_member_homework_role_changed();
+
+-- =====================================================================
+-- D71 à D73 (11/11/2026) — Aide Devoirs : tâche « Préparer les devoirs » les jours de devoirs, profil de l'enfant, pages d'exercices créées à partir d'une leçon
+-- (US-118 RF7, US-119 RF1, RF11 et RT1, US-180). Les jours de devoirs sont le réglage family_settings.homework_days (plus haut).
+-- =====================================================================
+
+-- Profil de l'enfant (D73 S-38) : la fiche ENFANT porte le lien vers le profil d'invité secondaire de l'enfant. Le lien n'est pas sur family_members.user_id (réservé à la fiche
+-- « autre » créée avec le profil, que sync_member_from_user suit et que la suppression du profil anonymise) ni dans homework_children (retirer l'âge des devoirs ou effacer les
+-- progrès ne change rien à ce que voit l'enfant). Il est unique, du même foyer, réservé à un invité secondaire, remis à vide à la suppression du profil sans toucher à la fiche.
+ALTER TABLE family_members ADD COLUMN child_profile_user_id uuid;
+ALTER TABLE family_members
+  ADD CONSTRAINT fk_family_members_child_profile FOREIGN KEY (child_profile_user_id, account_id)
+    REFERENCES users (id, account_id) ON DELETE SET NULL (child_profile_user_id);
+ALTER TABLE family_members
+  ADD CONSTRAINT ck_family_members_child_profile CHECK (child_profile_user_id IS NULL
+    OR (role = 'child' AND user_id IS NULL AND archived_at IS NULL AND anonymized_at IS NULL));
+CREATE UNIQUE INDEX ux_family_members_child_profile ON family_members (child_profile_user_id) WHERE child_profile_user_id IS NOT NULL;
+COMMENT ON COLUMN family_members.child_profile_user_id IS $$Profil de l'enfant : profil d'invité secondaire de l'enfant, porté par sa fiche enfant (rôle enfant, non liée à un profil par user_id). Unique, du même foyer, remis à vide à la suppression du profil sans anonymiser la fiche, et à vide si la fiche cesse d'être une fiche enfant active. Le membre du profil est alors cette fiche enfant (family_member_of_profile) et sa fiche « autre » est masquée. Sans lien avec l'âge des devoirs. [D73 S-38, S-39]$$;
+
+CREATE FUNCTION family_member_child_profile_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  -- La fiche cesse d'être une fiche enfant active : le lien tombe, sans erreur
+  IF TG_OP = 'UPDATE' AND NEW.child_profile_user_id IS NOT NULL AND NEW.child_profile_user_id IS NOT DISTINCT FROM OLD.child_profile_user_id
+     AND (NEW.role <> 'child' OR NEW.archived_at IS NOT NULL OR NEW.anonymized_at IS NOT NULL) THEN
+    NEW.child_profile_user_id := NULL;
+  END IF;
+  IF NEW.child_profile_user_id IS NOT NULL AND (TG_OP = 'INSERT' OR NEW.child_profile_user_id IS DISTINCT FROM OLD.child_profile_user_id) THEN
+    IF NOT EXISTS (SELECT 1 FROM users u WHERE u.id = NEW.child_profile_user_id AND u.account_id = NEW.account_id AND u.role = 'guest' AND u.guest_rank = 'secondary') THEN
+      RAISE EXCEPTION 'Le profil d''un enfant est un invité secondaire du même foyer' USING ERRCODE = 'check_violation';
+    END IF;
+  END IF;
+  RETURN NEW;
+END $$;
+CREATE TRIGGER trg_family_members_child_profile BEFORE INSERT OR UPDATE ON family_members
+  FOR EACH ROW EXECUTE FUNCTION family_member_child_profile_guard();
+COMMENT ON FUNCTION family_member_child_profile_guard() IS $$Le profil relié à une fiche enfant est un invité secondaire du même foyer ; le lien tombe quand la fiche cesse d'être une fiche enfant active (changement de rôle, retrait, effacement). [D73 S-38]$$;
+
+-- Fiche « autre » masquée (D73 S-39) : la fiche créée avec le profil d'un enfant n'est ni listée, ni choisie comme participante d'un RDV ou d'une série, ni assignée à une tâche.
+-- La base refuse les nouvelles écritures qui la visent ; l'affichage passe par v_family_members_listed (ou family_member_is_hidden) ; le code retire la fiche des listes existantes.
+CREATE FUNCTION family_member_is_hidden(p_member uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
+  SELECT EXISTS (SELECT 1 FROM family_members o JOIN family_members c ON c.child_profile_user_id = o.user_id AND c.account_id = o.account_id WHERE o.id = p_member)
+$$;
+COMMENT ON FUNCTION family_member_is_hidden(uuid) IS $$Vrai si la fiche est la fiche « autre » du profil d'un enfant (profil relié à une fiche enfant) : elle est masquée dans les membres, les RDV et l'assignation des tâches. [D73 S-39]$$;
+
+CREATE FUNCTION family_member_not_hidden_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE v_member uuid;
+BEGIN
+  v_member := NULLIF(to_jsonb(NEW) ->> TG_ARGV[0], '')::uuid;
+  IF v_member IS NOT NULL AND family_member_is_hidden(v_member) THEN
+    RAISE EXCEPTION 'La fiche « autre » du profil d''un enfant est masquée : utilisez sa fiche enfant' USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NEW;
+END $$;
+CREATE TRIGGER trg_family_event_members_not_hidden BEFORE INSERT OR UPDATE OF member_id ON family_event_members
+  FOR EACH ROW EXECUTE FUNCTION family_member_not_hidden_guard('member_id');
+CREATE TRIGGER trg_family_event_series_members_not_hidden BEFORE INSERT OR UPDATE OF member_id ON family_event_series_members
+  FOR EACH ROW EXECUTE FUNCTION family_member_not_hidden_guard('member_id');
+CREATE TRIGGER trg_family_tasks_not_hidden BEFORE INSERT OR UPDATE OF assigned_member_id ON family_tasks
+  FOR EACH ROW EXECUTE FUNCTION family_member_not_hidden_guard('assigned_member_id');
+CREATE TRIGGER trg_family_task_series_not_hidden BEFORE INSERT OR UPDATE OF assigned_member_id ON family_task_series
+  FOR EACH ROW EXECUTE FUNCTION family_member_not_hidden_guard('assigned_member_id');
+COMMENT ON FUNCTION family_member_not_hidden_guard() IS $$Refuse qu'une écriture vise la fiche « autre » masquée du profil d'un enfant (participant d'un RDV ou d'une série, tâche ou série de tâches assignée). Le nom de la colonne vient de l'argument du trigger. [D73 S-39]$$;
+
+CREATE VIEW v_family_members_listed AS
+SELECT m.* FROM family_members m WHERE NOT family_member_is_hidden(m.id);
+COMMENT ON VIEW v_family_members_listed IS $$Membres du foyer à afficher et à proposer : family_members sans la fiche « autre » du profil d'un enfant, masquée (D73 S-39).$$;
+
+-- La tâche « Préparer les devoirs » est la série de source « homework_prep » (D69), reconnue par sa source et non par son titre. Une seule série active par foyer
+-- (ux_task_series_homework_prep), hebdomadaire, sans personne assignée ; ses occurrences copient la source de leur série et ne sont assignées à personne.
+ALTER TABLE family_task_series
+  ADD CONSTRAINT ck_task_series_homework_prep CHECK (source <> 'homework_prep'
+    OR (assigned_member_id IS NULL AND event_series_id IS NULL AND repeat_unit = 'week' AND repeat_interval = 1));
+ALTER TABLE family_tasks
+  ADD CONSTRAINT ck_tasks_homework_prep CHECK (source <> 'homework_prep' OR assigned_member_id IS NULL);
+
+-- Les jours de la série sont toujours les jours de devoirs du foyer : le formulaire de tâche ne les change pas (S-30)
+CREATE FUNCTION family_task_series_homework_prep_days() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  NEW.weekdays := COALESCE((SELECT st.homework_days FROM family_settings st WHERE st.account_id = NEW.account_id), ARRAY[1, 2, 4, 5]::smallint[]);
+  RETURN NEW;
+END $$;
+CREATE TRIGGER trg_family_task_series_homework_prep BEFORE INSERT OR UPDATE ON family_task_series
+  FOR EACH ROW WHEN (NEW.source = 'homework_prep') EXECUTE FUNCTION family_task_series_homework_prep_days();
+COMMENT ON FUNCTION family_task_series_homework_prep_days() IS $$Aligne les jours de la série « Préparer les devoirs » (source homework_prep) sur les jours de devoirs du foyer (family_settings.homework_days ; lundi, mardi, jeudi, vendredi sans réglage) à chaque écriture. [US-118 RF7, US-119 RF1, D71 S-30]$$;
+
+-- Un changement des jours de devoirs s'applique dès le lendemain (date locale de la famille) : la série prend les nouveaux jours, les occurrences à venir des jours décochés
+-- (à faire ou proposées) sont supprimées, et la date de création des occurrences est ramenée à aujourd'hui pour que le planificateur crée les jours ajoutés
+CREATE FUNCTION family_settings_homework_days_changed() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE v_today date;
+BEGIN
+  SELECT (now() AT TIME ZONE a.family_timezone)::date INTO v_today FROM accounts a WHERE a.id = NEW.account_id;
+  v_today := COALESCE(v_today, current_date);
+  UPDATE family_task_series s
+     SET weekdays = NEW.homework_days, materialized_until = LEAST(s.materialized_until, v_today)
+   WHERE s.account_id = NEW.account_id AND s.source = 'homework_prep' AND s.ended_at IS NULL;
+  DELETE FROM family_tasks t USING family_task_series s
+   WHERE t.series_id = s.id AND s.account_id = NEW.account_id AND s.source = 'homework_prep' AND s.ended_at IS NULL
+     AND t.status IN ('proposed', 'todo') AND t.due_date > v_today
+     AND NOT (date_part('isodow', t.due_date)::smallint = ANY (NEW.homework_days));
+  RETURN NULL;
+END $$;
+CREATE TRIGGER trg_family_settings_homework_days AFTER UPDATE OF homework_days ON family_settings
+  FOR EACH ROW WHEN (OLD.homework_days IS DISTINCT FROM NEW.homework_days) EXECUTE FUNCTION family_settings_homework_days_changed();
+COMMENT ON FUNCTION family_settings_homework_days_changed() IS $$Applique un changement des jours de devoirs à la série « Préparer les devoirs » du foyer, dès le lendemain : nouveaux jours dans la série, occurrences à venir des jours décochés supprimées (les faites et les passées restent), date de création des occurrences ramenée à aujourd'hui pour que le planificateur crée les jours ajoutés. [US-118 RF7, D71 S-30]$$;
+
+-- Lecture seule pour le profil d'un enfant (D73 S-40) : quand l'application indique le profil (app.user_id) et que c'est celui d'un enfant, aucune écriture sur les plannings,
+-- les éléments, les manuels proposés, les exercices validés ni l'âge des devoirs. Il lit ses éléments du jour par homework_child_items_for(), sans corrigé.
+CREATE FUNCTION homework_child_read_only_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF profile_is_child_linked(app_current_user_id()) THEN
+    RAISE EXCEPTION 'Le profil d''un enfant lit ses devoirs, il ne les modifie pas' USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  RETURN COALESCE(NEW, OLD);
+END $$;
+CREATE TRIGGER trg_homework_weeks_child_read_only BEFORE INSERT OR UPDATE OR DELETE ON homework_weeks
+  FOR EACH ROW EXECUTE FUNCTION homework_child_read_only_guard();
+CREATE TRIGGER trg_homework_items_child_read_only BEFORE INSERT OR UPDATE OR DELETE ON homework_week_items
+  FOR EACH ROW EXECUTE FUNCTION homework_child_read_only_guard();
+CREATE TRIGGER trg_homework_foreign_books_child_read_only BEFORE INSERT OR UPDATE OR DELETE ON homework_week_foreign_books
+  FOR EACH ROW EXECUTE FUNCTION homework_child_read_only_guard();
+CREATE TRIGGER trg_homework_validations_child_read_only BEFORE INSERT OR UPDATE OR DELETE ON homework_exercise_validations
+  FOR EACH ROW EXECUTE FUNCTION homework_child_read_only_guard();
+CREATE TRIGGER trg_homework_children_child_read_only BEFORE INSERT OR UPDATE OR DELETE ON homework_children
+  FOR EACH ROW EXECUTE FUNCTION homework_child_read_only_guard();
+COMMENT ON FUNCTION homework_child_read_only_guard() IS $$Refuse toute écriture sur les données Devoirs quand le profil indiqué par l'application (app.user_id) est celui d'un enfant : il ne coche pas ses éléments, ne déplace rien, ne change pas son âge des devoirs. Sans profil indiqué (traitements du serveur, suppressions en cascade), la règle ne joue pas. [D73 S-40]$$;
+
+-- Éléments du jour d'un enfant, sans corrigé : ce que le profil de l'enfant lit (D73 S-40). Ni le corrigé du catalogue, ni les autres jours, ni un autre enfant.
+CREATE FUNCTION homework_child_items_for(p_viewer uuid, p_day date)
+RETURNS TABLE (it_id bigint, it_day date, it_exercise_id bigint, it_activity_id bigint, it_textbook_key text, it_level homework_level, it_number integer,
+               it_theme text, it_statement text, it_activity_title text, it_activity_description text, it_activity_steps text, it_activity_materials text,
+               it_needs_adult boolean, it_custom_title bytea, it_checked_at timestamptz)
+LANGUAGE sql STABLE AS $$
+  SELECT i.id, i.day, i.exercise_id, i.activity_id, e.textbook_key, e.level, e.number, e.theme::text, e.statement,
+         a.title::text, a.description, a.steps, a.materials, a.needs_adult, i.custom_title, i.checked_at
+    FROM family_members c
+    JOIN family_settings st ON st.account_id = c.account_id AND st.homework_help_enabled
+    JOIN homework_week_items i ON i.member_id = c.id AND i.account_id = c.account_id
+    LEFT JOIN homework_exercises e ON e.id = i.exercise_id
+    LEFT JOIN homework_activities a ON a.id = i.activity_id
+   WHERE c.child_profile_user_id = p_viewer AND i.day = p_day
+$$;
+COMMENT ON FUNCTION homework_child_items_for(uuid, date) IS $$Éléments de devoirs du jour de l'enfant dont le profil est indiqué (exercices du catalogue avec leur énoncé, activités avec leurs étapes, activités libres du parent, case cochée), SANS le corrigé. Rien pour un autre profil, ni quand l'aide Devoirs est désactivée. Le jour est la date locale de la famille, passée par l'application. [US-119 RF4, D73 S-40]$$;
+
+-- ---------------------------------------------------------------------
+-- Pages d'exercices créées à partir d'une leçon (US-180) : le contenu structuré (exercices) est chiffré dans homework_exercise_pages, la fiche réponse et le barème,
+-- chiffrés aussi, dans une table à part lisible des seuls parents. Aucune photo : elle est transmise au modèle puis effacée (S-35), jamais écrite en base.
+-- ---------------------------------------------------------------------
+CREATE FUNCTION homework_question_forms_valid(p_forms homework_question_form[]) RETURNS boolean LANGUAGE sql IMMUTABLE AS $$
+  SELECT COALESCE(cardinality(p_forms) BETWEEN 1 AND 9 AND (SELECT count(DISTINCT f) FROM unnest(p_forms) f) = cardinality(p_forms), false)
+$$;
+COMMENT ON FUNCTION homework_question_forms_valid(homework_question_form[]) IS $$Vrai si la liste des formes de question d'une page est non vide et sans doublon (1 à 9 formes de la liste fermée). [US-180 RF3, D72 S-42]$$;
+
+CREATE TABLE homework_exercise_pages (
+  id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  account_id          uuid NOT NULL REFERENCES accounts (id) ON DELETE CASCADE,
+  member_id           uuid NOT NULL,
+  -- Profil qui a demandé la page : le parent, ou l'enfant lui-même par son profil ; vide si ce profil est supprimé
+  created_by_user_id  uuid REFERENCES users (id) ON DELETE SET NULL,
+  -- Thème, matière et niveau repérés par le modèle, CHIFFRÉS par l'application comme tous les textes saisis (D72)
+  theme               bytea NOT NULL CHECK (octet_length(theme) BETWEEN 1 AND 2000),
+  subject             bytea NOT NULL CHECK (octet_length(subject) BETWEEN 1 AND 1000),
+  level               bytea NOT NULL CHECK (octet_length(level) BETWEEN 1 AND 1000),
+  -- Formes de question de la page, liste fermée (QCM, vrai/faux, texte à trous…) : métadonnée sans contenu, utile aux statistiques de la console et au contrôle de la page
+  question_forms      homework_question_form[] NOT NULL CHECK (homework_question_forms_valid(question_forms)),
+  -- Les 3 exercices dans l'ordre facile, moyen, difficile, en données structurées CHIFFRÉES par l'application (énoncés seuls ; le contrôle du contenu est fait par le code, US-180 RT1)
+  exercises           bytea NOT NULL CHECK (octet_length(exercises) BETWEEN 1 AND 200000),
+  created_at          timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (id, account_id),
+  CONSTRAINT fk_homework_pages_child FOREIGN KEY (member_id, account_id)
+    REFERENCES homework_children (member_id, account_id) ON DELETE CASCADE
+);
+CREATE INDEX idx_homework_pages_member ON homework_exercise_pages (member_id, account_id, created_at DESC);
+CREATE INDEX idx_homework_pages_account ON homework_exercise_pages (account_id, created_at);
+CREATE INDEX idx_homework_pages_created ON homework_exercise_pages (created_at);
+CREATE INDEX idx_homework_pages_created_by ON homework_exercise_pages (created_by_user_id);
+COMMENT ON TABLE homework_exercise_pages IS $$Pages d'exercices créées à partir d'une leçon (3 exercices : facile, moyen, difficile), rattachées à un membre enfant suivi par l'aide Devoirs et à son foyer, avec le profil qui les a créées. Thème, matière, niveau et exercices chiffrés par l'application. Sans photo ni prénom. Lue par les parents du foyer et par l'enfant (par son profil) pour ses seules pages ; la fiche réponse est dans homework_exercise_page_answers, lue des seuls parents. Supprimée 12 mois après sa création, avec le membre, à l'effacement des progrès de Devoirs et avec le compte. Donnée de mineur, incluse dans l'export de la famille. [US-180 RF4 à RF7, RT4, RT5, D71 S-35, S-36, D72 S-42]$$;
+COMMENT ON COLUMN homework_exercise_pages.member_id IS $$Membre enfant (fiche enfant) pour qui la page est créée (il a un âge des devoirs) : la page disparaît avec son suivi Devoirs (retrait ou effacement du membre, effacement des âges). [US-180 RT4, RT5]$$;
+COMMENT ON COLUMN homework_exercise_pages.created_by_user_id IS $$Profil qui a demandé la page : un parent du foyer, ou l'enfant lui-même par son profil (contrôlé à l'écriture). Vide si ce profil est supprimé. Compte dans le plafond quotidien de ce profil. [US-180 RF10, RT4]$$;
+COMMENT ON COLUMN homework_exercise_pages.theme IS $$Thème de la leçon repéré par le modèle, chiffré par l'application, affiché dans « Exercices — [thème] » et dans le dossier des parents (« Les fractions — 10/11/2026 »). Aucune donnée personnelle : le modèle ne reçoit jamais le prénom (US-180 RT2). [US-180 RF3, RF7]$$;
+COMMENT ON COLUMN homework_exercise_pages.subject IS $$Matière repérée par le modèle (maths, français, histoire…), texte libre court, chiffré par l'application. [US-180 RF3, RT4]$$;
+COMMENT ON COLUMN homework_exercise_pages.level IS $$Niveau de la leçon repéré par le modèle (CP, CE2, CM1…), texte libre court chiffré par l'application : distinct de l'âge des devoirs de l'enfant. [US-180 RF3, RT4]$$;
+COMMENT ON COLUMN homework_exercise_pages.question_forms IS $$Formes de question utilisées par la page, dans la liste fermée homework_question_form (QCM, vrai/faux, vrai/faux avec correction, égalités à compléter, texte à trous, éléments à relier, ranger, problème, réponse rédigée), sans doublon. Posée par l'application après son contrôle de la page. [US-180 RF3, RT1, D72 S-42]$$;
+COMMENT ON COLUMN homework_exercise_pages.exercises IS $$Les 3 exercices dans l'ordre facile, moyen, difficile, en données structurées chiffrées par l'application (consigne, questions, cases, lignes d'écriture) que l'application met en forme avec la charte de MAAQ. Énoncés seuls : jamais de réponse ici. 200 000 octets au plus. [US-180 RF3, RF5, RT1, RT4]$$;
+
+CREATE TABLE homework_exercise_page_answers (
+  page_id        uuid PRIMARY KEY,
+  account_id     uuid NOT NULL,
+  -- Bonnes réponses, correction des phrases fausses, réponse type des réponses rédigées (« Toute réponse proche est acceptée »), chiffrées par l'application
+  answers        bytea NOT NULL CHECK (octet_length(answers) BETWEEN 1 AND 200000),
+  -- Barème sur 20 points (facile < moyen < difficile ; le total exact est contrôlé par le code, US-180 RT1), chiffré par l'application
+  grading_scale  bytea NOT NULL CHECK (octet_length(grading_scale) BETWEEN 1 AND 20000),
+  CONSTRAINT fk_homework_answers_page FOREIGN KEY (page_id, account_id)
+    REFERENCES homework_exercise_pages (id, account_id) ON DELETE CASCADE
+);
+CREATE INDEX idx_homework_answers_account ON homework_exercise_page_answers (account_id);
+COMMENT ON TABLE homework_exercise_page_answers IS $$Fiche réponse et barème d'une page d'exercices, « pour l'adulte qui corrige », chiffrés. Lue des seuls parents du foyer, y compris par la sécurité par ligne : l'enfant ne la voit jamais (même pour ses propres pages), il peut seulement l'écrire pour la page qu'il crée. Une page a toujours sa fiche (contrôle différé). Supprimée avec sa page. [US-180 RF4, RT4, D71 S-36]$$;
+COMMENT ON COLUMN homework_exercise_page_answers.page_id IS $$Page d'exercices à laquelle appartient la fiche (une fiche par page) : supprimée avec elle. [US-180 RT4]$$;
+COMMENT ON COLUMN homework_exercise_page_answers.answers IS $$Bonnes réponses de chaque question, correction des phrases fausses et réponse type des réponses rédigées, en données structurées chiffrées par l'application. Jamais renvoyée à un profil qui n'est pas un parent. [US-180 RF4, RT4]$$;
+COMMENT ON COLUMN homework_exercise_page_answers.grading_scale IS $$Barème sur 20 points (facile < moyen < difficile), en données structurées chiffrées par l'application. [US-180 RF4, RT1]$$;
+
+-- Droit d'un profil sur les pages d'exercices d'un foyer : « parent » (utilisateur principal et invité 1 : toutes les pages, la fiche réponse, la suppression) ou « child »
+-- (profil de l'enfant, relié à sa fiche enfant qui a un âge des devoirs, aide Devoirs activée : ses seules pages, sans la fiche réponse) ; NULL sinon.
+-- Sans membre indiqué, seul le droit de parent est possible.
+CREATE FUNCTION homework_pages_access(p_user uuid, p_account uuid, p_member uuid) RETURNS text LANGUAGE sql STABLE AS $$
+  SELECT CASE
+           WHEN u.role = 'primary_user' OR (u.role = 'guest' AND u.guest_rank = 'core') THEN 'parent'
+           WHEN u.role = 'guest' AND u.guest_rank = 'secondary' AND p_member IS NOT NULL
+                AND EXISTS (SELECT 1 FROM family_members c
+                              JOIN homework_children hc ON hc.member_id = c.id AND hc.account_id = c.account_id
+                              JOIN family_settings st ON st.account_id = c.account_id AND st.homework_help_enabled
+                             WHERE c.child_profile_user_id = u.id AND c.id = p_member AND c.account_id = u.account_id)
+           THEN 'child'
+         END
+    FROM users u
+   WHERE u.id = p_user AND u.account_id = p_account AND u.status IN ('active', 'grace_period')
+$$;
+COMMENT ON FUNCTION homework_pages_access(uuid, uuid, uuid) IS $$Droit d'un profil sur les pages d'exercices d'un foyer et d'un membre enfant : parent (utilisateur principal et invité 1), child (profil de cet enfant, relié à sa fiche enfant qui a un âge des devoirs, aide activée) ou NULL. Sert aux règles de sécurité par ligne et aux fonctions de lecture. [US-180 RF1, RF5, RF7, RT4, D71 S-34, S-36, D73]$$;
+
+-- Pages lisibles par un profil : toutes celles du foyer pour un parent, les siennes pour l'enfant (sans la fiche réponse)
+CREATE FUNCTION homework_exercise_pages_visible_to(p_viewer uuid) RETURNS SETOF homework_exercise_pages
+LANGUAGE sql STABLE AS $$
+  SELECT p.* FROM homework_exercise_pages p WHERE homework_pages_access(p_viewer, p.account_id, p.member_id) IS NOT NULL
+$$;
+COMMENT ON FUNCTION homework_exercise_pages_visible_to(uuid) IS $$Pages d'exercices lisibles par un profil : toutes celles de son foyer pour un parent, celles de l'enfant relié à son profil pour un profil d'enfant (la fiche réponse n'en fait pas partie). La limite des 30 derniers jours de « Mes exercices » est un affichage de l'application. [US-180 RF5, RF7, RT4]$$;
+
+-- Fiches réponse lisibles par un profil : celles du foyer pour un parent, aucune pour un enfant
+CREATE FUNCTION homework_exercise_answers_visible_to(p_viewer uuid) RETURNS SETOF homework_exercise_page_answers
+LANGUAGE sql STABLE AS $$
+  SELECT a.* FROM homework_exercise_page_answers a WHERE homework_pages_access(p_viewer, a.account_id, NULL) = 'parent'
+$$;
+COMMENT ON FUNCTION homework_exercise_answers_visible_to(uuid) IS $$Fiches réponse et barèmes lisibles par un profil : ceux de son foyer pour un parent (utilisateur principal et invité 1), aucun pour un profil d'enfant, y compris l'enfant à qui appartient la page. [US-180 RF4, RT4, D71 S-36]$$;
+
+-- Le profil qui crée la page est un parent du foyer, ou l'enfant lui-même (droit contrôlé à l'écriture, hors sécurité par ligne aussi)
+CREATE FUNCTION homework_page_before_insert() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF NEW.created_by_user_id IS NOT NULL AND homework_pages_access(NEW.created_by_user_id, NEW.account_id, NEW.member_id) IS NULL THEN
+    RAISE EXCEPTION 'Une page d''exercices est créée par un parent du foyer ou par l''enfant lui-même' USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NEW;
+END $$;
+CREATE TRIGGER trg_homework_pages_before_insert BEFORE INSERT ON homework_exercise_pages
+  FOR EACH ROW EXECUTE FUNCTION homework_page_before_insert();
+COMMENT ON FUNCTION homework_page_before_insert() IS $$Refuse une page d'exercices dont le profil créateur n'est ni un parent du foyer ni le profil de l'enfant concerné. [US-180 RF1, RT4]$$;
+
+-- Une page a toujours sa fiche réponse, au plus tard à la fin de la transaction. Exécutée avec les droits du propriétaire : l'enfant qui crée sa page ne peut pas lire la fiche.
+CREATE FUNCTION homework_page_needs_answers() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM homework_exercise_pages p WHERE p.id = NEW.id)
+     AND NOT EXISTS (SELECT 1 FROM homework_exercise_page_answers a WHERE a.page_id = NEW.id) THEN
+    RAISE EXCEPTION 'Une page d''exercices demande sa fiche réponse et son barème' USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NULL;
+END $$;
+CREATE CONSTRAINT TRIGGER trg_homework_pages_needs_answers AFTER INSERT ON homework_exercise_pages
+  DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION homework_page_needs_answers();
+COMMENT ON FUNCTION homework_page_needs_answers() IS $$Contrôle différé : une page d'exercices créée a sa fiche réponse et son barème à la fin de la transaction. Exécutée avec les droits du propriétaire (l'enfant qui crée sa page ne lit pas la fiche). [US-180 RT1, RT4]$$;
+
+-- Sécurité par ligne (activée, non forcée ; variable de session app.user_id) : le parent lit tout et supprime ; l'enfant lit ses seules pages et en crée pour lui ;
+-- la fiche réponse est lue et supprimée par les parents seuls, écrite par un parent ou par le profil qui crée la page
+ALTER TABLE homework_exercise_pages ENABLE ROW LEVEL SECURITY;
+CREATE POLICY homework_pages_read ON homework_exercise_pages FOR SELECT
+  USING (homework_pages_access((SELECT app_current_user_id()), account_id, member_id) IS NOT NULL);
+CREATE POLICY homework_pages_insert ON homework_exercise_pages FOR INSERT
+  WITH CHECK (created_by_user_id = (SELECT app_current_user_id())
+              AND homework_pages_access((SELECT app_current_user_id()), account_id, member_id) IS NOT NULL);
+CREATE POLICY homework_pages_delete ON homework_exercise_pages FOR DELETE
+  USING (homework_pages_access((SELECT app_current_user_id()), account_id, member_id) = 'parent');
+ALTER TABLE homework_exercise_page_answers ENABLE ROW LEVEL SECURITY;
+CREATE POLICY homework_answers_read ON homework_exercise_page_answers FOR SELECT
+  USING (homework_pages_access((SELECT app_current_user_id()), account_id, NULL) = 'parent');
+CREATE POLICY homework_answers_insert ON homework_exercise_page_answers FOR INSERT
+  WITH CHECK (homework_pages_access((SELECT app_current_user_id()), account_id, NULL) = 'parent'
+              OR EXISTS (SELECT 1 FROM homework_exercise_pages p
+                          WHERE p.id = homework_exercise_page_answers.page_id AND p.account_id = homework_exercise_page_answers.account_id
+                            AND p.created_by_user_id = (SELECT app_current_user_id())));
+CREATE POLICY homework_answers_delete ON homework_exercise_page_answers FOR DELETE
+  USING (homework_pages_access((SELECT app_current_user_id()), account_id, NULL) = 'parent');
 
 -- Graines : catalogue des thèmes de sorties (US-114 RF2) et manuels de maths (US-119 RF7). Les exercices et les activités sont chargés par l'équipe.
 INSERT INTO outing_themes (category, theme_key, label, sort_order) VALUES
@@ -5044,7 +5372,8 @@ INSERT INTO platform_settings (setting_key, value_type, value_text, min_value, m
   ('outing_proposal_retention_days', 'integer', '30', 1, NULL, $$Conservation d'une proposition de sorties après son jour visé, en jours (US-115 RF7)$$),
   ('outing_offer_memory_days',       'integer', '90', 1, NULL, $$Durée pendant laquelle une offre déjà proposée n'est pas reproposée au même parent, en jours (US-115 RF8)$$),
   ('homework_week_retention_months', 'integer', '12', 1, NULL, $$Conservation d'une semaine de devoirs et de ses éléments après la semaine, en mois (US-119 RT5, D65)$$),
-  ('homework_validation_grace_days', 'integer', '30', 1, NULL, $$Délai de grâce des exercices validés après la désactivation de l'aide Devoirs, en jours : une réactivation pendant ce délai les retrouve (US-119 RT5, D65)$$);
+  ('homework_validation_grace_days', 'integer', '30', 1, NULL, $$Délai de grâce des exercices validés après la désactivation de l'aide Devoirs, en jours : une réactivation pendant ce délai les retrouve (US-119 RT5, D65)$$),
+  ('homework_page_retention_months', 'integer', '12', 1, NULL, $$Conservation d'une page d'exercices créée à partir d'une leçon (avec sa fiche réponse), en mois après sa création (US-180 RT5, D71 S-35, avis du DPO à venir)$$);
 
 -- =====================================================================
 -- 8 sexies. CONTRATS V2 — LOT 11 : catégories à champs de documents, contrats de base et complémentaires, documents chiffrés, anonymisation,

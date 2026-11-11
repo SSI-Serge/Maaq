@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { useState } from "react";
 import { useApiMutation } from "@/client/hooks";
 import { Button, Notice, RetryNotice } from "@/components/ui";
@@ -77,7 +79,7 @@ interface Props {
   onCancel: () => void;
   /** La tâche a été annulée (« Annuler la tâche »). */
   onRemoved?: (cancelled: number) => void;
-  /** Tâche hebdomadaire de préparation des devoirs (D69) : elle revient chaque semaine (le jour reste modifiable) et porte le repère de l'aide Devoirs. */
+  /** Tâche du foyer « Préparer les devoirs » (D69, D71) : titre fixe, personne d'assigné, les jours de devoirs du foyer (non modifiables ici) ; seule l'heure se change. */
   homeworkPrep?: boolean;
 }
 
@@ -86,7 +88,7 @@ interface Props {
  * Une tâche récurrente se modifie ou s'annule pour une portée choisie (RF5). Le serveur refuse une version périmée.
  */
 export function TaskForm({ task, initial, assignable, onSaved, onCancel, onRemoved, homeworkPrep }: Props) {
-  // Tâche hebdomadaire des devoirs (D69) : titre fixe en lecture seule, un seul jour par semaine ; le jour, l'heure et la personne restent modifiables.
+  // Tâche des devoirs (D69, D71) : titre fixe en lecture seule, tâche du foyer sans personne assignée, jours venus du réglage « Jours de devoirs ».
   const prepTask = Boolean(homeworkPrep || task?.isHomeworkPrep);
   const start = task ? { title: task.title, note: task.note, due: task.due, dueTime: task.dueTime, assigneeId: task.assignee?.id ?? null, repetition: null } : (initial ?? { title: "", due: todayLocal() });
   const [title, setTitle] = useState(start.title);
@@ -112,7 +114,7 @@ export function TaskForm({ task, initial, assignable, onSaved, onCancel, onRemov
 
   async function submit() {
     if (invalid) return;
-    const fields = { title: prepTask ? HOMEWORK_PREP_TITLE : title.trim(), note: note.trim() || null, due, dueTime: dueTime || null, assigneeId };
+    const fields = { title: prepTask ? HOMEWORK_PREP_TITLE : title.trim(), note: note.trim() || null, due, dueTime: dueTime || null, assigneeId: prepTask ? null : assigneeId };
     const result = task
       ? await save.run<{ task: TaskView }>(`/api/family/tasks/${task.id}`, { method: "PATCH", body: { version: task.version, ...(recurringEdit ? { scope } : {}), ...fields } })
       : await save.run<{ task: TaskView }>("/api/family/tasks", {
@@ -155,7 +157,8 @@ export function TaskForm({ task, initial, assignable, onSaved, onCancel, onRemov
 
       {homeworkPrep && (
         <Notice tone="info">
-          Tâche de l&apos;aide Devoirs : elle portera le lien « Préparer les devoirs de la semaine ». Le jour, l&apos;heure et la personne restent modifiables. Une seule tâche de ce type par foyer.
+          Tâche de l&apos;aide Devoirs : une seule par foyer, visible par les deux parents et par les enfants qui ont un profil. Elle ouvre « Préparer les devoirs », le planning du jour et le dossier « Exercices ». Vous pouvez
+          changer l&apos;heure avant d&apos;enregistrer.
         </Notice>
       )}
 
@@ -168,9 +171,18 @@ export function TaskForm({ task, initial, assignable, onSaved, onCancel, onRemov
         </Field>
       </div>
 
-      <Field label="Assignée à">
-        <AssigneePicker members={assignable} value={assigneeId} onChange={setAssigneeId} disabled={save.pending} />
-      </Field>
+      {prepTask ? (
+        <div className={styles.field}>
+          <span className={styles.label}>Assignée à</span>
+          <span>
+            Personne <span className={styles.hint}>· c&apos;est une tâche du foyer.</span>
+          </span>
+        </div>
+      ) : (
+        <Field label="Assignée à">
+          <AssigneePicker members={assignable} value={assigneeId} onChange={setAssigneeId} disabled={save.pending} />
+        </Field>
+      )}
 
       {!task && (
         <fieldset className={styles.field} disabled={save.pending}>
@@ -184,15 +196,29 @@ export function TaskForm({ task, initial, assignable, onSaved, onCancel, onRemov
               ))}
             </select>
           )}
-          {homeworkPrep && <span className={styles.hint}>Chaque semaine.</span>}
+          {homeworkPrep && <span>Les jours de devoirs du foyer</span>}
           {(frequency === "weekly" || frequency === "biweekly") && (
             <div className={styles.members} role="group" aria-label="Jours de la semaine">
               {WEEKDAYS.map((w) => (
-                <button key={w.value} type="button" className={styles.chipToggle} aria-pressed={weekdays.includes(w.value)} aria-label={w.name} onClick={() => setWeekdays((cur) => (homeworkPrep ? [w.value] : cur.includes(w.value) ? cur.filter((x) => x !== w.value) : [...cur, w.value]))}>
+                <button
+                  key={w.value}
+                  type="button"
+                  className={styles.chipToggle}
+                  aria-pressed={weekdays.includes(w.value)}
+                  aria-disabled={homeworkPrep || undefined}
+                  aria-label={w.name}
+                  onClick={() => !homeworkPrep && setWeekdays((cur) => (cur.includes(w.value) ? cur.filter((x) => x !== w.value) : [...cur, w.value]))}
+                >
                   {w.label}
                 </button>
               ))}
-              <span className={styles.hint}>{homeworkPrep ? "Un seul jour par semaine." : "Sans jour choisi, le jour de la première échéance."}</span>
+              {homeworkPrep ? (
+                <span className={styles.hint}>
+                  Les jours viennent du réglage « Jours de devoirs », le même pour tout le foyer. Pour les changer : <Link href="/assistant/reglages">Réglages › Aide Devoirs</Link>.
+                </span>
+              ) : (
+                <span className={styles.hint}>Sans jour choisi, le jour de la première échéance.</span>
+              )}
             </div>
           )}
           {repeating && (

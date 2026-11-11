@@ -9,6 +9,15 @@ import type { HomeworkSetting } from "@/server/assistant/homework/settings";
 import styles from "./family.module.css";
 
 const AGES = [6, 7, 8, 9, 10, 11, 12];
+const DAYS = [
+  { value: 1, label: "L", name: "lundi" },
+  { value: 2, label: "M", name: "mardi" },
+  { value: 3, label: "Me", name: "mercredi" },
+  { value: 4, label: "J", name: "jeudi" },
+  { value: 5, label: "V", name: "vendredi" },
+  { value: 6, label: "S", name: "samedi" },
+  { value: 7, label: "D", name: "dimanche" },
+];
 
 /**
  * Carte « Aide Devoirs » des réglages familiaux (US-118) : un interrupteur commun au foyer, modifiable par les deux parents, lisible par les autres profils ;
@@ -23,7 +32,20 @@ export function HomeworkSettings() {
   const [intro, setIntro] = useState(false);
   const [erasing, setErasing] = useState(false);
   const [erased, setErased] = useState(false);
+  const [lastDay, setLastDay] = useState(false);
   const setting = override ?? query.data?.setting ?? null;
+
+  /** Jours de devoirs (US-118 RF7) : au moins un jour reste coché, sinon la case ne bouge pas et le message s'affiche. */
+  function toggleDay(day: number) {
+    if (!setting) return;
+    const on = setting.days.includes(day);
+    if (on && setting.days.length === 1) {
+      setLastDay(true);
+      return;
+    }
+    setLastDay(false);
+    void patch("days", "/api/family/homework", { days: on ? setting.days.filter((d) => d !== day) : [...setting.days, day] });
+  }
 
   async function patch(key: string, url: string, body: Record<string, unknown>) {
     setPending(key);
@@ -115,20 +137,36 @@ export function HomeworkSettings() {
                 ))}
               </select>
               {child.levelLabel ? <span className={styles.hint}>Maths : {child.levelLabel}</span> : <span className={styles.hint}>Sans âge des devoirs, {child.firstName} n&apos;est pas proposé dans l&apos;aide.</span>}
+              {child.hasProfile && <span className={styles.hint}>{child.firstName} a un profil</span>}
             </div>
           ))}
+
+          <div className={styles.label}>Jours de devoirs</div>
+          <div className={styles.members} role="group" aria-label="Jours de devoirs">
+            {DAYS.map((d) => (
+              <button key={d.value} type="button" aria-pressed={setting.days.includes(d.value)} aria-label={d.name} className={styles.chipToggle} disabled={!setting.canEdit || pending !== null} onClick={() => toggleDay(d.value)}>
+                {d.label}
+              </button>
+            ))}
+          </div>
+          {lastDay && (
+            <span className={styles.fieldError} role="alert">
+              Gardez au moins un jour de devoirs.
+            </span>
+          )}
+          <p className={styles.hint}>La tâche « Préparer les devoirs » revient ces jours-là, pour tout le foyer.</p>
 
           {setting.enabled &&
             (setting.weeklyTask ? (
               <p className={styles.hint}>
-                ✓ Tâche « Préparer les devoirs de la semaine » {setting.weeklyTask.label}. <Link href="/assistant/taches">Voir les tâches</Link>
+                ✓ Tâche « Préparer les devoirs », {setting.weeklyTask.label}. <Link href="/assistant/taches">Voir les tâches ›</Link>
               </p>
             ) : (
               setting.canEdit && (
                 <Link href="/assistant/taches/nouvelle?modele=preparation_devoirs" className={styles.linkRow}>
                   <span>
-                    Créer une tâche de préparation hebdo des devoirs
-                    <span className={styles.linkRowSub}>Un rappel chaque dimanche à 18 h, avec le lien pour préparer la semaine</span>
+                    Créer la tâche des devoirs
+                    <span className={styles.linkRowSub}>« Préparer les devoirs », les jours de devoirs à 17 h, pour tout le foyer.</span>
                   </span>
                   <span aria-hidden>›</span>
                 </Link>

@@ -7,7 +7,7 @@ import { requireParent } from "../family";
 import { addDays } from "../series";
 import { taskViewer, type TaskViewer } from "../tasks";
 import { ACTIVITY_CATEGORIES, cardUrl, categoryLabel, LEVEL_LABEL, splitSteps } from "./catalog";
-import { homeworkEnabled, levelForAge } from "./settings";
+import { homeworkDaysOf, homeworkEnabled, levelForAge } from "./settings";
 
 /**
  * Semaines de devoirs (US-119). Les règles de progression et la construction de la semaine sont appliquées ici, par le code, et non par le modèle (RT3) ;
@@ -40,6 +40,11 @@ export const mondayOf = (day: string): string => addDays(day, 1 - isoWeekday(day
 export function upcomingMondays(today: string, count = 5): string[] {
   const first = mondayOf(today);
   return Array.from({ length: count }, (_, i) => addDays(first, 7 * i));
+}
+
+/** Jours d'une semaine qui ne sont pas déjà passés : tous pour une semaine à venir, aujourd'hui et les suivants pour la semaine en cours (US-119 RF11). */
+export function remainingDays(weekStart: string, days: number[], today: string): number[] {
+  return days.filter((d) => addDays(weekStart, d - 1) >= today);
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------
@@ -318,38 +323,6 @@ async function insertItems(trx: Db, accountId: string, weekId: string, planned: 
   }
 }
 
-const itemsLabel = (n: number) => `${n} ${n > 1 ? "éléments" : "élément"}`;
-
-/** Une tâche « Devoirs — [prénom] (N éléments) » par enfant et par jour de travail ayant des éléments, assignée à l'enfant et liée à la semaine (RF4). */
-export async function syncHomeworkTasks(trx: Db, accountId: string, weekId: string, createdBy: string | null): Promise<void> {
-  const groups = await trx
-    .selectFrom("homework_week_items as i")
-    .innerJoin("family_members as m", "m.id", "i.member_id")
-    .select(["i.member_id", sql<string>`i.day::text`.as("day"), "m.first_name", sql<number>`count(*)::int`.as("n")])
-    .where("i.week_id", "=", weekId)
-    .groupBy(["i.member_id", "i.day", "m.first_name"])
-    .execute();
-  const tasks = await trx.selectFrom("family_tasks").select(["id", "assigned_member_id", sql<string>`due_date::text`.as("due"), "status", "title"]).where("homework_week_id", "=", weekId).execute();
-  const taskOf = new Map(tasks.map((t) => [`${t.assigned_member_id}|${t.due}`, t]));
-  const wanted = new Set<string>();
-  for (const g of groups) {
-    const key = `${g.member_id}|${g.day}`;
-    wanted.add(key);
-    const title = `Devoirs — ${g.first_name ?? "Enfant"} (${itemsLabel(g.n)})`;
-    const task = taskOf.get(key);
-    if (!task) {
-      await trx
-        .insertInto("family_tasks")
-        .values({ account_id: accountId, title: seal(title), status: "todo", due_date: g.day, assigned_member_id: g.member_id, created_by_user_id: createdBy, source: "homework", homework_week_id: weekId })
-        .execute();
-    } else if (open(task.title) !== title) {
-      await trx.updateTable("family_tasks").set({ title: seal(title) }).where("id", "=", task.id).execute();
-    }
-  }
-  // Un jour sans élément n'a plus de tâche, sauf si elle est déjà faite (on ne retire pas ce qui a été coché).
-  for (const t of tasks) if (!wanted.has(`${t.assigned_member_id}|${t.due}`) && t.status !== "done") await trx.deleteFrom("family_tasks").where("id", "=", t.id).execute();
-}
-
 function translate(error: unknown): unknown {
   const code = (error as { code?: string }).code;
   if (code === "23505") return fail("week_exists", "Une semaine de devoirs est déjà préparée pour cette semaine.", 409);
@@ -361,12 +334,19 @@ export interface PreparedWeek {
   weekId: string;
 }
 
-/** Enregistre la semaine choisie : semaine, manuels étrangers proposés, éléments et tâches, en une seule transaction (RF10 : rien d'enregistré en cas d'échec). */
+/**
+ * Enregistre la semaine choisie : semaine, manuels étrangers proposés et éléments, en une seule transaction (RF10 : rien d'enregistré en cas d'échec). Elle ne crée plus de tâche
+ * « Devoirs — [prénom] » par enfant et par jour (D71 S-33) : le planning du jour s'ouvre depuis la tâche « Préparer les devoirs ». Les tâches de ce type déjà créées restent.
+ * Préparer la semaine en cours ne touche pas aux jours déjà passés (RF11) : seuls aujourd'hui et les jours suivants sont des jours de travail.
+ */
 export async function prepareWeek(ctx: Ctx, session: SessionContext, input: WeekInput): Promise<PreparedWeek> {
   const v = await viewerOf(ctx, session);
   if (!isDay(input.weekStart) || isoWeekday(input.weekStart) !== 1) throw fail("invalid_week", "Choisissez un lundi pour la semaine de devoirs.");
   if (input.weekStart < mondayOf(v.today)) throw fail("past_week", "Cette semaine est passée : choisissez la semaine en cours ou une suivante.");
   if (!validDays(input.workDays)) throw fail("invalid_days", "Choisissez au moins un jour de travail.");
+  const workDays = remainingDays(input.weekStart, input.workDays, v.today);
+  if (!workDays.length) throw fail("no_day_left", "Les jours choisis sont déjà passés : choisissez un jour à venir, ou une autre semaine.");
+  input = { ...input, workDays };
   if (!input.children.length) throw fail("no_child", "Choisissez au moins un enfant.");
   if (new Set(input.children.map((c) => c.memberId)).size !== input.children.length) throw fail("duplicate_child", "Un enfant ne figure qu'une fois dans la semaine.");
   const existing = await ctx.db.selectFrom("homework_weeks").select("id").where("account_id", "=", v.accountId).where(sql<boolean>`week_start = ${input.weekStart}::date`).executeTakeFirst();
@@ -389,7 +369,6 @@ export async function prepareWeek(ctx: Ctx, session: SessionContext, input: Week
         for (const book of p.foreign) await trx.insertInto("homework_week_foreign_books").values({ week_id: week.id, account_id: v.accountId, member_id: p.memberId, textbook_key: book }).execute();
         await insertItems(trx, v.accountId, week.id, p.items);
       }
-      await syncHomeworkTasks(trx, v.accountId, week.id, v.userId);
       return week.id;
     });
     return { weekId };
@@ -506,7 +485,7 @@ export interface WeekSummary {
 }
 
 /** Semaines préparées, les plus récentes d'abord (écran « Semaines de devoirs »). */
-export async function listWeeks(ctx: Ctx, session: SessionContext): Promise<{ weeks: WeekSummary[]; today: string; mondays: { weekStart: string; prepared: boolean }[] }> {
+export async function listWeeks(ctx: Ctx, session: SessionContext): Promise<{ weeks: WeekSummary[]; today: string; mondays: { weekStart: string; prepared: boolean; weekId: string | null }[] }> {
   const v = await taskViewer(ctx, session);
   if (!v.parent) throw fail("forbidden", "Seuls les parents du foyer ont accès aux semaines de devoirs.", 403);
   const rows = await ctx.db.selectFrom("homework_weeks").select(["id", sql<string>`week_start::text`.as("start")]).where("account_id", "=", v.accountId).orderBy("week_start", "desc").limit(60).execute();
@@ -517,8 +496,8 @@ export async function listWeeks(ctx: Ctx, session: SessionContext): Promise<{ we
     const mine = items.filter((i) => i.week_id === r.id);
     return { id: r.id, weekStart: r.start, weekEnd: addDays(r.start, 6), children: mine.map((i) => i.first_name ?? "").sort(), items: mine.reduce((sum, i) => sum + i.n, 0) };
   });
-  const prepared = new Set(rows.map((r) => r.start));
-  return { weeks, today: v.today, mondays: upcomingMondays(v.today).map((weekStart) => ({ weekStart, prepared: prepared.has(weekStart) })) };
+  const prepared = new Map(rows.map((r) => [r.start, r.id]));
+  return { weeks, today: v.today, mondays: upcomingMondays(v.today).map((weekStart) => ({ weekStart, prepared: prepared.has(weekStart), weekId: prepared.get(weekStart) ?? null })) };
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------
@@ -556,7 +535,6 @@ export async function moveItem(ctx: Ctx, session: SessionContext, itemId: string
       const item = await lockItem(trx, v.accountId, itemId);
       if (!Number.isInteger(day) || !item.work_days.includes(day)) throw fail("invalid_day", "Choisissez un jour de travail de la semaine.");
       await trx.updateTable("homework_week_items").set({ day: addDays(item.week_start, day - 1) }).where("id", "=", itemId).execute();
-      await syncHomeworkTasks(trx, v.accountId, item.week_id, v.userId);
     });
   } catch (error) {
     throw translateItem(error);
@@ -566,9 +544,8 @@ export async function moveItem(ctx: Ctx, session: SessionContext, itemId: string
 export async function removeItem(ctx: Ctx, session: SessionContext, itemId: string): Promise<void> {
   const v = await viewerOf(ctx, session);
   await ctx.db.transaction().execute(async (trx) => {
-    const item = await lockItem(trx, v.accountId, itemId);
+    await lockItem(trx, v.accountId, itemId);
     await trx.deleteFrom("homework_week_items").where("id", "=", itemId).execute();
-    await syncHomeworkTasks(trx, v.accountId, item.week_id, v.userId);
   });
 }
 
@@ -583,7 +560,6 @@ export async function addItem(ctx: Ctx, session: SessionContext, weekId: string,
       const already = new Set((await trx.selectFrom("homework_week_foreign_books").select("textbook_key").where("week_id", "=", week.id).where("member_id", "=", memberId).execute()).map((b) => b.textbook_key));
       for (const book of foreign) if (!already.has(book)) await trx.insertInto("homework_week_foreign_books").values({ week_id: week.id, account_id: v.accountId, member_id: memberId, textbook_key: book }).execute();
       await insertItems(trx, v.accountId, week.id, items);
-      await syncHomeworkTasks(trx, v.accountId, week.id, v.userId);
     });
   } catch (error) {
     throw translateItem(error);
@@ -595,6 +571,125 @@ function translateItem(error: unknown): unknown {
   if (code === "23505") return fail("duplicate_item", "Cet élément est déjà prévu ce jour-là.", 409);
   if (code === "23514") return fail("invalid_choice", (error as Error).message, 422);
   return error;
+}
+
+// ---------------------------------------------------------------------------------------------------------------------------
+// Planning du jour, ouvert depuis la tâche « Préparer les devoirs » (US-119 RF1, D71 S-31, D73 S-40)
+// ---------------------------------------------------------------------------------------------------------------------------
+
+export interface TodayItem {
+  /** « Ex 21 à 23 · fractions », le titre d'une activité, ou l'activité du parent. */
+  title: string;
+  /** « Maths · manuel France », « Nature · avec un adulte »… */
+  sub: string;
+  domain: WeekDomain;
+  /** Pour l'enfant, des mots plus simples : « Exercices 21 à 23 » puis le thème. */
+  childTitle: string;
+  childSub: string;
+}
+
+export interface TodayChild {
+  memberId: string;
+  firstName: string;
+  homeworkAge: number;
+  levelLabel: string;
+  hasProfile: boolean;
+  /** Semaine de devoirs en cours, si elle est préparée : « Voir la semaine de [prénom] ». */
+  weekId: string | null;
+  items: TodayItem[];
+}
+
+export type HomeworkToday =
+  | { role: "parent"; today: string; days: number[]; children: TodayChild[] }
+  | { role: "child"; today: string; firstName: string; items: TodayItem[] };
+
+interface DayRow {
+  textbook: string | null;
+  number: number | null;
+  theme: string | null;
+  activityTitle: string | null;
+  category: HomeworkActivityCategory | null;
+  needsAdult: boolean;
+  custom: Buffer | null;
+}
+
+/** Les éléments d'un jour, lisibles : les exercices qui se suivent dans un même manuel forment une seule ligne. */
+function todayItems(rows: DayRow[], labels: Map<string, string>): TodayItem[] {
+  const out: TodayItem[] = [];
+  const exercises = rows.filter((r) => r.number !== null && r.textbook).sort((a, b) => a.textbook!.localeCompare(b.textbook!) || a.number! - b.number!);
+  for (let i = 0; i < exercises.length; ) {
+    let j = i;
+    while (j + 1 < exercises.length && exercises[j + 1].textbook === exercises[i].textbook && exercises[j + 1].number === exercises[j].number! + 1) j += 1;
+    const run = exercises.slice(i, j + 1);
+    const themes = [...new Set(run.map((r) => (r.theme ?? "").trim()).filter(Boolean))].join(" ; ");
+    const range = run.length > 1 ? `${run[0].number} à ${run[run.length - 1].number}` : `${run[0].number}`;
+    out.push({
+      title: `Ex ${range}${themes ? ` · ${themes}` : ""}`, sub: `Maths · ${labels.get(run[0].textbook!) ?? run[0].textbook}`, domain: "maths",
+      childTitle: run.length > 1 ? `Exercices ${range}` : `Exercice ${range}`, childSub: themes || "Maths",
+    });
+    i = j + 1;
+  }
+  for (const r of rows) {
+    if (r.number !== null && r.textbook) continue;
+    if (r.activityTitle) {
+      const category = r.category ? categoryLabel(r.category) : "Activité";
+      out.push({
+        title: r.activityTitle, sub: `${category}${r.needsAdult ? " · avec un adulte" : ""}`, domain: r.category ? DOMAIN_OF_CATEGORY[r.category] : "perso",
+        childTitle: r.activityTitle, childSub: r.needsAdult ? "Avec un adulte" : category,
+      });
+    } else if (r.custom) {
+      const title = open(r.custom);
+      out.push({ title, sub: "Activité du parent", domain: "perso", childTitle: title, childSub: "Activité" });
+    }
+  }
+  return out;
+}
+
+/**
+ * Ce que montre la tâche « Préparer les devoirs ». Pour un parent : le planning du jour de chaque enfant qui a un âge des devoirs. Pour le profil d'un enfant : son seul
+ * planning du jour, en lecture seule et sans corrigé (la base ne lui rend que ses éléments, `homework_child_items_for`). Tout autre profil est refusé, comme quand l'aide est désactivée.
+ */
+export async function homeworkToday(ctx: Ctx, session: SessionContext): Promise<HomeworkToday> {
+  const v = await taskViewer(ctx, session);
+  if (!v.parent && !v.child) throw fail("forbidden", "Les devoirs sont réservés aux parents du foyer et aux enfants qui ont un profil.", 403);
+  if (!(await homeworkEnabled(ctx, v.accountId))) throw fail("homework_disabled", "L'aide Devoirs n'est pas activée pour la famille.", 409);
+  const labels = new Map((await ctx.db.selectFrom("homework_textbooks").select(["textbook_key", "label"]).execute()).map((b) => [b.textbook_key, b.label]));
+  if (!v.parent) {
+    const child = await ctx.db
+      .selectFrom("family_members as m")
+      .innerJoin("homework_children as h", "h.member_id", "m.id")
+      .select(["m.id", "m.first_name"])
+      .where("m.child_profile_user_id", "=", v.userId)
+      .where("m.account_id", "=", v.accountId)
+      .executeTakeFirst();
+    if (!child) throw fail("forbidden", "Les devoirs sont réservés aux parents du foyer et aux enfants qui ont un profil.", 403);
+    const { rows } = await sql<{ it_textbook_key: string | null; it_number: number | null; it_theme: string | null; it_activity_title: string | null; it_needs_adult: boolean | null; it_custom_title: Buffer | null }>`
+      select it_textbook_key, it_number, it_theme, it_activity_title, it_needs_adult, it_custom_title from homework_child_items_for(${v.userId}::uuid, ${v.today}::date) order by it_id`.execute(ctx.db);
+    const items = todayItems(rows.map((r) => ({ textbook: r.it_textbook_key, number: r.it_number, theme: r.it_theme, activityTitle: r.it_activity_title, category: null, needsAdult: Boolean(r.it_needs_adult), custom: r.it_custom_title })), labels);
+    return { role: "child", today: v.today, firstName: child.first_name ?? "", items };
+  }
+  const kids = await loadChildren(ctx.db, v.accountId);
+  const profiles = new Set((await ctx.db.selectFrom("family_members").select("id").where("account_id", "=", v.accountId).where("child_profile_user_id", "is not", null).execute()).map((m) => m.id));
+  const week = await ctx.db.selectFrom("homework_weeks").select("id").where("account_id", "=", v.accountId).where(sql<boolean>`week_start = ${mondayOf(v.today)}::date`).executeTakeFirst();
+  const rows = await ctx.db
+    .selectFrom("homework_week_items as i")
+    .leftJoin("homework_exercises as e", "e.id", "i.exercise_id")
+    .leftJoin("homework_activities as a", "a.id", "i.activity_id")
+    .select(["i.member_id", "i.custom_title", "e.textbook_key", "e.number", "e.theme", "a.title as activity_title", "a.category", "a.needs_adult"])
+    .where("i.account_id", "=", v.accountId)
+    .where(sql<boolean>`i.day = ${v.today}::date`)
+    .orderBy("i.id")
+    .execute();
+  return {
+    role: "parent", today: v.today, days: await homeworkDaysOf(ctx.db, v.accountId),
+    children: kids.map((k) => ({
+      memberId: k.memberId, firstName: k.firstName, homeworkAge: k.age, levelLabel: LEVEL_LABEL[k.level], hasProfile: profiles.has(k.memberId), weekId: week?.id ?? null,
+      items: todayItems(
+        rows.filter((r) => r.member_id === k.memberId).map((r) => ({ textbook: r.textbook_key, number: r.number, theme: r.theme, activityTitle: r.activity_title, category: r.category, needsAdult: Boolean(r.needs_adult), custom: r.custom_title })),
+        labels,
+      ),
+    })),
+  };
 }
 
 export { ACTIVITY_CATEGORIES };

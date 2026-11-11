@@ -11,7 +11,7 @@ import styles from "./family.module.css";
 
 /** Écran « Devoirs » : les semaines préparées et les semaines à venir à préparer (US-119 RF9). Réservé aux parents, aide activée. */
 export function HomeworkListScreen() {
-  const list = useApiQuery<{ weeks: WeekSummary[]; today: string; mondays: { weekStart: string; prepared: boolean }[] }>("/api/family/homework/weeks");
+  const list = useApiQuery<{ weeks: WeekSummary[]; today: string; mondays: { weekStart: string; prepared: boolean; weekId: string | null }[] }>("/api/family/homework/weeks");
   const setting = useApiQuery<{ setting: HomeworkSetting }>("/api/family/homework");
   const data = list.data;
   const enabled = setting.data?.setting.enabled;
@@ -30,10 +30,10 @@ export function HomeworkListScreen() {
             <p className={styles.hint}>L&apos;aide vous propose des exercices de maths et des activités pour chaque enfant ; vous choisissez tout.</p>
             <div className={styles.taskList}>
               {data.mondays.map((m) => (
-                <Link key={m.weekStart} href={`/assistant/devoirs/preparer?semaine=${m.weekStart}`} className={styles.linkRow} aria-disabled={m.prepared} style={m.prepared ? { opacity: 0.55, pointerEvents: "none" } : undefined}>
+                <Link key={m.weekStart} href={m.prepared && m.weekId ? `/assistant/devoirs/${m.weekId}` : `/assistant/devoirs/preparer?semaine=${m.weekStart}`} className={styles.linkRow}>
                   <span>
                     Semaine du {shortDate(m.weekStart)}
-                    <span className={styles.linkRowSub}>{m.prepared ? "Déjà préparée" : "Préparer les devoirs de la semaine"}</span>
+                    <span className={styles.linkRowSub}>{m.prepared ? "Déjà préparée · l'ouvrir pour la modifier" : "Préparer les devoirs"}</span>
                   </span>
                   <span aria-hidden>›</span>
                 </Link>

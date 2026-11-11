@@ -109,7 +109,7 @@ async function previousEventOrigin(db: Db, userId: string, e: CalendarEvent): Pr
     select o.id, o.location_point from family_events o
      where o.account_id = ${e.accountId}::uuid and o.id <> ${e.id}::uuid and o.status = 'confirmed' and o.location_point is not null and not o.all_day
        and o.ends_at <= ${e.startsAt} and o.ends_at > ${new Date(e.startsAt.getTime() - PREVIOUS_EVENT_MS)}
-       and (o.whole_family or exists (select 1 from family_event_members m join family_members fm on fm.id = m.member_id where m.event_id = o.id and fm.user_id = ${userId}::uuid))
+       and ((o.whole_family and not profile_is_child_linked(${userId}::uuid)) or exists (select 1 from family_event_members m where m.event_id = o.id and m.member_id = family_member_of_profile(${userId}::uuid)))
      order by o.ends_at desc limit 1`.execute(db);
   const point = pointOf(rows[0]?.location_point ?? null);
   return point ? { kind: "previous_event", point, eventId: rows[0].id } : null;
@@ -203,8 +203,9 @@ export async function setTracking(ctx: Ctx, session: SessionContext, eventId: st
     if (known) throw fail(GUARD_MESSAGES[known], known + ".", 422);
     throw error;
   }
-  const member = await ctx.db.selectFrom("family_members").select("id").where("user_id", "=", userId).executeTakeFirst();
-  return (await travelView(ctx.db, userId, member?.id ?? null, e, ctx.now, provider))!;
+  // Membre du profil : sa fiche, ou la fiche enfant pour le profil d'un enfant (D73)
+  const { rows: own } = await sql<{ id: string | null }>`select family_member_of_profile(${userId}::uuid) as id`.execute(ctx.db);
+  return (await travelView(ctx.db, userId, own[0]?.id ?? null, e, ctx.now, provider))!;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------

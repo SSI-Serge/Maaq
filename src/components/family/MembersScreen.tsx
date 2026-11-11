@@ -5,7 +5,7 @@ import { useApiMutation, useApiQuery } from "@/client/hooks";
 import type { MutationState } from "@/client/hooks";
 import { AppShell, appStyles as s } from "@/components/app/AppShell";
 import { Button, Loading, Notice, RetryNotice } from "@/components/ui";
-import type { FamilyMemberView, FamilyOverview } from "@/server/assistant/family";
+import type { ChildProfileOption, FamilyMemberView, FamilyOverview } from "@/server/assistant/family";
 import { birthLabel, todayLocal } from "./format";
 import { FALLBACK_COLOR } from "./parts";
 import styles from "./family.module.css";
@@ -64,13 +64,15 @@ const Bin = () => (
 );
 
 /** Prénom et mois de naissance : le formulaire de l'ajout et de la modification (mêmes contrôles, US-93 RF2). */
-function MemberForm({ title, member, submitLabel, pendingLabel, hint, onSubmit, onCancel, mutation }: {
+function MemberForm({ title, member, submitLabel, pendingLabel, hint, onSubmit, onCancel, mutation, profiles }: {
   title: string;
   member?: FamilyMemberView;
   submitLabel: string;
   pendingLabel: string;
   hint?: string;
-  onSubmit: (values: { firstName: string; birth: string | null }) => void;
+  /** Invités secondaires du foyer : sur la fiche d'un enfant, le parent choisit lequel est cet enfant (D73 S-48). */
+  profiles?: ChildProfileOption[];
+  onSubmit: (values: { firstName: string; birth: string | null; profileUserId?: string | null }) => void;
   onCancel: () => void;
   mutation: MutationState;
 }) {
@@ -80,7 +82,10 @@ function MemberForm({ title, member, submitLabel, pendingLabel, hint, onSubmit, 
   const nameError = !name.trim() ? "Le prénom est obligatoire." : [...name.trim()].length > MAX_NAME ? `Le prénom ne peut pas dépasser ${MAX_NAME} caractères.` : null;
   const birthError = birth && birth > today.slice(0, 7) ? "La date de naissance ne peut pas être dans le futur." : null;
   const invalid = Boolean(nameError || birthError);
-  const values = () => ({ firstName: name.trim(), birth: birth || null });
+  const childCard = Boolean(member && member.role === "child" && !member.linked && profiles);
+  const [profile, setProfile] = useState(member?.profile?.userId ?? "");
+  const first = name.trim() || member?.firstName || "l'enfant";
+  const values = () => ({ firstName: name.trim(), birth: birth || null, ...(childCard ? { profileUserId: profile || null } : {}) });
 
   return (
     <form
@@ -110,6 +115,25 @@ function MemberForm({ title, member, submitLabel, pendingLabel, hint, onSubmit, 
           <input {...a11y} type="month" className={`${styles.input} ${birthError ? styles.inputError : ""}`} value={birth} max={today.slice(0, 7)} onChange={(e) => setBirth(e.target.value)} disabled={mutation.pending} />
         )}
       </Field>
+      {childCard && (
+        <Field
+          label={`Profil de ${first}`}
+          hint={`Choisissez l'invité secondaire qui est ${first}. Avec ce profil, ${first} voit la tâche « Préparer les devoirs », ses exercices, et seulement les RDV auxquels ${first} participe. Réservé aux parents.`}
+        >
+          {(a11y) => (
+            <select {...a11y} className={styles.select} value={profile} onChange={(e) => setProfile(e.target.value)} disabled={mutation.pending}>
+              <option value="">Aucun profil</option>
+              {(profiles ?? [])
+                .filter((p) => !p.memberId || p.memberId === member?.id)
+                .map((p) => (
+                  <option key={p.userId} value={p.userId}>
+                    {p.firstName}
+                  </option>
+                ))}
+            </select>
+          )}
+        </Field>
+      )}
       {hint && <span className={styles.hint}>{hint}</span>}
       <Outcome mutation={mutation} onRetry={() => onSubmit(values())} />
       <div className={styles.actionsRow}>
@@ -206,11 +230,11 @@ function ErasePanel({ member, onDone, onCancel }: { member: FamilyMemberView; on
 
 type Mode = "view" | "edit" | "remove" | "erase";
 
-function MemberCard({ member, onChanged }: { member: FamilyMemberView; onChanged: (message: string) => void }) {
+function MemberCard({ member, profiles, onChanged }: { member: FamilyMemberView; profiles: ChildProfileOption[]; onChanged: (message: string) => void }) {
   const [mode, setMode] = useState<Mode>("view");
   const mutation = useApiMutation();
 
-  async function save(values: { firstName: string; birth: string | null }) {
+  async function save(values: { firstName: string; birth: string | null; profileUserId?: string | null }) {
     // Le prénom d'un membre relié à un profil ne s'envoie pas : il suit le profil (US-93 RF3).
     const body = member.linked ? { birth: values.birth } : values;
     const result = await mutation.run<{ member: FamilyMemberView }>(`/api/family/members/${member.id}`, { method: "PATCH", body });
@@ -223,7 +247,7 @@ function MemberCard({ member, onChanged }: { member: FamilyMemberView; onChanged
   if (mode === "edit") {
     return (
       <div className={styles.memberCard}>
-        <MemberForm title="Modifier le membre" member={member} submitLabel="Enregistrer" pendingLabel="Enregistrement…" onSubmit={(v) => void save(v)} onCancel={() => setMode("view")} mutation={mutation} />
+        <MemberForm title="Modifier le membre" member={member} profiles={profiles} submitLabel="Enregistrer" pendingLabel="Enregistrement…" onSubmit={(v) => void save(v)} onCancel={() => setMode("view")} mutation={mutation} />
       </div>
     );
   }
@@ -251,6 +275,7 @@ function MemberCard({ member, onChanged }: { member: FamilyMemberView; onChanged
             {member.badge && <span className={`${styles.rank} ${member.badge === "guest" ? styles.rankGuest : ""}`}>{RANK[member.badge]}</span>}
           </div>
           {member.birth && <div className={styles.memberMeta}>Né(e) en {birthLabel(member.birth)}</div>}
+          {member.role === "child" && !member.linked && <div className={styles.memberMeta}>{member.profile ? `Profil : ${member.profile.firstName}` : "Pas de profil relié"}</div>}
         </div>
         <div className={styles.iconButtons}>
           <button type="button" className={styles.iconButton} aria-label={`Modifier ${member.firstName}`} onClick={() => setMode("edit")}>
@@ -333,7 +358,7 @@ export function MembersScreen() {
 
           <div className={styles.memberList}>
             {data.members.map((m) => (
-              <MemberCard key={m.id} member={m} onChanged={changed} />
+              <MemberCard key={m.id} member={m} profiles={data.profiles} onChanged={changed} />
             ))}
           </div>
 

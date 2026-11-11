@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useApiMutation, useApiQuery } from "@/client/hooks";
@@ -11,7 +12,9 @@ import { addDays, shortDate } from "./format";
 import styles from "./family.module.css";
 
 /**
- * Préparer la semaine de devoirs avec l'aide Devoirs (US-119 RF2, RF3, RF10) : des questions à boutons, quatre étapes, le choix recommandé en premier.
+ * Préparer la semaine de devoirs avec l'aide Devoirs (US-119 RF2, RF3, RF10, RF11) : des questions à boutons, quatre étapes, le choix recommandé en premier.
+ * Un parent l'ouvre à tout moment depuis la tâche « Préparer les devoirs » : la semaine en cours ou une des 4 suivantes, tous les enfants cochés au départ, les jours de
+ * devoirs du foyer proposés d'abord. Une semaine déjà préparée s'ouvre pour être modifiée ; les jours déjà passés de la semaine en cours ne sont pas touchés.
  *   1. la semaine, les jours de travail et les enfants ; 2. les thématiques (maths et six catégories d'activités) ;
  *   3. pour chaque enfant, les blocs d'exercices de son niveau et les activités de son âge des devoirs ; 4. le jour de chaque élément, et les activités du parent.
  * Les choix sont gardés dans le navigateur (sessionStorage) : si la préparation n'aboutit pas, ils sont renvoyés tels quels avec « Réessayer » (RF10). Le serveur n'enregistre
@@ -21,8 +24,9 @@ import styles from "./family.module.css";
 const STORAGE_KEY = "maaq.homework.draft";
 const MATHS = "maths";
 
+/** « Les jours de devoirs du foyer » vient du réglage (US-118 RF7) ; un autre choix ne vaut que pour cette semaine. */
+const HOUSEHOLD = "foyer";
 const RHYTHMS: { key: string; label: string; days: number[] }[] = [
-  { key: "school", label: "Soirs d'école", days: [1, 2, 4, 5] },
   { key: "school_weekend", label: "Soirs d'école et week-end", days: [1, 2, 4, 5, 6, 7] },
   { key: "wednesday_weekend", label: "Mercredi et week-end", days: [3, 6, 7] },
   { key: "all", label: "Tous les jours", days: [1, 2, 3, 4, 5, 6, 7] },
@@ -38,8 +42,9 @@ interface Draft {
   step: 1 | 2 | 3 | 4;
   weekStart: string;
   rhythm: string;
-  workDays: number[];
   memberIds: string[];
+  /** Les enfants ont été choisis à la main : sinon, tous ceux qui ont un âge des devoirs sont cochés (RF11). */
+  kidsChosen?: boolean;
   themes: string[];
   /** Éléments choisis par enfant : blocs de maths (`textbook:1,2,3,4,5`) et activités (`a:identifiant`). */
   picks: Record<string, string[]>;
@@ -48,13 +53,14 @@ interface Draft {
   customs: Custom[];
 }
 
-const emptyDraft = (weekStart: string): Draft => ({ step: 1, weekStart, rhythm: "school", workDays: RHYTHMS[0].days, memberIds: [], themes: [], picks: {}, days: {}, customs: [] });
+const emptyDraft = (weekStart: string): Draft => ({ step: 1, weekStart, rhythm: HOUSEHOLD, memberIds: [], themes: [], picks: {}, days: {}, customs: [] });
 
-function loadDraft(weekStart: string): Draft {
+function loadDraft(weekStart: string, asked: boolean): Draft {
   try {
     const raw = window.sessionStorage.getItem(STORAGE_KEY);
     const draft = raw ? (JSON.parse(raw) as Draft) : null;
-    if (draft && draft.weekStart === weekStart) return draft;
+    // Un brouillon gardé reprend là où il en était, sauf si une autre semaine est demandée par l'adresse.
+    if (draft && typeof draft.rhythm === "string" && (!asked || draft.weekStart === weekStart)) return draft;
   } catch {
     // Sans stockage de session, le brouillon reste dans l'écran : il vit tant que la page est ouverte.
   }
@@ -93,9 +99,13 @@ function elementsOf(options: HomeworkOptions | undefined, picks: string[]): Elem
   return out;
 }
 
-export function HomeworkPlanner({ weekStart }: { weekStart: string }) {
+const WEEKDAY_NAMES = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"];
+const BACK = { href: "/assistant/devoirs/tache", label: "Préparer les devoirs" };
+
+export function HomeworkPlanner({ weekStart, asked = false }: { weekStart: string; asked?: boolean }) {
   const router = useRouter();
   const setting = useApiQuery<{ setting: HomeworkSetting }>("/api/family/homework");
+  const weeks = useApiQuery<{ today: string; mondays: { weekStart: string; prepared: boolean; weekId: string | null }[] }>("/api/family/homework/weeks");
   const [draft, setDraft] = useState<Draft | null>(null);
   const [options, setOptions] = useState<Record<string, HomeworkOptions>>({});
   const [optionsError, setOptionsError] = useState<string | null>(null);
@@ -104,7 +114,7 @@ export function HomeworkPlanner({ weekStart }: { weekStart: string }) {
 
   // Le brouillon vient du stockage du navigateur : il ne se lit qu'après l'affichage côté client.
   // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => setDraft(loadDraft(weekStart)), [weekStart]);
+  useEffect(() => setDraft(loadDraft(weekStart, asked)), [weekStart, asked]);
   useEffect(() => {
     if (draft) saveDraft(draft);
   }, [draft]);
@@ -112,13 +122,20 @@ export function HomeworkPlanner({ weekStart }: { weekStart: string }) {
   const children = useMemo(() => (setting.data?.setting.children ?? []).filter((c) => c.homeworkAge !== null), [setting.data]);
   const change = (patch: Partial<Draft>) => setDraft((d) => (d ? { ...d, ...patch } : d));
 
+  // Tous les enfants qui ont un âge des devoirs sont cochés au départ ; le parent peut en décocher (RF11).
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (children.length) setDraft((d) => (d && !d.kidsChosen && d.memberIds.length !== children.length ? { ...d, memberIds: children.map((c) => c.memberId) } : d));
+  }, [children]);
+
   // Les propositions de chaque enfant se chargent en arrivant à l'étape 3.
   const needed = draft && draft.step >= 3 ? draft.memberIds : [];
+  const chosenWeek = draft?.weekStart ?? weekStart;
   useEffect(() => {
     let cancelled = false;
     for (const memberId of needed) {
       if (options[memberId]) continue;
-      void fetch(`/api/family/homework/options?member=${memberId}&week=${weekStart}`, { credentials: "same-origin" })
+      void fetch(`/api/family/homework/options?member=${memberId}&week=${chosenWeek}`, { credentials: "same-origin" })
         .then(async (response) => {
           if (!response.ok) throw new Error(String(response.status));
           return (await response.json()) as HomeworkOptions;
@@ -130,27 +147,47 @@ export function HomeworkPlanner({ weekStart }: { weekStart: string }) {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [needed.join(","), weekStart]);
+  }, [needed.join(","), chosenWeek]);
 
-  if (!draft) return <AppShell title="Préparer les devoirs" back={{ href: "/assistant/devoirs", label: "Devoirs" }}><Loading /></AppShell>;
+  if (!draft) return <AppShell title="Préparer la semaine" back={BACK}><Loading /></AppShell>;
   const d = draft;
+  const today = weeks.data?.today ?? null;
+  const householdDays = setting.data?.setting.days ?? [1, 2, 4, 5];
+  const rhythmDays = d.rhythm === HOUSEHOLD ? householdDays : (RHYTHMS.find((r) => r.key === d.rhythm)?.days ?? householdDays);
+  // Semaine en cours : les jours déjà passés ne sont pas touchés (RF11).
+  const workDays = today ? rhythmDays.filter((day) => addDays(d.weekStart, day - 1) >= today) : rhythmDays;
+  const mondays = weeks.data?.mondays ?? [{ weekStart: d.weekStart, prepared: false, weekId: null }];
+  const picked = mondays.find((m) => m.weekStart === d.weekStart);
+  const current = today !== null && mondays[0]?.weekStart === d.weekStart && d.weekStart <= today;
+  // Changer de semaine repart des propositions de cette semaine-là : les choix d'exercices et de jours ne se reportent pas.
+  const pickWeek = (start: string) => {
+    if (start === d.weekStart) return;
+    setOptions({});
+    change({ weekStart: start, picks: {}, days: {}, customs: [] });
+  };
   const name = (id: string) => children.find((c) => c.memberId === id)?.firstName ?? "";
   const elements = (id: string) => elementsOf(options[id], d.picks[id] ?? []);
-  const placedCount = d.memberIds.reduce((sum, id) => sum + elements(id).filter((e) => (d.days[`${id}|${e.key}`] ?? []).length > 0).length, 0) + d.customs.filter((c) => c.title.trim() && c.days.length).length;
+
+  const placedCount =
+    d.memberIds.reduce((sum, id) => sum + elements(id).filter((e) => (d.days[`${id}|${e.key}`] ?? []).some((x) => workDays.includes(x))).length, 0) +
+    d.customs.filter((c) => c.title.trim() && c.days.some((x) => workDays.includes(x))).length;
 
   async function send() {
     setFailed(false);
     const body = {
       weekStart: d.weekStart,
-      workDays: d.workDays,
+      workDays,
       children: d.memberIds.map((memberId) => ({
         memberId,
         items: [
           ...elements(memberId).flatMap((e) => {
-            const days = d.days[`${memberId}|${e.key}`] ?? [];
+            const days = (d.days[`${memberId}|${e.key}`] ?? []).filter((x) => workDays.includes(x));
             return days.length ? [{ ...e.item, days }] : [];
           }),
-          ...d.customs.filter((c) => c.memberId === memberId && c.title.trim() && c.days.length).map((c) => ({ kind: "custom" as const, title: c.title.trim(), days: c.days })),
+          ...d.customs
+            .map((c) => ({ ...c, days: c.days.filter((x) => workDays.includes(x)) }))
+            .filter((c) => c.memberId === memberId && c.title.trim() && c.days.length)
+            .map((c) => ({ kind: "custom" as const, title: c.title.trim(), days: c.days })),
         ],
       })),
     };
@@ -162,7 +199,7 @@ export function HomeworkPlanner({ weekStart }: { weekStart: string }) {
   }
 
   return (
-    <AppShell title="Préparer les devoirs" back={{ href: "/assistant/devoirs", label: "Devoirs" }}>
+    <AppShell title="Préparer la semaine" back={BACK}>
       {setting.error && <RetryNotice message={setting.error.message} onRetry={setting.reload} />}
       {setting.data && !setting.data.setting.enabled && <Notice tone="info">L&apos;aide Devoirs est désactivée : activez-la dans les réglages.</Notice>}
       {setting.data && setting.data.setting.enabled && children.length === 0 && <Notice tone="info">Indiquez l&apos;âge des devoirs d&apos;au moins un enfant dans les réglages.</Notice>}
@@ -174,26 +211,57 @@ export function HomeworkPlanner({ weekStart }: { weekStart: string }) {
 
           {d.step === 1 && (
             <div className={styles.form}>
-              <div className={styles.label}>Jours de travail</div>
+              <div className={styles.label}>Quelle semaine ?</div>
               <div className={styles.wrapRow}>
-                {RHYTHMS.map((r) => (
-                  <button key={r.key} type="button" className={styles.chipToggle} aria-pressed={d.rhythm === r.key} onClick={() => change({ rhythm: r.key, workDays: r.days })}>
-                    {r.label}
+                {mondays.map((m, i) => (
+                  <button key={m.weekStart} type="button" className={styles.chipToggle} aria-pressed={d.weekStart === m.weekStart} onClick={() => pickWeek(m.weekStart)}>
+                    {i === 0 && today !== null && m.weekStart <= today ? `Cette semaine, du ${shortDate(m.weekStart)}` : `Du ${shortDate(m.weekStart)}`}
+                    {m.prepared ? " · déjà préparée" : ""}
                   </button>
                 ))}
               </div>
-              <div className={styles.label}>Enfants</div>
-              <div className={styles.wrapRow}>
-                {children.map((c) => (
-                  <button key={c.memberId} type="button" className={styles.chipToggle} aria-pressed={d.memberIds.includes(c.memberId)} onClick={() => change({ memberIds: toggle(d.memberIds, c.memberId) })}>
-                    {c.firstName}
-                  </button>
-                ))}
-              </div>
+              {picked?.prepared && <span className={styles.hint}>Cette semaine est déjà préparée : ouvrez son écran « Semaine de devoirs » pour la modifier.</span>}
+              {!picked?.prepared && current && <span className={styles.hint}>Les jours déjà passés ne sont pas touchés.</span>}
+              {!picked?.prepared && (
+                <>
+                  <div className={styles.label}>Quels jours ?</div>
+                  <div className={styles.wrapRow}>
+                    <button type="button" className={styles.chipToggle} aria-pressed={d.rhythm === HOUSEHOLD} onClick={() => change({ rhythm: HOUSEHOLD })}>
+                      Les jours de devoirs du foyer ({householdDays.map((x) => WEEKDAY_NAMES[x - 1]).join(", ")})
+                    </button>
+                    {RHYTHMS.map((r) => (
+                      <button key={r.key} type="button" className={styles.chipToggle} aria-pressed={d.rhythm === r.key} onClick={() => change({ rhythm: r.key })}>
+                        {r.label}
+                      </button>
+                    ))}
+                  </div>
+                  <span className={styles.hint}>
+                    Un autre choix ne vaut que pour cette semaine.
+                    {current && workDays.length > 0 && workDays.length < rhythmDays.length ? ` Il reste : ${workDays.map((x) => WEEKDAY_NAMES[x - 1]).join(", ")}.` : ""}
+                    {workDays.length === 0 ? " Ces jours sont déjà passés cette semaine : choisissez d'autres jours, ou une autre semaine." : ""}
+                  </span>
+                  <div className={styles.label}>Pour quels enfants ?</div>
+                  <div className={styles.wrapRow}>
+                    {children.map((c) => (
+                      <button key={c.memberId} type="button" className={styles.chipToggle} aria-pressed={d.memberIds.includes(c.memberId)} onClick={() => change({ memberIds: toggle(d.memberIds, c.memberId), kidsChosen: true })}>
+                        {c.firstName}
+                        {c.levelLabel ? ` · ${c.levelLabel}` : ""}
+                      </button>
+                    ))}
+                  </div>
+                  <span className={styles.hint}>Seuls les enfants qui ont un âge des devoirs sont proposés.</span>
+                </>
+              )}
               <div className={styles.actionsRow}>
-                <Button onClick={() => change({ step: 2 })} disabled={d.memberIds.length === 0}>
-                  Continuer
-                </Button>
+                {picked?.prepared && picked.weekId ? (
+                  <Link href={`/assistant/devoirs/${picked.weekId}`} className={styles.cta}>
+                    Ouvrir la semaine du {shortDate(picked.weekStart)}
+                  </Link>
+                ) : (
+                  <Button onClick={() => change({ step: 2 })} disabled={d.memberIds.length === 0 || workDays.length === 0}>
+                    Continuer
+                  </Button>
+                )}
               </div>
             </div>
           )}
@@ -293,7 +361,7 @@ export function HomeworkPlanner({ weekStart }: { weekStart: string }) {
                     <div key={e.key} className={styles.field}>
                       <div className={styles.label}>{e.label}</div>
                       <div className={styles.hint}>{e.detail}</div>
-                      <DayButtons weekStart={d.weekStart} workDays={d.workDays} value={d.days[`${id}|${e.key}`] ?? []} onChange={(days) => change({ days: { ...d.days, [`${id}|${e.key}`]: days } })} />
+                      <DayButtons weekStart={d.weekStart} workDays={workDays} value={d.days[`${id}|${e.key}`] ?? []} onChange={(days) => change({ days: { ...d.days, [`${id}|${e.key}`]: days } })} />
                     </div>
                   ))}
                 </div>
@@ -309,7 +377,7 @@ export function HomeworkPlanner({ weekStart }: { weekStart: string }) {
                     ))}
                   </select>
                   <input className={styles.input} value={c.title} maxLength={100} placeholder="Ex. Lecture 15 min" aria-label="Titre de l'activité" onChange={(e) => change({ customs: d.customs.map((x, j) => (j === i ? { ...x, title: e.target.value } : x)) })} />
-                  <DayButtons weekStart={d.weekStart} workDays={d.workDays} value={c.days} onChange={(days) => change({ customs: d.customs.map((x, j) => (j === i ? { ...x, days } : x)) })} />
+                  <DayButtons weekStart={d.weekStart} workDays={workDays} value={c.days} onChange={(days) => change({ customs: d.customs.map((x, j) => (j === i ? { ...x, days } : x)) })} />
                   <Button variant="ghost" onClick={() => change({ customs: d.customs.filter((_, j) => j !== i) })}>
                     Retirer
                   </Button>

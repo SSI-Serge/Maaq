@@ -33,12 +33,14 @@ Le script SQL complet est aussi livré seul : `maaq_schema.sql`.
 
 **Mise à jour du 06/11/2026 — lot 14 : Courses et repas (US-152 à US-175, décisions CR-01 à CR-34).** Quarante-sept tables, sept types énumérés, dix valeurs ajoutées à des types existants (`agent_status` `retired`, `legal_document_type` `grocery_price_sharing_consent`, huit actions de `audit_action`), deux colonnes (`agents.retired_at`, `agents.retired_by_user_id`), vingt et un réglages de la console, huit vues et quatorze fonctions entrent au lot 14 (le schéma passe à 148 tables). L'agent natif « Courses et repas » a deux familles de données. **Le catalogue commun** (cuisines, catégories, étiquettes de régime, de viande et d'allergène, plats, rayons, produits, références par enseigne, critères d'additifs, saisons, semaines types de batch cooking et leurs correspondances, versions allégées, produits à référencer) est géré dans la console. **La base commune des prix** (`grocery_shared_prices`) est **anonyme par construction** : aucune colonne ne désigne un foyer, un profil ni un jour (la date est le lundi de la semaine), une seule porte d'écriture (`share_grocery_price()`), la ville n'est montrée qu'à partir de 2 foyers (compteur `grocery_city_sharing`), la preuve du consentement est gardée comme pour les contrats. **Les données du foyer** (réglages, enseignes, allergies et régimes chiffrés, plats personnels, menus validés, liste de courses, tickets sans photo) sont rattachées au compte et protégées par la sécurité par ligne : le couple a tout, un invité secondaire consulte la liste et y ajoute un produit. Les durées de conservation sont des réglages de la console (menus 12 mois, tickets 3 ans, produits achetés 3 mois, journal des produits à référencer 12 mois, à confirmer par le DPO) avec une purge (`purge_expired_grocery_data()`). L'état « retiré » d'un agent (CR-34) est réversible et invisible des tableaux de bord. US-176 (remplacer le skill) est reportée après le pilote (CR-32) : aucune table de skill. Voir la section 2.20 ; hypothèses H134 à H168. **CR-35 (06/11/2026, avant l'application du lot par le développeur)** : une ville voisine devient visible dès qu'un autre foyer y est inscrit (le foyer qui consulte compte aussi dans la ville consultée) et les lignes de la base commune de plus de 12 mois sont supprimées par la purge quotidienne ; seul `lot_14_2_schema.sql` a changé. **CR-36 et CR-37 (06/11/2026, après le chargement du catalogue de départ)** : le prix et sa date d'une référence deviennent facultatifs (les deux ou aucun ; sans prix, « N/A »), chaque référence porte un statut de conformité déclaré par le catalogue d'origine (conforme, à vérifier, aucun conforme trouvé, sans objet), la vue `v_grocery_product_references` recalcule la conformité finale et signale les références « à vérifier » ; le rayon de départ « Crèmerie » devient « Crémerie ». Livré par un rattrapage pour la base qui a déjà le lot 14 (`rattrapage_lot_14_references_sans_prix.sql`) et par un `lot_14_2_schema.sql` régénéré pour une base neuve. **Décision du PO du 07/11/2026 (agent natif) et CR-38** : l'agent « Courses et repas » est déclaré dans `agents` (plateforme `anthropic`, référence `courses-repas`, rubrique Perso) avec une colonne `agents.listed_in_catalog` (faux pour l'Assistant Famille, tuile fixe : le catalogue ne filtre plus sur la plateforme) ; l'invité secondaire peut cocher « acheté » n'importe quel article de la liste validée, sans voir aucun prix (`grocery_list_for()`). Livré par `rattrapage_lot_14_secondaire_et_agent.sql` et un nouveau `lot_14_2_schema.sql` ; le générateur sait désormais affecter une instruction `UPDATE` et une ligne de données à un lot (`lot_0_2` n'a pas changé). **Format du conditionnement (07/11/2026)** : colonne facultative `grocery_product_references.package_format` (colonne « format » du classeur et du fichier d'import des références), exposée en dernière colonne de `v_grocery_product_references` et de `grocery_list_for()` ; livrée par `rattrapage_lot_14_format_references.sql` et un nouveau `lot_14_2_schema.sql`. **Prix au kilo ou au litre (07/11/2026, CR-39 et CR-40)** : poids ou volume mesuré et prix au kilo sur `grocery_receipt_lines`, quantité normalisée du format et unité du prix sur `grocery_product_references` (fonction `grocery_parse_package()`), unité du prix sur `grocery_shared_prices` et `grocery_list_items` ; un article au kilo n'entre pas dans le total estimé de la liste ; livré par `rattrapage_lot_14_prix_au_kilo.sql` et un nouveau `lot_14_2_schema.sql`. **Doublon de ticket (07/11/2026, CR-41)** : heure facultative `grocery_receipts.purchased_time` ; un ticket est un doublon s'il a la même date, la même heure exacte et le même total qu'un ticket du foyer (le magasin n'entre pas en compte), sinon, sans heure, même magasin, même date et même total ; deux index uniques partiels remplacent la contrainte `uq_grocery_receipts_duplicate` ; livré par `rattrapage_lot_14_ticket_heure.sql` et un nouveau `lot_14_2_schema.sql`. **Menu en conversation libre (08/11/2026, CR-42, CR-43, CR-45)** : le menu se compose avec l'IA ; un plat libre est gardé avec le menu (cuisine, recette, durée sur `meal_menu_entries`, ingrédients dans `meal_menu_entry_ingredients`) et n'entre jamais dans le catalogue commun ; origine de chaque plat (`dish_origin` : catalog, household, ai) ; version allégée proposée par l'IA (texte, choix, `meal_menu_entry_light_items`) ; copie dans Mes plats avec lien pour un plat libre ou du catalogue ; livré par `rattrapage_lot_14_menu_libre.sql` et un nouveau `lot_14_2_schema.sql`. **Déroulé de la séance de batch rédigé par l'IA (CR-47)** : table `meal_menu_session_steps` (étapes numérotées : texte, plat concerné et durée facultatifs, chevauchement avec une étape précédente, conservation d'un plat : réfrigérateur ou congélateur et jour où le sortir) pour les menus qui ne reprennent pas une semaine type, dans le même rattrapage. **Plafond de menus par foyer et par jour (CR-44)** : table `meal_menu_daily_counters`, fonction `register_meal_menu()` et réglage `meal_menu_daily_cap` (10 par défaut), dans un rattrapage séparé `rattrapage_lot_14_plafond_menus.sql` à appliquer juste après `rattrapage_lot_14_menu_libre.sql`. **Quantités des recettes et scénarios d'achat (CR-49, CR-50, CR-51)** : recette écrite pour le nombre de personnes du foyer pour tout plat (`meal_menus.servings`), quantité et unité par ingrédient du menu, vue `v_meal_menu_needs`, produits « placard » (`grocery_products.is_pantry`), besoin du menu dans la liste ; dans un troisième rattrapage séparé `rattrapage_lot_14_quantites.sql`, à appliquer après le plafond. **Deux semaines, suppression d'un menu ou d'une liste (CR-54, CR-55)** : chaque produit de liste est rattaché à son menu (`grocery_list_items.menu_id`), une seule liste par menu, reprise des produits non achetés en pense-bête calculé à la lecture (`grocery_leftovers_for()`, qui remplace `grocery_carry_over_unbought()`), suppressions définitives `delete_meal_menu()` et `delete_grocery_list()` ; dans un quatrième rattrapage séparé `rattrapage_lot_14_semaines.sql`, à appliquer après les quantités. **Quatre semaines, liste du mois, coût réel, budget et plats de saison (CR-56 à CR-64)** : liste du mois (`grocery_list_groups`), rayon frais, lien d'un produit acheté vers sa ligne de ticket, budget mensuel des repas, base commune et anonyme des plats de saison avec la sélection du foyer, dans un cinquième rattrapage regroupé en deux fichiers (`rattrapage_lot_14_mois_1_valeurs_enumerees.sql`, `rattrapage_lot_14_mois_2_schema.sql`), à appliquer après les semaines. **Produits du quotidien et seuil de l'historique (CR-66, CR-67)** : la liste des produits du quotidien tenue en console (`grocery_daily_products`, 15 produits de départ, commune et sans donnée de foyer) et le réglage `grocery_history_min_products`, dans un sixième rattrapage en deux fichiers (`rattrapage_lot_14_quotidien_1_valeurs_enumerees.sql`, `rattrapage_lot_14_quotidien_2_schema.sql`), à appliquer après le mois. **Aucun fichier livré n'est modifié** : seuls `lot_14_1_valeurs_enumerees.sql` et `lot_14_2_schema.sql` s'ajoutent.
 
+**Mise à jour du 11/11/2026 — aide Devoirs (décisions D71 à D73, S-30 à S-48 : US-118 RF7, US-119 RF1, RF11 et RT1, nouvelle US-180).** Deux tables (le schéma passe à 161 tables), deux colonnes, un type, un réglage de console, aucune valeur ajoutée à un type existant. Les **jours de devoirs** sont un réglage familial (`family_settings.homework_days`, lundi, mardi, jeudi et vendredi au départ, au moins un jour) ; la tâche récurrente « Préparer les devoirs » (la série de source `homework_prep` de D69, reconnue par sa source) revient ces jours-là, **sans personne assignée**, et la base aligne ses jours sur le réglage : un changement retire les occurrences à venir des jours décochés dès le lendemain. **Profil de l'enfant** (D73 S-38) : la **fiche enfant** porte le lien vers le profil d'invité secondaire de l'enfant (`family_members.child_profile_user_id` : unique, du même foyer, remis à vide à la suppression du profil sans anonymiser la fiche) ; il n'est ni sur `family_members.user_id` (réservé à la fiche « autre » créée avec le profil) ni dans `homework_children`, donc retirer l'âge des devoirs ne change pas ce que voit l'enfant. Le **membre du profil** d'un enfant est sa fiche enfant (`family_member_of_profile()`), et sa fiche « autre » est **masquée** (S-39 : plus de nouvelle participation à un RDV ou à une série, plus d'assignation de tâche, vue `v_family_members_listed`). Cette règle unique s'applique à `family_events_visible_to()` (participant = fiche enfant, et **pas** les RDV de toute la famille, S-45), `family_tasks_visible_to()` (+ la tâche des devoirs si l'aide est activée et l'âge renseigné), `can_check_family_task()` et `change_family_task_status()` (il ne coche pas la tâche des devoirs mais garde ses tâches, S-40 et S-46), et `family_event_notice_recipients()` (un RDV de toute la famille ne le prévient pas). Il lit ses éléments du jour sans corrigé (`homework_child_items_for()`) et ne peut rien écrire sur les données Devoirs. **Pages d'exercices** (US-180) : `homework_exercise_pages` (membre enfant, foyer, profil créateur, thème, matière, niveau, formes de question en liste fermée `homework_question_form` ; thème, matière, niveau et trois exercices chiffrés) et `homework_exercise_page_answers` (fiche réponse et barème chiffrés, **lisibles des seuls parents, y compris par la sécurité par ligne**) ; aucune photo n'est stockée. Les pages sont supprimées 12 mois après leur création (`homework_page_retention_months`), avec le membre, à l'effacement des progrès de Devoirs et avec le compte ; elles entrent dans l'export de la famille. Les tâches « Devoirs — [prénom] » ne sont plus créées ; celles qui existent ne sont pas supprimées. Livré en quatre fichiers (`rattrapage_lot_10_d71_1_schema.sql`, passage à blanc, **reprise unique** de l'ancienne tâche du dimanche avec son heure gardée, contraintes). Le tchat de l'Assistant Famille fermé à ce profil (S-47) reste tenu par l'application. Hypothèse H169.
+
 ---
 
 ## 1. Synthèse
 
 - **Périmètre** : 70 US existantes (US-1 à US-70), 25 US de l'Assistant Famille (US-71 à US-94, US-106) et 9 US du MVP2 (US-95 à US-98, US-102, US-107 à US-110), 8 US des sous-agents Sorties et Devoirs (US-114 à US-121), 17 US des Contrats V2 (US-122 à US-138), la vidéo de présentation (US-140), 11 US Émotions (US-141 à US-151), 24 US Courses et repas (US-152 à US-175 ; US-176 reportée après le pilote), 13 modules (accès, configuration, invités, catalogue, contrats, tchat, carnet, administration, réglages, sécurité/RGPD, support, Assistant Famille, Calendrier intelligent). 148 tables, 15 vues, 113 fonctions, 100 triggers de règles.
-- **SGBD** : PostgreSQL 15+, hébergé dans l'UE. Le DDL a été exécuté et testé : 1968 contrôles de comportement, tous réussis.
+- **SGBD** : PostgreSQL 15+, hébergé dans l'UE. Le DDL a été exécuté et testé : 2078 contrôles de comportement, tous réussis.
 - **Choix structurants** : un seul modèle `users` pour les 3 rôles avec un rang `core`/`secondary` ; un `accounts` qui sert de frontière d'isolation et porte quota et délai de grâce ; catalogue, contrats et informations par agent entièrement pilotés par des données (aucune migration pour ajouter un agent, un contrat ou un champ) ; **calendrier familial, membres, mails transférés et conversations stockés au niveau du foyer** (jamais de l'agent) ; **carnet de bord partitionné par mois** (≈ 50 demandes par profil et par jour au maximum, 1 000 comptes par an).
 - **Principe RGPD** : MAAQ ne stocke ni les messages du tchat (chez Digitorn) ni les mots de passe Google ; secrets hachés ; informations personnelles chiffrées côté application ; purge par traitements planifiés.
 - **Assistant Famille (24/10/2026)** : membres distincts des profils (alias par rôle), RDV du foyer avec statuts contrôlés en base, mail de transfert et conversations avec purges automatiques, contenu des mails et images hors base avec file de suppression des fichiers. Accord du PO obtenu ; Foundry a été abandonné depuis (D54).
@@ -488,6 +490,7 @@ Validé par le PO le 30/10/2026 (spécification `MAAQ_US_Detaillees_BA_Sorties_D
 | US-119 RT4, D66 | Catalogue des exercices et des activités, chargé une fois ; **les contenus sont portés par la base**, non par un fichier de l'application | `homework_textbooks` (France, Singapour, Chine semés), `homework_exercises` (dont `statement`, l'énoncé, 2 000 caractères au plus), `homework_activities` (dont `description`, la description, 1 000, `steps`, les étapes, 4 000, et `materials`, le matériel, 1 000) : colonnes facultatives, jamais vides quand elles sont renseignées ; tables créées avec le schéma, **lignes chargées par l'équipe** |
 | US-119 RT5, RF5, RF6 | Progrès par enfant : exercices validés sur photos, éléments cochés, prévus, semaines préparées | `homework_exercise_validations` (seules les photos valident), `homework_weeks`, `homework_week_items` (case cochée = « fait », jamais « validé »), `homework_week_foreign_books` ; **aucune photo, aucune colonne de fichier** |
 | US-119 RF4 | Une tâche par enfant et par jour de travail, liée à la semaine | valeur `homework` de `task_source` (nécessaire : elle identifie les tâches créées par l'aide, qui disparaissent avec la semaine ou l'enfant) ; colonne `family_tasks.homework_week_id`, index unique (semaine, membre, jour) |
+| US-118 RF7, US-119 RF1/RF11/RT1, US-180 RT4 à RT6, D71 à D73 (11/11/2026) | Jours de devoirs du foyer ; tâche « Préparer les devoirs » les jours de devoirs, sans personne assignée, visible des deux parents et du profil de l'enfant ; profil de l'enfant relié à sa fiche enfant ; pages d'exercices créées à partir d'une leçon, avec fiche réponse réservée aux parents | `family_settings.homework_days` (smallint[], 1 à 7 sans doublon, au moins un jour, rangé par trigger) ; `family_members.child_profile_user_id` (unique, même foyer, invité secondaire, ON DELETE SET NULL sur la colonne seule, tombe si la fiche cesse d'être une fiche enfant active) ; `family_member_of_profile()`, `profile_is_child_linked()`, `family_member_is_hidden()`, gardes `family_member_not_hidden_guard()` sur `family_event_members`, `family_event_series_members`, `family_tasks`, `family_task_series`, vue `v_family_members_listed` ; `family_events_visible_to()`, `family_tasks_visible_to()`, `can_check_family_task()`, `change_family_task_status()`, `family_event_notice_recipients()` REMPLACÉES ; `family_task_series` source `homework_prep` : `ck_task_series_homework_prep`, jours imposés par `family_task_series_homework_prep_days()`, `ck_tasks_homework_prep`, `family_settings_homework_days_changed()` ; `homework_prep_task_visible_to()` ; lecture seule `homework_child_read_only_guard()` et `homework_child_items_for()` ; type `homework_question_form` (9 formes) ; `homework_exercise_pages` (clé étrangère composite vers `homework_children`, suppression en cascade, contenu chiffré) et `homework_exercise_page_answers` (une fiche par page, contrôle différé), sécurité par ligne sur les deux, `homework_pages_access()`, `homework_exercise_pages_visible_to()`, `homework_exercise_answers_visible_to()` ; réglage de console `homework_page_retention_months` (12) ; `erase_member_homework_data()`, `erase_family_homework_progress()`, `purge_expired_homework_data()` REMPLACÉES ; aucune photo ; livré par quatre fichiers `rattrapage_lot_10_d71_*` (structure, passage à blanc, reprise unique, contraintes) |
 | US-119 RF7 | Règles de progression | voir « garanti par la base » ci-dessous |
 | US-93, US-118 RF5, US-119 RT5 | Effacement des données de mineurs | `erase_member_homework_data()` (appelée au retrait et à l'effacement du membre et au changement de rôle), `erase_family_homework_progress()` (bouton « Effacer les progrès de Devoirs » : conserve l'âge des devoirs, D65) ; `purge_expired_homework_data()` : semaines 12 mois après la semaine, exercices validés gardés tant que l'aide est active puis 30 jours après sa désactivation (D65, à valider par le DPO, H102) |
 
@@ -790,13 +793,14 @@ Je n'ai pas eu besoin du brief de base : les US détaillées suffisent. La colon
 | H159 | **Nouvelle** (US-166 RF2, 07/11/2026) : le format du conditionnement (« 1 kg », « sachet de 250 g ») est une colonne facultative de `grocery_product_references`, **nommée `package_format` et non `format`** : « format » est aussi une fonction du langage employée par plusieurs fonctions du schéma, et un nom de colonne identique aurait déplacé ces fonctions dans le lot récent (règle du générateur). La colonne « format » du fichier d'import (produit, rayon, enseigne, reference, format, prix, date_prix, statut, additifs, composition) s'écrit donc dans `package_format`. La liste de courses n'a pas de colonne de format : `grocery_list_for()` le retrouve par la référence retenue de l'article (produit, enseigne, nom de la référence), vide si l'article n'a pas de référence connue ; il est visible de tous les profils, sans prix. | Confirmée (PO) | Faible. |
 | H160 | **Nouvelle** (CR-39, CR-40, 07/11/2026) : le prix au kilo ou au litre s'appuie sur des unités explicites, **jamais sur un poids moyen par pièce**. Ticket : `measured_quantity` et `measure_unit` (kg ou l, convertis avant l'écriture) restent privés au foyer ; `price_per_measure` est le prix lu, sinon total ÷ poids arrondi à 2 décimales (aucun prix sur une remise ou sans poids) ; `quantity` reste le nombre d'articles. Référence : `package_amount` et `package_unit` sont déduits de `package_format` par `grocery_parse_package()` (« 1 kg », « 500 g », « 1,5 l », « 75 cl », « sachet de 250 g », « N x M unité » ; « 6 œufs », « 1 pièce », « barquette » ne sont pas compris et restent vides) ; l'import peut les fournir et ils priment ; un changement de format refait la déduction seulement si les valeurs actuelles étaient déduites. `price_unit` dit si le prix d'une référence est par article, par kg ou par litre : il n'est **pas** déduit du format (un sac de 1 kg de riz est un article, une banane vendue 1,89 €/kg ne l'est pas) et vaut « par article » tant qu'il n'est pas renseigné à l'import ou dans la console. Base commune : seul le prix au kilo est partagé, jamais le poids ; la médiane de contrôle ne compare que des prix de même unité. Liste : `grocery_list_items.price_unit` est copiée de la référence à la validation ; l'application ne totalise que les articles « par article » (« prix au kilo, non totalisé »). | Confirmée (PO) | Moyen : un `price_unit` oublié sur une référence vendue au poids la ferait totaliser comme un article. |
 | H161 | **Nouvelle** (CR-41, US-161 RT2, 07/11/2026) : l'heure d'un ticket est une colonne `purchased_time time(0)` facultative, en heure locale du magasin, sans fuseau ; les secondes sont gardées quand elles sont lues et valent 00 sinon : « 14:32 » et « 14:32:00 » sont la même heure, « 14:32:17 » en est une autre. Avec une heure, le doublon se reconnaît sur la date, l'heure et le total **sans tenir compte du magasin** ; sans heure, comme avant. **Un ticket avec heure et un ticket sans heure ne se bloquent jamais** (aucune heure à comparer) : un ancien ticket sans heure, ressaisi plus tard avec son heure, ne serait pas reconnu comme doublon. Si le PO veut que la base le refuse, c'est un contrôle de plus (même magasin, date et total entre un ticket avec heure et un ticket sans heure), à décider. Les anciens tickets gardent la valeur vide. L'application doit imposer l'heure à la saisie quand elle n'est pas lue (la base l'accepte vide). | Confirmée (PO), cas heure/sans heure à confirmer | Moyen : un ancien ticket ressaisi avec son heure s'ajouterait une seconde fois au budget. |
-| H162 | **Nouvelle** (CR-42, CR-43, CR-45, 08/11/2026) : le contenu d'un plat libre vit sur la ligne de menu (`cuisine_id`, `recipe`, `duration_minutes`) et ses ingrédients dans `meal_menu_entry_ingredients`, sans table de plats ; un plat libre a au moins un ingrédient (contrôle différé) et une cuisine ; `dish_origin` (catalog, household, ai) est renseignée par l'application, sans valeur par défaut (un oubli est refusé) ; les menus déjà validés ont reçu household s'ils pointaient vers un plat de Mes plats, sinon catalog. **Copie dans Mes plats** : l'application copie le plat (libre ou du catalogue : nom, cuisine, recette, durée, ingrédients) dans `meal_household_dishes` et ses ingrédients, puis renseigne `household_dish_id` de la ligne de menu ; la ligne garde son contenu, donc un plat supprimé ensuite de Mes plats reste lisible dans l'historique. Les copies ne portent pas d'étiquettes (régimes, allergènes) : l'avertissement « Contient peut-être… » est calculé par l'application (CR-44). **Version allégée de l'IA** : possible pour toute origine dont le plat n'a pas de version allégée dans le catalogue (US-157 RF5) ; le choix standard ou allégée d'un plat libre vit sur la ligne (`light_chosen`), celui d'un plat du catalogue reste dans `meal_light_choices`. **Remplacement d'un menu** : le menu de la semaine est mis à jour (même identifiant, `validated_at` remis à jour) et ses lignes sont remplacées dans une transaction, pour que `grocery_lists.menu_id` ne soit pas perdu ; la liste est refaite par l'application (les articles cochés « acheté » et ajoutés à la main sont gardés) : aucun changement de `grocery_list_items`. **Objets devenus inutiles, laissés en place** : `meal_menu_entries.is_off_batch` et `planning_match_to_confirm` (à faux), valeur `pleasure` de `meal_entry_kind`, catégories de plats encore gérées dans la console (US-165). **CR-43 reformule H136** : les régimes et allergies restent chiffrés par l'application et aucune vue ni fonction de la base ne les lit, mais l'application les déchiffre et les envoie à l'IA, sans nom ni prénom, pour composer le menu ; l'accord du DPO est requis avant la production et une preuve de consentement à l'envoi n'est créée qu'après son avis. **Plafond de menus (CR-44, `meal_menu_daily_counters`)** : une seule table de compteurs par foyer et par jour, sans donnée personnelle hors `account_id` ; elle n'a pas à être exportée (compteur technique de 7 jours) mais elle est effacée avec le compte (cascade). **Lot 9 (produits du quotidien, CR-66 et CR-67)** : la liste des produits du quotidien est commune et sans donnée de foyer : rien à exporter, rien à effacer avec le compte. **Lot 9 (quatre semaines et plats de saison, CR-56 à CR-64)** : l'export du foyer reprend, en plus, sa sélection de plats de saison du mois (`meal_season_household_dishes`), le lien `season_dish_id` de ses lignes de menu, son budget mensuel des repas, son regroupement en liste du mois et le lien de ses produits achetés vers les lignes de ticket ; la base commune des plats de saison n'est pas exportée (anonyme, sans lien avec le foyer) et l'effacement du compte n'y touche pas ; il supprime la sélection, les regroupements et les liens. **Lot 9 (deux semaines, CR-54 et CR-55)** : pas de nouvelle table ; l'export du foyer ajoute le menu de chaque produit de liste (`menu_id`) ; les suppressions `delete_meal_menu` et `delete_grocery_list` sont des suppressions définitives qui ne laissent aucune trace dans les tables du foyer (le compteur de menus du jour, technique, est gardé). **Lot 9 (quantités, CR-49 et CR-50)** : pas de nouvelle table ; l'export du foyer ajoute le nombre de personnes du menu, la recette adaptée de chaque ligne, la quantité et l'unité de chaque ingrédient, ainsi que, pour chaque produit de la liste, le besoin du menu, les mentions « à vérifier » et « placard » et l'état coché. **Lot 9** : l'export du foyer inclut, pour chaque ligne de menu, cuisine, recette, durée, ingrédients et version allégée proposée (texte et adaptation), et le déroulé de la séance rédigé par l'IA (`meal_menu_session_steps`, CR-47) ; l'effacement du compte emporte les deux nouvelles tables (cascade). | Confirmée (PO) | Moyen : un oubli d'`dish_origin` ou d'ingrédient est refusé par la base, mais un export sans les plats libres serait incomplet. |
+| H162 | **Nouvelle** (CR-42, CR-43, CR-45, 08/11/2026) : le contenu d'un plat libre vit sur la ligne de menu (`cuisine_id`, `recipe`, `duration_minutes`) et ses ingrédients dans `meal_menu_entry_ingredients`, sans table de plats ; un plat libre a au moins un ingrédient (contrôle différé) et une cuisine ; `dish_origin` (catalog, household, ai) est renseignée par l'application, sans valeur par défaut (un oubli est refusé) ; les menus déjà validés ont reçu household s'ils pointaient vers un plat de Mes plats, sinon catalog. **Copie dans Mes plats** : l'application copie le plat (libre ou du catalogue : nom, cuisine, recette, durée, ingrédients) dans `meal_household_dishes` et ses ingrédients, puis renseigne `household_dish_id` de la ligne de menu ; la ligne garde son contenu, donc un plat supprimé ensuite de Mes plats reste lisible dans l'historique. Les copies ne portent pas d'étiquettes (régimes, allergènes) : l'avertissement « Contient peut-être… » est calculé par l'application (CR-44). **Version allégée de l'IA** : possible pour toute origine dont le plat n'a pas de version allégée dans le catalogue (US-157 RF5) ; le choix standard ou allégée d'un plat libre vit sur la ligne (`light_chosen`), celui d'un plat du catalogue reste dans `meal_light_choices`. **Remplacement d'un menu** : le menu de la semaine est mis à jour (même identifiant, `validated_at` remis à jour) et ses lignes sont remplacées dans une transaction, pour que `grocery_lists.menu_id` ne soit pas perdu ; la liste est refaite par l'application (les articles cochés « acheté » et ajoutés à la main sont gardés) : aucun changement de `grocery_list_items`. **Objets devenus inutiles, laissés en place** : `meal_menu_entries.is_off_batch` et `planning_match_to_confirm` (à faux), valeur `pleasure` de `meal_entry_kind`, catégories de plats encore gérées dans la console (US-165). **CR-43 reformule H136** : les régimes et allergies restent chiffrés par l'application et aucune vue ni fonction de la base ne les lit, mais l'application les déchiffre et les envoie à l'IA, sans nom ni prénom, pour composer le menu ; l'accord du DPO est requis avant la production et une preuve de consentement à l'envoi n'est créée qu'après son avis. **Plafond de menus (CR-44, `meal_menu_daily_counters`)** : une seule table de compteurs par foyer et par jour, sans donnée personnelle hors `account_id` ; elle n'a pas à être exportée (compteur technique de 7 jours) mais elle est effacée avec le compte (cascade). **Lot 9 (aide Devoirs, D71 à D73 et US-180)** : l'export du foyer reprend, en plus, les pages d'exercices de ses enfants, avec leur fiche réponse (donnée du foyer, de mineurs, sans photo, contenu chiffré) et le lien du profil de chaque fiche enfant ; elles sont supprimées avec le membre (retrait ou effacement), à l'effacement des progrès de Devoirs et avec le compte. **Lot 9 (produits du quotidien, CR-66 et CR-67)** : la liste des produits du quotidien est commune et sans donnée de foyer : rien à exporter, rien à effacer avec le compte. **Lot 9 (quatre semaines et plats de saison, CR-56 à CR-64)** : l'export du foyer reprend, en plus, sa sélection de plats de saison du mois (`meal_season_household_dishes`), le lien `season_dish_id` de ses lignes de menu, son budget mensuel des repas, son regroupement en liste du mois et le lien de ses produits achetés vers les lignes de ticket ; la base commune des plats de saison n'est pas exportée (anonyme, sans lien avec le foyer) et l'effacement du compte n'y touche pas ; il supprime la sélection, les regroupements et les liens. **Lot 9 (deux semaines, CR-54 et CR-55)** : pas de nouvelle table ; l'export du foyer ajoute le menu de chaque produit de liste (`menu_id`) ; les suppressions `delete_meal_menu` et `delete_grocery_list` sont des suppressions définitives qui ne laissent aucune trace dans les tables du foyer (le compteur de menus du jour, technique, est gardé). **Lot 9 (quantités, CR-49 et CR-50)** : pas de nouvelle table ; l'export du foyer ajoute le nombre de personnes du menu, la recette adaptée de chaque ligne, la quantité et l'unité de chaque ingrédient, ainsi que, pour chaque produit de la liste, le besoin du menu, les mentions « à vérifier » et « placard » et l'état coché. **Lot 9** : l'export du foyer inclut, pour chaque ligne de menu, cuisine, recette, durée, ingrédients et version allégée proposée (texte et adaptation), et le déroulé de la séance rédigé par l'IA (`meal_menu_session_steps`, CR-47) ; l'effacement du compte emporte les deux nouvelles tables (cascade). | Confirmée (PO) | Moyen : un oubli d'`dish_origin` ou d'ingrédient est refusé par la base, mais un export sans les plats libres serait incomplet. |
 | H163 | **Nouvelle** (CR-47, 08/11/2026) : le déroulé de la séance écrit par l'IA est une table d'étapes plutôt qu'un texte unique sur `meal_menus`, pour garder le lien avec le plat et la durée de chaque étape (choix du PO) ; la conservation des plats s'écrit comme des étapes de fin de déroulé (plat concerné, réfrigérateur ou congélateur, jour où le sortir) avec deux colonnes structurées facultatives (`storage_mode`, `take_out_day`) plutôt que dans le seul texte, pour pouvoir l'afficher et la rappeler sans relire le texte ; une seule conservation par plat. Chaque étape peut se chevaucher avec une étape précédente (`overlaps_position`) : choix « étape précédente seulement » pour exclure tout cycle, ce qui suffit à recalculer la durée totale sans compter deux fois les étapes en chevauchement ; une IA qui désignerait une étape suivante doit être corrigée par l'application. **Réservé aux menus sans semaine type** : un contrôle différé refuse des étapes sur un menu dont `batch_week_id` est renseigné (une suppression de la semaine type rend le menu « sans semaine type » sans étape : son déroulé n'est plus affiché, comme avant). Lors du remplacement d'un menu, l'application remplace aussi les étapes dans la même transaction. Une étape peut renvoyer à une ligne du même menu (clé composite `(entry_id, menu_id)`) ; si la ligne est supprimée l'étape reste, sans son plat. | Confirmée (PO) | Faible. |
 | H164 | **Nouvelle** (CR-44, 08/11/2026) : le plafond de menus complets est compté par foyer et par jour civil dans le fuseau du foyer, calculé par l'application (`menu_date`) ; chaque correction compte comme un menu (US-156 RF12ter) ; le compteur ne dépasse jamais le plafond et un refus ne compte rien ; la fonction est atomique (une seule instruction d'insertion avec mise à jour conditionnelle) ; un plafond nul ou négatif refuse tout ; le plafond du réglage est borné de 1 à 100. Les compteurs sont purgés après 7 jours et ne sont pas exportés (donnée technique sans contenu), mais ils portent `account_id` et sont effacés avec le compte. | Confirmée (PO) | Faible. |
 | H165 | **Nouvelle** (CR-49, CR-50, CR-51, 09/11/2026) : la quantité d'un ingrédient du menu est écrite par l'IA pour le nombre de personnes du foyer (`meal_menus.servings`, gardé avec le menu) ; elle est facultative (une quantité absente donne 1 unité et « Quantité à vérifier »), comme l'unité, et les deux vont ensemble. Cuillère et pincée sont des unités uniques (soupe et café confondues) : elles ne se convertissent pas et rendent l'ingrédient « placard ». La base calcule `base_unit`/`base_quantity` (g, ml, pièce : kg × 1000, cl × 10, l × 1000) ; la vue `v_meal_menu_needs` additionne par produit (ou par nom d'ingrédient inconnu du catalogue) et par unité de base ; la division par le format de la référence choisie (`package_amount`, `package_unit`) et l'arrondi au paquet supérieur restent dans l'application, parce que la référence dépend du scénario d'achat. **Tout plat du menu a au moins un ingrédient**, de toute origine (CR-51 a) ; les menus validés avant CR-42 restent sans ingrédient ni quantité (CR-51 e). **Placard** : `grocery_products.is_pantry` (console) et règle calculée sur l'unité (cuillère, pincée) ; le marquage initial des produits déjà chargés se fait par leur nom normalisé, mot entier : sel, poivre, huile(s), vinaigre(s), sucre, farine, levure, moutarde, bouillon(s), épice(s), quatre-épices, cumin, paprika, curry, cannelle, curcuma, muscade, herbes de Provence, herbes séchées ou sèches, écrits **avec ou sans accents** (le nom normalisé du catalogue réel n'a pas d'accents : « epices », « quatre epices », « herbes sechees » ; le motif accepte aussi le tiret) ; il ne s'exécute qu'une fois (à la création de la colonne) et le PO corrige ensuite dans la console. Les quantités modifiées à la main ne survivent pas au remplacement du menu : la liste est recalculée (CR-51 c), donc aucun marqueur « modifié ». `is_selected` (coché) et `is_pantry` de la liste sont posés par l'application à partir de la vue ; un produit au poids garde `price_unit` = kg et son poids × prix au kilo entre dans le total quand `needed_amount` est connu (CR-40 modifié). | Confirmée (PO) | Moyen : un produit mal marqué « placard » est décoché par défaut (corrigeable dans la console) ; un export sans ces colonnes serait incomplet. |
 | H166 | **Nouvelle** (CR-54, CR-55, 09/11/2026) : le rattachement à un menu est un champ du produit (`menu_id`) plutôt qu'une table de liaison ; il suit toujours le menu de la liste du produit (la base le remplit et refuse tout écart). Le remplissage des produits existants se fait une seule fois, à la création de la colonne : via la liste pour les produits validés, achetés ou ajoutés après la validation, via le menu le plus récent du foyer pour les produits en préparation ; si un produit de liste ne peut pas être rattaché (liste sans menu) ou si deux listes ont le même menu, le rattrapage s'arrête avec un message, sans rien modifier. **Pense-bêtes** : calculés à la lecture (`grocery_leftovers_for`), jamais recopiés, donc toujours à jour (ils disparaissent quand le produit est acheté sur la liste d'origine) ; un pense-bête « coché » est copié dans la semaine visée par l'application ; il n'est plus un pense-bête dès qu'un produit de même nom existe dans cette semaine (si l'utilisateur supprime ensuite ce produit, le pense-bête réapparaît tant que la liste d'origine existe). Seule la plus récente liste d'une semaine antérieure est reprise ; une liste supprimée n'est plus reprise ; `not_bought_last_time` n'est plus écrit (gardé pour les données existantes). **Suppressions** : `delete_meal_menu` et `delete_grocery_list` sont des fonctions à droits de l'appelant ; le contrôle « couple seulement » utilise `app.user_id` comme le garde-fou de la liste (sans profil indiqué, pas de contrôle, H144) ; un menu supprimé directement (purge à 12 mois) emporte ses produits en cascade et laisse sa liste sans menu, que la purge supprime ensuite une fois vide. Un ajout à la main appartient à la semaine affichée ; sans aucun menu, il n'a pas de menu et le premier menu validé le reprend (application). | Confirmée (PO) | Moyen : un produit sans menu hors du cas autorisé est refusé par la base ; un export sans `menu_id` serait incomplet. |
 | H167 | **Nouvelle** (CR-56 à CR-64, 09/11/2026) : la liste du mois est un regroupement stocké (`grocery_list_groups`) ; chaque semaine garde sa liste (`grocery_lists`), le regroupement porte le scénario et la date uniques ; la base refuse qu'une liste regroupée ait un autre scénario ; elle ne refuse pas un regroupement de moins de 2 listes à la création (l'application assigne les listes ensuite) mais le supprime dès qu'il en reste moins de 2. « À acheter plus tard » se lit à la lecture (rayon frais de `grocery_aisles` du produit, semaine après la première) ; un produit sans rayon n'est pas frais. **Coût réel** : le lien produit acheté → ligne de ticket est rempli par l'application quand le ticket est rapproché du menu ; le coût réel d'un menu est la somme des lignes reliées ; un ingrédient inconnu du catalogue est rapproché par son nom, moins fiable. **Budget mensuel** : réglage du foyer, pas de la console. **Base commune des plats de saison** : anonyme (aucun foyer, aucun prix, lundi d'entrée), conservation sans limite en attendant l'avis du DPO (avec CR-43), jamais purgée ni effacée avec un compte ; le contenu d'un plat n'est pas recopié chez le foyer (sa sélection garde le lien) ; le compteur « choisi » monte une seule fois par foyer et par plat si l'application appelle `choose_season_dish()` AVANT d'écrire la ligne de menu ; il peut remonter après une purge ou une suppression de menu (accepté) ; deux appels successifs avant l'écriture de la ligne comptent deux fois. Les allergies et les régimes du foyer sont chiffrés : la recherche filtre sur les étiquettes que l'application lui passe, l'exclusion des allergies par mots-clés se fait dans l'application sur les candidats rendus. Le premier plat d'un nom normalisé est gardé, rien n'est fusionné (la console corrige). Un plat jamais servi est exclu du menu du mois (US-178 RF3). Lot 9 : l'export du foyer reprend sa sélection de plats de saison, les lignes de menu liées, son budget et son regroupement ; la base commune n'est pas exportée ; l'effacement du compte n'y touche pas. | Confirmée (PO) | Moyen : un oubli de l'ordre d'appel de `choose_season_dish()` fausse le compteur ; la base commune est anonyme mais sa date d'entrée est arrondie au lundi. |
 | H168 | **Nouvelle** (CR-66, CR-67, 10/11/2026) : les produits du quotidien sont une liste commune tenue en console (aucun foyer, aucun prix), lisible par tous les profils ; la base garde le nom, la clé normalisée (calculée par l'application, unique) et le rayon ; le rapprochement avec l'historique, le menu et les produits ajoutés se fait dans l'application, par le produit du catalogue (`product_id`) puis par la clé. Le seuil de la rubrique « Produits de mon historique » est un réglage de console (10), lu par l'application. Aucune fonction de lecture n'est livrée (décision du PO). Le rayon d'un produit du quotidien ne se supprime pas tant qu'il en porte (RESTRICT), mais la fusion de rayons les range dans le rayon conservé. Retirer un produit le masque (`retired_at`) sans le supprimer ; supprimer un produit du catalogue délie le produit du quotidien sans le supprimer. La liste de départ est semée une seule fois, jamais réécrite par un rattrapage rejoué. Lot 9 : aucune donnée de foyer, donc rien à exporter ni à effacer. | Confirmée (PO) | Faible : une clé mal calculée par l'application ferait manquer le rapprochement par le nom (le lien au catalogue le couvre quand il existe). |
+| H169 | **Nouvelle** (D71 à D73, 11/11/2026) : (1) Le lien profil → enfant est `family_members.child_profile_user_id`, sur la fiche enfant : un profil ne relie qu'une fiche, du même foyer, invité secondaire ; il tombe sans erreur quand la fiche cesse d'être une fiche enfant active (rôle, retrait, effacement) ; un profil retiré (statut) garde son lien tant qu'il n'est pas supprimé. Il ne dépend pas de l'âge des devoirs. (2) Le membre d'un profil d'enfant est sa fiche enfant ; la fiche « autre » créée avec le profil existe toujours (les déclencheurs de création, de suivi et d'anonymisation ne la quittent pas) mais la base refuse les nouvelles écritures qui la visent ; les lignes déjà posées sur elle avant la liaison ne sont pas migrées (à nettoyer par l'application au moment de relier). Les listes de membres utilisent `v_family_members_listed`. (3) Le profil d'un enfant ne voit ni les RDV de toute la famille ni ceux d'un autre enfant, mais garde ses propres demandes ; il n'est pas prévenu d'un RDV de toute la famille ; ses autres règles (suivi de trajet, carnet) ne sont pas touchées, son accès au tchat étant fermé par l'application. (4) Il ne coche pas la tâche des devoirs (erreur `insufficient_privilege`) mais coche ses propres tâches ; il n'écrit rien sur les données Devoirs quand l'application indique son profil (`app.user_id`) ; il lit ses éléments du jour sans le corrigé par `homework_child_items_for()`. (5) La tâche garde la source `homework_prep`, sans nouvelle valeur ; le titre n'est pas migré (affiché d'après la source). (6) Un changement des jours supprime les occurrences à venir des jours décochés et ramène `materialized_until` à aujourd'hui ; une occurrence annulée garde sa date et ne sera pas recréée. (7) Les pages : thème, matière, niveau, exercices, fiche réponse et barème chiffrés par l'application (décision du PO, D72 : comme les autres textes saisis) ; formes de question en liste fermée, posées par l'application après son contrôle ; aucun contrôle de contenu en base (trois exercices, total de 20) : c'est le code (US-180 RT1). (8) La fiche réponse est une table à part, la seule façon de la réserver aux parents jusqu'à la base ; l'enfant peut l'écrire pour la page qu'il crée mais pas la relire ; il relit ses pages tant que l'aide est activée (les « 30 derniers jours » sont un affichage). (9) Les pages suivent le suivi Devoirs : effacer l'âge des devoirs ou retirer le membre les efface. (10) Conservation de 12 mois : à valider par le DPO avec l'AIPD (S-35). (11) Le tchat de l'Assistant Famille fermé à ce profil (S-47) est tenu par l'application : un garde-fou en base est possible mais risque de bloquer d'autres agents ; non posé. | À confirmer (DPO pour la conservation) | Moyen : les lignes posées sur la fiche « autre » avant la liaison restent (invisibles pour l'enfant) tant que l'application ne les nettoie pas ; une occurrence annulée sur un jour de devoirs rajouté n'est pas recréée. |
 
 ### 3.2 Contradictions et zones floues relevées dans les sources
 
@@ -983,6 +987,9 @@ erDiagram
   homework_children ||--o{ homework_week_items : "travaille"
   homework_weeks ||--o{ homework_week_foreign_books : "propose"
   homework_children ||--o{ homework_week_foreign_books : "reçoit"
+  homework_children ||--o{ homework_exercise_pages : "reçoit des pages"
+  homework_exercise_pages ||--|| homework_exercise_page_answers : "a pour fiche réponse"
+  users |o--o| family_members : "profil de l'enfant"
   homework_weeks ||--o{ family_tasks : "crée la tâche"
   agents |o--o{ chat_erasure_requests : "pour"
   platform_settings ||--o{ platform_setting_changes : "historisé par"
@@ -1471,6 +1478,9 @@ CREATE TYPE outing_proposal_status AS ENUM ('ready', 'dismissed', 'added');
 CREATE TYPE outing_idea_section   AS ENUM ('in_budget', 'novelty');
 CREATE TYPE outing_idea_status    AS ENUM ('proposed', 'dismissed', 'added');
 CREATE TYPE homework_level        AS ENUM ('cp', 'ce1', 'ce2', 'cm1', 'cm2');
+-- Formes de question des pages d'exercices créées à partir d'une leçon (US-180 RF3, D72 S-42) : liste fermée
+CREATE TYPE homework_question_form AS ENUM ('multiple_choice', 'true_false', 'true_false_correction', 'equations_to_complete', 'fill_in_blanks',
+                                           'matching', 'ordering', 'problem', 'written_answer');
 CREATE TYPE homework_activity_category AS ENUM ('nature', 'philosophy', 'stem', 'art', 'imagination', 'games_projects');
 
 -- Contrats V2 (lot 11, US-122 à US-138)
@@ -4076,6 +4086,22 @@ CREATE FUNCTION find_family_event_conflicts(
 $$;
 COMMENT ON FUNCTION find_family_event_conflicts(uuid, uuid[], boolean, timestamptz, timestamptz, uuid) IS $$RDV en conflit avec un créneau donné (même membre ou toute la famille, statuts confirmé et provisoire). [US-74]$$;
 
+-- D73 (S-38, S-39) : le membre d'un profil est sa fiche « autre » (créée avec lui), SAUF pour l'invité secondaire relié à une fiche enfant
+-- (family_members.child_profile_user_id) : son membre est alors la fiche enfant, et sa fiche « autre » est masquée. En plpgsql : la colonne est
+-- ajoutée plus bas, au lot 10.
+CREATE FUNCTION family_member_of_profile(p_user uuid) RETURNS uuid LANGUAGE plpgsql STABLE AS $$
+BEGIN
+  RETURN COALESCE((SELECT c.id FROM family_members c WHERE c.child_profile_user_id = p_user),
+                  (SELECT m.id FROM family_members m WHERE m.user_id = p_user));
+END $$;
+COMMENT ON FUNCTION family_member_of_profile(uuid) IS $$Membre d'un profil : la fiche enfant à laquelle il est relié (family_members.child_profile_user_id) s'il est le profil d'un enfant, sinon sa propre fiche (créée avec lui). Règle unique pour la visibilité des RDV et des tâches, le droit de cocher et les destinataires des notifications. NULL si le profil n'a pas de fiche. [US-92, D73 S-38, S-39]$$;
+
+CREATE FUNCTION profile_is_child_linked(p_user uuid) RETURNS boolean LANGUAGE plpgsql STABLE AS $$
+BEGIN
+  RETURN EXISTS (SELECT 1 FROM family_members c WHERE c.child_profile_user_id = p_user);
+END $$;
+COMMENT ON FUNCTION profile_is_child_linked(uuid) IS $$Vrai si le profil est celui d'un enfant (relié à une fiche enfant). Ce profil ne voit pas les RDV de toute la famille, ne coche pas la tâche des devoirs, ne modifie pas ses éléments de devoirs et n'a pas le tchat de l'Assistant Famille (ce dernier point est tenu par l'application). [D73 S-38, S-40, S-45, S-47]$$;
+
 -- RDV visibles par un profil (D26) : parents = tous ; invité secondaire = RDV dont il est un membre concerné,
 -- RDV « toute la famille » et RDV issus de ses propres demandes. Les RDV annulés et ignorés ne s'affichent pas.
 CREATE FUNCTION family_events_visible_to(p_viewer uuid) RETURNS SETOF family_events
@@ -4085,12 +4111,12 @@ LANGUAGE sql STABLE AS $$
     JOIN users v ON v.id = p_viewer AND v.account_id = e.account_id
    WHERE e.status IN ('provisional', 'set_aside', 'confirmed')
      AND ( v.role = 'primary_user' OR v.guest_rank = 'core'
-        OR e.whole_family
+        OR (e.whole_family AND NOT profile_is_child_linked(v.id))
         OR e.requested_by_user_id = v.id
-        OR EXISTS (SELECT 1 FROM family_event_members m JOIN family_members fm ON fm.id = m.member_id
-                    WHERE m.event_id = e.id AND fm.user_id = v.id) )
+        OR EXISTS (SELECT 1 FROM family_event_members m
+                    WHERE m.event_id = e.id AND m.member_id = family_member_of_profile(v.id)) )
 $$;
-COMMENT ON FUNCTION family_events_visible_to(uuid) IS $$RDV visibles par un profil selon son rang (décision D26). [US-78, 79]$$;
+COMMENT ON FUNCTION family_events_visible_to(uuid) IS $$RDV visibles par un profil selon son rang (décision D26). Un profil relié à une fiche enfant ne voit que les RDV dont la fiche enfant est participante, jamais ceux de toute la famille (D73 S-45). [US-78, 79]$$;
 
 -- Droit de confirmer, modifier, ignorer ou annuler : parents = tous les RDV ; invité secondaire = ses propres demandes (D26)
 CREATE FUNCTION can_manage_family_event(p_user_id uuid, p_event_id uuid) RETURNS boolean
@@ -4616,11 +4642,14 @@ DECLARE v_task family_tasks%ROWTYPE; v_member uuid;
 BEGIN
   SELECT * INTO v_task FROM family_tasks WHERE id = p_task_id FOR UPDATE;
   IF NOT FOUND THEN RETURN false; END IF;
+  IF v_task.source = 'homework_prep' AND profile_is_child_linked(p_user_id) THEN
+    RAISE EXCEPTION 'Le profil d''un enfant ne change pas l''état de la tâche des devoirs' USING ERRCODE = 'insufficient_privilege';
+  END IF;
   IF p_expected_version IS NOT NULL AND v_task.version <> p_expected_version THEN RETURN false; END IF;
   IF NOT family_task_transition_allowed(v_task.status, p_to) THEN RETURN false; END IF;
   IF p_to = 'done' THEN
-    SELECT id INTO v_member FROM family_members WHERE user_id = p_user_id AND account_id = v_task.account_id;
-    IF NOT FOUND THEN
+    v_member := family_member_of_profile(p_user_id);
+    IF v_member IS NULL OR NOT EXISTS (SELECT 1 FROM family_members WHERE id = v_member AND account_id = v_task.account_id) THEN
       RAISE EXCEPTION 'Ce profil n''a pas de membre : impossible de cocher la tâche' USING ERRCODE = 'check_violation';
     END IF;
   END IF;
@@ -4633,7 +4662,7 @@ BEGIN
    WHERE id = p_task_id;
   RETURN true;
 END $$;
-COMMENT ON FUNCTION change_family_task_status(uuid, task_status, uuid, integer, task_cancel_reason) IS $$Change le statut d'une tâche de façon atomique (transition permise, version attendue) ; « faite par » = membre du profil. false = introuvable, modifiée ou transition interdite. [US-110 RF7, AT-1]$$;
+COMMENT ON FUNCTION change_family_task_status(uuid, task_status, uuid, integer, task_cancel_reason) IS $$Change le statut d'une tâche de façon atomique (transition permise, version attendue) ; « faite par » = membre du profil (la fiche enfant pour un enfant). false = introuvable, modifiée ou transition interdite. Le profil d'un enfant ne change jamais l'état de la tâche « Préparer les devoirs » (erreur insufficient_privilege, D73 S-40). [US-110 RF7, AT-1]$$;
 
 -- Termine une tâche récurrente (« Toutes », ou fin de la règle) : les occurrences à faire à partir d'aujourd'hui sont annulées.
 -- Retourne le nombre d'occurrences annulées.
@@ -4657,10 +4686,22 @@ CREATE FUNCTION family_event_retired_task_count(p_event_id uuid) RETURNS integer
 $$;
 COMMENT ON FUNCTION family_event_retired_task_count(uuid) IS $$Nombre de tâches annulées avec leur RDV (annulation ou abandon), pour la notification aux parents. [US-95 RF7]$$;
 
+-- D71, D73 (S-31) : la tâche « Préparer les devoirs » (source homework_prep) est vue du profil d'un enfant (relié à une fiche enfant qui a un âge des devoirs),
+-- tant que l'aide Devoirs est activée pour le foyer. En plpgsql : les tables Devoirs sont créées plus bas, au lot 10.
+CREATE FUNCTION homework_prep_task_visible_to(p_user uuid, p_account uuid) RETURNS boolean LANGUAGE plpgsql STABLE AS $$
+BEGIN
+  RETURN EXISTS (SELECT 1 FROM family_members c
+                   JOIN homework_children hc ON hc.member_id = c.id AND hc.account_id = c.account_id
+                   JOIN family_settings st ON st.account_id = c.account_id AND st.homework_help_enabled
+                  WHERE c.child_profile_user_id = p_user AND c.account_id = p_account);
+END $$;
+COMMENT ON FUNCTION homework_prep_task_visible_to(uuid, uuid) IS $$Vrai si le profil est celui d'un enfant (relié à une fiche enfant) qui a un âge des devoirs et que l'aide Devoirs est activée pour le foyer : il voit alors la tâche « Préparer les devoirs » sans qu'elle lui soit assignée. [US-119 RF1 et RT1, D71 S-31, D73]$$;
+
 -- Droits sur les tâches (AT-2, D26) : parents = toutes ; invité secondaire = celles qu'il a créées, celles qui lui sont assignées
 -- et celles des RDV qu'il voit. Les tâches annulées ne s'affichent pas ; une tâche proposée n'est vue que des parents et du demandeur du RDV.
 CREATE FUNCTION family_tasks_visible_to(p_viewer uuid) RETURNS SETOF family_tasks
 LANGUAGE sql STABLE AS $$
+  -- D71, D73 : membre du profil = fiche enfant pour un enfant ; la tâche des devoirs est vue de son profil (homework_prep_task_visible_to)
   SELECT t.*
     FROM family_tasks t
     JOIN users v ON v.id = p_viewer AND v.account_id = t.account_id
@@ -4668,12 +4709,13 @@ LANGUAGE sql STABLE AS $$
      AND ( v.role = 'primary_user' OR v.guest_rank = 'core'
         OR ( t.status <> 'proposed'
              AND ( t.created_by_user_id = v.id
-                OR EXISTS (SELECT 1 FROM family_members fm WHERE fm.id = t.assigned_member_id AND fm.user_id = v.id)
-                OR t.event_id IN (SELECT id FROM family_events_visible_to(p_viewer)) ) )
+                OR t.assigned_member_id = family_member_of_profile(v.id)
+                OR t.event_id IN (SELECT id FROM family_events_visible_to(p_viewer))
+                OR ( t.source = 'homework_prep' AND homework_prep_task_visible_to(v.id, t.account_id) ) ) )
         OR ( t.status = 'proposed'
              AND EXISTS (SELECT 1 FROM family_events e WHERE e.id = t.event_id AND e.requested_by_user_id = v.id) ) )
 $$;
-COMMENT ON FUNCTION family_tasks_visible_to(uuid) IS $$Tâches visibles par un profil selon son rang (décision D26, AT-2). [US-110, US-96]$$;
+COMMENT ON FUNCTION family_tasks_visible_to(uuid) IS $$Tâches visibles par un profil selon son rang (décision D26, AT-2). Les tâches assignées sont celles de la fiche du profil (la fiche enfant pour un enfant). Exception D71 : la tâche « Préparer les devoirs » est visible du profil d'un enfant qui a un âge des devoirs, tant que l'aide Devoirs est activée. [US-110, US-96, US-119 RF1 et RT1, D71 S-31, D73]$$;
 
 -- Droit de modifier, assigner ou annuler : parents = toutes ; invité secondaire = les tâches qu'il a créées
 CREATE FUNCTION can_manage_family_task(p_user_id uuid, p_task_id uuid) RETURNS boolean
@@ -4688,11 +4730,11 @@ COMMENT ON FUNCTION can_manage_family_task(uuid, uuid) IS $$Vrai si le profil pe
 -- Droit de cocher : le droit de gérer, plus les tâches assignées à son propre membre
 CREATE FUNCTION can_check_family_task(p_user_id uuid, p_task_id uuid) RETURNS boolean
 LANGUAGE sql STABLE AS $$
-  SELECT can_manage_family_task(p_user_id, p_task_id)
-      OR EXISTS (SELECT 1 FROM family_tasks t JOIN family_members fm ON fm.id = t.assigned_member_id
-                  WHERE t.id = p_task_id AND fm.user_id = p_user_id)
+  SELECT (can_manage_family_task(p_user_id, p_task_id)
+          OR EXISTS (SELECT 1 FROM family_tasks t WHERE t.id = p_task_id AND t.assigned_member_id = family_member_of_profile(p_user_id)))
+     AND NOT EXISTS (SELECT 1 FROM family_tasks t WHERE t.id = p_task_id AND t.source = 'homework_prep' AND profile_is_child_linked(p_user_id))
 $$;
-COMMENT ON FUNCTION can_check_family_task(uuid, uuid) IS $$Vrai si le profil peut cocher cette tâche (parents : toutes ; invité secondaire : ses créations et les tâches qui lui sont assignées). [AT-2]$$;
+COMMENT ON FUNCTION can_check_family_task(uuid, uuid) IS $$Vrai si le profil peut cocher cette tâche (parents : toutes ; invité secondaire : ses créations et les tâches qui lui sont assignées, celles de la fiche enfant pour un enfant). Le profil d'un enfant ne coche jamais la tâche « Préparer les devoirs » (D73 S-40) mais garde ses tâches à lui (S-46). [AT-2]$$;
 
 -- « En retard » n'est pas un statut mais un affichage : tâche à faire dont l'échéance est passée, dans le fuseau de la famille (AT-1)
 CREATE VIEW v_family_tasks AS
@@ -5407,8 +5449,8 @@ BEGIN
              OR (NOT v_e.auto_confirmed AND v_e.confirmed_at <= v_e.created_at + make_interval(mins => v_delay))
            ELSE
              p_kind = 'event_added'
-             AND EXISTS (SELECT 1 FROM family_event_members m JOIN family_members fm ON fm.id = m.member_id
-                          WHERE m.event_id = v_e.id AND fm.user_id = u.id)
+             AND EXISTS (SELECT 1 FROM family_event_members m
+                          WHERE m.event_id = v_e.id AND m.member_id = family_member_of_profile(u.id))
          END;
 END $$;
 COMMENT ON FUNCTION family_event_notice_recipients(uuid, notification_kind) IS $$Destinataires d'une notification « RDV ajouté » ou « RDV à confirmer » avec leur canal (appareil autorisé ou non) : jamais le demandeur ni celui qui confirme, seulement après la date de mise en service, réglage personnel respecté ; invité secondaire seulement pour « ajouté » ; jamais pour un RDV créé depuis une idée de sortie (source « outing »). [US-113 RF1 à RF11, RF14, US-120 RF5]$$;
@@ -6027,10 +6069,20 @@ ALTER TABLE family_settings
   ADD CONSTRAINT ck_family_settings_homework CHECK (NOT homework_help_enabled OR (homework_help_first_enabled_at IS NOT NULL AND homework_help_disabled_at IS NULL));
 COMMENT ON COLUMN family_settings.homework_help_enabled IS $$Aide Devoirs activée pour toute la famille (faux par défaut). Ne s'active que si la famille compte au moins un membre enfant ; désactiver arrête l'aide sans effacer les plannings ni les progrès. [US-118 RF1, RF2, RF5, D64]$$;
 COMMENT ON COLUMN family_settings.homework_help_first_enabled_at IS $$Date de la première activation, posée automatiquement : vide = la présentation en trois lignes n'a jamais été montrée (US-118 RF3)$$;
+-- D71 (S-30) : jours de devoirs du foyer, de 1 (lundi) à 7 (dimanche) ; lundi, mardi, jeudi et vendredi au départ ; au moins un jour. La tâche « Préparer les devoirs » revient ces jours-là.
+ALTER TABLE family_settings
+  ADD COLUMN homework_days smallint[] NOT NULL DEFAULT ARRAY[1, 2, 4, 5]::smallint[];
+ALTER TABLE family_settings
+  ADD CONSTRAINT ck_family_settings_homework_days CHECK (iso_weekdays_valid(homework_days));
+COMMENT ON COLUMN family_settings.homework_days IS $$Jours de devoirs du foyer (1 = lundi … 7 = dimanche, sans doublon, au moins un) : lundi, mardi, jeudi et vendredi au départ. Réglage familial, modifiable par les deux parents, lisible en lecture seule par les invités secondaires. La tâche « Préparer les devoirs » revient ces jours-là : la base aligne les jours de sa série sur ce réglage (trigger) et retire les occurrences à venir des jours décochés dès le lendemain. Stocké trié. [US-118 RF7, US-119 RF1, D71 S-30]$$;
 COMMENT ON COLUMN family_settings.homework_help_disabled_at IS $$Date de la dernière désactivation de l'aide, posée automatiquement quand elle passe de vraie à fausse et remise à vide à la réactivation. Les exercices validés sont gardés jusqu'à homework_validation_grace_days (30) après cette date : une réactivation pendant ce délai les retrouve (D65)$$;
 
 CREATE FUNCTION family_settings_homework_before_write() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
+  -- Jours de devoirs rangés dans l'ordre (la validité est contrôlée par ck_family_settings_homework_days)
+  IF NEW.homework_days IS NOT NULL THEN
+    NEW.homework_days := ARRAY(SELECT d FROM unnest(NEW.homework_days) d ORDER BY d);
+  END IF;
   IF TG_OP = 'UPDATE' AND OLD.homework_help_enabled AND NOT NEW.homework_help_enabled THEN
     NEW.homework_help_disabled_at := now();
   END IF;
@@ -6205,7 +6257,7 @@ ALTER TABLE family_event_series
   ADD CONSTRAINT ck_event_series_yearly CHECK (repeat_unit <> 'yearly' OR NOT skip_school_holidays);
 ALTER TABLE family_task_series
   ADD CONSTRAINT ck_task_series_unit CHECK (repeat_unit IS DISTINCT FROM 'yearly');
-COMMENT ON COLUMN family_tasks.homework_week_id IS $$Semaine de devoirs à l'origine de la tâche « Devoirs — [prénom] (N éléments) » (source « homework ») : une tâche par enfant et par jour de travail ; supprimée avec la semaine. [US-119 RF4]$$;
+COMMENT ON COLUMN family_tasks.homework_week_id IS $$Semaine de devoirs à l'origine de la tâche « Devoirs — [prénom] (N éléments) » (source « homework ») : une tâche par enfant et par jour de travail ; supprimée avec la semaine. Ces tâches ne sont plus créées depuis D71 (S-33) : préparer une semaine n'en crée plus, le planning du jour s'ouvre depuis la tâche « Préparer les devoirs » ; celles qui existent restent jusqu'à leur échéance. [US-119 RF4, D71]$$;
 
 -- L'âge des devoirs ne concerne qu'un membre enfant actif
 CREATE FUNCTION homework_child_before_write() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -6294,40 +6346,44 @@ CREATE FUNCTION erase_member_homework_data(p_member_id uuid, p_keep_age boolean 
 BEGIN
   DELETE FROM family_tasks WHERE source = 'homework' AND assigned_member_id = p_member_id;
   DELETE FROM homework_week_items WHERE member_id = p_member_id;
+  DELETE FROM homework_exercise_pages WHERE member_id = p_member_id;
   DELETE FROM homework_week_foreign_books WHERE member_id = p_member_id;
   DELETE FROM homework_exercise_validations WHERE member_id = p_member_id;
   IF NOT p_keep_age THEN
     DELETE FROM homework_children WHERE member_id = p_member_id;
   END IF;
 END $$;
-COMMENT ON FUNCTION erase_member_homework_data(uuid, boolean) IS $$Supprime les données Devoirs d'un enfant : tâches « Devoirs », éléments prévus, manuels proposés, exercices validés et, sauf demande contraire, l'âge des devoirs. Appelée au retrait et à l'effacement du membre. [US-93, US-119 RT5]$$;
+COMMENT ON FUNCTION erase_member_homework_data(uuid, boolean) IS $$Supprime les données Devoirs d'un enfant : tâches « Devoirs », éléments prévus, pages d'exercices (avec leur fiche réponse), manuels proposés, exercices validés et, sauf demande contraire, l'âge des devoirs. Appelée au retrait et à l'effacement du membre. [US-93, US-119 RT5, US-180 RT5]$$;
 
 -- Bouton « Effacer les progrès de Devoirs » (US-118 RF5) : supprime les semaines préparées (avec éléments et tâches), les exercices validés et,
 -- si p_keep_ages est faux, l'âge des devoirs des enfants. Retourne le nombre de semaines, de validations et de tâches supprimées.
 CREATE FUNCTION erase_family_homework_progress(p_account_id uuid, p_keep_ages boolean DEFAULT true) RETURNS bigint LANGUAGE plpgsql AS $$
-DECLARE v_tasks bigint; v_weeks bigint; v_valid bigint;
+DECLARE v_tasks bigint; v_weeks bigint; v_valid bigint; v_pages bigint;
 BEGIN
   DELETE FROM family_tasks WHERE account_id = p_account_id AND source = 'homework';
   GET DIAGNOSTICS v_tasks = ROW_COUNT;
   DELETE FROM homework_weeks WHERE account_id = p_account_id;
   GET DIAGNOSTICS v_weeks = ROW_COUNT;
+  DELETE FROM homework_exercise_pages WHERE account_id = p_account_id;
+  GET DIAGNOSTICS v_pages = ROW_COUNT;
   DELETE FROM homework_exercise_validations v USING homework_children c WHERE c.member_id = v.member_id AND c.account_id = p_account_id;
   GET DIAGNOSTICS v_valid = ROW_COUNT;
   IF NOT p_keep_ages THEN
     DELETE FROM homework_children WHERE account_id = p_account_id;
   END IF;
-  RETURN v_tasks + v_weeks + v_valid;
+  RETURN v_tasks + v_weeks + v_valid + v_pages;
 END $$;
-COMMENT ON FUNCTION erase_family_homework_progress(uuid, boolean) IS $$Efface les plannings et les progrès Devoirs d'une famille : semaines préparées (avec éléments et tâches « Devoirs »), exercices validés et, si demandé, l'âge des devoirs (conservé par défaut : c'est le comportement de l'écran, D65). Retourne le nombre de lignes supprimées. [US-118 RF5, US-119 RT5]$$;
+COMMENT ON FUNCTION erase_family_homework_progress(uuid, boolean) IS $$Efface les plannings et les progrès Devoirs d'une famille : semaines préparées (avec éléments et tâches « Devoirs »), pages d'exercices (avec leur fiche réponse), exercices validés et, si demandé, l'âge des devoirs (conservé par défaut : c'est le comportement de l'écran, D65). Retourne le nombre de lignes supprimées. [US-118 RF5, US-119 RT5, US-180 RT5]$$;
 
 -- Purge Devoirs (D65, à valider par le DPO et à écrire dans l'AIPD) : semaines préparées et leurs éléments supprimés 12 mois après la semaine
 -- (avec les manuels proposés et les tâches « Devoirs » liées) ; exercices validés gardés tant que l'aide est active pour la famille de l'enfant,
 -- puis encore 30 jours après sa désactivation (délai de grâce : une réactivation les retrouve). Retourne le nombre de semaines et de validations supprimées.
 CREATE FUNCTION purge_expired_homework_data() RETURNS bigint LANGUAGE plpgsql AS $$
-DECLARE v_months integer; v_grace integer; v_a bigint; v_b bigint;
+DECLARE v_months integer; v_grace integer; v_pages integer; v_a bigint; v_b bigint; v_c bigint;
 BEGIN
   SELECT value_text::integer INTO v_months FROM platform_settings WHERE setting_key = 'homework_week_retention_months';
   SELECT value_text::integer INTO v_grace FROM platform_settings WHERE setting_key = 'homework_validation_grace_days';
+  SELECT value_text::integer INTO v_pages FROM platform_settings WHERE setting_key = 'homework_page_retention_months';
   DELETE FROM homework_weeks WHERE week_start + 6 < current_date - make_interval(months => COALESCE(v_months, 12));
   GET DIAGNOSTICS v_a = ROW_COUNT;
   DELETE FROM homework_exercise_validations v USING homework_children c
@@ -6337,9 +6393,11 @@ BEGIN
                         AND (st.homework_help_enabled
                              OR st.homework_help_disabled_at >= now() - make_interval(days => COALESCE(v_grace, 30))));
   GET DIAGNOSTICS v_b = ROW_COUNT;
-  RETURN v_a + v_b;
+  DELETE FROM homework_exercise_pages WHERE created_at < now() - make_interval(months => COALESCE(v_pages, 12));
+  GET DIAGNOSTICS v_c = ROW_COUNT;
+  RETURN v_a + v_b + v_c;
 END $$;
-COMMENT ON FUNCTION purge_expired_homework_data() IS $$Supprime les semaines de devoirs (avec éléments, manuels proposés et tâches « Devoirs ») 12 mois après la semaine, et les exercices validés des enfants dont la famille n'a plus l'aide Devoirs active depuis plus de 30 jours (homework_validation_grace_days). À planifier chaque jour. [US-119 RT5, D65]$$;
+COMMENT ON FUNCTION purge_expired_homework_data() IS $$Supprime les semaines de devoirs (avec éléments, manuels proposés et tâches « Devoirs ») 12 mois après la semaine, les pages d'exercices (avec leur fiche réponse) 12 mois après leur création (homework_page_retention_months), et les exercices validés des enfants dont la famille n'a plus l'aide Devoirs active depuis plus de 30 jours (homework_validation_grace_days). À planifier chaque jour. [US-119 RT5, D65, US-180 RT5]$$;
 
 -- Un membre qui n'est plus enfant n'est plus suivi par l'aide Devoirs
 CREATE FUNCTION family_member_homework_role_changed() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -6349,6 +6407,283 @@ BEGIN
 END $$;
 CREATE TRIGGER trg_family_members_homework_role AFTER UPDATE OF role ON family_members
   FOR EACH ROW WHEN (OLD.role = 'child' AND NEW.role <> 'child') EXECUTE FUNCTION family_member_homework_role_changed();
+
+-- =====================================================================
+-- D71 à D73 (11/11/2026) — Aide Devoirs : tâche « Préparer les devoirs » les jours de devoirs, profil de l'enfant, pages d'exercices créées à partir d'une leçon
+-- (US-118 RF7, US-119 RF1, RF11 et RT1, US-180). Les jours de devoirs sont le réglage family_settings.homework_days (plus haut).
+-- =====================================================================
+
+-- Profil de l'enfant (D73 S-38) : la fiche ENFANT porte le lien vers le profil d'invité secondaire de l'enfant. Le lien n'est pas sur family_members.user_id (réservé à la fiche
+-- « autre » créée avec le profil, que sync_member_from_user suit et que la suppression du profil anonymise) ni dans homework_children (retirer l'âge des devoirs ou effacer les
+-- progrès ne change rien à ce que voit l'enfant). Il est unique, du même foyer, réservé à un invité secondaire, remis à vide à la suppression du profil sans toucher à la fiche.
+ALTER TABLE family_members ADD COLUMN child_profile_user_id uuid;
+ALTER TABLE family_members
+  ADD CONSTRAINT fk_family_members_child_profile FOREIGN KEY (child_profile_user_id, account_id)
+    REFERENCES users (id, account_id) ON DELETE SET NULL (child_profile_user_id);
+ALTER TABLE family_members
+  ADD CONSTRAINT ck_family_members_child_profile CHECK (child_profile_user_id IS NULL
+    OR (role = 'child' AND user_id IS NULL AND archived_at IS NULL AND anonymized_at IS NULL));
+CREATE UNIQUE INDEX ux_family_members_child_profile ON family_members (child_profile_user_id) WHERE child_profile_user_id IS NOT NULL;
+COMMENT ON COLUMN family_members.child_profile_user_id IS $$Profil de l'enfant : profil d'invité secondaire de l'enfant, porté par sa fiche enfant (rôle enfant, non liée à un profil par user_id). Unique, du même foyer, remis à vide à la suppression du profil sans anonymiser la fiche, et à vide si la fiche cesse d'être une fiche enfant active. Le membre du profil est alors cette fiche enfant (family_member_of_profile) et sa fiche « autre » est masquée. Sans lien avec l'âge des devoirs. [D73 S-38, S-39]$$;
+
+CREATE FUNCTION family_member_child_profile_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  -- La fiche cesse d'être une fiche enfant active : le lien tombe, sans erreur
+  IF TG_OP = 'UPDATE' AND NEW.child_profile_user_id IS NOT NULL AND NEW.child_profile_user_id IS NOT DISTINCT FROM OLD.child_profile_user_id
+     AND (NEW.role <> 'child' OR NEW.archived_at IS NOT NULL OR NEW.anonymized_at IS NOT NULL) THEN
+    NEW.child_profile_user_id := NULL;
+  END IF;
+  IF NEW.child_profile_user_id IS NOT NULL AND (TG_OP = 'INSERT' OR NEW.child_profile_user_id IS DISTINCT FROM OLD.child_profile_user_id) THEN
+    IF NOT EXISTS (SELECT 1 FROM users u WHERE u.id = NEW.child_profile_user_id AND u.account_id = NEW.account_id AND u.role = 'guest' AND u.guest_rank = 'secondary') THEN
+      RAISE EXCEPTION 'Le profil d''un enfant est un invité secondaire du même foyer' USING ERRCODE = 'check_violation';
+    END IF;
+  END IF;
+  RETURN NEW;
+END $$;
+CREATE TRIGGER trg_family_members_child_profile BEFORE INSERT OR UPDATE ON family_members
+  FOR EACH ROW EXECUTE FUNCTION family_member_child_profile_guard();
+COMMENT ON FUNCTION family_member_child_profile_guard() IS $$Le profil relié à une fiche enfant est un invité secondaire du même foyer ; le lien tombe quand la fiche cesse d'être une fiche enfant active (changement de rôle, retrait, effacement). [D73 S-38]$$;
+
+-- Fiche « autre » masquée (D73 S-39) : la fiche créée avec le profil d'un enfant n'est ni listée, ni choisie comme participante d'un RDV ou d'une série, ni assignée à une tâche.
+-- La base refuse les nouvelles écritures qui la visent ; l'affichage passe par v_family_members_listed (ou family_member_is_hidden) ; le code retire la fiche des listes existantes.
+CREATE FUNCTION family_member_is_hidden(p_member uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
+  SELECT EXISTS (SELECT 1 FROM family_members o JOIN family_members c ON c.child_profile_user_id = o.user_id AND c.account_id = o.account_id WHERE o.id = p_member)
+$$;
+COMMENT ON FUNCTION family_member_is_hidden(uuid) IS $$Vrai si la fiche est la fiche « autre » du profil d'un enfant (profil relié à une fiche enfant) : elle est masquée dans les membres, les RDV et l'assignation des tâches. [D73 S-39]$$;
+
+CREATE FUNCTION family_member_not_hidden_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE v_member uuid;
+BEGIN
+  v_member := NULLIF(to_jsonb(NEW) ->> TG_ARGV[0], '')::uuid;
+  IF v_member IS NOT NULL AND family_member_is_hidden(v_member) THEN
+    RAISE EXCEPTION 'La fiche « autre » du profil d''un enfant est masquée : utilisez sa fiche enfant' USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NEW;
+END $$;
+CREATE TRIGGER trg_family_event_members_not_hidden BEFORE INSERT OR UPDATE OF member_id ON family_event_members
+  FOR EACH ROW EXECUTE FUNCTION family_member_not_hidden_guard('member_id');
+CREATE TRIGGER trg_family_event_series_members_not_hidden BEFORE INSERT OR UPDATE OF member_id ON family_event_series_members
+  FOR EACH ROW EXECUTE FUNCTION family_member_not_hidden_guard('member_id');
+CREATE TRIGGER trg_family_tasks_not_hidden BEFORE INSERT OR UPDATE OF assigned_member_id ON family_tasks
+  FOR EACH ROW EXECUTE FUNCTION family_member_not_hidden_guard('assigned_member_id');
+CREATE TRIGGER trg_family_task_series_not_hidden BEFORE INSERT OR UPDATE OF assigned_member_id ON family_task_series
+  FOR EACH ROW EXECUTE FUNCTION family_member_not_hidden_guard('assigned_member_id');
+COMMENT ON FUNCTION family_member_not_hidden_guard() IS $$Refuse qu'une écriture vise la fiche « autre » masquée du profil d'un enfant (participant d'un RDV ou d'une série, tâche ou série de tâches assignée). Le nom de la colonne vient de l'argument du trigger. [D73 S-39]$$;
+
+CREATE VIEW v_family_members_listed AS
+SELECT m.* FROM family_members m WHERE NOT family_member_is_hidden(m.id);
+COMMENT ON VIEW v_family_members_listed IS $$Membres du foyer à afficher et à proposer : family_members sans la fiche « autre » du profil d'un enfant, masquée (D73 S-39).$$;
+
+-- La tâche « Préparer les devoirs » est la série de source « homework_prep » (D69), reconnue par sa source et non par son titre. Une seule série active par foyer
+-- (ux_task_series_homework_prep), hebdomadaire, sans personne assignée ; ses occurrences copient la source de leur série et ne sont assignées à personne.
+ALTER TABLE family_task_series
+  ADD CONSTRAINT ck_task_series_homework_prep CHECK (source <> 'homework_prep'
+    OR (assigned_member_id IS NULL AND event_series_id IS NULL AND repeat_unit = 'week' AND repeat_interval = 1));
+ALTER TABLE family_tasks
+  ADD CONSTRAINT ck_tasks_homework_prep CHECK (source <> 'homework_prep' OR assigned_member_id IS NULL);
+
+-- Les jours de la série sont toujours les jours de devoirs du foyer : le formulaire de tâche ne les change pas (S-30)
+CREATE FUNCTION family_task_series_homework_prep_days() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  NEW.weekdays := COALESCE((SELECT st.homework_days FROM family_settings st WHERE st.account_id = NEW.account_id), ARRAY[1, 2, 4, 5]::smallint[]);
+  RETURN NEW;
+END $$;
+CREATE TRIGGER trg_family_task_series_homework_prep BEFORE INSERT OR UPDATE ON family_task_series
+  FOR EACH ROW WHEN (NEW.source = 'homework_prep') EXECUTE FUNCTION family_task_series_homework_prep_days();
+COMMENT ON FUNCTION family_task_series_homework_prep_days() IS $$Aligne les jours de la série « Préparer les devoirs » (source homework_prep) sur les jours de devoirs du foyer (family_settings.homework_days ; lundi, mardi, jeudi, vendredi sans réglage) à chaque écriture. [US-118 RF7, US-119 RF1, D71 S-30]$$;
+
+-- Un changement des jours de devoirs s'applique dès le lendemain (date locale de la famille) : la série prend les nouveaux jours, les occurrences à venir des jours décochés
+-- (à faire ou proposées) sont supprimées, et la date de création des occurrences est ramenée à aujourd'hui pour que le planificateur crée les jours ajoutés
+CREATE FUNCTION family_settings_homework_days_changed() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE v_today date;
+BEGIN
+  SELECT (now() AT TIME ZONE a.family_timezone)::date INTO v_today FROM accounts a WHERE a.id = NEW.account_id;
+  v_today := COALESCE(v_today, current_date);
+  UPDATE family_task_series s
+     SET weekdays = NEW.homework_days, materialized_until = LEAST(s.materialized_until, v_today)
+   WHERE s.account_id = NEW.account_id AND s.source = 'homework_prep' AND s.ended_at IS NULL;
+  DELETE FROM family_tasks t USING family_task_series s
+   WHERE t.series_id = s.id AND s.account_id = NEW.account_id AND s.source = 'homework_prep' AND s.ended_at IS NULL
+     AND t.status IN ('proposed', 'todo') AND t.due_date > v_today
+     AND NOT (date_part('isodow', t.due_date)::smallint = ANY (NEW.homework_days));
+  RETURN NULL;
+END $$;
+CREATE TRIGGER trg_family_settings_homework_days AFTER UPDATE OF homework_days ON family_settings
+  FOR EACH ROW WHEN (OLD.homework_days IS DISTINCT FROM NEW.homework_days) EXECUTE FUNCTION family_settings_homework_days_changed();
+COMMENT ON FUNCTION family_settings_homework_days_changed() IS $$Applique un changement des jours de devoirs à la série « Préparer les devoirs » du foyer, dès le lendemain : nouveaux jours dans la série, occurrences à venir des jours décochés supprimées (les faites et les passées restent), date de création des occurrences ramenée à aujourd'hui pour que le planificateur crée les jours ajoutés. [US-118 RF7, D71 S-30]$$;
+
+-- Lecture seule pour le profil d'un enfant (D73 S-40) : quand l'application indique le profil (app.user_id) et que c'est celui d'un enfant, aucune écriture sur les plannings,
+-- les éléments, les manuels proposés, les exercices validés ni l'âge des devoirs. Il lit ses éléments du jour par homework_child_items_for(), sans corrigé.
+CREATE FUNCTION homework_child_read_only_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF profile_is_child_linked(app_current_user_id()) THEN
+    RAISE EXCEPTION 'Le profil d''un enfant lit ses devoirs, il ne les modifie pas' USING ERRCODE = 'insufficient_privilege';
+  END IF;
+  RETURN COALESCE(NEW, OLD);
+END $$;
+CREATE TRIGGER trg_homework_weeks_child_read_only BEFORE INSERT OR UPDATE OR DELETE ON homework_weeks
+  FOR EACH ROW EXECUTE FUNCTION homework_child_read_only_guard();
+CREATE TRIGGER trg_homework_items_child_read_only BEFORE INSERT OR UPDATE OR DELETE ON homework_week_items
+  FOR EACH ROW EXECUTE FUNCTION homework_child_read_only_guard();
+CREATE TRIGGER trg_homework_foreign_books_child_read_only BEFORE INSERT OR UPDATE OR DELETE ON homework_week_foreign_books
+  FOR EACH ROW EXECUTE FUNCTION homework_child_read_only_guard();
+CREATE TRIGGER trg_homework_validations_child_read_only BEFORE INSERT OR UPDATE OR DELETE ON homework_exercise_validations
+  FOR EACH ROW EXECUTE FUNCTION homework_child_read_only_guard();
+CREATE TRIGGER trg_homework_children_child_read_only BEFORE INSERT OR UPDATE OR DELETE ON homework_children
+  FOR EACH ROW EXECUTE FUNCTION homework_child_read_only_guard();
+COMMENT ON FUNCTION homework_child_read_only_guard() IS $$Refuse toute écriture sur les données Devoirs quand le profil indiqué par l'application (app.user_id) est celui d'un enfant : il ne coche pas ses éléments, ne déplace rien, ne change pas son âge des devoirs. Sans profil indiqué (traitements du serveur, suppressions en cascade), la règle ne joue pas. [D73 S-40]$$;
+
+-- Éléments du jour d'un enfant, sans corrigé : ce que le profil de l'enfant lit (D73 S-40). Ni le corrigé du catalogue, ni les autres jours, ni un autre enfant.
+CREATE FUNCTION homework_child_items_for(p_viewer uuid, p_day date)
+RETURNS TABLE (it_id bigint, it_day date, it_exercise_id bigint, it_activity_id bigint, it_textbook_key text, it_level homework_level, it_number integer,
+               it_theme text, it_statement text, it_activity_title text, it_activity_description text, it_activity_steps text, it_activity_materials text,
+               it_needs_adult boolean, it_custom_title bytea, it_checked_at timestamptz)
+LANGUAGE sql STABLE AS $$
+  SELECT i.id, i.day, i.exercise_id, i.activity_id, e.textbook_key, e.level, e.number, e.theme::text, e.statement,
+         a.title::text, a.description, a.steps, a.materials, a.needs_adult, i.custom_title, i.checked_at
+    FROM family_members c
+    JOIN family_settings st ON st.account_id = c.account_id AND st.homework_help_enabled
+    JOIN homework_week_items i ON i.member_id = c.id AND i.account_id = c.account_id
+    LEFT JOIN homework_exercises e ON e.id = i.exercise_id
+    LEFT JOIN homework_activities a ON a.id = i.activity_id
+   WHERE c.child_profile_user_id = p_viewer AND i.day = p_day
+$$;
+COMMENT ON FUNCTION homework_child_items_for(uuid, date) IS $$Éléments de devoirs du jour de l'enfant dont le profil est indiqué (exercices du catalogue avec leur énoncé, activités avec leurs étapes, activités libres du parent, case cochée), SANS le corrigé. Rien pour un autre profil, ni quand l'aide Devoirs est désactivée. Le jour est la date locale de la famille, passée par l'application. [US-119 RF4, D73 S-40]$$;
+
+-- ---------------------------------------------------------------------
+-- Pages d'exercices créées à partir d'une leçon (US-180) : le contenu structuré (exercices) est chiffré dans homework_exercise_pages, la fiche réponse et le barème,
+-- chiffrés aussi, dans une table à part lisible des seuls parents. Aucune photo : elle est transmise au modèle puis effacée (S-35), jamais écrite en base.
+-- ---------------------------------------------------------------------
+CREATE FUNCTION homework_question_forms_valid(p_forms homework_question_form[]) RETURNS boolean LANGUAGE sql IMMUTABLE AS $$
+  SELECT COALESCE(cardinality(p_forms) BETWEEN 1 AND 9 AND (SELECT count(DISTINCT f) FROM unnest(p_forms) f) = cardinality(p_forms), false)
+$$;
+COMMENT ON FUNCTION homework_question_forms_valid(homework_question_form[]) IS $$Vrai si la liste des formes de question d'une page est non vide et sans doublon (1 à 9 formes de la liste fermée). [US-180 RF3, D72 S-42]$$;
+
+CREATE TABLE homework_exercise_pages (
+  id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  account_id          uuid NOT NULL REFERENCES accounts (id) ON DELETE CASCADE,
+  member_id           uuid NOT NULL,
+  -- Profil qui a demandé la page : le parent, ou l'enfant lui-même par son profil ; vide si ce profil est supprimé
+  created_by_user_id  uuid REFERENCES users (id) ON DELETE SET NULL,
+  -- Thème, matière et niveau repérés par le modèle, CHIFFRÉS par l'application comme tous les textes saisis (D72)
+  theme               bytea NOT NULL CHECK (octet_length(theme) BETWEEN 1 AND 2000),
+  subject             bytea NOT NULL CHECK (octet_length(subject) BETWEEN 1 AND 1000),
+  level               bytea NOT NULL CHECK (octet_length(level) BETWEEN 1 AND 1000),
+  -- Formes de question de la page, liste fermée (QCM, vrai/faux, texte à trous…) : métadonnée sans contenu, utile aux statistiques de la console et au contrôle de la page
+  question_forms      homework_question_form[] NOT NULL CHECK (homework_question_forms_valid(question_forms)),
+  -- Les 3 exercices dans l'ordre facile, moyen, difficile, en données structurées CHIFFRÉES par l'application (énoncés seuls ; le contrôle du contenu est fait par le code, US-180 RT1)
+  exercises           bytea NOT NULL CHECK (octet_length(exercises) BETWEEN 1 AND 200000),
+  created_at          timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (id, account_id),
+  CONSTRAINT fk_homework_pages_child FOREIGN KEY (member_id, account_id)
+    REFERENCES homework_children (member_id, account_id) ON DELETE CASCADE
+);
+CREATE INDEX idx_homework_pages_member ON homework_exercise_pages (member_id, account_id, created_at DESC);
+CREATE INDEX idx_homework_pages_account ON homework_exercise_pages (account_id, created_at);
+CREATE INDEX idx_homework_pages_created ON homework_exercise_pages (created_at);
+CREATE INDEX idx_homework_pages_created_by ON homework_exercise_pages (created_by_user_id);
+COMMENT ON TABLE homework_exercise_pages IS $$Pages d'exercices créées à partir d'une leçon (3 exercices : facile, moyen, difficile), rattachées à un membre enfant suivi par l'aide Devoirs et à son foyer, avec le profil qui les a créées. Thème, matière, niveau et exercices chiffrés par l'application. Sans photo ni prénom. Lue par les parents du foyer et par l'enfant (par son profil) pour ses seules pages ; la fiche réponse est dans homework_exercise_page_answers, lue des seuls parents. Supprimée 12 mois après sa création, avec le membre, à l'effacement des progrès de Devoirs et avec le compte. Donnée de mineur, incluse dans l'export de la famille. [US-180 RF4 à RF7, RT4, RT5, D71 S-35, S-36, D72 S-42]$$;
+COMMENT ON COLUMN homework_exercise_pages.member_id IS $$Membre enfant (fiche enfant) pour qui la page est créée (il a un âge des devoirs) : la page disparaît avec son suivi Devoirs (retrait ou effacement du membre, effacement des âges). [US-180 RT4, RT5]$$;
+COMMENT ON COLUMN homework_exercise_pages.created_by_user_id IS $$Profil qui a demandé la page : un parent du foyer, ou l'enfant lui-même par son profil (contrôlé à l'écriture). Vide si ce profil est supprimé. Compte dans le plafond quotidien de ce profil. [US-180 RF10, RT4]$$;
+COMMENT ON COLUMN homework_exercise_pages.theme IS $$Thème de la leçon repéré par le modèle, chiffré par l'application, affiché dans « Exercices — [thème] » et dans le dossier des parents (« Les fractions — 10/11/2026 »). Aucune donnée personnelle : le modèle ne reçoit jamais le prénom (US-180 RT2). [US-180 RF3, RF7]$$;
+COMMENT ON COLUMN homework_exercise_pages.subject IS $$Matière repérée par le modèle (maths, français, histoire…), texte libre court, chiffré par l'application. [US-180 RF3, RT4]$$;
+COMMENT ON COLUMN homework_exercise_pages.level IS $$Niveau de la leçon repéré par le modèle (CP, CE2, CM1…), texte libre court chiffré par l'application : distinct de l'âge des devoirs de l'enfant. [US-180 RF3, RT4]$$;
+COMMENT ON COLUMN homework_exercise_pages.question_forms IS $$Formes de question utilisées par la page, dans la liste fermée homework_question_form (QCM, vrai/faux, vrai/faux avec correction, égalités à compléter, texte à trous, éléments à relier, ranger, problème, réponse rédigée), sans doublon. Posée par l'application après son contrôle de la page. [US-180 RF3, RT1, D72 S-42]$$;
+COMMENT ON COLUMN homework_exercise_pages.exercises IS $$Les 3 exercices dans l'ordre facile, moyen, difficile, en données structurées chiffrées par l'application (consigne, questions, cases, lignes d'écriture) que l'application met en forme avec la charte de MAAQ. Énoncés seuls : jamais de réponse ici. 200 000 octets au plus. [US-180 RF3, RF5, RT1, RT4]$$;
+
+CREATE TABLE homework_exercise_page_answers (
+  page_id        uuid PRIMARY KEY,
+  account_id     uuid NOT NULL,
+  -- Bonnes réponses, correction des phrases fausses, réponse type des réponses rédigées (« Toute réponse proche est acceptée »), chiffrées par l'application
+  answers        bytea NOT NULL CHECK (octet_length(answers) BETWEEN 1 AND 200000),
+  -- Barème sur 20 points (facile < moyen < difficile ; le total exact est contrôlé par le code, US-180 RT1), chiffré par l'application
+  grading_scale  bytea NOT NULL CHECK (octet_length(grading_scale) BETWEEN 1 AND 20000),
+  CONSTRAINT fk_homework_answers_page FOREIGN KEY (page_id, account_id)
+    REFERENCES homework_exercise_pages (id, account_id) ON DELETE CASCADE
+);
+CREATE INDEX idx_homework_answers_account ON homework_exercise_page_answers (account_id);
+COMMENT ON TABLE homework_exercise_page_answers IS $$Fiche réponse et barème d'une page d'exercices, « pour l'adulte qui corrige », chiffrés. Lue des seuls parents du foyer, y compris par la sécurité par ligne : l'enfant ne la voit jamais (même pour ses propres pages), il peut seulement l'écrire pour la page qu'il crée. Une page a toujours sa fiche (contrôle différé). Supprimée avec sa page. [US-180 RF4, RT4, D71 S-36]$$;
+COMMENT ON COLUMN homework_exercise_page_answers.page_id IS $$Page d'exercices à laquelle appartient la fiche (une fiche par page) : supprimée avec elle. [US-180 RT4]$$;
+COMMENT ON COLUMN homework_exercise_page_answers.answers IS $$Bonnes réponses de chaque question, correction des phrases fausses et réponse type des réponses rédigées, en données structurées chiffrées par l'application. Jamais renvoyée à un profil qui n'est pas un parent. [US-180 RF4, RT4]$$;
+COMMENT ON COLUMN homework_exercise_page_answers.grading_scale IS $$Barème sur 20 points (facile < moyen < difficile), en données structurées chiffrées par l'application. [US-180 RF4, RT1]$$;
+
+-- Droit d'un profil sur les pages d'exercices d'un foyer : « parent » (utilisateur principal et invité 1 : toutes les pages, la fiche réponse, la suppression) ou « child »
+-- (profil de l'enfant, relié à sa fiche enfant qui a un âge des devoirs, aide Devoirs activée : ses seules pages, sans la fiche réponse) ; NULL sinon.
+-- Sans membre indiqué, seul le droit de parent est possible.
+CREATE FUNCTION homework_pages_access(p_user uuid, p_account uuid, p_member uuid) RETURNS text LANGUAGE sql STABLE AS $$
+  SELECT CASE
+           WHEN u.role = 'primary_user' OR (u.role = 'guest' AND u.guest_rank = 'core') THEN 'parent'
+           WHEN u.role = 'guest' AND u.guest_rank = 'secondary' AND p_member IS NOT NULL
+                AND EXISTS (SELECT 1 FROM family_members c
+                              JOIN homework_children hc ON hc.member_id = c.id AND hc.account_id = c.account_id
+                              JOIN family_settings st ON st.account_id = c.account_id AND st.homework_help_enabled
+                             WHERE c.child_profile_user_id = u.id AND c.id = p_member AND c.account_id = u.account_id)
+           THEN 'child'
+         END
+    FROM users u
+   WHERE u.id = p_user AND u.account_id = p_account AND u.status IN ('active', 'grace_period')
+$$;
+COMMENT ON FUNCTION homework_pages_access(uuid, uuid, uuid) IS $$Droit d'un profil sur les pages d'exercices d'un foyer et d'un membre enfant : parent (utilisateur principal et invité 1), child (profil de cet enfant, relié à sa fiche enfant qui a un âge des devoirs, aide activée) ou NULL. Sert aux règles de sécurité par ligne et aux fonctions de lecture. [US-180 RF1, RF5, RF7, RT4, D71 S-34, S-36, D73]$$;
+
+-- Pages lisibles par un profil : toutes celles du foyer pour un parent, les siennes pour l'enfant (sans la fiche réponse)
+CREATE FUNCTION homework_exercise_pages_visible_to(p_viewer uuid) RETURNS SETOF homework_exercise_pages
+LANGUAGE sql STABLE AS $$
+  SELECT p.* FROM homework_exercise_pages p WHERE homework_pages_access(p_viewer, p.account_id, p.member_id) IS NOT NULL
+$$;
+COMMENT ON FUNCTION homework_exercise_pages_visible_to(uuid) IS $$Pages d'exercices lisibles par un profil : toutes celles de son foyer pour un parent, celles de l'enfant relié à son profil pour un profil d'enfant (la fiche réponse n'en fait pas partie). La limite des 30 derniers jours de « Mes exercices » est un affichage de l'application. [US-180 RF5, RF7, RT4]$$;
+
+-- Fiches réponse lisibles par un profil : celles du foyer pour un parent, aucune pour un enfant
+CREATE FUNCTION homework_exercise_answers_visible_to(p_viewer uuid) RETURNS SETOF homework_exercise_page_answers
+LANGUAGE sql STABLE AS $$
+  SELECT a.* FROM homework_exercise_page_answers a WHERE homework_pages_access(p_viewer, a.account_id, NULL) = 'parent'
+$$;
+COMMENT ON FUNCTION homework_exercise_answers_visible_to(uuid) IS $$Fiches réponse et barèmes lisibles par un profil : ceux de son foyer pour un parent (utilisateur principal et invité 1), aucun pour un profil d'enfant, y compris l'enfant à qui appartient la page. [US-180 RF4, RT4, D71 S-36]$$;
+
+-- Le profil qui crée la page est un parent du foyer, ou l'enfant lui-même (droit contrôlé à l'écriture, hors sécurité par ligne aussi)
+CREATE FUNCTION homework_page_before_insert() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF NEW.created_by_user_id IS NOT NULL AND homework_pages_access(NEW.created_by_user_id, NEW.account_id, NEW.member_id) IS NULL THEN
+    RAISE EXCEPTION 'Une page d''exercices est créée par un parent du foyer ou par l''enfant lui-même' USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NEW;
+END $$;
+CREATE TRIGGER trg_homework_pages_before_insert BEFORE INSERT ON homework_exercise_pages
+  FOR EACH ROW EXECUTE FUNCTION homework_page_before_insert();
+COMMENT ON FUNCTION homework_page_before_insert() IS $$Refuse une page d'exercices dont le profil créateur n'est ni un parent du foyer ni le profil de l'enfant concerné. [US-180 RF1, RT4]$$;
+
+-- Une page a toujours sa fiche réponse, au plus tard à la fin de la transaction. Exécutée avec les droits du propriétaire : l'enfant qui crée sa page ne peut pas lire la fiche.
+CREATE FUNCTION homework_page_needs_answers() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM homework_exercise_pages p WHERE p.id = NEW.id)
+     AND NOT EXISTS (SELECT 1 FROM homework_exercise_page_answers a WHERE a.page_id = NEW.id) THEN
+    RAISE EXCEPTION 'Une page d''exercices demande sa fiche réponse et son barème' USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NULL;
+END $$;
+CREATE CONSTRAINT TRIGGER trg_homework_pages_needs_answers AFTER INSERT ON homework_exercise_pages
+  DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION homework_page_needs_answers();
+COMMENT ON FUNCTION homework_page_needs_answers() IS $$Contrôle différé : une page d'exercices créée a sa fiche réponse et son barème à la fin de la transaction. Exécutée avec les droits du propriétaire (l'enfant qui crée sa page ne lit pas la fiche). [US-180 RT1, RT4]$$;
+
+-- Sécurité par ligne (activée, non forcée ; variable de session app.user_id) : le parent lit tout et supprime ; l'enfant lit ses seules pages et en crée pour lui ;
+-- la fiche réponse est lue et supprimée par les parents seuls, écrite par un parent ou par le profil qui crée la page
+ALTER TABLE homework_exercise_pages ENABLE ROW LEVEL SECURITY;
+CREATE POLICY homework_pages_read ON homework_exercise_pages FOR SELECT
+  USING (homework_pages_access((SELECT app_current_user_id()), account_id, member_id) IS NOT NULL);
+CREATE POLICY homework_pages_insert ON homework_exercise_pages FOR INSERT
+  WITH CHECK (created_by_user_id = (SELECT app_current_user_id())
+              AND homework_pages_access((SELECT app_current_user_id()), account_id, member_id) IS NOT NULL);
+CREATE POLICY homework_pages_delete ON homework_exercise_pages FOR DELETE
+  USING (homework_pages_access((SELECT app_current_user_id()), account_id, member_id) = 'parent');
+ALTER TABLE homework_exercise_page_answers ENABLE ROW LEVEL SECURITY;
+CREATE POLICY homework_answers_read ON homework_exercise_page_answers FOR SELECT
+  USING (homework_pages_access((SELECT app_current_user_id()), account_id, NULL) = 'parent');
+CREATE POLICY homework_answers_insert ON homework_exercise_page_answers FOR INSERT
+  WITH CHECK (homework_pages_access((SELECT app_current_user_id()), account_id, NULL) = 'parent'
+              OR EXISTS (SELECT 1 FROM homework_exercise_pages p
+                          WHERE p.id = homework_exercise_page_answers.page_id AND p.account_id = homework_exercise_page_answers.account_id
+                            AND p.created_by_user_id = (SELECT app_current_user_id())));
+CREATE POLICY homework_answers_delete ON homework_exercise_page_answers FOR DELETE
+  USING (homework_pages_access((SELECT app_current_user_id()), account_id, NULL) = 'parent');
 
 -- Graines : catalogue des thèmes de sorties (US-114 RF2) et manuels de maths (US-119 RF7). Les exercices et les activités sont chargés par l'équipe.
 INSERT INTO outing_themes (category, theme_key, label, sort_order) VALUES
@@ -6387,7 +6722,8 @@ INSERT INTO platform_settings (setting_key, value_type, value_text, min_value, m
   ('outing_proposal_retention_days', 'integer', '30', 1, NULL, $$Conservation d'une proposition de sorties après son jour visé, en jours (US-115 RF7)$$),
   ('outing_offer_memory_days',       'integer', '90', 1, NULL, $$Durée pendant laquelle une offre déjà proposée n'est pas reproposée au même parent, en jours (US-115 RF8)$$),
   ('homework_week_retention_months', 'integer', '12', 1, NULL, $$Conservation d'une semaine de devoirs et de ses éléments après la semaine, en mois (US-119 RT5, D65)$$),
-  ('homework_validation_grace_days', 'integer', '30', 1, NULL, $$Délai de grâce des exercices validés après la désactivation de l'aide Devoirs, en jours : une réactivation pendant ce délai les retrouve (US-119 RT5, D65)$$);
+  ('homework_validation_grace_days', 'integer', '30', 1, NULL, $$Délai de grâce des exercices validés après la désactivation de l'aide Devoirs, en jours : une réactivation pendant ce délai les retrouve (US-119 RT5, D65)$$),
+  ('homework_page_retention_months', 'integer', '12', 1, NULL, $$Conservation d'une page d'exercices créée à partir d'une leçon (avec sa fiche réponse), en mois après sa création (US-180 RT5, D71 S-35, avis du DPO à venir)$$);
 
 -- =====================================================================
 -- 8 sexies. CONTRATS V2 — LOT 11 : catégories à champs de documents, contrats de base et complémentaires, documents chiffrés, anonymisation,
@@ -9720,7 +10056,7 @@ SELECT ensure_logbook_partitions(3);
 
 ## 6. Dictionnaire de données
 
-Généré automatiquement depuis la base (159 tables, 1421 colonnes), donc toujours identique au DDL. Les tables `logbook_entries` et `logbook_entry_participants` sont partitionnées par mois : le dictionnaire décrit la table parente. Les colonnes `created_at` / `updated_at` sont l'audit standard ; `updated_at` est tenu à jour par un trigger. La user story source est indiquée au niveau de la table ; les références plus précises (RF / RT) figurent dans les descriptions.
+Généré automatiquement depuis la base (161 tables, 1437 colonnes), donc toujours identique au DDL. Les tables `logbook_entries` et `logbook_entry_participants` sont partitionnées par mois : le dictionnaire décrit la table parente. Les colonnes `created_at` / `updated_at` sont l'audit standard ; `updated_at` est tenu à jour par un trigger. La user story source est indiquée au niveau de la table ; les références plus précises (RF / RT) figurent dans les descriptions.
 
 ### `account_connections`
 
@@ -10804,19 +11140,20 @@ Généré automatiquement depuis la base (159 tables, 1421 colonnes), donc toujo
 | Colonne | Type | Contraintes | Description |
 |---|---|---|---|
 | `id` | uuid | **PK** · UNIQUE (id, account_id) · défaut gen_random_uuid() | Identifiant technique |
-| `account_id` | uuid | NOT NULL · UNIQUE (id, account_id) · UNIQUE (account_id, role, alias_number) · FK → accounts · ON DELETE CASCADE · FK → users · ON DELETE SET NULL | Compte concerné |
-| `user_id` | uuid | CHECK ck_family_members_name_length · FK → users · ON DELETE SET NULL | Profil lié, NULL pour un membre sans compte. Coupé à la suppression du profil, ce qui déclenche l'anonymisation du membre |
+| `account_id` | uuid | NOT NULL · UNIQUE (id, account_id) · UNIQUE (account_id, role, alias_number) · FK → accounts · ON DELETE CASCADE · FK → users · ON DELETE SET NULL · FK → users · ON DELETE SET NULL | Compte concerné |
+| `user_id` | uuid | CHECK ck_family_members_name_length · FK → users · ON DELETE SET NULL · CHECK ck_family_members_child_profile | Profil lié, NULL pour un membre sans compte. Coupé à la suppression du profil, ce qui déclenche l'anonymisation du membre |
 | `first_name` | varchar(100) | CHECK ck_family_members_anonymized · CHECK ck_family_members_name_length | Prénom |
 | `birth_year` | smallint | CHECK ck_family_members_anonymized_birth · CHECK ck_family_members_birth | Année de naissance, facultative, avec le mois (jamais le jour, D54). Les âges sont transmis au modèle par tranche, calculés sans stockage supplémentaire (D37, family_member_age_months). Donnée d'un mineur : incluse dans l'export (US-92 RT4) |
 | `birth_month` | smallint | CHECK ck_family_members_anonymized_birth · CHECK ck_family_members_birth | Mois de naissance (1 à 12), facultatif, renseigné avec l'année ; le jour n'existe pas en base (D54) |
-| `role` | member_role | NOT NULL · UNIQUE (account_id, role, alias_number) · défaut 'child' | parent (utilisateur principal, invité 1) ; child ; other (invité secondaire par défaut). Un changement de rôle attribue un nouvel alias |
+| `role` | member_role | NOT NULL · UNIQUE (account_id, role, alias_number) · CHECK ck_family_members_child_profile · défaut 'child' | parent (utilisateur principal, invité 1) ; child ; other (invité secondaire par défaut). Un changement de rôle attribue un nouvel alias |
 | `alias_number` | smallint | NOT NULL · UNIQUE (account_id, role, alias_number) | Numéro d'alias par compte et par rôle, jamais réutilisé, même après archivage ou anonymisation |
 | `color_index` | smallint | NOT NULL · CHECK family_members_color_index_check | Couleur du membre dans le calendrier |
-| `archived_at` | timestamptz | CHECK ck_family_members_anonymized_archived | Date d'archivage |
-| `anonymized_at` | timestamptz | CHECK ck_family_members_anonymized · CHECK ck_family_members_anonymized_archived · CHECK ck_family_members_anonymized_birth | Date d'effacement des données du membre (prénom et naissance vidés) ; il reste affiché « Ancien membre » dans les RDV partagés (US-93 RF13) |
+| `archived_at` | timestamptz | CHECK ck_family_members_anonymized_archived · CHECK ck_family_members_child_profile | Date d'archivage |
+| `anonymized_at` | timestamptz | CHECK ck_family_members_anonymized · CHECK ck_family_members_anonymized_archived · CHECK ck_family_members_anonymized_birth · CHECK ck_family_members_child_profile | Date d'effacement des données du membre (prénom et naissance vidés) ; il reste affiché « Ancien membre » dans les RDV partagés (US-93 RF13) |
 | `created_by_user_id` | uuid | FK → users · ON DELETE SET NULL | Profil à l'origine de la création |
 | `created_at` | timestamptz | NOT NULL · défaut now() | Date de création |
 | `updated_at` | timestamptz | NOT NULL · défaut now() | Date de dernière modification (automatique) |
+| `child_profile_user_id` | uuid | FK → users · ON DELETE SET NULL · CHECK ck_family_members_child_profile | Profil de l'enfant : profil d'invité secondaire de l'enfant, porté par sa fiche enfant (rôle enfant, non liée à un profil par user_id). Unique, du même foyer, remis à vide à la suppression du profil sans anonymiser la fiche, et à vide si la fiche cesse d'être une fiche enfant active. Le membre du profil est alors cette fiche enfant (family_member_of_profile) et sa fiche « autre » est masquée. Sans lien avec l'âge des devoirs. [D73 S-38, S-39] |
 
 ### `family_reminder_settings`
 
@@ -10841,12 +11178,13 @@ Généré automatiquement depuis la base (159 tables, 1421 colonnes), donc toujo
 | `account_id` | uuid | **PK** · FK → accounts · ON DELETE CASCADE | Compte concerné |
 | `school_zone` | character(1) | CHECK family_settings_school_zone_check | Zone scolaire de la famille (A, B ou C) |
 | `anticipation_enabled` | boolean | NOT NULL · défaut true | Catalogue d'anticipation et suggestions de l'historique actifs pour la famille |
-| `homework_help_enabled` | boolean | NOT NULL · CHECK ck_family_settings_homework · défaut false | Aide Devoirs activée pour toute la famille (faux par défaut). Ne s'active que si la famille compte au moins un membre enfant ; désactiver arrête l'aide sans effacer les plannings ni les progrès. [US-118 RF1, RF2, RF5, D64] |
-| `homework_help_first_enabled_at` | timestamptz | CHECK ck_family_settings_homework | Date de la première activation, posée automatiquement : vide = la présentation en trois lignes n'a jamais été montrée (US-118 RF3) |
-| `homework_help_disabled_at` | timestamptz | CHECK ck_family_settings_homework | Date de la dernière désactivation de l'aide, posée automatiquement quand elle passe de vraie à fausse et remise à vide à la réactivation. Les exercices validés sont gardés jusqu'à homework_validation_grace_days (30) après cette date : une réactivation pendant ce délai les retrouve (D65) |
 | `updated_by_user_id` | uuid | FK → users · ON DELETE SET NULL | Profil ayant fait la dernière modification |
 | `created_at` | timestamptz | NOT NULL · défaut now() | Date de création |
 | `updated_at` | timestamptz | NOT NULL · défaut now() | Date de dernière modification (automatique) |
+| `homework_help_enabled` | boolean | NOT NULL · CHECK ck_family_settings_homework · défaut false | Aide Devoirs activée pour toute la famille (faux par défaut). Ne s'active que si la famille compte au moins un membre enfant ; désactiver arrête l'aide sans effacer les plannings ni les progrès. [US-118 RF1, RF2, RF5, D64] |
+| `homework_help_first_enabled_at` | timestamptz | CHECK ck_family_settings_homework | Date de la première activation, posée automatiquement : vide = la présentation en trois lignes n'a jamais été montrée (US-118 RF3) |
+| `homework_help_disabled_at` | timestamptz | CHECK ck_family_settings_homework | Date de la dernière désactivation de l'aide, posée automatiquement quand elle passe de vraie à fausse et remise à vide à la réactivation. Les exercices validés sont gardés jusqu'à homework_validation_grace_days (30) après cette date : une réactivation pendant ce délai les retrouve (D65) |
+| `homework_days` | smallint[] | NOT NULL · CHECK ck_family_settings_homework_days · défaut ARRAY[(1), (2), (4), (5)] | Jours de devoirs du foyer (1 = lundi … 7 = dimanche, sans doublon, au moins un) : lundi, mardi, jeudi et vendredi au départ. Réglage familial, modifiable par les deux parents, lisible en lecture seule par les invités secondaires. La tâche « Préparer les devoirs » revient ces jours-là : la base aligne les jours de sa série sur ce réglage (trigger) et retire les occurrences à venir des jours décochés dès le lendemain. Stocké trié. [US-118 RF7, US-119 RF1, D71 S-30] |
 
 ### `family_situation_answers`
 
@@ -11383,6 +11721,34 @@ Généré automatiquement depuis la base (159 tables, 1421 colonnes), donc toujo
 | `custom_title` | bytea | CHECK ck_homework_items_kind | Titre d'une activité libre du parent, chiffré par l'application |
 | `checked_at` | timestamptz |  | Date de la case cochée : « fait », sans valider (seules les photos valident) |
 | `created_at` | timestamptz | NOT NULL · défaut now() | Date de création |
+
+### `homework_exercise_pages`
+
+*Pages d'exercices créées à partir d'une leçon (3 exercices : facile, moyen, difficile), rattachées à un membre enfant suivi par l'aide Devoirs et à son foyer, avec le profil qui les a créées. Thème, matière, niveau et exercices chiffrés par l'application. Sans photo ni prénom. Lue par les parents du foyer et par l'enfant (par son profil) pour ses seules pages ; la fiche réponse est dans homework_exercise_page_answers, lue des seuls parents. Supprimée 12 mois après sa création, avec le membre, à l'effacement des progrès de Devoirs et avec le compte. Donnée de mineur, incluse dans l'export de la famille.* — **US-180 RF4 à RF7, RT4, RT5, D71 S-35, S-36, D72 S-42**
+
+| Colonne | Type | Contraintes | Description |
+|---|---|---|---|
+| `id` | uuid | **PK** · UNIQUE (id, account_id) · défaut gen_random_uuid() | Identifiant technique |
+| `account_id` | uuid | NOT NULL · UNIQUE (id, account_id) · FK → accounts · ON DELETE CASCADE · FK → homework_children · ON DELETE CASCADE | Compte concerné |
+| `member_id` | uuid | NOT NULL · FK → homework_children · ON DELETE CASCADE | Membre enfant (fiche enfant) pour qui la page est créée (il a un âge des devoirs) : la page disparaît avec son suivi Devoirs (retrait ou effacement du membre, effacement des âges). [US-180 RT4, RT5] |
+| `created_by_user_id` | uuid | FK → users · ON DELETE SET NULL | Profil qui a demandé la page : un parent du foyer, ou l'enfant lui-même par son profil (contrôlé à l'écriture). Vide si ce profil est supprimé. Compte dans le plafond quotidien de ce profil. [US-180 RF10, RT4] |
+| `theme` | bytea | NOT NULL · CHECK homework_exercise_pages_theme_check | Thème de la leçon repéré par le modèle, chiffré par l'application, affiché dans « Exercices — [thème] » et dans le dossier des parents (« Les fractions — 10/11/2026 »). Aucune donnée personnelle : le modèle ne reçoit jamais le prénom (US-180 RT2). [US-180 RF3, RF7] |
+| `subject` | bytea | NOT NULL · CHECK homework_exercise_pages_subject_check | Matière repérée par le modèle (maths, français, histoire…), texte libre court, chiffré par l'application. [US-180 RF3, RT4] |
+| `level` | bytea | NOT NULL · CHECK homework_exercise_pages_level_check | Niveau de la leçon repéré par le modèle (CP, CE2, CM1…), texte libre court chiffré par l'application : distinct de l'âge des devoirs de l'enfant. [US-180 RF3, RT4] |
+| `question_forms` | homework_question_form[] | NOT NULL · CHECK homework_exercise_pages_question_forms_check | Formes de question utilisées par la page, dans la liste fermée homework_question_form (QCM, vrai/faux, vrai/faux avec correction, égalités à compléter, texte à trous, éléments à relier, ranger, problème, réponse rédigée), sans doublon. Posée par l'application après son contrôle de la page. [US-180 RF3, RT1, D72 S-42] |
+| `exercises` | bytea | NOT NULL · CHECK homework_exercise_pages_exercises_check | Les 3 exercices dans l'ordre facile, moyen, difficile, en données structurées chiffrées par l'application (consigne, questions, cases, lignes d'écriture) que l'application met en forme avec la charte de MAAQ. Énoncés seuls : jamais de réponse ici. 200 000 octets au plus. [US-180 RF3, RF5, RT1, RT4] |
+| `created_at` | timestamptz | NOT NULL · défaut now() | Date de création |
+
+### `homework_exercise_page_answers`
+
+*Fiche réponse et barème d'une page d'exercices, « pour l'adulte qui corrige », chiffrés. Lue des seuls parents du foyer, y compris par la sécurité par ligne : l'enfant ne la voit jamais (même pour ses propres pages), il peut seulement l'écrire pour la page qu'il crée. Une page a toujours sa fiche (contrôle différé). Supprimée avec sa page.* — **US-180 RF4, RT4, D71 S-36**
+
+| Colonne | Type | Contraintes | Description |
+|---|---|---|---|
+| `page_id` | uuid | **PK** · FK → homework_exercise_pages · ON DELETE CASCADE | Page d'exercices à laquelle appartient la fiche (une fiche par page) : supprimée avec elle. [US-180 RT4] |
+| `account_id` | uuid | NOT NULL · FK → homework_exercise_pages · ON DELETE CASCADE | Compte concerné |
+| `answers` | bytea | NOT NULL · CHECK homework_exercise_page_answers_answers_check | Bonnes réponses de chaque question, correction des phrases fausses et réponse type des réponses rédigées, en données structurées chiffrées par l'application. Jamais renvoyée à un profil qui n'est pas un parent. [US-180 RF4, RT4] |
+| `grading_scale` | bytea | NOT NULL · CHECK homework_exercise_page_answers_grading_scale_check | Barème sur 20 points (facile < moyen < difficile), en données structurées chiffrées par l'application. [US-180 RF4, RT1] |
 
 ### `homework_weeks`
 
@@ -12438,6 +12804,7 @@ Toutes les US sont couvertes. « Oui, sans donnée » signifie que l'US décrit 
 | US-173 | Consulter et exporter les produits sans référence | `grocery_unreferenced_events`, `grocery_unreferenced_status`, `v_grocery_unreferenced`, `note_grocery_unreferenced()` | oui |
 | US-174 | Importer les nouvelles références dans le catalogue | `grocery_product_references`, `grocery_reference_marks_referenced()` (statut « référencé »), `grocery_unreferenced_status` | oui |
 | US-175 | Modérer la base commune des prix | `v_grocery_shared_prices_moderation`, `grocery_shared_prices.removed_at`, réglages `grocery_check_*`, `admin_audit_log` (`grocery_price_moderated`) | oui |
+| US-180 | Créer des exercices à partir d'une leçon (enfant autonome) | `homework_exercise_pages`, `homework_exercise_page_answers` (fiche réponse réservée aux parents), `homework_question_form`, `family_members.child_profile_user_id`, `homework_pages_access()`, `homework_exercise_pages_visible_to()`, `homework_exercise_answers_visible_to()`, `homework_child_items_for()`, `homework_prep_task_visible_to()`, `family_tasks_visible_to()`, `erase_member_homework_data()`, `erase_family_homework_progress()`, `purge_expired_homework_data()` ; plafond quotidien, lecture de la leçon et mise en forme dans l'application | oui |
 | US-176 | Remplacer le skill de l'agent | reportée après le pilote (CR-32) : aucun objet | reportée |
 | US-140 | Découvrir MAAQ en vidéo | `users.presentation_seen_at`, `audit_action` `presentation_updated` ; la vidéo est dans un bucket, hors base | oui |
 | US-138 | Décider de poursuivre une analyse dont la lecture est incertaine | `contract_analysis_reviews`, `v_contract_reviews_to_decide`, `contract_review_before_update()`, `contract_review_after_decision()`, `audit_action` `contract_review_viewed` | oui |
@@ -12460,7 +12827,7 @@ Toutes les US sont couvertes. « Oui, sans donnée » signifie que l'US décrit 
 | US-121 | Être prévenu qu'un RDV de sortie sera visible par l'autre parent | aucune structure propre : le RDV de sortie suit les règles ordinaires de visibilité (`family_events_visible_to()`, D26) ; l'avertissement est celui de l'application | oui |
 | US-120 | Créer le RDV effectif à partir d'une proposition de sortie | `event_source` `outing`, `family_events` (CHECK `ck_family_events_outing`), `family_event_notice_recipients()` (aucune notification de l'autre parent), aucun lien vers la proposition | oui |
 | US-119 | Préparer la semaine de devoirs avec le sous-agent Devoirs | `homework_textbooks`, `homework_exercises`, `homework_activities`, `homework_exercise_validations`, `homework_weeks`, `homework_week_items`, `homework_week_foreign_books`, `family_tasks` (`homework_week_id`, source `homework`), `homework_level_progress()`, `homework_foreign_unlocked()`, `homework_france_level_done()`, `erase_member_homework_data()`, `erase_family_homework_progress()`, `purge_expired_homework_data()` | oui |
-| US-118 | Activer ou désactiver le sous-agent Devoirs | `family_settings` (`homework_help_enabled`, `homework_help_first_enabled_at`), `homework_children` (âge des devoirs), `homework_level_for_age()`, `erase_family_homework_progress()` | oui |
+| US-118 | Activer ou désactiver le sous-agent Devoirs | `family_settings` (`homework_help_enabled`, `homework_help_first_enabled_at`, `homework_days`), `homework_children` (âge des devoirs), `homework_level_for_age()`, `erase_family_homework_progress()` | oui |
 | US-117 | Ne pas voir les propositions de sortie faites à l'autre parent | sécurité par ligne et `outing_criteria_visible_to()`, `outing_proposals_visible_to()`, `outing_ideas_visible_to()`, `app_current_user_id()` ; aucune clé étrangère ni vue du foyer vers les tables Sorties | oui |
 | US-116 | Écarter une proposition de sortie sans y donner suite | `outing_proposals` (statut), `outing_proposal_ideas` (statut), `outing_idea_after_status()`, `outing_proposal_transition_allowed()`, `outing_offer_memory` | oui |
 | US-115 | Recevoir une proposition de sortie suggérée automatiquement | `outing_proposals`, `outing_proposal_ideas`, `outing_offer_memory`, `outing_excluded_offers()`, `scheduled_notifications` (type `outing_proposal`), `purge_expired_outing_data()` | oui |
@@ -12797,9 +13164,9 @@ Toutes les US sont couvertes. « Oui, sans donnée » signifie que l'US décrit 
 - ☑ **Sécurité / RGPD** : secrets en empreinte, chiffrement applicatif des informations personnelles, durées de conservation, purge, anonymisation, export, minimisation.
 - ☑ **Évolutivité** : catalogue, contrats, champs, rubriques, connecteurs et réglages pilotés par des données ; carnet partitionné ; plan de RLS et de plans d'abonnement.
 - ☑ **Toutes les user stories couvertes** : 104 sur 104 (US-1 à US-70, les 25 US de l'Assistant Famille et les 9 US du MVP2 ; US-38 partiellement par choix : les messages des agents Digitorn restent chez Digitorn). Quinze règles de user stories doivent être alignées avec les décisions du PM (section 3.4) ; les impacts de l'Assistant Famille sont dans `MAAQ_US_Detaillees_BA_Assistant_Famille.md`, ceux du MVP2 dans `MAAQ_US_Detaillees_BA_Assistant_Famille_MVP2.md`.
-- ☑ **DDL exécutable** : exécuté sans erreur sur PostgreSQL (PGlite) ; 1968 contrôles de comportement réussis, dont les membres, les RDV, les mails, les conversations, les séries, les tâches, les questions d'anticipation, le suivi de trajet et la dernière position, les purges et la suppression d'un foyer (quotas, limites réglables, unicité, états, cascades, visibilité du carnet, statuts calculés, partitions et purges réglables, champs par agent et pré-remplissage, connexion du compte, purge des profils jamais activés, plafond quotidien de demandes, fuseau de l'appareil).
+- ☑ **DDL exécutable** : exécuté sans erreur sur PostgreSQL (PGlite) ; 2078 contrôles de comportement réussis, dont les membres, les RDV, les mails, les conversations, les séries, les tâches, les questions d'anticipation, le suivi de trajet et la dernière position, les purges et la suppression d'un foyer (quotas, limites réglables, unicité, états, cascades, visibilité du carnet, statuts calculés, partitions et purges réglables, champs par agent et pré-remplissage, connexion du compte, purge des profils jamais activés, plafond quotidien de demandes, fuseau de l'appareil).
 - ☑ **DDL commenté** : commentaire d'en-tête par table, `COMMENT ON` sur tables, vues, fonctions et colonnes non évidentes.
 - ☑ **Guide de relecture et points à valider fournis** (section 2).
-- ☑ **Aucune hypothèse cachée** : 168 hypothèses numérotées (section 3.1) ; celles qui engagent le schéma sont aussi référencées dans le DDL (H5, H7 à H9, H11 à H15, H25, H29, H35).
+- ☑ **Aucune hypothèse cachée** : 169 hypothèses numérotées (section 3.1) ; celles qui engagent le schéma sont aussi référencées dans le DDL (H5, H7 à H9, H11 à H15, H25, H29, H35).
 
 **Limites de la vérification** : les règles du planificateur du MVP2 (création des séances et des occurrences, génération mensuelle des questions, repérage des RDV qui reviennent, calcul des trajets) sont dans l'application et ne sont pas testées ici ; la base garantit l'idempotence, les plafonds, les transitions, la visibilité et les durées de conservation. Le DDL a été exécuté sur PGlite (PostgreSQL 18.3 compilé en WebAssembly), pas sur une instance PostgreSQL serveur, et pas sur les versions 15 à 17 (aucune fonction propre à la 18 n'est utilisée, donc la compatibilité est attendue). Les performances n'ont pas été mesurées : le volume réel n'est connu que par les prévisions du PM (1 000 comptes par an, plafond de 50 demandes par jour et par profil). Foundry est abandonné (D54) ; l'engagement écrit d'Anthropic sur la conservation des données (P-37) reste à obtenir, `erasure_trace_targets` étant facultative en attendant. Rien n'a été vérifié auprès de Digitorn : toute la couche d'échange (identifiants, API du carnet, dates des entrées) reste à confirmer.

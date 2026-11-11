@@ -57,7 +57,7 @@ export interface EventTasksView {
 }
 
 const canActOn = (v: TaskViewer, e: CalendarEvent) => v.parent || e.createdByUserId === v.userId;
-const sees = (v: TaskViewer, e: CalendarEvent) => v.parent || e.createdByUserId === v.userId || e.allFamily || (v.memberId !== null && e.memberIds.includes(v.memberId));
+const sees = (v: TaskViewer, e: CalendarEvent) => v.parent || e.createdByUserId === v.userId || (e.allFamily && !v.child) || (v.memberId !== null && e.memberIds.includes(v.memberId));
 
 // ---------------------------------------------------------------------------------------------------------------------------
 // Lecture
@@ -119,10 +119,12 @@ export interface WriteContext {
   members: Map<string, MemberChip>;
   parent: boolean;
   memberId: string | null;
+  /** Profil d'un enfant (D73) : absent pour l'agent, qui écrit pour un parent. */
+  child?: boolean;
   source: "user" | "agent";
 }
 
-const viewerOf = (w: WriteContext): TaskViewer => ({ accountId: w.accountId, userId: w.userId, parent: w.parent, memberId: w.memberId, timeZone: w.timeZone, today: localDay(w.now, w.timeZone), nowLocal: "" });
+const viewerOf = (w: WriteContext): TaskViewer => ({ accountId: w.accountId, userId: w.userId, parent: w.parent, memberId: w.memberId, child: Boolean(w.child), timeZone: w.timeZone, today: localDay(w.now, w.timeZone), nowLocal: "" });
 
 /** Échéance d'une tâche de ce RDV : jamais passée, jamais après le jour du RDV (US-95 RF3 bis, D51). */
 function dueFor(e: CalendarEvent, input: EventTaskInput, w: WriteContext): { due: string; daysBefore: number | null } {
@@ -182,7 +184,7 @@ export async function insertEventTask(db: Kysely<DB>, w: WriteContext, e: Calend
 }
 
 async function writeContext(ctx: Ctx, v: TaskViewer): Promise<WriteContext> {
-  return { accountId: v.accountId, userId: v.userId, timeZone: v.timeZone, now: ctx.now, members: await loadMembers(ctx.db, v.accountId), parent: v.parent, memberId: v.memberId, source: "user" };
+  return { accountId: v.accountId, userId: v.userId, timeZone: v.timeZone, now: ctx.now, members: await loadMembers(ctx.db, v.accountId), parent: v.parent, memberId: v.memberId, child: v.child, source: "user" };
 }
 
 async function targetEvent(ctx: Ctx, session: SessionContext, eventId: string): Promise<{ v: TaskViewer; e: CalendarEvent }> {

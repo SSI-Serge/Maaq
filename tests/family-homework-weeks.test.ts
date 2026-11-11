@@ -1,7 +1,7 @@
 import type { Kysely } from "kysely";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { addChild } from "@/server/assistant/family";
-import { open } from "@/server/assistant/fields";
+import { open, seal } from "@/server/assistant/fields";
 import { loadHomeworkCatalog } from "@/server/assistant/homework/catalog";
 import { setHomeworkAge, setHomeworkEnabled } from "@/server/assistant/homework/settings";
 import {
@@ -176,12 +176,11 @@ describe("options proposées au parent (US-119 RF2, RF7)", () => {
 });
 
 describe("préparer la semaine (US-119 RF4)", () => {
-  it("CA 4.1 : une semaine, ses éléments, et une tâche « Devoirs — Léo (N éléments) » par jour de travail, assignée à l'enfant", async () => {
+  it("CA 4.1 : une semaine et ses éléments ; aucune tâche « Devoirs — Léo » n'est créée (D71 S-33)", async () => {
     const f = await family();
     const { weekId } = await standardWeek(f);
-    const tasks = await tasksOf(weekId);
-    expect(tasks.map((t) => open(t.title))).toEqual(["Devoirs — Léo (6 éléments)", "Devoirs — Léo (1 élément)"]);
-    expect(tasks.every((t) => t.assigned_member_id === f.leo && t.source === "homework" && t.status === "todo")).toBe(true);
+    expect(await tasksOf(weekId)).toEqual([]);
+    expect(await db.selectFrom("family_tasks").select("id").where("account_id", "=", f.accountId).where("source", "=", "homework").execute()).toEqual([]);
     const week = await getWeek(ctx(), f.julienSession, weekId); // l'autre parent la voit aussi
     expect(week).toMatchObject({ weekStart: WEEK, workDays: [1, 2, 3] });
     expect(week.children[0].items.filter((i) => i.day === 1)).toHaveLength(6);
@@ -232,7 +231,7 @@ describe("préparer la semaine (US-119 RF4)", () => {
       weekStart: WEEK, workDays: [2, 4],
       children: [{ memberId: f.leo, items: [{ kind: "exercises", textbook: "france", numbers: leoBlock.numbers.slice(0, 2), days: [2] }] }, { memberId: f.ines, items: [{ kind: "exercises", textbook: "france", numbers: inesBlock.numbers.slice(0, 3), days: [4] }] }],
     });
-    expect((await tasksOf(weekId)).map((t) => open(t.title))).toEqual(["Devoirs — Léo (2 éléments)", "Devoirs — Inès (3 éléments)"]);
+    expect(await tasksOf(weekId)).toEqual([]);
     const week = await getWeek(ctx(), f.camilleSession, weekId);
     expect(week.children.map((c) => [c.firstName, c.levelLabel])).toEqual([["Léo", "CE1"], ["Inès", "CM1"]]);
   });
@@ -267,16 +266,16 @@ describe("modifier la semaine (US-119 RF4, RF6)", () => {
     expect(await db.selectFrom("homework_exercise_validations").select("member_id").where("member_id", "=", f.leo).execute()).toHaveLength(0);
   });
 
-  it("déplacer un élément d'un jour à l'autre met à jour les tâches ; retirer le dernier élément d'un jour retire la tâche", async () => {
+  it("déplacer un élément d'un jour à l'autre, puis le retirer ; une ancienne tâche « Devoirs — Léo » déjà créée reste jusqu'à son échéance (D71 S-33)", async () => {
     const f = await family();
     const { weekId } = await standardWeek(f);
+    // Tâche créée avant D71 : modifier la semaine ne la supprime plus ni ne la renomme.
+    await db.insertInto("family_tasks").values({ account_id: f.accountId, title: seal("Devoirs — Léo (1 élément)"), status: "todo", due_date: "2054-11-10", assigned_member_id: f.leo, source: "homework", homework_week_id: weekId }).execute();
     const day2 = (await getWeek(ctx(), f.camilleSession, weekId)).children[0].items.find((i) => i.day === 2)!;
     await moveItem(ctx(), f.camilleSession, day2.id, 3);
-    expect((await tasksOf(weekId)).map((t) => open(t.title))).toEqual(["Devoirs — Léo (6 éléments)", "Devoirs — Léo (1 élément)"]);
-    const due = await db.selectFrom("family_tasks").select(({ fn }) => fn.min("due_date").as("first")).where("homework_week_id", "=", weekId).executeTakeFirstOrThrow();
-    expect(due.first).toBeTruthy();
+    expect((await getWeek(ctx(), f.camilleSession, weekId)).children[0].items.filter((i) => i.day === 3)).toHaveLength(1);
     await removeItem(ctx(), f.camilleSession, day2.id);
-    expect(await tasksOf(weekId)).toHaveLength(1);
+    expect((await tasksOf(weekId)).map((t) => open(t.title))).toEqual(["Devoirs — Léo (1 élément)"]);
     expect((await failure(moveItem(ctx(), f.camilleSession, day2.id, 1))).status).toBe(404);
   });
 
@@ -296,7 +295,8 @@ describe("modifier la semaine (US-119 RF4, RF6)", () => {
     await addItem(ctx(), f.camilleSession, weekId, f.leo, { kind: "custom", title: "Dessin libre", days: [3] });
     const block = (await franceBlock(f, f.leo)).numbers;
     await addItem(ctx(), f.camilleSession, weekId, f.leo, { kind: "exercises", textbook: "france", numbers: [block[0]], days: [3] });
-    expect((await tasksOf(weekId)).map((t) => open(t.title))).toEqual(["Devoirs — Léo (6 éléments)", "Devoirs — Léo (1 élément)", "Devoirs — Léo (2 éléments)"]);
+    expect(await tasksOf(weekId)).toEqual([]);
+    expect((await getWeek(ctx(), f.camilleSession, weekId)).children[0].items.filter((i) => i.day === 3)).toHaveLength(2);
     expect((await failure(addItem(ctx(), f.camilleSession, weekId, f.leo, { kind: "custom", title: "x", days: [7] }))).code).toBe("invalid_day");
   });
 
@@ -320,6 +320,7 @@ describe("modifier la semaine (US-119 RF4, RF6)", () => {
   it("D65 : effacer l'enfant (retrait du membre) supprime ses éléments et ses tâches", async () => {
     const f = await family();
     const { weekId } = await standardWeek(f);
+    await db.insertInto("family_tasks").values({ account_id: f.accountId, title: seal("Devoirs — Léo (1 élément)"), status: "todo", due_date: "2054-11-10", assigned_member_id: f.leo, source: "homework", homework_week_id: weekId }).execute();
     await db.updateTable("family_members").set({ archived_at: new Date() }).where("id", "=", f.leo).execute();
     expect(await tasksOf(weekId)).toHaveLength(0);
     expect(await db.selectFrom("homework_week_items").select("id").where("member_id", "=", f.leo).execute()).toHaveLength(0);

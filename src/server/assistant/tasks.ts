@@ -6,7 +6,8 @@ import { loadCalendarEventsByIds, type CalendarEvent, type EventType } from "./c
 import { open, openOptional, seal, sealOptional } from "./fields";
 import { isParent } from "./family";
 import { HOMEWORK_PREP_TITLE } from "./homework/prep";
-import { homeworkEnabled } from "./homework/settings";
+import { homeworkDaysOf, homeworkEnabled } from "./homework/settings";
+import { profileMember } from "./profile-member";
 import { utcToLocal } from "./local-time";
 import { loadMembers, type MemberChip } from "./member-chips";
 import { familyTimeZone } from "./reminders";
@@ -56,13 +57,14 @@ export interface TaskView {
   followsEventSeries: boolean;
   /** Semaine de devoirs d'où vient la tâche « Devoirs — [prénom] (N éléments) » : le lien ouvre l'écran de la semaine (US-119 RF4). */
   homeworkWeekId: string | null;
-  /** Tâche hebdomadaire de préparation des devoirs (source `homework_prep`) : son titre est fixe. */
+  /** Tâche du foyer « Préparer les devoirs » (source `homework_prep`) : son titre est fixe, elle n'est assignée à personne et revient les jours de devoirs. */
   isHomeworkPrep: boolean;
   /**
-   * Tâche hebdomadaire « Préparer les devoirs de la semaine » (D69) : reconnue par sa source, pas par son titre. Le lien ouvre la préparation de la semaine qui suit son échéance, puis
-   * « Voir la semaine de devoirs » une fois la semaine prête. Vide pour les autres tâches, pour un profil qui n'est pas parent, et quand l'aide Devoirs est désactivée (la tâche reste, sans lien).
+   * Tâche « Préparer les devoirs » (D69, D71) : reconnue par sa source, pas par son titre. Elle ouvre l'écran des devoirs : pour un parent, « Préparer les devoirs », le planning du
+   * jour de chaque enfant et le dossier « Exercices » ; pour le profil d'un enfant, son seul planning du jour et ses exercices. Vide pour les autres tâches et quand l'aide
+   * Devoirs est désactivée (la tâche reste alors dans la liste des parents, sans lien).
    */
-  homeworkPrep: { weekStart: string; weekId: string | null } | null;
+  homeworkPrep: { role: "parent" | "child" } | null;
   doneBy: string | null;
   doneAt: string | null;
   version: number;
@@ -80,7 +82,7 @@ export interface TaskLists {
   done: TaskView[];
   /** Membres à qui une tâche peut être assignée par ce profil (US-96 RF2, RF3). */
   assignable: MemberChip[];
-  viewer: { parent: boolean; memberId: string | null };
+  viewer: { parent: boolean; memberId: string | null; child: boolean };
   todayDate: string;
 }
 
@@ -88,8 +90,10 @@ export interface TaskViewer {
   accountId: string;
   userId: string;
   parent: boolean;
-  /** Fiche « membre » du profil : l'invité secondaire n'assigne qu'à lui-même (US-96 RF3) et ne coche que ses tâches. */
+  /** Fiche « membre » du profil : l'invité secondaire n'assigne qu'à lui-même (US-96 RF3) et ne coche que ses tâches. Pour le profil d'un enfant, c'est sa fiche enfant (D73). */
   memberId: string | null;
+  /** Profil d'un enfant, relié à sa fiche enfant : pas de RDV de toute la famille, tâche des devoirs en lecture seule (S-40, S-45). */
+  child: boolean;
   /** Fuseau de la famille : les échéances sont des jours de la famille (AF-2). */
   timeZone: string;
   today: string;
@@ -102,10 +106,10 @@ const NOT_FOUND = () => fail("not_found", "Cette tâche n'existe plus ou ne vous
 export async function taskViewer(ctx: Ctx, session: SessionContext): Promise<TaskViewer> {
   const accountId = session.user.accountId;
   if (!accountId || session.user.role === "admin") throw fail("forbidden", "Les tâches sont réservées aux profils d'un foyer.", 403);
-  const member = await ctx.db.selectFrom("family_members").select("id").where("account_id", "=", accountId).where("user_id", "=", session.user.id).executeTakeFirst();
+  const member = await profileMember(ctx.db, accountId, session.user.id);
   const timeZone = await familyTimeZone(ctx.db, accountId);
   const nowLocal = utcToLocal(ctx.now, timeZone);
-  return { accountId, userId: session.user.id, parent: isParent(session), memberId: member?.id ?? null, timeZone, today: nowLocal.slice(0, 10), nowLocal };
+  return { accountId, userId: session.user.id, parent: isParent(session), memberId: member.memberId, child: member.child, timeZone, today: nowLocal.slice(0, 10), nowLocal };
 }
 
 // ---------------------------------------------------------------------------------------------------------------------------
@@ -192,10 +196,12 @@ const isOverdue = (v: TaskViewer, row: Pick<TaskRow, "status" | "due_date" | "du
   row.status === "todo" && `${row.due_date}T${(row.due_time ?? "23:59:59").slice(0, 8).padEnd(8, ":00")}` < `${v.nowLocal}:00`;
 
 export const canManageTask = (v: TaskViewer, row: Pick<TaskRow, "created_by_user_id">) => v.parent || row.created_by_user_id === v.userId;
-export const canCheckTask = (v: TaskViewer, row: Pick<TaskRow, "created_by_user_id" | "assigned_member_id">) => canManageTask(v, row) || (v.memberId !== null && row.assigned_member_id === v.memberId);
+/** Le profil d'un enfant ne coche jamais la tâche « Préparer les devoirs » : seul un parent la coche (D73 S-40). */
+export const canCheckTask = (v: TaskViewer, row: Pick<TaskRow, "created_by_user_id" | "assigned_member_id" | "source">) =>
+  !(v.child && row.source === "homework_prep") && (canManageTask(v, row) || (v.memberId !== null && row.assigned_member_id === v.memberId));
 
-/** Le profil voit-il ce RDV ? (D26 : les parents voient tout ; un invité secondaire, ses demandes, les RDV de toute la famille et ceux où il figure.) */
-const sees = (v: TaskViewer, e: CalendarEvent) => v.parent || e.createdByUserId === v.userId || e.allFamily || (v.memberId !== null && e.memberIds.includes(v.memberId));
+/** Le profil voit-il ce RDV ? (D26 : les parents voient tout ; un invité secondaire, ses demandes, les RDV de toute la famille et ceux où il figure ; le profil d'un enfant, jamais ceux de toute la famille, S-45.) */
+const sees = (v: TaskViewer, e: CalendarEvent) => v.parent || e.createdByUserId === v.userId || (e.allFamily && !v.child) || (v.memberId !== null && e.memberIds.includes(v.memberId));
 
 export async function toTaskViews(db: Kysely<DB>, v: TaskViewer, rows: TaskRow[], members?: Map<string, MemberChip>): Promise<TaskView[]> {
   if (!rows.length) return [];
@@ -209,23 +215,18 @@ export async function toTaskViews(db: Kysely<DB>, v: TaskViewer, rows: TaskRow[]
     const s = await loadTaskSeries(db, v.accountId, id);
     if (s) series.set(id, s);
   }
-  // Lien de la tâche hebdomadaire des devoirs : la semaine qui suit l'échéance, préparée ou non (D69).
-  const prepRows = v.parent ? rows.filter((r) => r.source === "homework_prep") : [];
-  const prepWeeks = new Map<string, string>();
-  const prepOn = prepRows.length > 0 && Boolean((await db.selectFrom("family_settings").select("homework_help_enabled").where("account_id", "=", v.accountId).executeTakeFirst())?.homework_help_enabled);
-  if (prepOn) {
-    const starts = [...new Set(prepRows.map((r) => mondayAfter(r.due_date)))];
-    const found = await db.selectFrom("homework_weeks").select(["id", sql<string>`week_start::text`.as("start")]).where("account_id", "=", v.accountId).where(sql<boolean>`week_start = any(${starts}::date[])`).execute();
-    for (const w of found) prepWeeks.set(w.start, w.id);
-  }
-  const prep = (r: TaskRow): TaskView["homeworkPrep"] => (prepOn && r.source === "homework_prep" ? { weekStart: mondayAfter(r.due_date), weekId: prepWeeks.get(mondayAfter(r.due_date)) ?? null } : null);
+  // La tâche des devoirs ouvre l'écran des devoirs tant que l'aide est activée (D71) : vue parent, ou vue de l'enfant pour son profil (que la base ne lui montre qu'avec un âge des devoirs).
+  const prepOn =
+    (v.parent || v.child) && rows.some((r) => r.source === "homework_prep") &&
+    Boolean((await db.selectFrom("family_settings").select("homework_help_enabled").where("account_id", "=", v.accountId).executeTakeFirst())?.homework_help_enabled);
+  const prep = (r: TaskRow): TaskView["homeworkPrep"] => (prepOn && r.source === "homework_prep" ? { role: v.parent ? "parent" : "child" } : null);
   const hearts = await heartsOfTasks(db, v.userId, rows);
   return rows.map((r): TaskView => {
     const event = r.event_id ? events.get(r.event_id) : undefined;
     const s = r.series_id ? series.get(r.series_id) : undefined;
     const own: SeriesRule | null = s && !s.event_series_id ? taskRuleOf(s) : null;
     return {
-      id: r.id, title: open(r.title), note: openOptional(r.note), status: r.status, due: r.due_date, dueTime: r.due_time ? r.due_time.slice(0, 5) : null, overdue: isOverdue(v, r),
+      id: r.id, title: r.source === "homework_prep" ? HOMEWORK_PREP_TITLE : open(r.title), note: openOptional(r.note), status: r.status, due: r.due_date, dueTime: r.due_time ? r.due_time.slice(0, 5) : null, overdue: isOverdue(v, r),
       assignee: r.assigned_member_id ? (chips.get(r.assigned_member_id) ?? null) : null,
       event: event && sees(v, event) ? { id: event.id, title: event.title, start: utcToLocal(event.startsAt, v.timeZone) } : null,
       daysBefore: r.days_before_event, recurring: Boolean(r.series_id), rule: own ? ruleLabel(own) : null, repetition: own ? taskRepetitionOf(own) : null, followsEventSeries: Boolean(s?.event_series_id), homeworkWeekId: r.homework_week_id, isHomeworkPrep: r.source === "homework_prep", homeworkPrep: prep(r),
@@ -251,12 +252,14 @@ export async function listTasks(ctx: Ctx, session: SessionContext, options: { mi
   const members = await loadMembers(ctx.db, v.accountId);
   const horizon = addDays(v.today, UPCOMING_DAYS);
   const mine = options.mine ? (v.memberId ?? "00000000-0000-0000-0000-000000000000") : null;
+  // « Mes tâches » : celles assignées au membre du profil ; pour le profil d'un enfant, la tâche des devoirs y reste aussi (S-41).
+  const isMine = sql<boolean>`(t.assigned_member_id = ${mine}::uuid or (${v.child} and t.source = 'homework_prep'))`;
   const open_ = await selectTasks(ctx.db)
     .where("t.account_id", "=", v.accountId)
     .where(visibleTo(v.userId))
     .where("t.status", "=", "todo")
     .where("t.due_date", "<=", sql<Date>`${horizon}::date`)
-    .$if(Boolean(mine), (qb) => qb.where("t.assigned_member_id", "=", mine!))
+    .$if(Boolean(mine), (qb) => qb.where(isMine))
     .execute();
   const beyond = await selectTasks(ctx.db)
     .where("t.account_id", "=", v.accountId)
@@ -264,7 +267,7 @@ export async function listTasks(ctx: Ctx, session: SessionContext, options: { mi
     .where("t.status", "=", "todo")
     .where("t.series_id", "is", null)
     .where("t.due_date", ">", sql<Date>`${horizon}::date`)
-    .$if(Boolean(mine), (qb) => qb.where("t.assigned_member_id", "=", mine!))
+    .$if(Boolean(mine), (qb) => qb.where(isMine))
     .orderBy("t.due_date")
     .limit(100)
     .execute();
@@ -273,7 +276,7 @@ export async function listTasks(ctx: Ctx, session: SessionContext, options: { mi
     .where(visibleTo(v.userId))
     .where("t.status", "=", "done")
     .where(sql<boolean>`t.done_at > now() - ${`${DONE_DAYS} days`}::interval`)
-    .$if(Boolean(mine), (qb) => qb.where("t.assigned_member_id", "=", mine!))
+    .$if(Boolean(mine), (qb) => qb.where(isMine))
     .orderBy("t.done_at", "desc")
     .limit(200)
     .execute();
@@ -285,7 +288,7 @@ export async function listTasks(ctx: Ctx, session: SessionContext, options: { mi
     later: (await toTaskViews(ctx.db, v, beyond, members)).sort(byDue),
     done: await toTaskViews(ctx.db, v, finished, members),
     assignable: assignableMembers(v, members),
-    viewer: { parent: v.parent, memberId: v.memberId },
+    viewer: { parent: v.parent, memberId: v.memberId, child: v.child },
     todayDate: v.today,
   };
 }
@@ -322,7 +325,7 @@ async function viewOf(db: Kysely<DB>, v: TaskViewer, id: string): Promise<TaskVi
 export interface NewTask extends TaskFields {
   /** Répétition (US-110 RF3) : la tâche devient une règle dont les occurrences se cochent séparément. */
   repetition?: TaskRepetition | null;
-  /** « homework_prep » : tâche hebdomadaire de préparation des devoirs (D69), créée depuis la carte Aide Devoirs ; une seule série active par foyer. */
+  /** « homework_prep » : tâche du foyer « Préparer les devoirs » (D69, D71), créée depuis la carte Aide Devoirs ; une seule série active par foyer, les jours de devoirs du foyer, personne d'assigné. */
   kind?: "homework_prep";
 }
 
@@ -334,9 +337,10 @@ export async function createTask(ctx: Ctx, session: SessionContext, input: NewTa
   if (input.kind === "homework_prep") {
     if (!v.parent) throw fail("forbidden", "Seuls les parents du foyer créent cette tâche.", 403);
     if (!(await homeworkEnabled(ctx, v.accountId))) throw fail("homework_disabled", "L'aide Devoirs n'est pas activée pour la famille.", 409);
-    if (input.repetition?.frequency !== "weekly") throw fail("prep_needs_weekly", "La préparation des devoirs revient chaque semaine.", 422);
-    if ((input.repetition.weekdays?.length ?? 0) > 1) throw fail("prep_one_day", "La préparation des devoirs revient un seul jour par semaine.", 422);
+    // Tâche du foyer : personne d'assigné, et les jours viennent du réglage « Jours de devoirs », jamais du formulaire (US-119 RF1, S-30).
     task.title = HOMEWORK_PREP_TITLE;
+    task.assigneeId = null;
+    input = { ...input, repetition: { frequency: "weekly", weekdays: await homeworkDaysOf(ctx.db, v.accountId), end: { kind: "never" } } };
   }
   try {
     const id = await ctx.db.transaction().execute(async (trx) => {
@@ -419,7 +423,11 @@ export async function updateTask(ctx: Ctx, session: SessionContext, id: string, 
       if (row.status !== "todo") throw settled(row);
       if (row.version !== options.expectedVersion) throw staleVersion(row);
       const task = checkFields(v, changes, members, { keepAssignee: row.assigned_member_id });
-      if (row.source === "homework_prep") task.title = HOMEWORK_PREP_TITLE;
+      if (row.source === "homework_prep") {
+        // Tâche du foyer : son titre et l'absence d'assignation ne changent pas ; ses jours suivent le réglage du foyer (la base les aligne).
+        task.title = HOMEWORK_PREP_TITLE;
+        task.assigneeId = null;
+      }
       reassigned = task.assigneeId !== null && task.assigneeId !== row.assigned_member_id;
       const series = row.series_id ? await loadTaskSeries(trx, v.accountId, row.series_id, { forUpdate: true }) : undefined;
       const scope: Scope = options.scope ?? "this";
@@ -461,6 +469,7 @@ export async function assignTask(ctx: Ctx, session: SessionContext, id: string, 
     await ctx.db.transaction().execute(async (trx) => {
       const row = await lockTask(trx, v, id);
       if (!canManageTask(v, row)) throw fail("forbidden", "Vous ne pouvez pas réassigner cette tâche.", 403);
+      if (row.source === "homework_prep" && memberId) throw fail("household_task", "« Préparer les devoirs » est une tâche du foyer : elle n'est assignée à personne.", 422);
       if (row.status !== "todo") throw settled(row);
       if (options.expectedVersion !== undefined && row.version !== options.expectedVersion) throw staleVersion(row);
       if (memberId) {

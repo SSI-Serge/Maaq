@@ -107,9 +107,12 @@ export function AssistantHome() {
       }
     >
       <div className={styles.homeActions}>
-        <Link href="/assistant/demande" className={styles.cta}>
-          + Nouvelle demande
-        </Link>
+        {/* Le tchat de l'Assistant Famille est réservé aux deux parents (le serveur le refuse aux autres profils) : l'entrée n'est pas montrée au profil d'un enfant (S-47). */}
+        {!lists?.viewer.child && (
+          <Link href="/assistant/demande" className={styles.cta}>
+            + Nouvelle demande
+          </Link>
+        )}
         <Link href="/assistant/taches/nouvelle" className={styles.cta}>
           + Tâche
         </Link>

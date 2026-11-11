@@ -63,12 +63,22 @@ export interface FamilyMemberView {
   /** Rendez-vous à venir (provisoires ou confirmés) qui le concernent, pour la confirmation de retrait (US-93 RF5). */
   upcoming: number;
   removedAt: string | null;
+  /** Profil de l'enfant (D73 S-38, S-48) : l'invité secondaire relié à cette fiche enfant, choisi par un parent ; vide pour les autres membres et sans lien. */
+  profile: { userId: string; firstName: string } | null;
+}
+
+/** Un invité secondaire du foyer, proposé dans « Profil de [prénom] » ; `memberId` dit à quelle fiche enfant il est déjà relié. */
+export interface ChildProfileOption {
+  userId: string;
+  firstName: string;
+  memberId: string | null;
 }
 
 export interface FamilyOverview {
   members: FamilyMemberView[];
   removed: FamilyMemberView[];
   max: number;
+  profiles: ChildProfileOption[];
 }
 
 /** Naissance en « AAAA-MM », ou rien si elle n'est pas connue. */
@@ -103,7 +113,8 @@ async function viewsOf(ctx: Ctx, accountId: string, session: SessionContext, sco
   const base = ctx.db
     .selectFrom("family_members as m")
     .leftJoin("users as u", "u.id", "m.user_id")
-    .select(["m.id", "m.first_name", "m.role", birthText("m."), "m.color_index", "m.user_id", "m.archived_at", "u.role as user_role"])
+    .leftJoin("users as cp", "cp.id", "m.child_profile_user_id")
+    .select(["m.id", "m.first_name", "m.role", birthText("m."), "m.color_index", "m.user_id", "m.archived_at", "u.role as user_role", "m.child_profile_user_id", "cp.first_name as profile_name"])
     .where("m.account_id", "=", accountId)
     .where("m.role", "in", [...ASSISTANT_ROLES])
     .orderBy("m.role")
@@ -133,13 +144,29 @@ async function viewsOf(ctx: Ctx, accountId: string, session: SessionContext, sco
     linked: r.user_id !== null,
     upcoming: counts.get(r.id) ?? 0,
     removedAt: r.archived_at ? new Date(r.archived_at as Date | string).toISOString() : null,
+    profile: r.child_profile_user_id ? { userId: r.child_profile_user_id, firstName: r.profile_name ?? "" } : null,
   }));
+}
+
+/** Les invités secondaires actifs du foyer : ceux qu'un parent peut relier à une fiche enfant. */
+async function childProfileOptions(ctx: Ctx, accountId: string): Promise<ChildProfileOption[]> {
+  const rows = await ctx.db
+    .selectFrom("users as u")
+    .leftJoin("family_members as c", "c.child_profile_user_id", "u.id")
+    .select(["u.id", "u.first_name", "c.id as member_id"])
+    .where("u.account_id", "=", accountId)
+    .where("u.role", "=", "guest")
+    .where("u.guest_rank", "=", "secondary")
+    .where("u.status", "in", ["active", "grace_period", "pending_activation"])
+    .orderBy("u.first_name")
+    .execute();
+  return rows.map((r) => ({ userId: r.id, firstName: r.first_name, memberId: r.member_id }));
 }
 
 /** Membres actifs, puis membres retirés (section repliée « Membres retirés », qui garde l'effacement définitif). */
 export async function familyOverview(ctx: Ctx, session: SessionContext): Promise<FamilyOverview> {
   const accountId = requireParent(session);
-  return { members: await viewsOf(ctx, accountId, session, "active"), removed: await viewsOf(ctx, accountId, session, "removed"), max: MAX_MEMBERS };
+  return { members: await viewsOf(ctx, accountId, session, "active"), removed: await viewsOf(ctx, accountId, session, "removed"), max: MAX_MEMBERS, profiles: await childProfileOptions(ctx, accountId) };
 }
 
 export async function listFamilyMembers(ctx: Ctx, session: SessionContext): Promise<FamilyMemberView[]> {
@@ -212,6 +239,41 @@ export async function updateMember(ctx: Ctx, session: SessionContext, id: string
     changes.birth_month = birth?.birth_month ?? null;
   }
   if (Object.keys(changes).length) await ctx.db.updateTable("family_members").set(changes).where("id", "=", id).execute();
+  return viewOne(ctx, session, id);
+}
+
+/**
+ * « Profil de [prénom] » (D73 S-38, S-48, S-49) : un parent relie un invité secondaire du foyer à une fiche enfant, ou retire le lien. Le membre de ce profil devient la
+ * fiche enfant, et sa propre fiche « autre » est masquée : les RDV (participants) et les tâches (assignations) déjà posés sur elle sont reportés sur la fiche enfant, sans
+ * doublon, dans la même transaction. La base refuse ensuite toute écriture qui viserait la fiche masquée. Retirer le lien ne déplace rien.
+ */
+export async function setChildProfile(ctx: Ctx, session: SessionContext, id: string, userId: string | null): Promise<FamilyMemberView> {
+  const accountId = requireParent(session);
+  const child = await ctx.db.selectFrom("family_members").select(["id", "role", "user_id", "archived_at", "child_profile_user_id"]).where("account_id", "=", accountId).where("id", "=", id).executeTakeFirst();
+  if (!child || child.archived_at) throw new Rejection("not_found", "Ce membre n'existe pas ou a été retiré.", 404);
+  if (child.role !== "child" || child.user_id) throw new Rejection("not_a_child", "Seule une fiche enfant peut être reliée au profil d'un invité.", 422);
+  if (userId === child.child_profile_user_id) return viewOne(ctx, session, id);
+  if (userId === null) {
+    await ctx.db.updateTable("family_members").set({ child_profile_user_id: null }).where("id", "=", id).execute();
+    return viewOne(ctx, session, id);
+  }
+  const option = (await childProfileOptions(ctx, accountId)).find((p) => p.userId === userId);
+  if (!option) throw new Rejection("invalid_profile", "Choisissez un invité secondaire de votre foyer.", 422);
+  if (option.memberId) throw new Rejection("profile_taken", "Ce profil est déjà relié à un autre enfant.", 409);
+  await ctx.db.transaction().execute(async (trx) => {
+    const own = await trx.selectFrom("family_members").select("id").where("account_id", "=", accountId).where("user_id", "=", userId).executeTakeFirst();
+    if (own) {
+      // RDV : l'enfant devient participant à la place de la fiche « autre » ; s'il l'était déjà, la ligne en double disparaît simplement.
+      await sql`insert into family_event_members (event_id, member_id, account_id) select event_id, ${id}::uuid, account_id from family_event_members where member_id = ${own.id}::uuid on conflict do nothing`.execute(trx);
+      await trx.deleteFrom("family_event_members").where("member_id", "=", own.id).execute();
+      await sql`insert into family_event_series_members (series_id, member_id, account_id) select series_id, ${id}::uuid, account_id from family_event_series_members where member_id = ${own.id}::uuid on conflict do nothing`.execute(trx);
+      await trx.deleteFrom("family_event_series_members").where("member_id", "=", own.id).execute();
+      // Tâches encore ouvertes et règles actives : assignées à la fiche enfant. Les tâches faites gardent leur histoire.
+      await trx.updateTable("family_tasks").set({ assigned_member_id: id }).where("assigned_member_id", "=", own.id).where("status", "in", ["proposed", "todo"]).execute();
+      await trx.updateTable("family_task_series").set({ assigned_member_id: id }).where("assigned_member_id", "=", own.id).where("ended_at", "is", null).execute();
+    }
+    await trx.updateTable("family_members").set({ child_profile_user_id: userId }).where("id", "=", id).execute();
+  });
   return viewOne(ctx, session, id);
 }
 

@@ -1,12 +1,16 @@
 import { randomUUID } from "node:crypto";
-import { sql } from "kysely";
+import { sql, type Kysely } from "kysely";
 import { describeError } from "@/server/safe-log";
 import type { Ctx, SessionContext } from "@/server/auth/service";
-import type { HomeworkLevel } from "@/server/db/schema.generated";
+import type { DB, HomeworkLevel } from "@/server/db/schema.generated";
 import { Rejection } from "@/server/http";
 import { requireFamilyProfile, requireParent } from "../family";
 import { familyAgentId } from "../conversation";
+import { utcToLocal } from "../local-time";
+import { familyTimeZone } from "../reminders";
+import { loadTaskSeries, materializeOwnSeries, taskHorizon } from "../task-series";
 import { LEVEL_LABEL } from "./catalog";
+import { DEFAULT_HOMEWORK_DAYS } from "./prep";
 
 /**
  * Aide Devoirs du foyer (US-118) : un réglage familial lisible par tous les profils et modifiable par les deux parents (D64, S-07), désactivé par défaut (SG-2).
@@ -23,6 +27,8 @@ export interface HomeworkChildView {
   homeworkAge: number | null;
   level: HomeworkLevel | null;
   levelLabel: string | null;
+  /** L'enfant a son profil (invité secondaire relié à sa fiche, choisi dans Réglages › Membres) : la carte le rappelle seulement (S-48). */
+  hasProfile: boolean;
 }
 
 export interface HomeworkSetting {
@@ -34,8 +40,16 @@ export interface HomeworkSetting {
   /** Au moins un membre enfant : sans lui l'aide ne s'active pas (RF2). */
   hasChildren: boolean;
   children: HomeworkChildView[];
-  /** Tâche hebdomadaire de préparation (D69) : sa règle en clair (« chaque dimanche à 18 h ») quand une série est active, sinon rien et la carte propose de la créer. */
+  /** Jours de devoirs du foyer (1 = lundi … 7 = dimanche), au moins un : la tâche « Préparer les devoirs » revient ces jours-là (US-118 RF7). */
+  days: number[];
+  /** Tâche « Préparer les devoirs » (D69, D71) : sa règle en clair (« les jours de devoirs à 17 h ») quand une série est active, sinon rien et la carte propose de la créer. */
   weeklyTask: { label: string } | null;
+}
+
+/** Jours de devoirs du foyer ; lundi, mardi, jeudi et vendredi tant que rien n'est réglé. */
+export async function homeworkDaysOf(db: Kysely<DB>, accountId: string): Promise<number[]> {
+  const row = await db.selectFrom("family_settings").select("homework_days").where("account_id", "=", accountId).executeTakeFirst();
+  return row?.homework_days?.length ? [...row.homework_days].sort((a, b) => a - b) : [...DEFAULT_HOMEWORK_DAYS];
 }
 
 /** Niveau de maths de l'âge des devoirs : 6 ans CP … 10 ans CM2, et 11 ou 12 ans CM2 (RF4). Même règle que `homework_level_for_age` dans la base. */
@@ -47,7 +61,7 @@ export async function homeworkChildren(ctx: Ctx, accountId: string): Promise<Hom
   const rows = await ctx.db
     .selectFrom("family_members as m")
     .leftJoin("homework_children as h", "h.member_id", "m.id")
-    .select(["m.id", "m.first_name", "h.homework_age"])
+    .select(["m.id", "m.first_name", "h.homework_age", "m.child_profile_user_id"])
     .where("m.account_id", "=", accountId)
     .where("m.role", "=", "child")
     .where("m.archived_at", "is", null)
@@ -59,12 +73,13 @@ export async function homeworkChildren(ctx: Ctx, accountId: string): Promise<Hom
     homeworkAge: r.homework_age,
     level: r.homework_age === null ? null : levelForAge(r.homework_age),
     levelLabel: r.homework_age === null ? null : LEVEL_LABEL[levelForAge(r.homework_age)],
+    hasProfile: r.child_profile_user_id !== null,
   }));
 }
 
 export async function getHomeworkSetting(ctx: Ctx, session: SessionContext): Promise<HomeworkSetting> {
   const { accountId, parent } = requireFamilyProfile(session);
-  const row = await ctx.db.selectFrom("family_settings").select(["homework_help_enabled", "homework_help_first_enabled_at"]).where("account_id", "=", accountId).executeTakeFirst();
+  const row = await ctx.db.selectFrom("family_settings").select(["homework_help_enabled", "homework_help_first_enabled_at", "homework_days"]).where("account_id", "=", accountId).executeTakeFirst();
   const children = await homeworkChildren(ctx, accountId);
   return {
     enabled: row?.homework_help_enabled ?? false,
@@ -72,26 +87,48 @@ export async function getHomeworkSetting(ctx: Ctx, session: SessionContext): Pro
     canEdit: parent,
     hasChildren: children.length > 0,
     children,
+    days: row?.homework_days?.length ? [...row.homework_days].sort((a, b) => a - b) : [...DEFAULT_HOMEWORK_DAYS],
     weeklyTask: await weeklyTaskOf(ctx, accountId),
   };
 }
 
-const WEEKDAY_NAMES = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"];
-
-/** La série active « Préparer les devoirs de la semaine », décrite en clair ; une seule par foyer (index unique de la base). */
+/** La série active « Préparer les devoirs », décrite en clair ; une seule par foyer (index unique de la base). Ses jours sont toujours les jours de devoirs du foyer. */
 async function weeklyTaskOf(ctx: Ctx, accountId: string): Promise<{ label: string } | null> {
   const row = await ctx.db
     .selectFrom("family_task_series")
-    .select(["weekdays", sql<string | null>`due_time::text`.as("time"), sql<string>`first_date::text`.as("first")])
+    .select([sql<string | null>`due_time::text`.as("time")])
     .where("account_id", "=", accountId)
     .where("source", "=", "homework_prep")
     .where("ended_at", "is", null)
     .executeTakeFirst();
   if (!row) return null;
-  const days = (row.weekdays ?? []).map((d) => WEEKDAY_NAMES[d - 1]).filter(Boolean);
-  const when = days.length ? `chaque ${days.join(" et ")}` : "chaque semaine";
-  const time = row.time ? ` à ${Number(row.time.slice(0, 2))} h${row.time.slice(3, 5) === "00" ? "" : row.time.slice(3, 5)}` : "";
-  return { label: `${when}${time}` };
+  const time = row.time ? ` à ${Number(row.time.slice(0, 2))} h${row.time.slice(3, 5) === "00" ? "" : ` ${row.time.slice(3, 5)}`}` : "";
+  return { label: `les jours de devoirs${time}` };
+}
+
+/**
+ * Jours de devoirs du foyer (US-118 RF7, S-30) : sept jours possibles, au moins un. Les deux parents les changent. La base aligne la tâche « Préparer les devoirs » sur ces jours
+ * et retire, dès le lendemain, ses occurrences à venir des jours décochés ; ici, les occurrences des jours ajoutés sont créées tout de suite. L'heure de la tâche est gardée (S-44).
+ */
+export async function setHomeworkDays(ctx: Ctx, session: SessionContext, days: number[]): Promise<HomeworkSetting> {
+  const accountId = requireParent(session);
+  const wanted = [...new Set(days)].sort((a, b) => a - b);
+  if (!wanted.length) throw new Rejection("no_homework_day", "Gardez au moins un jour de devoirs.", 422);
+  if (wanted.some((d) => !Number.isInteger(d) || d < 1 || d > 7)) throw new Rejection("invalid_days", "Les jours de devoirs vont du lundi au dimanche.", 422);
+  await ctx.db.transaction().execute(async (trx) => {
+    await trx
+      .insertInto("family_settings")
+      .values({ account_id: accountId, homework_days: wanted, updated_by_user_id: session.user.id })
+      .onConflict((oc) => oc.column("account_id").doUpdateSet({ homework_days: wanted, updated_by_user_id: session.user.id }))
+      .execute();
+    const series = await trx.selectFrom("family_task_series").select("id").where("account_id", "=", accountId).where("source", "=", "homework_prep").where("ended_at", "is", null).executeTakeFirst();
+    if (!series) return;
+    const fresh = await loadTaskSeries(trx, accountId, series.id);
+    if (!fresh) return;
+    const today = utcToLocal(ctx.now, await familyTimeZone(trx, accountId)).slice(0, 10);
+    await materializeOwnSeries(trx, fresh, today, await taskHorizon(trx, today));
+  });
+  return getHomeworkSetting(ctx, session);
 }
 
 /** Vrai si l'aide est activée pour ce foyer : porte d'entrée de tout ce qui touche aux devoirs (apparition, tchat, accueil). */

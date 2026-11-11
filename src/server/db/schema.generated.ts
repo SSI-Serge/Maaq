@@ -97,6 +97,8 @@ export type GroceryUnreferencedState = "referenced" | "rejected" | "to_reference
 
 export type GuestRank = "core" | "secondary";
 
+export type HomeworkQuestionForm = "equations_to_complete" | "fill_in_blanks" | "matching" | "multiple_choice" | "ordering" | "problem" | "true_false" | "true_false_correction" | "written_answer";
+
 export type HomeworkActivityCategory = "art" | "games_projects" | "imagination" | "nature" | "philosophy" | "stem";
 
 export type HomeworkLevel = "ce1" | "ce2" | "cm1" | "cm2" | "cp";
@@ -1292,6 +1294,10 @@ export interface FamilyMembers {
    * Année de naissance, facultative, avec le mois (jamais le jour, D54). Les âges sont transmis au modèle par tranche, calculés sans stockage supplémentaire (D37, family_member_age_months). Donnée d'un mineur : incluse dans l'export (US-92 RT4)
    */
   birth_year: number | null;
+  /**
+   * Profil de l'enfant : profil d'invité secondaire de l'enfant, porté par sa fiche enfant. Le membre du profil est alors cette fiche (family_member_of_profile) et sa fiche « autre » est masquée (D73 S-38, S-39)
+   */
+  child_profile_user_id: string | null;
   color_index: number;
   created_at: Generated<Timestamp>;
   created_by_user_id: string | null;
@@ -1334,6 +1340,10 @@ export interface FamilySettings {
    * Date de la première activation, posée automatiquement : vide = la présentation en trois lignes n'a jamais été montrée (US-118 RF3)
    */
   homework_help_first_enabled_at: Timestamp | null;
+  /**
+   * Jours de devoirs du foyer (1 = lundi … 7 = dimanche, au moins un) : lundi, mardi, jeudi et vendredi au départ (US-118 RF7, D71 S-30)
+   */
+  homework_days: Generated<number[]>;
   school_zone: string | null;
   updated_at: Generated<Timestamp>;
   updated_by_user_id: string | null;
@@ -1833,6 +1843,29 @@ export interface HomeworkExercises {
   statement: string | null;
   textbook_key: string;
   theme: string;
+}
+
+export interface HomeworkExercisePages {
+  account_id: string;
+  created_at: Generated<Timestamp>;
+  created_by_user_id: string | null;
+  /**
+   * Les 3 exercices (facile, moyen, difficile), données structurées chiffrées par l'application ; énoncés seuls
+   */
+  exercises: Buffer;
+  id: Generated<string>;
+  level: Buffer;
+  member_id: string;
+  question_forms: HomeworkQuestionForm[];
+  subject: Buffer;
+  theme: Buffer;
+}
+
+export interface HomeworkExercisePageAnswers {
+  account_id: string;
+  answers: Buffer;
+  grading_scale: Buffer;
+  page_id: string;
 }
 
 export interface HomeworkExerciseValidations {
@@ -2968,6 +3001,8 @@ export interface DB {
   grocery_unreferenced_status: GroceryUnreferencedStatus;
   homework_activities: HomeworkActivities;
   homework_children: HomeworkChildren;
+  homework_exercise_page_answers: HomeworkExercisePageAnswers;
+  homework_exercise_pages: HomeworkExercisePages;
   homework_exercise_validations: HomeworkExerciseValidations;
   homework_exercises: HomeworkExercises;
   homework_textbooks: HomeworkTextbooks;

@@ -46,7 +46,7 @@ export async function recipientsOf(db: Db, accountId: string): Promise<Recipient
     .selectFrom("users as u")
     .leftJoin("family_members as m", "m.user_id", "u.id")
     .leftJoin("user_assistant_settings as s", "s.user_id", "u.id")
-    .select(["u.id", "u.first_name", "u.email", "u.role", "u.guest_rank", "m.id as member_id", "s.task_daily_reminder_enabled as daily"])
+    .select(["u.id", "u.first_name", "u.email", "u.role", "u.guest_rank", sql<string | null>`family_member_of_profile(u.id)`.as("member_id"), "s.task_daily_reminder_enabled as daily"])
     .where("u.account_id", "=", accountId)
     .where("u.status", "in", ["active", "grace_period"])
     .where((eb) => eb.or([eb("u.role", "=", "primary_user"), eb("u.role", "=", "guest")]))
@@ -224,7 +224,7 @@ async function loadOpenTasks(db: Db, accountId: string, from: string, to: string
   const rows = await db
     .selectFrom("family_tasks as t")
     .leftJoin("family_members as m", "m.id", "t.assigned_member_id")
-    .select(["t.id", "t.title", sql<string>`t.due_date::text`.as("due"), sql<string | null>`t.due_time::text`.as("due_time"), "t.assigned_member_id", "m.user_id as assigned_user"])
+    .select(["t.id", "t.title", sql<string>`t.due_date::text`.as("due"), sql<string | null>`t.due_time::text`.as("due_time"), "t.assigned_member_id", sql<string | null>`coalesce(m.user_id, m.child_profile_user_id)`.as("assigned_user")])
     .where("t.account_id", "=", accountId)
     .where("t.status", "=", "todo")
     .where("t.due_date", ">=", sql<Date>`${from}::date`)
@@ -340,7 +340,7 @@ async function assignedTarget(ctx: Ctx, taskId: string, byUserId: string): Promi
     .selectFrom("family_tasks as t")
     .innerJoin("family_members as m", "m.id", "t.assigned_member_id")
     .innerJoin("accounts as a", "a.id", "t.account_id")
-    .select(["t.account_id", "t.title", sql<string>`t.due_date::text`.as("due"), sql<string | null>`t.due_time::text`.as("due_time"), "m.user_id", "a.family_timezone"])
+    .select(["t.account_id", "t.title", sql<string>`t.due_date::text`.as("due"), sql<string | null>`t.due_time::text`.as("due_time"), sql<string | null>`coalesce(m.user_id, m.child_profile_user_id)`.as("user_id"), "a.family_timezone"])
     .where("t.id", "=", taskId)
     .where("t.status", "=", "todo")
     .executeTakeFirst();

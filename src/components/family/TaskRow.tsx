@@ -68,7 +68,9 @@ export function TaskRow({ task, assignable, showDate = true, onChanged }: Props)
   const checked = justDone || done;
   const color = task.assignee?.color ?? FALLBACK_COLOR;
   const code = mutation.error?.body?.code;
-  const canAssign = task.can.manage && task.status === "todo" && assignable.length > 0;
+  // « Préparer les devoirs » est une tâche du foyer : elle n'est assignée à personne (D71).
+  const canAssign = task.can.manage && task.status === "todo" && assignable.length > 0 && !task.isHomeworkPrep;
+  const unassigned = task.isHomeworkPrep ? "Tâche du foyer" : "Non assignée";
   return (
     <div className={`${styles.taskRow} ${checked ? styles.taskDone : ""}`} style={{ borderLeftColor: color }}>
       <input
@@ -80,7 +82,7 @@ export function TaskRow({ task, assignable, showDate = true, onChanged }: Props)
         aria-label={`${checked ? "Décocher" : "Cocher"} : ${task.title}`}
       />
       <div className={styles.taskBody}>
-        <Link href={`/assistant/taches/${task.id}`} className={styles.taskTitle}>
+        <Link href={task.homeworkPrep ? `/assistant/devoirs/tache?tache=${task.id}` : `/assistant/taches/${task.id}`} className={styles.taskTitle}>
           {task.assignee && task.assignee.role === "child" && !task.homeworkWeekId ? `${task.assignee.firstName} — ${task.title.charAt(0).toLowerCase()}${task.title.slice(1)}` : task.title}
         </Link>
         <div className={styles.taskMeta}>
@@ -88,22 +90,17 @@ export function TaskRow({ task, assignable, showDate = true, onChanged }: Props)
           {canAssign ? (
             <button type="button" className={styles.assignee} onClick={() => setPicking((v) => !v)} aria-expanded={picking} disabled={mutation.pending}>
               <span className={styles.dot} style={{ background: color }} aria-hidden />
-              {task.assignee?.firstName ?? "Non assignée"}
+              {task.assignee?.firstName ?? unassigned}
             </button>
           ) : (
-            <span>{task.assignee?.firstName ?? "Non assignée"}</span>
+            <span>{task.assignee?.firstName ?? unassigned}</span>
           )}
           {showDate && <span>{shortDate(task.due)}</span>}
           {task.dueTime && <span>{dueTimeLabel(task.dueTime)}</span>}
           {task.recurring && <span title={task.rule ?? "À chaque séance"}>↻ {task.rule ?? "À chaque séance"}</span>}
           {task.event && <Link href={`/calendrier/rdv/${task.event.id}`}>{task.event.title} ›</Link>}
           {task.homeworkWeekId && <Link href={`/assistant/devoirs/${task.homeworkWeekId}`}>Semaine de devoirs ›</Link>}
-          {task.homeworkPrep &&
-            (task.homeworkPrep.weekId ? (
-              <Link href={`/assistant/devoirs/${task.homeworkPrep.weekId}`}>Voir la semaine de devoirs ›</Link>
-            ) : (
-              <Link href={`/assistant/devoirs/preparer?semaine=${task.homeworkPrep.weekStart}`}>Préparer les devoirs de la semaine ›</Link>
-            ))}
+          {task.homeworkPrep && <Link href={`/assistant/devoirs/tache?tache=${task.id}`}>Planning du jour et exercices ›</Link>}
           {checked && task.status === "done" && task.doneBy && <span>Faite par {task.doneBy}</span>}
           {task.status === "done" && task.heart?.thanksFrom && <HeartButton target={{ kind: "task", id: task.id }} heart={task.heart} onChanged={onChanged} />}
           {justDone && (

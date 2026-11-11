@@ -7,7 +7,8 @@ import { useApiQuery } from "@/client/hooks";
 import { AppShell, appStyles as s, Section } from "@/components/app/AppShell";
 import { Loading, Notice, RetryNotice } from "@/components/ui";
 import type { TaskLists, TaskView } from "@/server/assistant/tasks";
-import { HOMEWORK_PREP_TITLE } from "@/server/assistant/homework/prep";
+import { DEFAULT_HOMEWORK_DAYS, HOMEWORK_PREP_TIME, HOMEWORK_PREP_TITLE } from "@/server/assistant/homework/prep";
+import type { HomeworkSetting } from "@/server/assistant/homework/settings";
 import { addDays, todayLocal } from "./format";
 import { TaskForm, type TaskFormInitial } from "./TaskForm";
 import { TaskRow } from "./TaskRow";
@@ -96,16 +97,17 @@ function Group({ title, tasks, data, showDate = true, onChanged }: { title: stri
   );
 }
 
-/** Valeurs de départ de la tâche hebdomadaire de préparation des devoirs (D69) : chaque dimanche à 18 h, assignée au parent qui la crée. */
-function prepInitial(lists: TaskLists): TaskFormInitial {
+/** Valeurs de départ de la tâche « Préparer les devoirs » (D69, D71) : les jours de devoirs du foyer à 17 h, sans personne assignée ; la première échéance est le prochain jour de devoirs. */
+function prepInitial(days: number[]): TaskFormInitial {
   const today = todayLocal();
   const weekday = ((new Date(`${today}T00:00:00Z`).getUTCDay() + 6) % 7) + 1;
+  const ahead = [0, 1, 2, 3, 4, 5, 6].find((n) => days.includes(((weekday - 1 + n) % 7) + 1)) ?? 0;
   return {
     title: HOMEWORK_PREP_TITLE,
-    due: addDays(today, (7 - weekday) % 7),
-    dueTime: "18:00",
-    assigneeId: lists.viewer.memberId,
-    repetition: { frequency: "weekly", weekdays: [7], end: { kind: "never" } },
+    due: addDays(today, ahead),
+    dueTime: HOMEWORK_PREP_TIME,
+    assigneeId: null,
+    repetition: { frequency: "weekly", weekdays: days, end: { kind: "never" } },
   };
 }
 
@@ -114,14 +116,17 @@ export function NewTaskScreen({ model }: { model?: string | null }) {
   const router = useRouter();
   const lists = useApiQuery<{ lists: TaskLists }>("/api/family/tasks");
   const prep = model === "preparation_devoirs";
+  // Les jours de la tâche des devoirs viennent du réglage du foyer, jamais du formulaire (S-30).
+  const homework = useApiQuery<{ setting: HomeworkSetting }>("/api/family/homework");
+  const days = homework.data?.setting.days ?? (homework.error ? DEFAULT_HOMEWORK_DAYS : null);
   return (
     <AppShell title="Nouvelle tâche" back={{ href: "/assistant/taches", label: "Tâches" }}>
       {lists.error && <RetryNotice message={lists.error.message} onRetry={lists.reload} />}
-      {lists.loading && !lists.data && <Loading slow={lists.slow} />}
-      {lists.data && (
+      {(lists.loading && !lists.data) || (prep && !days) ? <Loading slow={lists.slow} /> : null}
+      {lists.data && (!prep || days) && (
         <TaskForm
           assignable={lists.data.lists.assignable}
-          initial={prep ? prepInitial(lists.data.lists) : undefined}
+          initial={prep && days ? prepInitial(days) : undefined}
           homeworkPrep={prep}
           onSaved={() => router.push("/assistant/taches")}
           onCancel={() => router.push("/assistant/taches")}

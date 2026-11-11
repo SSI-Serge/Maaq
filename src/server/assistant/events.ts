@@ -7,6 +7,7 @@ import { EVENT_TYPES, MEDICAL_TITLE, SOURCE_CODE, STATUS_CODE, TYPE_CODE, eventT
 import { parsePoint, sealPoint, type PlacePoint } from "./address";
 import { seal, sealOptional } from "./fields";
 import { isParent } from "./family";
+import { profileMember } from "./profile-member";
 import { loadMembers, type MemberChip } from "./member-chips";
 import { isLocalDateTime, localMs, localToUtc, utcToLocal } from "./local-time";
 import { env } from "@/server/env";
@@ -109,8 +110,10 @@ interface Viewer {
   accountId: string;
   userId: string;
   parent: boolean;
-  /** Fiche « membre » du profil, s'il en a une : un invité secondaire voit les rendez-vous où il figure. */
+  /** Fiche « membre » du profil, s'il en a une : un invité secondaire voit les rendez-vous où il figure. Pour le profil d'un enfant, sa fiche enfant (D73). */
   memberId: string | null;
+  /** Profil d'un enfant : il ne voit un RDV que s'il y est nommé, jamais ceux de toute la famille (S-45). */
+  child: boolean;
   timeZone: string;
 }
 
@@ -120,12 +123,12 @@ const NOT_FOUND = () => fail("not_found", "Ce rendez-vous n'existe plus ou ne vo
 async function viewerOf(ctx: Ctx, session: SessionContext): Promise<Viewer> {
   const accountId = session.user.accountId;
   if (!accountId || session.user.role === "admin") throw fail("forbidden", "Le calendrier familial est réservé aux profils d'un foyer.", 403);
-  const member = await ctx.db.selectFrom("family_members").select("id").where("account_id", "=", accountId).where("user_id", "=", session.user.id).executeTakeFirst();
-  return { accountId, userId: session.user.id, parent: isParent(session), memberId: member?.id ?? null, timeZone: session.device.timezone || "Europe/Paris" };
+  const member = await profileMember(ctx.db, accountId, session.user.id);
+  return { accountId, userId: session.user.id, parent: isParent(session), memberId: member.memberId, child: member.child, timeZone: session.device.timezone || "Europe/Paris" };
 }
 
 /** D26 : voir. */
-const canSee = (v: Viewer, e: CalendarEvent) => v.parent || e.createdByUserId === v.userId || e.allFamily || (v.memberId !== null && e.memberIds.includes(v.memberId));
+const canSee = (v: Viewer, e: CalendarEvent) => v.parent || e.createdByUserId === v.userId || (e.allFamily && !v.child) || (v.memberId !== null && e.memberIds.includes(v.memberId));
 /** D26 : confirmer, modifier, ignorer ou annuler. */
 const canAct = (v: Viewer, e: CalendarEvent) => v.parent || e.createdByUserId === v.userId;
 
@@ -286,7 +289,7 @@ export async function getEvent(ctx: Ctx, session: SessionContext, id: string): P
   const members = await loadMembers(ctx.db, v.accountId);
   const names = await firstNames(ctx.db, [e.createdByUserId, e.statusChangedByUserId]);
   const view = await withConflicts(ctx.db, v, toView(v, e, members, names, ctx.now), e, ctx.now);
-  const taskViewer = { accountId: v.accountId, userId: v.userId, parent: v.parent, memberId: v.memberId, timeZone: v.timeZone, today: utcToLocal(ctx.now, v.timeZone).slice(0, 10), nowLocal: utcToLocal(ctx.now, v.timeZone) };
+  const taskViewer = { accountId: v.accountId, userId: v.userId, parent: v.parent, memberId: v.memberId, child: v.child, timeZone: v.timeZone, today: utcToLocal(ctx.now, v.timeZone).slice(0, 10), nowLocal: utcToLocal(ctx.now, v.timeZone) };
   return { ...view, heart: await heartOfEvent(ctx.db, v.userId, e, ctx.now), series: await seriesView(ctx.db, e, v.timeZone), tasks: await loadEventTasks(ctx.db, taskViewer, e, ctx.now, members), travel: await travelView(ctx.db, v.userId, v.memberId, e, ctx.now), ...(await reminderDetails(ctx.db, v.accountId, e, v.timeZone, ctx.now)) };
 }
 
