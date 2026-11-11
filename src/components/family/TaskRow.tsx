@@ -99,7 +99,7 @@ export function TaskRow({ task, assignable, showDate = true, onChanged }: Props)
           {task.dueTime && <span>{dueTimeLabel(task.dueTime)}</span>}
           {task.recurring && <span title={task.rule ?? "À chaque séance"}>↻ {task.rule ?? "À chaque séance"}</span>}
           {task.event && <Link href={`/calendrier/rdv/${task.event.id}`}>{task.event.title} ›</Link>}
-          {task.homeworkWeekId && <Link href={`/assistant/devoirs/${task.homeworkWeekId}`}>Semaine de devoirs ›</Link>}
+          {task.homeworkWeekId && <Link href={`/assistant/devoirs/${task.homeworkWeekId}${task.assignee ? `?enfant=${task.assignee.id}` : ""}`}>Semaine de devoirs ›</Link>}
           {task.homeworkPrep && <Link href={`/assistant/devoirs/tache?tache=${task.id}`}>Planning du jour et exercices ›</Link>}
           {checked && task.status === "done" && task.doneBy && <span>Faite par {task.doneBy}</span>}
           {task.status === "done" && task.heart?.thanksFrom && <HeartButton target={{ kind: "task", id: task.id }} heart={task.heart} onChanged={onChanged} />}

@@ -3,8 +3,17 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-11T14:50:00.000Z",
+  "updated": "2026-11-11T17:35:00.000Z",
   "deploys": [
+    {
+      "at": "2026-11-11T17:35:00.000Z",
+      "env": "preview",
+      "what": "Aide Devoirs, correction d'anomalie : le lien d'un enfant ouvre la semaine de devoirs sur la page de cet enfant, et non plus sur celle du premier. Rév. 00115. Suite complète verte (1337 essais). Pas de changement de base. Écran non vu : le PO teste.",
+      "storyIds": [
+        "f16s114",
+        "f16s127"
+      ]
+    },
     {
       "at": "2026-11-11T14:50:00.000Z",
       "env": "preview",

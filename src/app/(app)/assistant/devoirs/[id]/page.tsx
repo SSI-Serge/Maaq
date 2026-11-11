@@ -1,10 +1,20 @@
 "use client";
 
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import { HomeworkWeekScreen } from "@/components/family/HomeworkScreens";
 
-/** Écran « Semaine de devoirs » (US-119 RF4). */
-export default function HomeworkWeekPage() {
+function Screen() {
   const { id } = useParams<{ id: string }>();
-  return <HomeworkWeekScreen id={id} />;
+  const child = useSearchParams().get("enfant");
+  return <HomeworkWeekScreen id={id} childId={child && /^[0-9a-f-]{36}$/.test(child) ? child : null} />;
+}
+
+/** Écran « Semaine de devoirs » (US-119 RF4) ; `?enfant=` ouvre la page de cet enfant. */
+export default function HomeworkWeekPage() {
+  return (
+    <Suspense>
+      <Screen />
+    </Suspense>
+  );
 }

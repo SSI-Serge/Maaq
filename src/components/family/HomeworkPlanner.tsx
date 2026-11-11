@@ -9,6 +9,7 @@ import { Button, Loading, Notice, RetryNotice } from "@/components/ui";
 import type { HomeworkSetting } from "@/server/assistant/homework/settings";
 import type { HomeworkOptions } from "@/server/assistant/homework/weeks";
 import { addDays, shortDate } from "./format";
+import { weekHref } from "./homework-domains";
 import styles from "./family.module.css";
 
 /**
@@ -213,13 +214,14 @@ export function HomeworkPlanner({ weekStart, asked = false, redo = null }: { wee
       ? await submit.run<{ weekId: string }>(`/api/family/homework/weeks/${redo.weekId}`, { method: "PUT", body: { workDays: body.workDays, children: body.children } })
       : await submit.run<{ weekId: string }>("/api/family/homework/weeks", { method: "POST", body });
     if (result) {
-      saveDraft(null);
-      router.push(`/assistant/devoirs/${result.weekId}`);
+      if (!redo) saveDraft(null);
+      // La semaine s'ouvre sur la page de l'enfant concerné : celui qu'on vient de refaire, ou le seul enfant de la préparation.
+      router.push(weekHref(result.weekId, redo?.memberId ?? (d.memberIds.length === 1 ? d.memberIds[0] : null)));
     } else setFailed(true);
   }
 
   return (
-    <AppShell title={title} back={redo ? { href: `/assistant/devoirs/${redo.weekId}`, label: "Semaine de devoirs" } : BACK}>
+    <AppShell title={title} back={redo ? { href: weekHref(redo.weekId, redo.memberId), label: "Semaine de devoirs" } : BACK}>
       {setting.error && <RetryNotice message={setting.error.message} onRetry={setting.reload} />}
       {setting.data && !setting.data.setting.enabled && <Notice tone="info">L&apos;aide Devoirs est désactivée : activez-la dans les réglages.</Notice>}
       {setting.data && setting.data.setting.enabled && children.length === 0 && <Notice tone="info">Indiquez l&apos;âge des devoirs d&apos;au moins un enfant dans les réglages.</Notice>}

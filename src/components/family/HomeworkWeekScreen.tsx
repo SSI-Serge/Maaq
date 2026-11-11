@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useApiMutation, useApiQuery } from "@/client/hooks";
 import { AppShell } from "@/components/app/AppShell";
 import { Loading, Notice, RetryNotice } from "@/components/ui";
 import type { WeekChildView, WeekItemView, WeekView } from "@/server/assistant/homework/weeks";
 import { todayLocal } from "./format";
-import { DAY_LONG, DAY_SHORT, DOMAIN_LABEL, dayDate, weekRange, weekTitle } from "./homework-domains";
+import { childOfWeek, DAY_LONG, DAY_SHORT, DOMAIN_LABEL, dayDate, weekHref, weekRange, weekTitle } from "./homework-domains";
 import { PhotoPanel } from "./HomeworkPhotoPanel";
 import styles from "./family.module.css";
 import week from "./homework-week.module.css";
@@ -20,13 +21,19 @@ const DAYS = [1, 2, 3, 4, 5, 6, 7];
  * (sans valider : seules les photos valident, RF6), on déplace un élément d'un jour à l'autre, on en retire, on en ajoute dans un jour, on affiche les corrigés, on imprime.
  * Aucun compteur ni barre de progression (AT-9).
  */
-export function HomeworkWeekScreen({ id }: { id: string }) {
+export function HomeworkWeekScreen({ id, childId = null }: { id: string; childId?: string | null }) {
   const query = useApiQuery<{ week: WeekView }>(`/api/family/homework/weeks/${id}`);
   const data = query.data?.week;
   const gone = query.error?.body?.code === "not_found";
-  const [child, setChild] = useState<string | null>(null);
+  // La semaine s'ouvre sur la page de l'enfant visé par le lien (« Voir la semaine de [prénom] », retour de « Refaire ») ; l'onglet choisi ensuite reste dans l'adresse.
+  const router = useRouter();
+  const [child, setChildState] = useState<string | null>(childId);
+  const setChild = (memberId: string) => {
+    setChildState(memberId);
+    router.replace(weekHref(id, memberId), { scroll: false });
+  };
   const [answers, setAnswers] = useState(false);
-  const current = data?.children.find((c) => c.memberId === child) ?? data?.children[0];
+  const current = data ? childOfWeek(data.children, child) : undefined;
   const workDays = data ? data.workDays.map((d) => DAY_SHORT[d - 1]).join(", ") : "";
 
   return (

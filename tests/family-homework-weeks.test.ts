@@ -1,3 +1,4 @@
+import { childOfWeek, weekHref } from "@/components/family/homework-domains";
 import type { Kysely } from "kysely";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { addChild } from "@/server/assistant/family";
@@ -5,7 +6,7 @@ import { open, seal } from "@/server/assistant/fields";
 import { loadHomeworkCatalog } from "@/server/assistant/homework/catalog";
 import { setHomeworkAge, setHomeworkEnabled } from "@/server/assistant/homework/settings";
 import {
-  activityOptions, addItem, childOptions, getWeek, listWeeks, moveItem, prepareWeek, removeItem, setItemChecked, upcomingMondays, weekPreparedFor, type WeekInput, redoWeek } from "@/server/assistant/homework/weeks";
+  activityOptions, addItem, childOptions, getWeek, listWeeks, moveItem, prepareWeek, removeItem, setItemChecked, upcomingMondays, weekPreparedFor, type WeekInput, redoWeek, homeworkToday } from "@/server/assistant/homework/weeks";
 import type { Ctx } from "@/server/auth/service";
 import type { DB } from "@/server/db/schema.generated";
 import { Rejection } from "@/server/http";
@@ -390,5 +391,29 @@ describe("refaire la semaine d'un enfant (US-119 RF12, S-55)", () => {
     expect((await failure(redoWeek(ctx(), f.camilleSession, past.id, { workDays: [1], children: piano([1]) }))).code).toBe("past_week");
     // La semaine est intacte après ces refus.
     expect((await getWeek(ctx(), f.camilleSession, weekId)).children[0].items.map((i) => `${i.day}:${i.title}`)).toEqual(items);
+  });
+});
+
+describe("la semaine s'ouvre sur la page de l'enfant visé (US-119 RF4)", () => {
+  it("deux enfants : le lien d'un enfant ouvre sa page, pas celle du premier ; sans enfant visé, ou pour un enfant absent de la semaine, la première page", async () => {
+    const f = await family();
+    const { weekId } = await prepareWeek(ctx(), f.camilleSession, {
+      weekStart: WEEK, workDays: [1],
+      children: [{ memberId: f.leo, items: [{ kind: "custom", title: "Lecture", days: [1] }] }, { memberId: f.ines, items: [{ kind: "custom", title: "Chant", days: [1] }] }],
+    });
+    const week = await getWeek(ctx(), f.camilleSession, weekId);
+    expect(week.children.map((c) => c.firstName)).toEqual(["Léo", "Inès"]);
+    expect(weekHref(weekId, f.ines)).toBe(`/assistant/devoirs/${weekId}?enfant=${f.ines}`);
+    expect(weekHref(weekId)).toBe(`/assistant/devoirs/${weekId}`);
+    expect(childOfWeek(week.children, f.ines)?.firstName).toBe("Inès");
+    expect(childOfWeek(week.children, f.ines)?.items.map((i) => i.title)).toEqual(["Chant"]);
+    expect(childOfWeek(week.children, f.leo)?.firstName).toBe("Léo");
+    expect(childOfWeek(week.children, null)?.firstName).toBe("Léo");
+    expect(childOfWeek(week.children, "00000000-0000-4000-8000-000000000000")?.firstName).toBe("Léo");
+    expect(childOfWeek([], f.ines)).toBeUndefined();
+    // Le planning du jour de la tâche donne, pour chaque enfant, la semaine et son identifiant : le lien « Voir la semaine de [prénom] » vise bien cet enfant.
+    const today = await homeworkToday({ get db() { return db; }, now: new Date("2054-11-09T09:00:00Z") } as never, f.camilleSession);
+    if (today.role !== "parent") throw new Error("vue parent attendue");
+    expect(today.children.map((c) => [c.firstName, weekHref(c.weekId!, c.memberId)])).toEqual([["Léo", `/assistant/devoirs/${weekId}?enfant=${f.leo}`], ["Inès", `/assistant/devoirs/${weekId}?enfant=${f.ines}`]]);
   });
 });

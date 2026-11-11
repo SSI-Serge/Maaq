@@ -13,6 +13,7 @@ import { dueTimeLabel } from "./TaskRow";
 import styles from "./family.module.css";
 import sheet from "./homework-page.module.css";
 import week from "./homework-week.module.css";
+import { weekHref } from "./homework-domains";
 
 const WEEKDAY_NAMES = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"];
 
@@ -108,7 +109,7 @@ export function HomeworkTaskScreen({ taskId }: { taskId: string | null }) {
                   </div>
                 ))}
                 {k.weekId && (
-                  <Link href={`/assistant/devoirs/${k.weekId}`} className={styles.link}>
+                  <Link href={weekHref(k.weekId, k.memberId)} className={styles.link}>
                     Voir la semaine de {k.firstName} ›
                   </Link>
                 )}

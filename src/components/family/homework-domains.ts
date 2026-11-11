@@ -36,3 +36,13 @@ export function weekRange(weekStart: string, weekEnd: string): string {
   const first = a.d === 1 ? "1er" : String(a.d);
   return a.m === b.m ? `du ${first} au ${b.d} ${MONTHS[b.m]} ${b.y}` : `du ${first} ${MONTHS[a.m]} au ${b.d} ${MONTHS[b.m]} ${b.y}`;
 }
+
+/**
+ * Adresse de l'écran « Semaine de devoirs », ouverte sur la page d'un enfant quand le lien le vise (US-119 RF4 : une page par enfant). Sans enfant, la semaine s'ouvre sur le premier.
+ */
+export const weekHref = (weekId: string, memberId?: string | null) => `/assistant/devoirs/${weekId}${memberId ? `?enfant=${memberId}` : ""}`;
+
+/** La page à montrer : celle de l'enfant demandé s'il a des éléments dans cette semaine, sinon celle du premier enfant. */
+export function childOfWeek<T extends { memberId: string }>(children: T[], wanted: string | null | undefined): T | undefined {
+  return children.find((c) => c.memberId === wanted) ?? children[0];
+}
