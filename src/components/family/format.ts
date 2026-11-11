@@ -39,6 +39,9 @@ export function numericDate(day: string): string {
   return `${weekday[0].toUpperCase()}${weekday.slice(1)}. ${pad(d.getUTCDate())}/${pad(d.getUTCMonth() + 1)}/${d.getUTCFullYear()}`;
 }
 
+/** « 10/11/2026 » : la date seule, pour le dossier des exercices (US-180 RF7). */
+export const plainDate = (day: string) => `${day.slice(8, 10)}/${day.slice(5, 7)}/${day.slice(0, 4)}`;
+
 /** « mar. 3 nov. » */
 export function shortDate(day: string): string {
   const d = utc(day);

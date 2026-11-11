@@ -11,7 +11,7 @@ import styles from "./family.module.css";
 const PHOTO_MAX_SIDE = 1600;
 
 /** Réduit la photo (JPEG, 1600 px au plus) avant l'envoi ; un navigateur qui ne sait pas le faire envoie le fichier tel quel. */
-async function shrink(file: File): Promise<Blob> {
+export async function shrink(file: File): Promise<Blob> {
   try {
     const bitmap = await createImageBitmap(file);
     const scale = Math.min(1, PHOTO_MAX_SIDE / Math.max(bitmap.width, bitmap.height));

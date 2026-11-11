@@ -3,8 +3,20 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-11T04:10:00.000Z",
+  "updated": "2026-11-11T09:05:00.000Z",
   "deploys": [
+    {
+      "at": "2026-11-11T09:05:00.000Z",
+      "env": "preview",
+      "what": "Aide Devoirs, lot 1 (D71 à D73) : jours de devoirs, tâche du foyer « Préparer les devoirs », profil de l'enfant relié à sa fiche, planning du jour depuis la tâche, préparation à tout moment, fin des tâches « Devoirs — [prénom] ». Rév. 00107. Suite complète verte (1323 essais). Base de test : rattrapage d71 appliqué après sauvegarde, avec l'accord du PO (1 tâche du dimanche transformée). Écrans non vus : le PO les teste. Rien en pilote avant la réponse du DPO.",
+      "storyIds": [
+        "f16s121",
+        "f16s122",
+        "f16s123",
+        "f16s124",
+        "f16s114"
+      ]
+    },
     {
       "at": "2026-11-11T04:10:00.000Z",
       "env": "preview",
@@ -2293,8 +2305,8 @@
           "title": "US-119 — Préparer la semaine de devoirs de mes enfants avec l'aide Devoirs",
           "state": "testing",
           "env": "preview",
-          "note": "Sur la zone de test : carte sur la tâche « devoir », parcours en 4 étapes, semaine par enfant et par jour, tâches, impression, photos analysées puis oubliées.",
-          "at": "2026-10-30T18:54:10Z",
+          "note": "Sur la zone de test : parcours en 4 étapes ouvert à tout moment depuis la tâche (semaine en cours ou une des 4 suivantes, tous les enfants cochés, jours passés non touchés), semaine par enfant et par jour, impression, photos analysées puis oubliées. Les tâches « Devoirs — [prénom] » ne sont plus créées (D71).",
+          "at": "2026-11-11T09:05:00.000Z",
           "unsure": "Parcours en écran à boutons et non dans le tchat ; photo jamais essayée avec le vrai modèle ; critère de passage de niveau à valider."
         },
         {
@@ -2353,12 +2365,12 @@
         },
         {
           "id": "f16s121",
-          "title": "Recevoir chaque semaine une tâche « Préparer les devoirs de la semaine »",
+          "title": "Retrouver la tâche du foyer « Préparer les devoirs » les jours de devoirs",
           "state": "testing",
           "env": "preview",
-          "note": "Créée depuis la carte Aide Devoirs : chaque dimanche à 18 h par défaut, avec le lien vers la préparation de la semaine suivante.",
-          "at": "2026-10-31T09:40:00Z",
-          "unsure": "Jamais essayée sur un téléphone."
+          "note": "Remplace la tâche du dimanche (D71) : elle revient les jours de devoirs choisis dans les réglages, à 17 h par défaut, sans personne assignée. Sur la base de test, l'ancienne tâche a été transformée (heure gardée).",
+          "at": "2026-11-11T09:05:00.000Z",
+          "unsure": "Écran jamais vu : le PO le teste."
         },
         {
           "id": "f16s122",
@@ -2368,6 +2380,34 @@
           "note": "Formulaire « Chaque année », demande à l'assistant (« tous les ans »), les deux prochaines occurrences créées d'avance, pas de vacances scolaires.",
           "at": "2026-10-31T09:40:00Z",
           "unsure": "Le dessin exact de la maquette (Design) n'a été suivi que pour les libellés ; à regarder sur un vrai écran."
+        },
+        {
+          "id": "f16s123",
+          "title": "Relier le profil d'un enfant à sa fiche (« Profil de [prénom] »)",
+          "state": "testing",
+          "env": "preview",
+          "at": "2026-11-11T09:05:00.000Z",
+          "note": "Dans Réglages › Membres. L'enfant voit alors ses tâches, la tâche des devoirs et seulement les RDV où il est nommé ; il ne coche pas la tâche des devoirs et n'a pas le tchat de l'Assistant Famille.",
+          "unsure": [
+            "Écran jamais vu : le PO le teste.",
+            "Rien en pilote avant la réponse du DPO sur le profil enfant (question 14 bis)."
+          ]
+        },
+        {
+          "id": "f16s124",
+          "title": "Voir le planning du jour des devoirs depuis la tâche (parent et enfant)",
+          "state": "testing",
+          "env": "preview",
+          "at": "2026-11-11T09:05:00.000Z",
+          "note": "Le parent voit chaque enfant ; l'enfant voit le sien seul, en lecture seule.",
+          "unsure": "Écran jamais vu : le PO le teste."
+        },
+        {
+          "id": "f16s125",
+          "title": "US-180 — Créer des exercices à partir d'une leçon",
+          "state": "building",
+          "env": null,
+          "note": "En cours : 3 exercices, fiche réponse réservée aux parents, barème sur 20, dossier « Exercices »."
         }
       ],
       "decisions": [
@@ -2626,7 +2666,9 @@
           "kind": "work",
           "what": "Plan de développement en 9 lots validé dans ses grandes lignes ; aucun développement commencé"
         }
-      ]
+      ],
+      "building": true,
+      "currentAction": "US-180 : exercices à partir d'une leçon"
     },
     {
       "id": "f17",

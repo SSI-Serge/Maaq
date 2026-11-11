@@ -1,14 +1,17 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { useApiMutation, useApiQuery } from "@/client/hooks";
 import { AppShell, Section } from "@/components/app/AppShell";
 import { Loading, Notice, RetryNotice } from "@/components/ui";
+import type { PageFolder } from "@/server/assistant/homework/pages";
 import type { HomeworkToday, TodayItem } from "@/server/assistant/homework/weeks";
 import type { TaskLists, TaskView } from "@/server/assistant/tasks";
-import { longDate } from "./format";
+import { longDate, plainDate } from "./format";
 import { dueTimeLabel } from "./TaskRow";
 import styles from "./family.module.css";
+import sheet from "./homework-page.module.css";
 import week from "./homework-week.module.css";
 
 const WEEKDAY_NAMES = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"];
@@ -21,15 +24,20 @@ const Dot = ({ item, big }: { item: TodayItem; big?: boolean }) => (
 );
 
 /**
- * Écran de la tâche « Préparer les devoirs » (US-119 RF1, RF11, D71 à D73). Pour un parent : cocher la tâche pour aujourd'hui, « Préparer les devoirs » à tout moment, et le planning
- * du jour de chaque enfant. Pour le profil d'un enfant : son seul planning du jour, en lecture seule (S-40) ; il ne coche ni la tâche ni ses éléments. Les liens restent
- * accessibles quand la tâche est cochée.
+ * Écran de la tâche « Préparer les devoirs » (US-119 RF1, RF11, US-180 RF1, RF5, RF7, D71 à D73). Pour un parent : cocher la tâche pour aujourd'hui, « Préparer les devoirs » à tout
+ * moment, le planning du jour de chaque enfant, le dossier « Exercices » et « Créer des exercices à partir d'une leçon » (avec le choix de l'enfant). Pour le profil d'un enfant :
+ * son seul planning du jour, en lecture seule (S-40), « Créer mes exercices à partir d'une leçon » et « Mes exercices », sans corrigé. Les liens restent accessibles quand la
+ * tâche est cochée, et tous les jours, pas seulement les jours de devoirs.
  */
 export function HomeworkTaskScreen({ taskId }: { taskId: string | null }) {
   const today = useApiQuery<{ today: HomeworkToday }>("/api/family/homework/today");
   const lists = useApiQuery<{ lists: TaskLists }>("/api/family/tasks");
+  const pages = useApiQuery<{ folder: PageFolder }>("/api/family/homework/pages");
   const check = useApiMutation();
+  const [picking, setPicking] = useState(false);
   const data = today.data?.today;
+  const folder = pages.data?.folder;
+  const pageCount = folder?.role === "parent" ? folder.children.reduce((sum, c) => sum + c.pages.length, 0) : 0;
   const all = lists.data ? [...lists.data.lists.overdue, ...lists.data.lists.today, ...lists.data.lists.upcoming, ...lists.data.lists.done] : [];
   // La tâche ouverte depuis la liste ; sinon celle d'aujourd'hui.
   const task: TaskView | undefined = all.find((t) => t.id === taskId) ?? all.find((t) => t.isHomeworkPrep && t.due === lists.data?.lists.todayDate);
@@ -107,10 +115,38 @@ export function HomeworkTaskScreen({ taskId }: { taskId: string | null }) {
               </div>
             ))}
           </Section>
+          <Section title="Exercices">
+            <Link href="/assistant/devoirs/exercices" className={styles.linkRow}>
+              <span>Dossier « Exercices »</span>
+              <span className={styles.hint}>{folder ? `${pageCount} page${pageCount > 1 ? "s" : ""} ›` : "›"}</span>
+            </Link>
+            <button type="button" className={styles.cta} style={{ width: "100%" }} onClick={() => setPicking(true)} disabled={data.children.length === 0}>
+              Créer des exercices à partir d&apos;une leçon
+            </button>
+          </Section>
           {task && task.status === "todo" && (
             <Link href={`/assistant/taches/${task.id}`} className={styles.link}>
               Changer l&apos;heure de la tâche ›
             </Link>
+          )}
+          {picking && (
+            <div style={{ position: "fixed", inset: 0, zIndex: 50, background: "rgba(43, 33, 31, 0.5)", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
+              <div role="dialog" aria-modal="true" aria-label="Pour quel enfant ?" className={styles.form} style={{ background: "var(--bg-raised)", borderRadius: "16px 16px 0 0" }}>
+                <div className={styles.confirmTitle}>Pour quel enfant ?</div>
+                <span className={styles.hint}>La page sera rangée dans son dossier.</span>
+                {data.children.map((k) => (
+                  <Link key={k.memberId} href={`/assistant/devoirs/lecon?enfant=${k.memberId}`} className={styles.linkRow}>
+                    <span>{k.firstName}</span>
+                    <span className={styles.hint}>
+                      {k.levelLabel} · {k.hasProfile ? "a un profil" : "sans profil"}
+                    </span>
+                  </Link>
+                ))}
+                <button type="button" className={styles.chipToggle} onClick={() => setPicking(false)}>
+                  Annuler
+                </button>
+              </div>
+            </div>
           )}
         </>
       )}
@@ -131,6 +167,32 @@ export function HomeworkTaskScreen({ taskId }: { taskId: string | null }) {
               </div>
             ))}
           </div>
+          <Link href="/assistant/devoirs/lecon" className={sheet.big} style={{ minHeight: 72 }}>
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+              <path d="M4 8h3l2-3h6l2 3h3v11H4z" />
+              <circle cx="12" cy="13" r="3.5" />
+            </svg>
+            Créer mes exercices à partir d&apos;une leçon
+          </Link>
+          {folder?.role === "child" && folder.pages.length > 0 && (
+            <>
+              <div style={{ fontSize: 15, fontWeight: 700, paddingTop: 4 }}>Mes exercices</div>
+              {folder.pages.map((p) => (
+                <Link key={p.id} href={`/assistant/devoirs/exercices/${p.id}`} className={sheet.mine}>
+                  <span>
+                    {p.theme}
+                    <small>
+                      {plainDate(p.created).slice(0, 5)}
+                      {p.createdBy ? ` · préparée par ${p.createdBy}` : ""}
+                    </small>
+                  </span>
+                  <span style={{ color: "var(--primary)", fontSize: 20 }} aria-hidden>
+                    ›
+                  </span>
+                </Link>
+              ))}
+            </>
+          )}
         </>
       )}
     </AppShell>
