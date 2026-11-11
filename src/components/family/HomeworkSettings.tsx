@@ -173,10 +173,10 @@ export function HomeworkSettings() {
               )
             ))}
           {setting.enabled && (
-            <Link href="/assistant/devoirs" className={styles.linkRow}>
+            <Link href="/assistant/devoirs?retour=reglages" className={styles.linkRow}>
               <span>
                 Semaines de devoirs
-                <span className={styles.linkRowSub}>Préparer ou consulter</span>
+                <span className={styles.linkRowSub}>Les semaines préparées, passées comprises</span>
               </span>
               <span aria-hidden>›</span>
             </Link>

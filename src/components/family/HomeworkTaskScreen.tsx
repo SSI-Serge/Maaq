@@ -115,6 +115,9 @@ export function HomeworkTaskScreen({ taskId }: { taskId: string | null }) {
               </div>
             ))}
           </Section>
+          <Link href="/assistant/devoirs?retour=tache" className={styles.link}>
+            Semaines passées ›
+          </Link>
           <Section title="Exercices">
             <Link href="/assistant/devoirs/exercices" className={styles.linkRow}>
               <span>Dossier « Exercices »</span>

@@ -62,9 +62,11 @@ export function AgentCard({ agent, origin, onRemoved }: { agent: DashboardAgent;
               {agent.nativePath ? "Ouvrir" : "Ouvrir le tchat"}
             </Link>
           )}
-          <Link href={`/catalogue/${agent.id}`} className={s.smallButton}>
-            Voir la fiche
-          </Link>
+          {!agent.chatClosed && (
+            <Link href={`/catalogue/${agent.id}`} className={s.smallButton}>
+              Voir la fiche
+            </Link>
+          )}
           {agent.status === "to_configure" && (
             <Link href={`/connecteurs?agent=${agent.id}`} className={s.smallButton}>
               Configurer

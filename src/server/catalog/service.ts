@@ -1,4 +1,4 @@
-import { isChildProfile } from "@/server/assistant/profile-member";
+import { isChildProfile, refuseChildCatalog } from "@/server/assistant/profile-member";
 import type { Ctx, SessionContext } from "@/server/auth/service";
 import { processChatErasure } from "@/server/auth/service";
 import { Rejection } from "@/server/http";
@@ -29,7 +29,7 @@ export interface DashboardAgent {
   maintenanceMessage: string | null;
   /** Agent natif : adresse de son accueil dans l'application (au lieu du tchat Digitorn). */
   nativePath: string | null;
-  /** Profil d'un enfant : les tchats des agents lui sont fermés (S-47), la carte ne propose pas « Ouvrir le tchat ». */
+  /** Profil d'un enfant : les tchats des agents et le catalogue lui sont fermés (S-47, S-53), la carte ne propose ni « Ouvrir le tchat » ni « Voir la fiche ». */
   chatClosed: boolean;
 }
 
@@ -40,6 +40,8 @@ export interface Dashboard {
   max: number;
   /** « contracts » alimente l'onglet « Agents des Contrats » de la page Contrats (US-31). */
   tabs: Record<"pro" | "perso" | "contracts", DashboardAgent[]>;
+  /** Profil d'un enfant : le catalogue lui est fermé (S-53), l'accueil ne montre ni « Catalogue » ni « Parcourir le catalogue ». */
+  catalogClosed: boolean;
 }
 
 function requireProfileWithDashboard(session: SessionContext): void {
@@ -72,6 +74,7 @@ export async function listCatalog(
   options: { category?: CategoryCode; query?: string },
 ): Promise<CatalogItem[]> {
   requireProfileWithDashboard(session);
+  await refuseChildCatalog(ctx.db, session.user.id);
   const allowed = visibleCategories(session);
   const query = normalizeText(options.query ?? "");
   const searching = query.length >= SEARCH_MIN_LENGTH;
@@ -153,6 +156,7 @@ export interface AgentSheet {
 
 export async function getAgentSheet(ctx: Ctx, session: SessionContext, agentId: string): Promise<AgentSheet> {
   requireProfileWithDashboard(session);
+  await refuseChildCatalog(ctx.db, session.user.id);
   const agent = await ctx.db
     .selectFrom("agents as a")
     .innerJoin("agent_categories as c", "c.id", "a.category_id")
@@ -229,7 +233,7 @@ export async function getDashboard(ctx: Ctx, session: SessionContext): Promise<D
       chatClosed,
     });
   }
-  return { max: await integerSetting(ctx.db, "max_agents_per_category", 10), tabs };
+  return { max: await integerSetting(ctx.db, "max_agents_per_category", 10), tabs, catalogClosed: chatClosed };
 }
 
 export interface AddResult {
@@ -249,6 +253,7 @@ export interface AddResult {
  */
 export async function addAgent(ctx: Ctx, session: SessionContext, agentId: string): Promise<AddResult> {
   requireProfileWithDashboard(session);
+  await refuseChildCatalog(ctx.db, session.user.id);
   const sheet = await getAgentSheet(ctx, session, agentId); // refuse un agent hors catalogue visible
 
   const alreadyAdded = await ctx.db.transaction().execute(async (trx) => {

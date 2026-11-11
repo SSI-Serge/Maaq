@@ -37,3 +37,9 @@ export async function refuseChildChat(db: Kysely<DB>, userId: string): Promise<v
   const { rows } = await sql<{ child: boolean }>`select profile_is_child_linked(${userId}::uuid) as child`.execute(db);
   if (rows[0]?.child) throw new Rejection("child_no_chat", "Le tchat des agents n'est pas ouvert à ce profil.", 403);
 }
+
+/** Le catalogue des agents est fermé au profil d'un enfant (D73 S-53) : ni liste, ni fiche, ni ajout d'un agent. Refus côté serveur ; les écrans n'en montrent aucune entrée. */
+export async function refuseChildCatalog(db: Kysely<DB>, userId: string): Promise<void> {
+  const { rows } = await sql<{ child: boolean }>`select profile_is_child_linked(${userId}::uuid) as child`.execute(db);
+  if (rows[0]?.child) throw new Rejection("child_no_catalog", "Le catalogue des agents n'est pas ouvert à ce profil.", 403);
+}

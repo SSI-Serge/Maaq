@@ -12,7 +12,7 @@ import type { Ctx } from "@/server/auth/service";
 import type { DB } from "@/server/db/schema.generated";
 import { Rejection } from "@/server/http";
 import { randomUUID } from "node:crypto";
-import { getDashboard } from "@/server/catalog/service";
+import { addAgent, getAgentSheet, getDashboard, listCatalog } from "@/server/catalog/service";
 import { getChat, sendMessage } from "@/server/chat/service";
 import { prepareExport, readExport, requestExport } from "@/server/compliance/exports";
 import { readZip } from "@/server/compliance/zip";
@@ -337,6 +337,13 @@ describe("tchats des agents fermés au profil d'un enfant (S-47 élargie)", () =
     const cards = (session: Family["leoSession"]) => getDashboard(ctx(), session).then((d) => [...d.tabs.pro, ...d.tabs.perso, ...d.tabs.contracts]);
     expect((await cards(f.leoSession)).every((a) => a.chatClosed)).toBe(true);
     expect((await cards(f.noeSession)).every((a) => !a.chatClosed)).toBe(true);
+    // S-53 : le catalogue des agents est fermé à l'enfant (liste, fiche, ajout), pas à un autre invité secondaire.
+    for (const attempt of [() => listCatalog(ctx(), f.leoSession, {}), () => getAgentSheet(ctx(), f.leoSession, agent), () => addAgent(ctx(), f.leoSession, agent)]) {
+      expect((await failure(attempt())).code).toBe("child_no_catalog");
+    }
+    expect((await getDashboard(ctx(), f.leoSession)).catalogClosed).toBe(true);
+    expect((await getDashboard(ctx(), f.noeSession)).catalogClosed).toBe(false);
+    await listCatalog(ctx(), f.noeSession, {});
   });
 });
 

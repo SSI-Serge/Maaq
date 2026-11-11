@@ -14,6 +14,7 @@ type Tab = "pro" | "perso";
 interface Dashboard {
   max: number;
   tabs: Record<Tab, DashboardAgent[]>;
+  catalogClosed?: boolean;
 }
 
 const TAB_LABEL: Record<Tab, string> = { pro: "Pro", perso: "Perso" };
@@ -59,9 +60,12 @@ export default function DashboardPage() {
       title={`Bonjour ${user.firstName}`}
       subtitle={user.role === "guest" ? "Invité" : "Utilisateur principal"}
       action={
-        <Link href="/catalogue" className={s.smallButton} style={{ marginTop: 6 }}>
-          Catalogue
-        </Link>
+        // Le catalogue est fermé au profil d'un enfant (S-53) : aucune entrée à l'écran.
+        dashboard.data && !dashboard.data.catalogClosed ? (
+          <Link href="/catalogue" className={s.smallButton} style={{ marginTop: 6 }}>
+            Catalogue
+          </Link>
+        ) : undefined
       }
     >
       {user.role === "primary_user" && <InviteSuggestion />}
@@ -93,7 +97,7 @@ export default function DashboardPage() {
       {dashboard.data && agents.length === 0 && (
         <div className={s.empty}>
           <p className={s.text}>Vous n&apos;avez pas encore d&apos;agent dans cette rubrique</p>
-          <ButtonLink href={`/catalogue?categorie=${tab}`}>Parcourir le catalogue</ButtonLink>
+          {!dashboard.data.catalogClosed && <ButtonLink href={`/catalogue?categorie=${tab}`}>Parcourir le catalogue</ButtonLink>}
         </div>
       )}
 

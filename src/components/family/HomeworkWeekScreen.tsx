@@ -11,7 +11,7 @@ import { PhotoPanel } from "./HomeworkPhotoPanel";
 import styles from "./family.module.css";
 import week from "./homework-week.module.css";
 
-const BACK = { href: "/assistant/devoirs", label: "Devoirs" };
+const BACK = { href: "/assistant/devoirs?retour=tache", label: "Semaines de devoirs" };
 const DAYS = [1, 2, 3, 4, 5, 6, 7];
 
 /**
