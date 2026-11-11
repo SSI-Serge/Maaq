@@ -118,12 +118,39 @@ export function ListFlow({ list, reload, onWeek, onGroup }: { list: ListPrepared
 
 /** Invité secondaire : il ajoute un produit et retire les siens, rien d'autre (CR-10). */
 function GuestView({ list, reload }: { list: ListPrepared; reload: () => void }) {
+  const take = useApiMutation();
+  const byRayon = [...list.reminders.reduce((m, r) => m.set(r.rayon, [...(m.get(r.rayon) ?? []), r]), new Map<string, ListPrepared["reminders"]>())];
+  // un rappel coché est ajouté à la liste de la semaine affichée (CR-10, CR-69) : il quitte alors les rappels
+  async function tick(name: string) {
+    if (await take.run("/api/courses/list/products", { method: "POST", body: { name, week: list.week ?? undefined } })) reload();
+  }
   return (
     <>
       <p className={styles.note}>
         La liste validée est dans <Link href="/courses/ma-liste">Ma liste de courses</Link>. Ici, vous pouvez ajouter un produit et retirer vos propres ajouts.
       </p>
       <AddedSection added={list.added} access={list.access} week={list.week} reload={reload} />
+      {/* l'invité secondaire ne voit de l'historique que les rappels de la semaine d'avant, sans prix (CR-69) */}
+      {list.reminders.length > 0 && (
+        <Rub title="Produits de mon historique" open>
+          <p className={family.hint}>Pas encore achetés la semaine d&apos;avant. Cochez ceux qu&apos;il vous faut : ils sont ajoutés à la liste.</p>
+          {byRayon.map(([rayon, items]) => (
+            <div key={rayon}>
+              <h3 className={styles.kick}>{rayon}</h3>
+              {items.map((r) => (
+                <label key={r.key} className={styles.choice}>
+                  <input type="checkbox" checked={false} disabled={take.pending} onChange={() => void tick(r.name)} />
+                  <span>
+                    {r.name}
+                    <span className={styles.pillWarn}> Pas encore acheté ({r.leftoverOf})</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+          ))}
+          {take.error && <Notice tone="error">{take.error.message}</Notice>}
+        </Rub>
+      )}
     </>
   );
 }

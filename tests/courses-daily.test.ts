@@ -10,7 +10,7 @@ import { getSettings, saveSettings } from "@/server/courses/household/settings";
 import { deleteWeekMenu } from "@/server/courses/list/delete";
 import { fromDto } from "@/server/courses/list/dto";
 import { myList, setBought } from "@/server/courses/list/mine";
-import { addProduct, prepareList, validateList } from "@/server/courses/list/service";
+import { addProduct, prepareList, removeProduct, validateList } from "@/server/courses/list/service";
 import { ensureCatalog } from "./helpers/courses-catalog";
 import { coupleFamily, type CoupleFamily } from "./helpers/couple";
 import { createProfile, testDb } from "./helpers/fixtures";
@@ -283,6 +283,23 @@ describe("CR-68 : « Produits ajoutés » ne montre que les ajouts à la main ; 
     expect(addedPart).not.toContain("Pas encore acheté");
     expect(historyPart).toContain("Piles");
     expect(historyPart).toContain("Pas encore acheté (semaine du 2 nov.)");
+
+    // invité secondaire (CR-69) : de l'historique il ne voit que les rappels, sans prix ; un rappel coché est ajouté à la liste
+    const guest = await prepareList(at(), f.elodie, W1);
+    expect(guest.model).toBeNull();
+    expect(guest.reminders).toEqual([{ key: "piles", name: "Piles", rayon: "Autres", leftoverOf: "semaine du 2 nov." }]);
+    const guestMarkup = renderToStaticMarkup(createElement(ListFlow, { list: guest, reload: () => {}, onWeek: () => {}, onGroup: () => {} }));
+    expect(guestMarkup).toContain("Pas encore achetés la semaine d&#x27;avant. Cochez ceux qu&#x27;il vous faut : ils sont ajoutés à la liste.");
+    expect(guestMarkup).toContain("Pas encore acheté (semaine du 2 nov.)");
+    expect(guestMarkup).not.toContain("Pensez aussi à :");
+    expect(guestMarkup).not.toContain("€");
+    expect((await prepareList(at(), f.sophie, W1)).reminders).toEqual([]);
+    await addProduct(at(), f.elodie, { name: "Piles", week: W1 });
+    const taken = await prepareList(at(), f.elodie, W1);
+    expect(taken.reminders).toEqual([]);
+    expect(taken.added.map((x) => x.name)).toEqual(["Piles"]);
+    await removeProduct(at(), f.elodie, "piles", W1);
+    expect((await prepareList(at(), f.elodie, W1)).reminders).toHaveLength(1);
 
     // le rappel compte dans le seuil : avec un seuil de 1, « Pensez aussi à : » n'est plus proposé
     await setThreshold(1);

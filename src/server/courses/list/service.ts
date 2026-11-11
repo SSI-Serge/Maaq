@@ -52,8 +52,19 @@ export interface MenuSummary {
   canWriteSteps: boolean;
 }
 
+/** Rappel « Pas encore acheté » montré à l'invité secondaire : le nom, le rayon et la semaine d'origine, jamais de prix (CR-69). */
+export interface Reminder {
+  key: string;
+  name: string;
+  rayon: string;
+  /** « semaine du 9 nov. » */
+  leftoverOf: string;
+}
+
 export interface ListPrepared {
   access: CourseAccess;
+  /** Invité secondaire : les rappels de la semaine d'avant, seule partie de « Produits de mon historique » qu'il voit (CR-69). Vide pour le couple, qui les a dans le modèle. */
+  reminders: Reminder[];
   menu: MenuSummary | null;
   /** Semaine affichée (lundi) et les deux semaines proposées ; une seule semaine affichée si l'autre n'a ni menu ni liste (CR-54). */
   week: string | null;
@@ -120,11 +131,13 @@ export async function prepareList(ctx: Ctx, session: SessionContext, requestedWe
   }
   const week = menu?.week_start ?? null;
   if (who.access === "list") {
-    return { access: "list", menu: null, week, weeks, validated: false, group: null, model: null, modes: {}, stores: [], sharing: false, householdSize: null, added, criteria: [], now: ctx.now.toISOString() };
+    const reminders: Reminder[] = leftovers.map((l) => ({ key: l.nameKey, name: l.label, rayon: l.aisle ?? "Autres", leftoverOf: `semaine du ${weekStartLabel(l.originWeek)}` }));
+    return { access: "list", reminders, menu: null, week, weeks, validated: false, group: null, model: null, modes: {}, stores: [], sharing: false, householdSize: null, added, criteria: [], now: ctx.now.toISOString() };
   }
   const settings = await loadSettings(ctx.db, who.accountId);
   const stores = settings.stores;
-  const base = { access: who.access, stores, sharing: settings.sharePrices, householdSize: settings.householdSize, added, week, weeks, now: ctx.now.toISOString() };
+  const base = {
+    reminders: [] as Reminder[], access: who.access, stores, sharing: settings.sharePrices, householdSize: settings.householdSize, added, week, weeks, now: ctx.now.toISOString() };
   if (!menu) return { ...base, menu: null, validated: false, group: null, model: null, modes: {}, criteria: [] };
   const menus = groupMenus ?? [menu];
 
