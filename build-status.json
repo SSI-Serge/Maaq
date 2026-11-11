@@ -3,8 +3,17 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-11T21:30:00.000Z",
+  "updated": "2026-11-11T22:00:11.000Z",
   "deploys": [
+    {
+      "at": "2026-11-11T22:00:11.000Z",
+      "env": "preview",
+      "what": "Aide Devoirs alignée sur les maquettes v83 : écran « Devoirs » en deux groupes avec pastilles, « Mon calendrier » de l'enfant, question « Modifier ou Refaire » dans la préparation, liens remontés sur l'écran de la tâche. Rév. 00117. Suite complète verte (1340 essais). Pas de changement de base. Écrans non vus : le PO teste.",
+      "storyIds": [
+        "f16s114",
+        "f16s127"
+      ]
+    },
     {
       "at": "2026-11-11T21:30:00.000Z",
       "env": "preview",
