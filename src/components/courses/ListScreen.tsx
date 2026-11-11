@@ -593,7 +593,7 @@ function ScenarioView({
                                 : origin === "quotidien"
                                   ? `Produit du quotidien · ${l.qty}`
                                 : origin === "habituel" && itemsByName.get(norm(l.name))?.leftoverWeek
-                                  ? `Pas encore acheté · ${l.qty}`
+                                  ? `Pas encore acheté (semaine du ${shortDay(itemsByName.get(norm(l.name))?.leftoverWeek ?? "")})`
                                 : origin === "habituel"
                                   ? `De votre historique · ${l.qty}`
                                   : ""}
