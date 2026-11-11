@@ -3,8 +3,16 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-11T02:40:00.000Z",
+  "updated": "2026-11-11T04:10:00.000Z",
   "deploys": [
+    {
+      "at": "2026-11-11T04:10:00.000Z",
+      "env": "preview",
+      "what": "Courses et repas, CR-70 et CR-71 (US-179) : effacer un échange du tchat avec « Annuler » pendant 5 secondes, effacer toute la conversation avec confirmation ; chaque profil n'efface que son tchat. Rév. 00106. Suite complète verte (1319 essais). Pas de changement de base. Écran non vu : le PO le teste. Menu IA fermé en production.",
+      "storyIds": [
+        "f21c4"
+      ]
+    },
     {
       "at": "2026-11-11T02:40:00.000Z",
       "env": "preview",
