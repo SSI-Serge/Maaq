@@ -3,8 +3,16 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-10T18:30:00.000Z",
+  "updated": "2026-11-11T02:40:00.000Z",
   "deploys": [
+    {
+      "at": "2026-11-11T02:40:00.000Z",
+      "env": "preview",
+      "what": "Courses et repas, CR-68 et CR-69 : « Produits ajoutés » ne montre que les ajouts à la main ; les rappels « Pas encore acheté » (ajouts à la main et produits de l'historique cochés, non achetés) passent dans « Produits de mon historique » ; l'invité secondaire y voit les seuls rappels, sans prix. Rév. 00105. Suite complète verte (1314 essais). Pas de changement de base. Menu IA fermé en production.",
+      "storyIds": [
+        "f21c4"
+      ]
+    },
     {
       "at": "2026-11-10T18:30:00.000Z",
       "env": "preview",
