@@ -1,3 +1,6 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { WeekPages } from "@/components/family/HomeworkWeekScreen";
 import { childOfWeek, weekHref } from "@/components/family/homework-domains";
 import type { Kysely } from "kysely";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -415,5 +418,33 @@ describe("la semaine s'ouvre sur la page de l'enfant visé (US-119 RF4)", () => 
     const today = await homeworkToday({ get db() { return db; }, now: new Date("2054-11-09T09:00:00Z") } as never, f.camilleSession);
     if (today.role !== "parent") throw new Error("vue parent attendue");
     expect(today.children.map((c) => [c.firstName, weekHref(c.weekId!, c.memberId)])).toEqual([["Léo", `/assistant/devoirs/${weekId}?enfant=${f.leo}`], ["Inès", `/assistant/devoirs/${weekId}?enfant=${f.ines}`]]);
+  });
+});
+
+describe("la page d'un enfant sans élément dans la semaine (anomalie du 11/11/2026)", () => {
+  it("la semaine n'a d'éléments que pour Léo : le lien d'Inès ouvre la page d'Inès, vide, avec « Refaire la semaine d'Inès », et non la page de Léo", async () => {
+    const f = await family();
+    const { weekId } = await prepareWeek(ctx(), f.camilleSession, { weekStart: WEEK, workDays: [1], children: [{ memberId: f.leo, items: [{ kind: "custom", title: "Lecture du soir", days: [1] }] }] });
+    const week = await getWeek(ctx(), f.camilleSession, weekId);
+    // Chaque enfant suivi par l'aide Devoirs a sa page, même sans élément.
+    expect(week.children.map((c) => [c.firstName, c.items.length])).toEqual([["Léo", 1], ["Inès", 0]]);
+    expect(childOfWeek(week.children, f.ines)?.firstName).toBe("Inès");
+    const render = (childId: string | null) => renderToStaticMarkup(createElement(WeekPages, { data: week, childId, answers: false, onPick: () => undefined, onAnswers: () => undefined, onChanged: () => undefined }));
+    const ines = render(f.ines);
+    expect(ines).toContain('aria-label="Semaine de Inès"');
+    expect(ines).toContain("Rien de prévu pour Inès cette semaine.");
+    expect(ines).toContain("Refaire la semaine de Inès");
+    expect(ines).toContain(`/assistant/devoirs/preparer?refaire=${weekId}&amp;enfant=${f.ines}`);
+    expect(ines).not.toContain("Lecture du soir");
+    expect(ines).not.toContain('aria-label="Semaine de Léo"');
+    // L'onglet d'Inès est celui qui est choisi.
+    expect(ines).toMatch(/aria-selected="true"[^>]*>Inès</);
+    expect(ines).toMatch(/aria-selected="false"[^>]*>Léo</);
+    const leo = render(f.leo);
+    expect(leo).toContain('aria-label="Semaine de Léo"');
+    expect(leo).toContain("Lecture du soir");
+    expect(leo).not.toContain("Rien de prévu pour");
+    // Sans enfant visé : la première page, comme avant.
+    expect(render(null)).toContain('aria-label="Semaine de Léo"');
   });
 });

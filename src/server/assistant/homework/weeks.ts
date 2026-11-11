@@ -501,7 +501,9 @@ export async function getWeek(ctx: Ctx, session: SessionContext, weekId: string)
     .execute();
   const labels = new Map((await ctx.db.selectFrom("homework_textbooks").select(["textbook_key", "label"]).execute()).map((b) => [b.textbook_key, b.label]));
   const kids = await loadChildren(ctx.db, v.accountId);
-  const memberIds = [...new Set(rows.map((r) => r.member_id))];
+  // Une page par enfant (RF4) : ceux qui ont des éléments dans la semaine, puis les autres enfants suivis par l'aide Devoirs, dont la page est vide
+  // (« Rien de prévu pour [prénom] cette semaine ») : le lien d'un enfant ouvre toujours SA page, jamais celle d'un autre.
+  const memberIds = [...new Set([...rows.map((r) => r.member_id), ...kids.map((k) => k.memberId)])];
   const children: WeekChildView[] = [];
   for (const memberId of memberIds) {
     const kid = kids.find((k) => k.memberId === memberId);

@@ -49,29 +49,42 @@ export function HomeworkWeekScreen({ id, childId = null }: { id: string; childId
       {query.error && !gone && <RetryNotice message={query.error.kind === "server" ? "La semaine n'a pas pu être chargée." : query.error.message} onRetry={query.reload} />}
       {data && (
         <div className={week.week}>
-          <div className={week.bar}>
-            {data.children.length > 1 && (
-              <div role="tablist" aria-label="Enfant" className={week.bar}>
-                {data.children.map((c) => (
-                  <button key={c.memberId} type="button" role="tab" aria-selected={c.memberId === current?.memberId} className={week.tab} onClick={() => setChild(c.memberId)}>
-                    {c.firstName}
-                  </button>
-                ))}
-              </div>
-            )}
-            <span className={week.spacer} />
-            <button type="button" className={week.toggle} aria-pressed={answers} onClick={() => setAnswers((v) => !v)}>
-              Corrigés (parents)
-            </button>
-            <Link href={`/assistant/devoirs/${data.id}/imprimer`} className={week.barLink}>
-              Imprimer
-            </Link>
-          </div>
-          {current && <ChildWeek weekView={data} child={current} answers={answers} onChanged={query.reload} />}
-          {data.children.length === 0 && <p className={styles.hint}>Cette semaine n&apos;a plus aucun élément.</p>}
+          <WeekPages data={data} childId={current?.memberId ?? null} answers={answers} onPick={setChild} onAnswers={() => setAnswers((v) => !v)} onChanged={query.reload} />
         </div>
       )}
     </AppShell>
+  );
+}
+
+/**
+ * Les pages de la semaine : un onglet par enfant et la page de l'enfant affiché. Chaque enfant suivi par l'aide Devoirs a sa page, même sans élément cette semaine : le lien
+ * d'un enfant ouvre toujours la sienne (« Rien de prévu pour [prénom] cette semaine », avec « Refaire la semaine de [prénom] »), jamais celle d'un autre enfant.
+ */
+export function WeekPages({ data, childId, answers, onPick, onAnswers, onChanged }: { data: WeekView; childId: string | null; answers: boolean; onPick: (memberId: string) => void; onAnswers: () => void; onChanged: () => void }) {
+  const current = childOfWeek(data.children, childId);
+  return (
+    <>
+      <div className={week.bar}>
+        {data.children.length > 1 && (
+          <div role="tablist" aria-label="Enfant" className={week.bar}>
+            {data.children.map((c) => (
+              <button key={c.memberId} type="button" role="tab" aria-selected={c.memberId === current?.memberId} className={week.tab} onClick={() => onPick(c.memberId)}>
+                {c.firstName}
+              </button>
+            ))}
+          </div>
+        )}
+        <span className={week.spacer} />
+        <button type="button" className={week.toggle} aria-pressed={answers} onClick={onAnswers}>
+          Corrigés (parents)
+        </button>
+        <Link href={`/assistant/devoirs/${data.id}/imprimer`} className={week.barLink}>
+          Imprimer
+        </Link>
+      </div>
+      {current && <ChildWeek weekView={data} child={current} answers={answers} onChanged={onChanged} />}
+      {data.children.length === 0 && <p className={styles.hint}>Cette semaine n&apos;a plus aucun élément.</p>}
+    </>
   );
 }
 
@@ -103,6 +116,7 @@ function ChildWeek({ weekView, child, answers, onChanged }: { weekView: WeekView
         <span className={week.kidLevel}>{child.levelLabel}</span>
         <span className={week.scrollHint}>Faites glisser pour voir la semaine ›</span>
       </div>
+      {child.items.length === 0 && <Notice tone="info">Rien de prévu pour {child.firstName} cette semaine.</Notice>}
       {child.suggestOlderAge && <Notice tone="info">{child.firstName} a validé tous les exercices du niveau. Vous pouvez augmenter son âge des devoirs d&apos;un an dans les réglages.</Notice>}
       <div className={week.grid}>
         {DAYS.map((day) => {

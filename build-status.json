@@ -3,8 +3,17 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-11T17:35:00.000Z",
+  "updated": "2026-11-11T21:30:00.000Z",
   "deploys": [
+    {
+      "at": "2026-11-11T21:30:00.000Z",
+      "env": "preview",
+      "what": "Aide Devoirs, anomalie corrigée pour de bon : un enfant sans devoirs dans la semaine a maintenant sa page (« Rien de prévu pour [prénom] cette semaine », avec « Refaire la semaine »), au lieu de voir s'ouvrir celle d'un autre enfant. Rév. 00116. Suite complète verte (1338 essais). Pas de changement de base. Écran non vu : le PO reteste.",
+      "storyIds": [
+        "f16s114",
+        "f16s127"
+      ]
+    },
     {
       "at": "2026-11-11T17:35:00.000Z",
       "env": "preview",

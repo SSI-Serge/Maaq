@@ -16,13 +16,16 @@ const DAYS = [1, 2, 3, 4, 5, 6, 7];
  */
 export function HomeworkPrintScreen({ id }: { id: string }) {
   const query = useApiQuery<{ week: WeekView }>(`/api/family/homework/weeks/${id}`);
-  const week = query.data?.week;
+  // Un enfant sans élément cette semaine a une page à l'écran, mais pas de feuille à imprimer.
+  const loaded = query.data?.week;
+  const week = loaded ? { ...loaded, children: loaded.children.filter((c) => c.items.length > 0) } : undefined;
+  const ready = Boolean(week);
   useEffect(() => {
-    if (week) {
+    if (ready) {
       const timer = setTimeout(() => window.print(), 600);
       return () => clearTimeout(timer);
     }
-  }, [week]);
+  }, [ready]);
   if (query.loading && !week) return <Loading slow={query.slow} />;
   if (!week) return <Notice tone="info">Cette page n&apos;existe plus ou ne vous est pas accessible.</Notice>;
   const sheetNumber = (childIndex: number, withCards: boolean[]) => 1 + withCards.slice(0, childIndex).reduce((n, has) => n + 1 + (has ? 1 : 0), 0);
