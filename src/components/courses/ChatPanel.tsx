@@ -295,7 +295,7 @@ export function ChatPanel({ couple, startMenu = 0, fromTicket = 0, weeks = [] }:
       <div role="log" aria-live="polite" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {messages.map((m, index) => {
           const firstOfExchange = index === 0 || messages[index - 1].exchange !== m.exchange;
-          // appui long sur la demande : le même menu que « … » (pas sur les cartes, dont les boutons se tiennent parfois appuyés)
+          // appui long sur le texte d'un message : le même menu que « … » ; jamais sur une carte, pour qu'un bouton tenu appuyé (« Valider le menu », propositions) n'ouvre pas l'effacement
           const hold = {
             onPointerDown: () => {
               pressTimer.current = setTimeout(() => setMenuOf(m.exchange), 600);
@@ -350,7 +350,7 @@ export function ChatPanel({ couple, startMenu = 0, fromTicket = 0, weeks = [] }:
                   </button>
                 </div>
               )}
-              {m.role === "user" ? (
+              {!m.card && !m.adjust ? (
                 <div {...hold} style={{ display: "contents" }}>
                   {body}
                 </div>
