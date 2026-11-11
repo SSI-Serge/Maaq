@@ -164,7 +164,7 @@ function Home({ home }: { home: CourseHome }) {
           )}
         </>
       )}
-      <ChatPanel couple={couple} startMenu={startMenu} fromTicket={fromTicket} weeks={home.weeks} />
+      {home.chat && <ChatPanel couple={couple} startMenu={startMenu} fromTicket={fromTicket} weeks={home.weeks} />}
     </>
   );
 }

@@ -1,3 +1,4 @@
+import { refuseChildChat } from "@/server/assistant/profile-member";
 import { exchangesOf } from "./exchanges";
 import { sql, type Kysely } from "kysely";
 import { familyTimeZone } from "@/server/assistant/reminders";
@@ -70,6 +71,7 @@ export interface CourseDeps {
 
 export async function sendCourseMessage(ctx: Ctx, session: SessionContext, input: { requestId: string; text: string; week?: string | null }, deps: CourseDeps = {}): Promise<CourseReply> {
   const who = await requireAccess(ctx, session, "list");
+  await refuseChildChat(ctx.db, session.user.id);
   const text = input.text.trim();
   if (!text) throw new Rejection("empty_request", "Écrivez votre demande avant de l'envoyer.", 422);
   if (text.length > MAX_COURSE_TEXT) throw new Rejection("request_too_long", `Votre demande dépasse ${MAX_COURSE_TEXT} caractères.`, 422);
@@ -183,6 +185,7 @@ export interface CourseMessageView {
 /** Messages récents du fil de ce profil (4 jours au plus), du plus ancien au plus récent. */
 export async function listCourseMessages(ctx: Ctx, session: SessionContext): Promise<CourseMessageView[]> {
   const who = await requireAccess(ctx, session, "list");
+  await refuseChildChat(ctx.db, session.user.id);
   const conversation = await ctx.db.selectFrom("agent_conversations").select("id").where("user_id", "=", session.user.id).where("agent_id", "=", await courseAgentId(ctx.db)).executeTakeFirst();
   if (!conversation) return [];
   const since = new Date(ctx.now.getTime() - COURSE_HISTORY_DAYS * 86_400_000);

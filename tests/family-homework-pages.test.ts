@@ -11,6 +11,17 @@ import type { AssistantModel, ModelRequest, ModelResponse } from "@/server/assis
 import type { Ctx } from "@/server/auth/service";
 import type { DB } from "@/server/db/schema.generated";
 import { Rejection } from "@/server/http";
+import { randomUUID } from "node:crypto";
+import { getDashboard } from "@/server/catalog/service";
+import { getChat, sendMessage } from "@/server/chat/service";
+import { prepareExport, readExport, requestExport } from "@/server/compliance/exports";
+import { readZip } from "@/server/compliance/zip";
+import { sendAssistantMessage } from "@/server/assistant/service";
+import { eraseConversation } from "@/server/courses/chat/erase";
+import { listCourseMessages, sendCourseMessage } from "@/server/courses/chat/service";
+import { courseHome } from "@/server/courses/home";
+import { childOptions, prepareWeek } from "@/server/assistant/homework/weeks";
+import { loadHomeworkCatalog } from "@/server/assistant/homework/catalog";
 import { createGuest, createProfile, sessionFor, testDb } from "./helpers/fixtures";
 
 /** US-180 : créer des exercices à partir d'une leçon (enfant autonome), fiche réponse réservée aux parents, dossier « Exercices ». */
@@ -299,5 +310,66 @@ describe("créer des exercices à partir d'une leçon (US-180)", () => {
     await setHomeworkEnabled(ctx(), f.camilleSession, { enabled: false });
     expect((await failure(listExercisePages(ctx(), f.leoSession))).code).toBe("homework_disabled");
     expect((await failure(getExercisePage(ctx(), f.camilleSession, kept.pageId))).code).toBe("homework_disabled");
+  });
+});
+
+describe("tchats des agents fermés au profil d'un enfant (S-47 élargie)", () => {
+  it("un refus du serveur pour chaque agent : Assistant Famille, Courses et repas, agents du catalogue ; un autre invité secondaire n'est pas touché par cette règle", async () => {
+    const f = await family();
+    const agent = "999999999";
+    const refused = [
+      () => sendAssistantMessage(ctx(), f.leoSession, { requestId: randomUUID(), text: "Ajoute un rendez-vous" }),
+      () => sendCourseMessage(ctx(), f.leoSession, { requestId: randomUUID(), text: "Un menu pour la semaine" }),
+      () => listCourseMessages(ctx(), f.leoSession),
+      () => eraseConversation(ctx(), f.leoSession),
+      () => getChat(ctx(), f.leoSession, agent),
+      () => sendMessage(ctx(), f.leoSession, { agentId: agent, requestId: randomUUID(), text: "Bonjour" }),
+    ];
+    for (const attempt of refused) expect((await failure(attempt())).status).toBe(403);
+    expect((await failure(listCourseMessages(ctx(), f.leoSession))).code).toBe("child_no_chat");
+    expect((await failure(getChat(ctx(), f.leoSession, agent))).code).toBe("child_no_chat");
+    // Noé, invité secondaire ordinaire : la règle de l'enfant ne le concerne pas (il garde les règles d'avant).
+    expect(await listCourseMessages(ctx(), f.noeSession)).toEqual([]);
+    expect((await failure(getChat(ctx(), f.noeSession, agent))).code).toBe("not_found");
+    // À l'écran : pas de tchat sur l'accueil de Courses et repas, pas de bouton « Ouvrir le tchat » sur le dashboard.
+    expect((await courseHome(ctx(), f.leoSession)).chat).toBe(false);
+    expect((await courseHome(ctx(), f.noeSession)).chat).toBe(true);
+    const cards = (session: Family["leoSession"]) => getDashboard(ctx(), session).then((d) => [...d.tabs.pro, ...d.tabs.perso, ...d.tabs.contracts]);
+    expect((await cards(f.leoSession)).every((a) => a.chatClosed)).toBe(true);
+    expect((await cards(f.noeSession)).every((a) => !a.chatClosed)).toBe(true);
+  });
+});
+
+describe("export de la famille (US-55, US-119 RT5, US-180 RT5)", () => {
+  it("l'export d'un parent contient l'âge des devoirs, les semaines, les exercices validés et les pages d'exercices avec leur fiche réponse ; celui de l'enfant, rien de tout cela", async () => {
+    await loadHomeworkCatalog(db);
+    const f = await family();
+    const block = (await childOptions(db, f.accountId, f.leo)).blocks[0];
+    await prepareWeek(ctx(), f.camilleSession, { weekStart: "2054-11-09", workDays: [1, 2], children: [{ memberId: f.leo, items: [{ kind: "exercises", textbook: "france", numbers: block.numbers.slice(0, 2), days: [1] }, { kind: "custom", title: "Lecture 15 min", days: [2] }] }] });
+    const exercise = await db.selectFrom("homework_week_items").select("exercise_id").where("member_id", "=", f.leo).where("exercise_id", "is not", null).executeTakeFirstOrThrow();
+    await db.insertInto("homework_exercise_validations").values({ member_id: f.leo, exercise_id: exercise.exercise_id! }).execute();
+    await createExercisePage(ctx(), f.leoSession, { photo }, fakeModel(lesson()));
+    const exported = async (session: Family["camilleSession"]) => {
+      const now: Ctx = { db, now: new Date() } as Ctx;
+      const { id } = await requestExport(now, session);
+      expect(await prepareExport(now, id)).toBe("ready");
+      const files = readZip(await readExport(now, session, id));
+      return { json: JSON.parse(files.find((x) => x.name === "mes-donnees.json")!.data.toString()), html: files.find((x) => x.name === "mes-donnees.html")!.data.toString() };
+    };
+    const parent = await exported(f.julienSession);
+    expect(parent.json.homeworkChildren).toEqual([expect.objectContaining({ enfant: "Léo", ageDesDevoirs: 8 }), expect.objectContaining({ enfant: "Mia", ageDesDevoirs: 7 })]);
+    expect(parent.json.homeworkWeeks).toHaveLength(3);
+    expect(parent.json.homeworkWeeks[2]).toMatchObject({ semaineDu: "2054-11-09", jour: "2054-11-10", enfant: "Léo", element: "Activité du parent : Lecture 15 min", fait: false });
+    expect(parent.json.homeworkValidations).toEqual([expect.objectContaining({ enfant: "Léo", exercice: expect.stringMatching(/^Exercice \d+ \(france, /) })]);
+    expect(parent.json.homeworkPages).toEqual([expect.objectContaining({ enfant: "Léo", theme: "Les fractions", matiere: "Maths", niveau: "CM1" })]);
+    expect(parent.json.homeworkPages[0].enonce).toContain("Exercice 1 (Facile, 5 points) : Je reconnais.");
+    expect(parent.json.homeworkPages[0].enonce).not.toContain("4 billes");
+    expect(parent.json.homeworkPages[0].ficheReponse).toContain("12 ÷ 3 = 4 ; 4 billes");
+    expect(parent.json.homeworkPages[0].ficheReponse).toContain("total 20 points");
+    expect(parent.html).toContain("Aide Devoirs : pages d&#39;exercices, avec leur fiche réponse");
+    // Le profil de l'enfant, invité secondaire, n'exporte ni les plannings ni la fiche réponse.
+    const child = await exported(f.leoSession);
+    expect([child.json.homeworkChildren, child.json.homeworkWeeks, child.json.homeworkValidations, child.json.homeworkPages]).toEqual([[], [], [], []]);
+    expect(JSON.stringify(child.json)).not.toContain("4 billes");
   });
 });

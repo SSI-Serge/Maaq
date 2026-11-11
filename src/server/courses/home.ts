@@ -1,3 +1,4 @@
+import { isChildProfile } from "@/server/assistant/profile-member";
 import type { Ctx, SessionContext } from "@/server/auth/service";
 import { env } from "@/server/env";
 import { loadSettings, requireAccess, type CourseAccess } from "./household/settings";
@@ -23,6 +24,8 @@ export interface CourseHome {
   weeks: WeekChoice[];
   /** « Menu du mois dans le budget » (CR-63) : toujours affiché ; avant 6 menus validés, le toucher explique les conditions avec ces deux nombres. */
   month: { menus: number; tickets: number; ready: boolean; needed: number } | null;
+  /** Faux pour le profil d'un enfant : les tchats des agents lui sont fermés (S-47), l'écran ne montre pas le tchat. */
+  chat: boolean;
 }
 
 const WEEKDAYS = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
@@ -50,6 +53,7 @@ export async function courseHome(ctx: Ctx, session: SessionContext): Promise<Cou
   return {
     access: who.access,
     firstName: session.user.firstName,
+    chat: !(await isChildProfile(ctx.db, session.user.id)),
     missing: settings?.missing ?? [],
     couple: settings?.couple ?? [],
     list: summary,

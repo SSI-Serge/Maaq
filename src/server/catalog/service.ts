@@ -1,3 +1,4 @@
+import { isChildProfile } from "@/server/assistant/profile-member";
 import type { Ctx, SessionContext } from "@/server/auth/service";
 import { processChatErasure } from "@/server/auth/service";
 import { Rejection } from "@/server/http";
@@ -28,6 +29,8 @@ export interface DashboardAgent {
   maintenanceMessage: string | null;
   /** Agent natif : adresse de son accueil dans l'application (au lieu du tchat Digitorn). */
   nativePath: string | null;
+  /** Profil d'un enfant : les tchats des agents lui sont fermés (S-47), la carte ne propose pas « Ouvrir le tchat ». */
+  chatClosed: boolean;
 }
 
 /** Accueil des agents natifs du catalogue, par référence de plateforme. */
@@ -213,6 +216,7 @@ export async function getDashboard(ctx: Ctx, session: SessionContext): Promise<D
     .orderBy("d.agent_id")
     .execute();
 
+  const chatClosed = await isChildProfile(ctx.db, session.user.id);
   const tabs: Dashboard["tabs"] = { pro: [], perso: [], contracts: [] };
   for (const row of rows) {
     tabs[row.category_code as "pro" | "perso" | "contracts"].push({
@@ -222,6 +226,7 @@ export async function getDashboard(ctx: Ctx, session: SessionContext): Promise<D
       status: row.display_status as DisplayStatus,
       maintenanceMessage: row.maintenance_message,
       nativePath: row.platform === "anthropic" ? (NATIVE_PATH[row.platform_agent_ref] ?? null) : null,
+      chatClosed,
     });
   }
   return { max: await integerSetting(ctx.db, "max_agents_per_category", 10), tabs };

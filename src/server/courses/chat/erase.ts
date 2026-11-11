@@ -1,3 +1,4 @@
+import { refuseChildChat } from "@/server/assistant/profile-member";
 import type { Kysely } from "kysely";
 import type { Ctx, SessionContext } from "@/server/auth/service";
 import type { DB } from "@/server/db/schema.generated";
@@ -40,6 +41,7 @@ async function visible(db: Kysely<DB>, userId: string): Promise<{ conversationId
 /** Efface l'échange qui contient ce message. Refusé pour le tchat d'un autre profil (message introuvable) et tant que la réponse à la demande n'est pas finie. */
 export async function eraseExchange(ctx: Ctx, session: SessionContext, messageId: string): Promise<{ deleted: number }> {
   await requireAccess(ctx, session, "list");
+  await refuseChildChat(ctx.db, session.user.id);
   const thread = /^\d{1,18}$/.test(messageId) ? await visible(ctx.db, session.user.id) : null;
   const exchanges = thread ? exchangesOf(thread.rows) : new Map<string, string>();
   const exchange = exchanges.get(messageId);
@@ -57,6 +59,7 @@ export async function eraseExchange(ctx: Ctx, session: SessionContext, messageId
 /** « Effacer la conversation » : tous les échanges visibles de ce profil ; la proposition cachée du menu du mois reste. Une réponse en cours fait refuser l'effacement. */
 export async function eraseConversation(ctx: Ctx, session: SessionContext): Promise<{ deleted: number }> {
   await requireAccess(ctx, session, "list");
+  await refuseChildChat(ctx.db, session.user.id);
   const thread = await visible(ctx.db, session.user.id);
   if (!thread || !thread.rows.length) return { deleted: 0 };
   const last = thread.rows[thread.rows.length - 1];

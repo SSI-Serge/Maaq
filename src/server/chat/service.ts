@@ -1,3 +1,4 @@
+import { refuseChildChat } from "@/server/assistant/profile-member";
 import { sql } from "kysely";
 import { digitorn, type ActionProposal, type ChatEvent, type RequesterRank } from "@/server/adapters/digitorn";
 import { messenger } from "@/server/adapters/messaging";
@@ -223,6 +224,7 @@ function describeProposal(proposal: ActionProposal): string {
  * 4 jours, signalements déjà faits et reste de demandes du jour. Relu régulièrement par l'écran.
  */
 export async function getChat(ctx: Ctx, session: SessionContext, agentId: string): Promise<ChatView> {
+  await refuseChildChat(ctx.db, session.user.id);
   const agent = await loadAgent(ctx, session, agentId);
   const embedded = isEmbedded(agent);
   const base = {
@@ -326,6 +328,7 @@ export async function sendMessage(
   session: SessionContext,
   input: { agentId: string; requestId: string; text: string },
 ): Promise<SendResult> {
+  await refuseChildChat(ctx.db, session.user.id);
   const agent = await loadAgent(ctx, session, input.agentId);
   requireLegacyChat(agent);
   const blockedText = blockedMessage(agent);
@@ -409,6 +412,7 @@ export async function decideAction(
   session: SessionContext,
   input: { agentId: string; proposalId: string; decision: "validate" | "refuse" },
 ): Promise<DecisionResult> {
+  await refuseChildChat(ctx.db, session.user.id);
   const agent = await loadAgent(ctx, session, input.agentId);
   requireLegacyChat(agent);
   if (blockedMessage(agent) !== null) {
@@ -493,6 +497,7 @@ export async function reportError(
   session: SessionContext,
   input: { agentId: string; messageRef: string; category: ReportCategory; comment?: string },
 ): Promise<{ alreadyReported: boolean }> {
+  await refuseChildChat(ctx.db, session.user.id);
   const agent = await loadAgent(ctx, session, input.agentId);
   requireLegacyChat(agent);
   const comment = input.comment?.trim() || null;

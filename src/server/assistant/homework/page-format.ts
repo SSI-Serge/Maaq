@@ -174,3 +174,59 @@ export function readModelPage(raw: string): ModelPage {
   const forms = QUESTION_FORMS.filter((f) => content.exercises.some((e) => e.questions.some((q) => q.form === f)));
   return { status: "ok", content, answers: exercises.map((e) => e.answers), grading: content.exercises.map((e) => ({ level: e.level, points: e.points })), forms };
 }
+
+// ---------------------------------------------------------------------------------------------------------------------------
+// Texte lisible d'une page, pour l'export de la famille (US-55, US-180 RT5)
+// ---------------------------------------------------------------------------------------------------------------------------
+
+const letter = (i: number) => "abcdefgh"[i] ?? String(i + 1);
+
+function questionText(q: Question): string {
+  switch (q.form) {
+    case "multiple_choice":
+      return `${q.text} (${q.options.join(" / ")})`;
+    case "matching":
+      return `Relie : ${q.left.join(", ")} — ${q.right.join(", ")}`;
+    case "ordering":
+      return `${q.text} ${q.items.join(" · ")}`;
+    default:
+      return q.text;
+  }
+}
+
+function answerText(q: Question, a: Answer | undefined): string {
+  if (!a) return "";
+  switch (a.form) {
+    case "multiple_choice":
+      return q.form === "multiple_choice" ? (q.options[a.correct] ?? "") : "";
+    case "true_false":
+      return a.value ? "Vrai" : "Faux";
+    case "true_false_correction":
+      return a.value ? "Vrai" : `Faux. ${a.correction ?? ""}`.trim();
+    case "equations_to_complete":
+    case "fill_in_blanks":
+      return a.blanks.join(" ; ");
+    case "matching":
+      return q.form === "matching" ? q.left.map((l, i) => `${l} → ${q.right[a.pairs[i]] ?? ""}`).join(" ; ") : "";
+    case "ordering":
+      return a.order.join(" · ");
+    case "problem":
+      return [a.calculation, a.result].filter(Boolean).join(" ; ");
+    case "written_answer":
+      return `${a.model} (toute réponse proche est acceptée)`;
+  }
+}
+
+/** L'énoncé d'une page, en texte : un exercice par paragraphe. */
+export function statementText(content: PageContent): string {
+  return content.exercises
+    .map((e, i) => [`Exercice ${i + 1} (${LEVEL_NAME[e.level]}, ${e.points} points) : ${e.title}. ${e.instruction}`, ...(e.context ? [e.context] : []), ...e.questions.map((q, j) => `${letter(j)}. ${questionText(q)}`)].join("\n"))
+    .join("\n\n");
+}
+
+/** La fiche réponse et le barème, en texte ; réservée à l'export d'un parent. */
+export function answersText(content: PageContent, answers: PageAnswers, grading: GradingScale): string {
+  const lines = content.exercises.map((e, i) => [`Exercice ${i + 1} :`, ...e.questions.map((q, j) => `${letter(j)}. ${answerText(q, answers[i]?.[j])}`)].join("\n"));
+  const scale = `Barème : ${grading.map((g) => `${LEVEL_NAME[g.level]} ${g.points}`).join(", ")}, total ${grading.reduce((sum, g) => sum + g.points, 0)} points`;
+  return [...lines, scale].join("\n\n");
+}

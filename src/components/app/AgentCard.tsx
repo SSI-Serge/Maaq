@@ -16,6 +16,8 @@ export interface DashboardAgent {
   maintenanceMessage: string | null;
   /** Agent natif : adresse de son accueil, à la place du tchat. */
   nativePath?: string | null;
+  /** Profil d'un enfant : les tchats des agents lui sont fermés (S-47). */
+  chatClosed?: boolean;
 }
 
 const STATUS: Record<AgentStatus, { label: string; tone: string }> = {
@@ -55,9 +57,11 @@ export function AgentCard({ agent, origin, onRemoved }: { agent: DashboardAgent;
       {agent.status === "to_configure" && <p className={s.muted}>Cet agent n&apos;est pas encore configuré : il manque des éléments pour l&apos;utiliser.</p>}
       <div className={s.cardActions}>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <Link href={agent.nativePath ?? `/tchat/${agent.id}?retour=${encodeURIComponent(origin)}`} className={s.smallButton} style={{ background: "var(--primary)", color: "var(--primary-ink)", padding: "7px 12px", borderRadius: 8 }}>
-            {agent.nativePath ? "Ouvrir" : "Ouvrir le tchat"}
-          </Link>
+          {(agent.nativePath || !agent.chatClosed) && (
+            <Link href={agent.nativePath ?? `/tchat/${agent.id}?retour=${encodeURIComponent(origin)}`} className={s.smallButton} style={{ background: "var(--primary)", color: "var(--primary-ink)", padding: "7px 12px", borderRadius: 8 }}>
+              {agent.nativePath ? "Ouvrir" : "Ouvrir le tchat"}
+            </Link>
+          )}
           <Link href={`/catalogue/${agent.id}`} className={s.smallButton}>
             Voir la fiche
           </Link>

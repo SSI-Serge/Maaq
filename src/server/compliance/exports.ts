@@ -7,6 +7,7 @@ import type { Ctx, SessionContext } from "@/server/auth/service";
 import { unbundlePhotos } from "@/server/contracts/service";
 import { loadDocument } from "@/server/contracts/storage";
 import { open } from "@/server/assistant/fields";
+import { answersText, statementText, type GradingScale, type PageAnswers, type PageContent } from "@/server/assistant/homework/page-format";
 import { textOf } from "@/server/contracts/report";
 import { dataDir } from "@/server/data-dir";
 import type { DB } from "@/server/db/schema.generated";
@@ -114,8 +115,75 @@ interface Collected {
   emotionNotesReceived: unknown[];
   emotionHearts: unknown[];
   emotionWishes: unknown[];
+  /**
+   * Aide Devoirs (US-55, US-119 RT5, US-180 RT5) : données des enfants du foyer, dans l'export d'un parent seulement (utilisateur principal et invité 1) : âge des devoirs,
+   * éléments des semaines préparées, exercices validés sur photos, pages d'exercices avec leur fiche réponse et leur barème.
+   */
+  homeworkChildren: unknown[];
+  homeworkWeeks: unknown[];
+  homeworkValidations: unknown[];
+  homeworkPages: unknown[];
   devices: unknown[];
   digitorn: unknown;
+}
+
+/** Données de l'aide Devoirs du foyer : plannings, progrès et pages d'exercices (fiche réponse comprise, l'export étant celui d'un parent). */
+async function collectHomework(db: Kysely<DB>, accountId: string) {
+  const day = (value: Date | string | null) => (value ? new Date(value).toISOString().slice(0, 10) : null);
+  const kids = await db
+    .selectFrom("homework_children as h")
+    .innerJoin("family_members as m", "m.id", "h.member_id")
+    .select(["m.first_name", "h.homework_age", "h.updated_at"])
+    .where("h.account_id", "=", accountId)
+    .orderBy("m.alias_number")
+    .execute();
+  const items = await db
+    .selectFrom("homework_week_items as i")
+    .innerJoin("homework_weeks as w", "w.id", "i.week_id")
+    .innerJoin("family_members as m", "m.id", "i.member_id")
+    .leftJoin("homework_exercises as e", "e.id", "i.exercise_id")
+    .leftJoin("homework_activities as a", "a.id", "i.activity_id")
+    .select([sql<string>`w.week_start::text`.as("week"), sql<string>`i.day::text`.as("day"), "m.first_name", "e.textbook_key", "e.level", "e.number", "e.theme", "a.title as activity", "i.custom_title", "i.checked_at"])
+    .where("i.account_id", "=", accountId)
+    .orderBy("w.week_start")
+    .orderBy("i.day")
+    .orderBy("i.id")
+    .execute();
+  const validations = await db
+    .selectFrom("homework_exercise_validations as v")
+    .innerJoin("homework_children as h", "h.member_id", "v.member_id")
+    .innerJoin("family_members as m", "m.id", "v.member_id")
+    .innerJoin("homework_exercises as e", "e.id", "v.exercise_id")
+    .select(["m.first_name", "e.textbook_key", "e.level", "e.number", "e.theme"])
+    .where("h.account_id", "=", accountId)
+    .orderBy("m.alias_number")
+    .orderBy("e.level")
+    .orderBy("e.number")
+    .execute();
+  const pages = await db
+    .selectFrom("homework_exercise_pages as p")
+    .innerJoin("family_members as m", "m.id", "p.member_id")
+    .leftJoin("homework_exercise_page_answers as a", "a.page_id", "p.id")
+    .leftJoin("users as u", "u.id", "p.created_by_user_id")
+    .select(["m.first_name", "p.theme", "p.subject", "p.level", "p.exercises", "p.created_at", "a.answers", "a.grading_scale", "u.first_name as by_name"])
+    .where("p.account_id", "=", accountId)
+    .orderBy("p.created_at")
+    .execute();
+  return {
+    children: kids.map((k) => ({ enfant: k.first_name, ageDesDevoirs: k.homework_age, modifieLe: day(k.updated_at as Date) })),
+    weeks: items.map((i) => ({
+      semaineDu: i.week, jour: i.day, enfant: i.first_name,
+      element: i.number !== null ? `Exercice ${i.number} (${i.textbook_key}, ${i.level}) : ${i.theme ?? ""}` : i.activity ? `Activité : ${i.activity}` : i.custom_title ? `Activité du parent : ${open(i.custom_title)}` : "",
+      fait: i.checked_at !== null,
+    })),
+    validations: validations.map((v) => ({ enfant: v.first_name, exercice: `Exercice ${v.number} (${v.textbook_key}, ${v.level}) : ${v.theme}` })),
+    pages: pages.map((p) => {
+      const stored = JSON.parse(open(p.exercises)) as { keyword: string | null; exercises: PageContent["exercises"] };
+      const content: PageContent = { theme: open(p.theme), keyword: stored.keyword, subject: open(p.subject), level: open(p.level), exercises: stored.exercises };
+      const sheet = p.answers && p.grading_scale ? answersText(content, JSON.parse(open(p.answers)) as PageAnswers, JSON.parse(open(p.grading_scale)) as GradingScale) : null;
+      return { enfant: p.first_name, theme: content.theme, matiere: content.subject, niveau: content.level, creeeLe: day(p.created_at as Date), creeePar: p.by_name, enonce: statementText(content), ficheReponse: sheet };
+    }),
+  };
 }
 
 /** Rassemble les données du profil, et elles seules : jamais celles de l'utilisateur principal pour un invité (RF2). */
@@ -290,6 +358,9 @@ async function collect(db: Kysely<DB>, userId: string, now: Date): Promise<{ dat
          where w.account_id = ${user.account_id}::uuid and w.removed_at is null and emotion_partner_of(${userId}::uuid) is not null order by w.created_at`.execute(db).then((r) => r.rows)
     : [];
 
+  // Aide Devoirs : pour un parent du foyer seulement ; un invité secondaire (dont le profil d'un enfant) n'exporte rien de ces données.
+  const homework = user.account_id && (isPrimary || user.guest_rank === "core") ? await collectHomework(db, user.account_id) : { children: [], weeks: [], validations: [], pages: [] };
+
   // Données détenues par Digitorn : historique, configuration des agents (RT1).
   let digitornData: unknown = null;
   if (user.digitorn_user_ref) digitornData = await digitorn().exportUserData(user.digitorn_user_ref);
@@ -329,6 +400,10 @@ async function collect(db: Kysely<DB>, userId: string, now: Date): Promise<{ dat
     emotionNotesReceived: emotionNotesReceived.map((n) => ({ ecritLe: date(n.created_at), mot: decryptValue(n.body) })),
     emotionHearts: emotionHearts.map((h) => ({ pose: date(h.created_at), sur: h.task_id ? "une tâche" : "un rendez-vous" })),
     emotionWishes: emotionWishes.map((w) => ({ envie: decryptValue(w.title), description: w.description ? decryptValue(w.description) : null, horizon: w.horizon, ajouteePar: w.first_name, ajouteeLe: date(w.created_at) })),
+    homeworkChildren: homework.children,
+    homeworkWeeks: homework.weeks,
+    homeworkValidations: homework.validations,
+    homeworkPages: homework.pages,
     devices: devices.map((d) => ({ type: d.device_type, navigateur: d.browser, premiereConnexion: date(d.first_connected_at), derniereActivite: date(d.last_activity_at), revoqueLe: date(d.revoked_at) })),
     digitorn: digitornData,
   };
@@ -351,6 +426,10 @@ const SECTIONS: [keyof Collected, string][] = [
   ["emotionNotesReceived", "Mots que j'ai reçus de mon partenaire (bilans ouverts)"],
   ["emotionHearts", "Cœurs que j'ai posés"],
   ["emotionWishes", "Nos envies"],
+  ["homeworkChildren", "Aide Devoirs : âge des devoirs de mes enfants"],
+  ["homeworkWeeks", "Aide Devoirs : semaines préparées"],
+  ["homeworkValidations", "Aide Devoirs : exercices validés sur photos"],
+  ["homeworkPages", "Aide Devoirs : pages d'exercices, avec leur fiche réponse"],
   ["devices", "Mes appareils"],
 ];
 

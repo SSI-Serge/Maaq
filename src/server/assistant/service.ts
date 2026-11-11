@@ -12,6 +12,7 @@ import { loadPseudoMembers, requireParent } from "./family";
 import { familyTimeZone } from "./reminders";
 import { createModel, type AssistantModel } from "./model";
 import { utcToLocal } from "./local-time";
+import { refuseChildChat } from "./profile-member";
 import { loadMembers, type MemberChip } from "./member-chips";
 import { placeMessageView, suggestPlaceSearch, type PlaceMessageView } from "./places";
 import { ruleLabel } from "./series";
@@ -103,6 +104,7 @@ export async function sendAssistantMessage(
   deps: AssistantDeps = {},
 ): Promise<AssistantReply> {
   const accountId = requireParent(session);
+  await refuseChildChat(ctx.db, session.user.id);
   const text = input.text.trim();
   if (!text) throw new Rejection("empty_request", "Écrivez votre demande avant de l'envoyer.", 422);
   if (text.length > MAX_ASSISTANT_TEXT) throw new Rejection("request_too_long", `Votre demande dépasse ${MAX_ASSISTANT_TEXT} caractères.`, 422);

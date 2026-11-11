@@ -1,5 +1,6 @@
-import type { Kysely } from "kysely";
+import { sql, type Kysely } from "kysely";
 import type { DB } from "@/server/db/schema.generated";
+import { Rejection } from "@/server/http";
 
 /**
  * Le membre d'un profil (D73 S-38, S-39, S-46) : règle unique, la même que `family_member_of_profile` dans la base. Un profil d'invité secondaire relié à une fiche
@@ -26,4 +27,13 @@ export async function profileMember(db: Kysely<DB>, accountId: string, userId: s
 /** Vrai si le profil est celui d'un enfant (relié à une fiche enfant). */
 export async function isChildProfile(db: Kysely<DB>, userId: string): Promise<boolean> {
   return Boolean(await db.selectFrom("family_members").select("id").where("child_profile_user_id", "=", userId).executeTakeFirst());
+}
+
+/**
+ * Les tchats des agents sont fermés au profil d'un enfant (D73 S-47, élargie par le PO le 11/11/2026) : l'Assistant Famille, Courses et repas et tous les autres agents.
+ * Refus côté serveur, d'après `profile_is_child_linked()` de la base ; les écrans ne montrent aucune entrée vers un tchat.
+ */
+export async function refuseChildChat(db: Kysely<DB>, userId: string): Promise<void> {
+  const { rows } = await sql<{ child: boolean }>`select profile_is_child_linked(${userId}::uuid) as child`.execute(db);
+  if (rows[0]?.child) throw new Rejection("child_no_chat", "Le tchat des agents n'est pas ouvert à ce profil.", 403);
 }
