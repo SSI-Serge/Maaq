@@ -3,8 +3,16 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-11T14:15:00.000Z",
+  "updated": "2026-11-11T14:50:00.000Z",
   "deploys": [
+    {
+      "at": "2026-11-11T14:50:00.000Z",
+      "env": "preview",
+      "what": "Aide Devoirs, correctif S-55 : refaire la semaine de devoirs d'un enfant (les devoirs à venir sont remplacés, ce qui est fait est gardé). Rév. 00114. Suite complète verte (1336 essais). Pas de changement de base. Écran non vu : le PO teste.",
+      "storyIds": [
+        "f16s127"
+      ]
+    },
     {
       "at": "2026-11-11T14:15:00.000Z",
       "env": "preview",
@@ -2470,6 +2478,15 @@
             "Écran jamais vu, codé d'après la description : la maquette n'était pas encore publiée.",
             "Rien en pilote avant la réponse du DPO."
           ]
+        },
+        {
+          "id": "f16s127",
+          "title": "Refaire la semaine de devoirs d'un enfant",
+          "state": "testing",
+          "env": "preview",
+          "at": "2026-11-11T14:50:00.000Z",
+          "note": "Depuis « Préparer les devoirs » (Modifier ou Refaire) ou depuis la page de l'enfant dans la semaine. Les devoirs à venir sont remplacés ; ce qui est fait, validé sur photos ou passé est gardé ; les autres enfants ne changent pas.",
+          "unsure": "Écran jamais vu, codé avant la maquette : le PO le teste."
         }
       ],
       "decisions": [

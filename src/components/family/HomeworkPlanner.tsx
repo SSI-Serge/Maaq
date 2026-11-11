@@ -102,10 +102,17 @@ function elementsOf(options: HomeworkOptions | undefined, picks: string[]): Elem
 const WEEKDAY_NAMES = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"];
 const BACK = { href: "/assistant/devoirs/tache", label: "Préparer les devoirs" };
 
-export function HomeworkPlanner({ weekStart, asked = false }: { weekStart: string; asked?: boolean }) {
+/** « Refaire » une semaine déjà préparée (US-119 RF12) : pour les enfants choisis, ou pour un seul enfant depuis sa page de la semaine. */
+export interface Redo {
+  weekId: string;
+  memberId: string | null;
+}
+
+export function HomeworkPlanner({ weekStart, asked = false, redo = null }: { weekStart: string; asked?: boolean; redo?: Redo | null }) {
   const router = useRouter();
   const setting = useApiQuery<{ setting: HomeworkSetting }>("/api/family/homework");
-  const weeks = useApiQuery<{ today: string; mondays: { weekStart: string; prepared: boolean; weekId: string | null }[] }>("/api/family/homework/weeks");
+  const weeks = useApiQuery<{ today: string; weeks: { id: string; weekStart: string }[]; mondays: { weekStart: string; prepared: boolean; weekId: string | null }[] }>("/api/family/homework/weeks");
+  const redoStart = redo ? (weeks.data?.weeks.find((w) => w.id === redo.weekId)?.weekStart ?? null) : null;
   const [draft, setDraft] = useState<Draft | null>(null);
   const [options, setOptions] = useState<Record<string, HomeworkOptions>>({});
   const [optionsError, setOptionsError] = useState<string | null>(null);
@@ -114,10 +121,16 @@ export function HomeworkPlanner({ weekStart, asked = false }: { weekStart: strin
 
   // Le brouillon vient du stockage du navigateur : il ne se lit qu'après l'affichage côté client.
   // eslint-disable-next-line react-hooks/set-state-in-effect
-  useEffect(() => setDraft(loadDraft(weekStart, asked)), [weekStart, asked]);
   useEffect(() => {
-    if (draft) saveDraft(draft);
-  }, [draft]);
+    // Refaire une semaine : un parcours neuf, sans brouillon gardé, aucun enfant coché (ou l'enfant de la page d'où l'on vient).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (redo) setDraft(redoStart ? { ...emptyDraft(redoStart), kidsChosen: true, memberIds: redo.memberId ? [redo.memberId] : [] } : null);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    else setDraft(loadDraft(weekStart, asked));
+  }, [weekStart, asked, redo?.weekId, redo?.memberId, redoStart]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (draft && !redo) saveDraft(draft);
+  }, [draft, redo]);
 
   const children = useMemo(() => (setting.data?.setting.children ?? []).filter((c) => c.homeworkAge !== null), [setting.data]);
   const change = (patch: Partial<Draft>) => setDraft((d) => (d ? { ...d, ...patch } : d));
@@ -149,7 +162,9 @@ export function HomeworkPlanner({ weekStart, asked = false }: { weekStart: strin
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [needed.join(","), chosenWeek]);
 
-  if (!draft) return <AppShell title="Préparer la semaine" back={BACK}><Loading /></AppShell>;
+  const title = redo ? "Refaire la semaine" : "Préparer la semaine";
+  if (redo && weeks.data && !redoStart) return <AppShell title={title} back={BACK}><Notice tone="info">Cette semaine n&apos;existe plus.</Notice></AppShell>;
+  if (!draft) return <AppShell title={title} back={BACK}><Loading /></AppShell>;
   const d = draft;
   const today = weeks.data?.today ?? null;
   const householdDays = setting.data?.setting.days ?? [1, 2, 4, 5];
@@ -157,7 +172,10 @@ export function HomeworkPlanner({ weekStart, asked = false }: { weekStart: strin
   // Semaine en cours : les jours déjà passés ne sont pas touchés (RF11).
   const workDays = today ? rhythmDays.filter((day) => addDays(d.weekStart, day - 1) >= today) : rhythmDays;
   const mondays = weeks.data?.mondays ?? [{ weekStart: d.weekStart, prepared: false, weekId: null }];
-  const picked = mondays.find((m) => m.weekStart === d.weekStart);
+  // En refaisant une semaine, elle n'est plus traitée comme « déjà préparée » : le parcours continue.
+  const picked = redo ? undefined : mondays.find((m) => m.weekStart === d.weekStart);
+  const shownChildren = redo?.memberId ? children.filter((c) => c.memberId === redo.memberId) : children;
+  const redoNames = d.memberIds.map((id) => children.find((c) => c.memberId === id)?.firstName ?? "").filter(Boolean);
   const current = today !== null && mondays[0]?.weekStart === d.weekStart && d.weekStart <= today;
   // Changer de semaine repart des propositions de cette semaine-là : les choix d'exercices et de jours ne se reportent pas.
   const pickWeek = (start: string) => {
@@ -191,7 +209,9 @@ export function HomeworkPlanner({ weekStart, asked = false }: { weekStart: strin
         ],
       })),
     };
-    const result = await submit.run<{ weekId: string }>("/api/family/homework/weeks", { method: "POST", body });
+    const result = redo
+      ? await submit.run<{ weekId: string }>(`/api/family/homework/weeks/${redo.weekId}`, { method: "PUT", body: { workDays: body.workDays, children: body.children } })
+      : await submit.run<{ weekId: string }>("/api/family/homework/weeks", { method: "POST", body });
     if (result) {
       saveDraft(null);
       router.push(`/assistant/devoirs/${result.weekId}`);
@@ -199,7 +219,7 @@ export function HomeworkPlanner({ weekStart, asked = false }: { weekStart: strin
   }
 
   return (
-    <AppShell title="Préparer la semaine" back={BACK}>
+    <AppShell title={title} back={redo ? { href: `/assistant/devoirs/${redo.weekId}`, label: "Semaine de devoirs" } : BACK}>
       {setting.error && <RetryNotice message={setting.error.message} onRetry={setting.reload} />}
       {setting.data && !setting.data.setting.enabled && <Notice tone="info">L&apos;aide Devoirs est désactivée : activez-la dans les réglages.</Notice>}
       {setting.data && setting.data.setting.enabled && children.length === 0 && <Notice tone="info">Indiquez l&apos;âge des devoirs d&apos;au moins un enfant dans les réglages.</Notice>}
@@ -211,16 +231,24 @@ export function HomeworkPlanner({ weekStart, asked = false }: { weekStart: strin
 
           {d.step === 1 && (
             <div className={styles.form}>
-              <div className={styles.label}>Quelle semaine ?</div>
-              <div className={styles.wrapRow}>
-                {mondays.map((m, i) => (
-                  <button key={m.weekStart} type="button" className={styles.chipToggle} aria-pressed={d.weekStart === m.weekStart} onClick={() => pickWeek(m.weekStart)}>
-                    {i === 0 && today !== null && m.weekStart <= today ? `Cette semaine, du ${shortDate(m.weekStart)}` : `Du ${shortDate(m.weekStart)}`}
-                    {m.prepared ? " · déjà préparée" : ""}
-                  </button>
-                ))}
-              </div>
-              {picked?.prepared && <span className={styles.hint}>Cette semaine est déjà préparée : ouvrez son écran « Semaine de devoirs » pour la modifier.</span>}
+              {redo ? (
+                <Notice tone="info">
+                  Vous refaites la semaine du {shortDate(d.weekStart)}. Les devoirs à venir des enfants choisis seront remplacés ; ce qui est déjà fait est gardé, et les autres enfants ne changent pas.
+                </Notice>
+              ) : (
+                <>
+                  <div className={styles.label}>Quelle semaine ?</div>
+                  <div className={styles.wrapRow}>
+                    {mondays.map((m, i) => (
+                      <button key={m.weekStart} type="button" className={styles.chipToggle} aria-pressed={d.weekStart === m.weekStart} onClick={() => pickWeek(m.weekStart)}>
+                        {i === 0 && today !== null && m.weekStart <= today ? `Cette semaine, du ${shortDate(m.weekStart)}` : `Du ${shortDate(m.weekStart)}`}
+                        {m.prepared ? " · déjà préparée" : ""}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+              {picked?.prepared && <span className={styles.hint}>Cette semaine est déjà préparée. « Modifier » ouvre son écran « Semaine de devoirs » ; « Refaire » relance les 4 étapes pour les enfants que vous choisissez.</span>}
               {!picked?.prepared && current && <span className={styles.hint}>Les jours déjà passés ne sont pas touchés.</span>}
               {!picked?.prepared && (
                 <>
@@ -242,8 +270,8 @@ export function HomeworkPlanner({ weekStart, asked = false }: { weekStart: strin
                   </span>
                   <div className={styles.label}>Pour quels enfants ?</div>
                   <div className={styles.wrapRow}>
-                    {children.map((c) => (
-                      <button key={c.memberId} type="button" className={styles.chipToggle} aria-pressed={d.memberIds.includes(c.memberId)} onClick={() => change({ memberIds: toggle(d.memberIds, c.memberId), kidsChosen: true })}>
+                    {shownChildren.map((c) => (
+                      <button key={c.memberId} type="button" className={styles.chipToggle} aria-pressed={d.memberIds.includes(c.memberId)} aria-disabled={redo?.memberId ? true : undefined} onClick={() => !redo?.memberId && change({ memberIds: toggle(d.memberIds, c.memberId), kidsChosen: true })}>
                         {c.firstName}
                         {c.levelLabel ? ` · ${c.levelLabel}` : ""}
                       </button>
@@ -254,9 +282,14 @@ export function HomeworkPlanner({ weekStart, asked = false }: { weekStart: strin
               )}
               <div className={styles.actionsRow}>
                 {picked?.prepared && picked.weekId ? (
-                  <Link href={`/assistant/devoirs/${picked.weekId}`} className={styles.cta}>
-                    Ouvrir la semaine du {shortDate(picked.weekStart)}
-                  </Link>
+                  <>
+                    <Link href={`/assistant/devoirs/${picked.weekId}`} className={styles.cta}>
+                      Modifier
+                    </Link>
+                    <Link href={`/assistant/devoirs/preparer?refaire=${picked.weekId}`} className={styles.cta}>
+                      Refaire
+                    </Link>
+                  </>
                 ) : (
                   <Button onClick={() => change({ step: 2 })} disabled={d.memberIds.length === 0 || workDays.length === 0}>
                     Continuer
@@ -386,13 +419,18 @@ export function HomeworkPlanner({ weekStart, asked = false }: { weekStart: strin
               <Button variant="secondary" onClick={() => change({ customs: [...d.customs, { memberId: d.memberIds[0], title: "", days: [] }] })}>
                 Ajouter une activité à moi
               </Button>
+              {redo && redoNames.length > 0 && (
+                <Notice tone="info">
+                  Les devoirs à venir de {redoNames.join(" et ")} cette semaine seront remplacés. Ce qui est déjà fait est gardé.
+                </Notice>
+              )}
               {failed && <Notice tone="error">La préparation n&apos;a pas abouti. Vos choix sont gardés : réessayez.{submit.error && submit.error.kind !== "server" ? ` (${submit.error.message})` : ""}</Notice>}
               <div className={styles.actionsRow}>
                 <Button variant="ghost" onClick={() => change({ step: 3 })} disabled={submit.pending}>
                   Retour
                 </Button>
                 <Button onClick={() => void send()} loading={submit.pending} disabled={placedCount === 0}>
-                  {failed ? "Réessayer" : "Préparer la semaine"}
+                  {failed ? "Réessayer" : redo ? "Refaire la semaine" : "Préparer la semaine"}
                 </Button>
               </div>
               <p className={styles.hint}>{placedCount === 0 ? "Choisissez au moins un jour pour un élément." : `${placedCount} élément${placedCount > 1 ? "s" : ""} placé${placedCount > 1 ? "s" : ""}.`}</p>

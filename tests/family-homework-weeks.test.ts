@@ -5,8 +5,7 @@ import { open, seal } from "@/server/assistant/fields";
 import { loadHomeworkCatalog } from "@/server/assistant/homework/catalog";
 import { setHomeworkAge, setHomeworkEnabled } from "@/server/assistant/homework/settings";
 import {
-  activityOptions, addItem, childOptions, getWeek, listWeeks, moveItem, prepareWeek, removeItem, setItemChecked, upcomingMondays, weekPreparedFor, type WeekInput,
-} from "@/server/assistant/homework/weeks";
+  activityOptions, addItem, childOptions, getWeek, listWeeks, moveItem, prepareWeek, removeItem, setItemChecked, upcomingMondays, weekPreparedFor, type WeekInput, redoWeek } from "@/server/assistant/homework/weeks";
 import type { Ctx } from "@/server/auth/service";
 import type { DB } from "@/server/db/schema.generated";
 import { Rejection } from "@/server/http";
@@ -325,5 +324,71 @@ describe("modifier la semaine (US-119 RF4, RF6)", () => {
     expect(await tasksOf(weekId)).toHaveLength(0);
     expect(await db.selectFrom("homework_week_items").select("id").where("member_id", "=", f.leo).execute()).toHaveLength(0);
     expect(await db.selectFrom("homework_children").select("member_id").where("member_id", "=", f.leo).execute()).toHaveLength(0);
+  });
+});
+
+describe("refaire la semaine d'un enfant (US-119 RF12, S-55)", () => {
+  const itemsOf = async (f: Family, weekId: string, memberId: string) =>
+    (await getWeek(ctx(), f.camilleSession, weekId)).children.find((c) => c.memberId === memberId)?.items.map((i) => `${i.day}:${i.kind === "exercise" ? "exercice" : i.title}${i.checked ? ":fait" : ""}`) ?? [];
+
+  it("CA 12.1 : les éléments à venir de l'enfant sont remplacés ; ce qui est coché ou validé sur photos reste ; les autres enfants ne changent pas", async () => {
+    const f = await family();
+    const leoBlock = await franceBlock(f, f.leo);
+    const inesBlock = await franceBlock(f, f.ines);
+    const { weekId } = await prepareWeek(ctx(), f.camilleSession, {
+      weekStart: WEEK, workDays: [1, 2],
+      children: [
+        { memberId: f.leo, items: [{ kind: "exercises", textbook: "france", numbers: leoBlock.numbers.slice(0, 3), days: [1] }, { kind: "custom", title: "Lecture 15 min", days: [1, 2] }] },
+        { memberId: f.ines, items: [{ kind: "exercises", textbook: "france", numbers: inesBlock.numbers.slice(0, 2), days: [2] }] },
+      ],
+    });
+    const before = (await getWeek(ctx(), f.camilleSession, weekId)).children.find((c) => c.memberId === f.leo)!.items;
+    // « Lecture » du mardi est cochée ; le premier exercice est validé sur photos.
+    await setItemChecked(ctx(), f.camilleSession, before.find((i) => i.kind === "custom" && i.day === 2)!.id, true);
+    const validated = await db.selectFrom("homework_week_items").select("exercise_id").where("week_id", "=", weekId).where("member_id", "=", f.leo).where("exercise_id", "is not", null).orderBy("exercise_id").executeTakeFirstOrThrow();
+    await db.insertInto("homework_exercise_validations").values({ member_id: f.leo, exercise_id: validated.exercise_id! }).execute();
+    const ines = await itemsOf(f, weekId, f.ines);
+
+    const result = await redoWeek(ctx(), f.julienSession, weekId, { workDays: [3], children: [{ memberId: f.leo, items: [{ kind: "custom", title: "Piano", days: [3] }, { kind: "exercises", textbook: "france", numbers: leoBlock.numbers.slice(3, 5), days: [3] }] }] });
+    expect(result).toEqual({ weekId, replaced: 3, kept: 2 });
+    const after = await itemsOf(f, weekId, f.leo);
+    expect(after).toHaveLength(5);
+    expect(after.filter((x) => x.startsWith("1:"))).toEqual(["1:exercice"]); // l'exercice validé sur photos
+    expect(after).toContain("2:Lecture 15 min:fait");
+    expect(after.filter((x) => x.startsWith("3:")).sort()).toEqual(["3:Piano", "3:exercice", "3:exercice"]);
+    expect(await itemsOf(f, weekId, f.ines)).toEqual(ines);
+    // Les colonnes de la semaine gardent les anciens jours et prennent les nouveaux.
+    expect((await getWeek(ctx(), f.camilleSession, weekId)).workDays).toEqual([1, 2, 3]);
+    // Un élément gardé n'est pas posé deux fois le même jour.
+    await redoWeek(ctx(), f.camilleSession, weekId, { workDays: [2], children: [{ memberId: f.leo, items: [{ kind: "custom", title: "Lecture 15 min", days: [2] }] }] });
+    expect((await itemsOf(f, weekId, f.leo)).filter((x) => x.startsWith("2:"))).toEqual(["2:Lecture 15 min:fait"]);
+    // Refaire pour un enfant qui n'était pas dans la semaine l'y ajoute.
+    const solo = await prepareWeek(ctx(), f.camilleSession, { weekStart: "2054-11-16", workDays: [1], children: [{ memberId: f.leo, items: [{ kind: "custom", title: "Dessin", days: [1] }] }] });
+    await redoWeek(ctx(), f.camilleSession, solo.weekId, { workDays: [1], children: [{ memberId: f.ines, items: [{ kind: "custom", title: "Chant", days: [1] }] }] });
+    expect((await getWeek(ctx(), f.camilleSession, solo.weekId)).children.map((c) => [c.firstName, c.items.map((i) => i.title)])).toEqual([["Léo", ["Dessin"]], ["Inès", ["Chant"]]]);
+  });
+
+  it("CA 12.2 : sur la semaine en cours, les jours passés ne sont ni proposés ni touchés ; refus hors des règles", async () => {
+    const f = await family();
+    const current = "2054-11-02"; // semaine du jeudi 05/11
+    const { weekId } = await prepareWeek(ctx(), f.camilleSession, { weekStart: current, workDays: [4, 5], children: [{ memberId: f.leo, items: [{ kind: "custom", title: "Lecture 15 min", days: [4, 5] }] }] });
+    // Un élément du lundi, déjà passé, ni coché ni validé : il reste.
+    await db.insertInto("homework_week_items").values({ week_id: weekId, account_id: f.accountId, member_id: f.leo, day: current, custom_title: seal("Poésie") }).execute();
+    const piano = (days: number[]) => [{ memberId: f.leo, items: [{ kind: "custom" as const, title: "Piano", days }] }];
+    expect((await failure(redoWeek(ctx(), f.camilleSession, weekId, { workDays: [1, 2], children: piano([1]) }))).code).toBe("no_day_left");
+    expect((await failure(redoWeek(ctx(), f.camilleSession, weekId, { workDays: [1, 5], children: piano([1]) }))).code).toBe("invalid_day");
+    await redoWeek(ctx(), f.camilleSession, weekId, { workDays: [1, 5], children: piano([5]) });
+    const items = (await getWeek(ctx(), f.camilleSession, weekId)).children[0].items.map((i) => `${i.day}:${i.title}`);
+    expect(items).toEqual(["1:Poésie", "5:Piano"]);
+    // Refus : pas un parent, semaine inconnue, rien à placer, aucun enfant, semaine passée.
+    const nothing = [{ memberId: f.leo, items: [] }];
+    expect((await failure(redoWeek(ctx(), f.elodieSession, weekId, { workDays: [5], children: nothing }))).status).toBe(403);
+    expect((await failure(redoWeek(ctx(), f.camilleSession, "00000000-0000-4000-8000-000000000000", { workDays: [5], children: nothing }))).status).toBe(404);
+    expect((await failure(redoWeek(ctx(), f.camilleSession, weekId, { workDays: [5], children: nothing }))).code).toBe("empty_week");
+    expect((await failure(redoWeek(ctx(), f.camilleSession, weekId, { workDays: [5], children: [] }))).code).toBe("no_child");
+    const past = await db.insertInto("homework_weeks").values({ account_id: f.accountId, week_start: "2054-10-26", work_days: [1] }).returning("id").executeTakeFirstOrThrow();
+    expect((await failure(redoWeek(ctx(), f.camilleSession, past.id, { workDays: [1], children: piano([1]) }))).code).toBe("past_week");
+    // La semaine est intacte après ces refus.
+    expect((await getWeek(ctx(), f.camilleSession, weekId)).children[0].items.map((i) => `${i.day}:${i.title}`)).toEqual(items);
   });
 });

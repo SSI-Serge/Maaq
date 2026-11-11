@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getWeek } from "@/server/assistant/homework/weeks";
+import { getWeek, redoWeek } from "@/server/assistant/homework/weeks";
+import { itemSchema } from "../../schemas";
 import { requireProfile } from "@/server/auth/http";
-import { handler, Rejection } from "@/server/http";
+import { handler, parseBody, Rejection } from "@/server/http";
 
 export const dynamic = "force-dynamic";
 
@@ -17,4 +18,13 @@ export async function weekIdOf(context: { params: Promise<{ id: string }> }): Pr
 export const GET = handler(async (_request: Request, context: { params: Promise<{ id: string }> }) => {
   const { session, ctx } = await requireProfile({ passive: true });
   return NextResponse.json({ week: await getWeek(ctx, session, await weekIdOf(context)) });
+});
+
+const redo = z.object({ workDays: z.array(z.number().int()).max(7), children: z.array(z.object({ memberId: z.uuid(), items: z.array(itemSchema).max(120) })).max(12) });
+
+/** « Refaire » la semaine des enfants choisis (US-119 RF12) : leurs éléments à venir sont remplacés, ce qui est fait est gardé. */
+export const PUT = handler(async (request: Request, context: { params: Promise<{ id: string }> }) => {
+  const { session, ctx } = await requireProfile();
+  const body = await parseBody(request, redo);
+  return NextResponse.json(await redoWeek(ctx, session, await weekIdOf(context), body));
 });

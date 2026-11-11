@@ -6,6 +6,7 @@ import { useApiMutation, useApiQuery } from "@/client/hooks";
 import { AppShell } from "@/components/app/AppShell";
 import { Loading, Notice, RetryNotice } from "@/components/ui";
 import type { WeekChildView, WeekItemView, WeekView } from "@/server/assistant/homework/weeks";
+import { todayLocal } from "./format";
 import { DAY_LONG, DAY_SHORT, DOMAIN_LABEL, dayDate, weekRange, weekTitle } from "./homework-domains";
 import { PhotoPanel } from "./HomeworkPhotoPanel";
 import styles from "./family.module.css";
@@ -129,6 +130,12 @@ function ChildWeek({ weekView, child, answers, onChanged }: { weekView: WeekView
       {mutation.error && <Notice tone="error">{mutation.error.kind === "server" ? "La modification n'a pas pu être enregistrée." : mutation.error.message}</Notice>}
       <p className={styles.hint}>Une case cochée compte comme « fait ». Envoyez une photo du travail pour que les progrès soient notés.</p>
       <PhotoPanel weekId={weekView.id} child={child} onDone={onChanged} />
+      {/* Refaire la semaine de cet enfant seul (US-119 RF12) : ses devoirs à venir sont remplacés, ce qui est fait est gardé. Une semaine passée ne se refait plus. */}
+      {weekView.weekEnd >= todayLocal() && (
+        <Link href={`/assistant/devoirs/preparer?refaire=${weekView.id}&enfant=${child.memberId}`} className={styles.link}>
+          Refaire la semaine de {child.firstName} ›
+        </Link>
+      )}
       {zoom?.card && (
         <div className={week.lightbox} role="dialog" aria-modal="true" aria-label={`Carte : ${zoom.title}`} onClick={() => setZoom(null)}>
           {/* eslint-disable-next-line @next/next/no-img-element */}

@@ -377,6 +377,62 @@ export async function prepareWeek(ctx: Ctx, session: SessionContext, input: Week
   }
 }
 
+/**
+ * « Refaire » la semaine d'un ou de plusieurs enfants (US-119 RF12, S-55). Leurs éléments des jours à venir sont remplacés par les nouveaux choix ; ce qui est fait (case
+ * cochée), validé sur photos ou d'un jour déjà passé reste. Les autres enfants de la semaine ne changent pas. Sur la semaine en cours, seuls aujourd'hui et les jours suivants
+ * sont des jours de travail. Tout est écrit en une seule transaction : en cas d'échec, la semaine reste comme elle était.
+ */
+export async function redoWeek(ctx: Ctx, session: SessionContext, weekId: string, input: Omit<WeekInput, "weekStart">): Promise<PreparedWeek & { replaced: number; kept: number }> {
+  const v = await viewerOf(ctx, session);
+  const week = await ctx.db.selectFrom("homework_weeks").select(["id", sql<string>`week_start::text`.as("start"), "work_days"]).where("id", "=", weekId).where("account_id", "=", v.accountId).executeTakeFirst();
+  if (!week) throw fail("not_found", "Cette semaine n'existe plus ou ne vous est pas accessible.", 404);
+  if (week.start < mondayOf(v.today)) throw fail("past_week", "Cette semaine est passée : elle ne se refait plus.");
+  if (!validDays(input.workDays)) throw fail("invalid_days", "Choisissez au moins un jour de travail.");
+  const workDays = remainingDays(week.start, input.workDays, v.today);
+  if (!workDays.length) throw fail("no_day_left", "Les jours choisis sont déjà passés : choisissez un jour à venir.");
+  if (!input.children.length) throw fail("no_child", "Choisissez au moins un enfant.");
+  if (new Set(input.children.map((c) => c.memberId)).size !== input.children.length) throw fail("duplicate_child", "Un enfant ne figure qu'une fois dans la semaine.");
+  const planned: { memberId: string; items: PlannedItem[]; foreign: string[] }[] = [];
+  for (const c of input.children) {
+    const result = await planItems(ctx.db, v.accountId, week.start, workDays, c, week.id);
+    if (result.items.length > MAX_ITEMS_PER_CHILD) throw fail("too_many_items", `Une semaine compte au plus ${MAX_ITEMS_PER_CHILD} éléments par enfant.`);
+    planned.push({ memberId: c.memberId, ...result });
+  }
+  if (!planned.some((p) => p.items.length)) throw fail("empty_week", "Placez au moins un élément dans la semaine.");
+  try {
+    return await ctx.db.transaction().execute(async (trx) => {
+      let replaced = 0;
+      let kept = 0;
+      for (const p of planned) {
+        // Remplacés : les éléments d'aujourd'hui et des jours suivants, ni cochés ni validés sur photos.
+        const gone = await trx
+          .deleteFrom("homework_week_items")
+          .where("week_id", "=", week.id)
+          .where("member_id", "=", p.memberId)
+          .where(sql<boolean>`day >= ${v.today}::date`)
+          .where("checked_at", "is", null)
+          .where(sql<boolean>`not exists (select 1 from homework_exercise_validations hv where hv.member_id = homework_week_items.member_id and hv.exercise_id = homework_week_items.exercise_id)`)
+          .executeTakeFirst();
+        replaced += Number(gone.numDeletedRows);
+        const rest = await trx.selectFrom("homework_week_items").select([sql<string>`day::text`.as("day"), "exercise_id", "activity_id", "custom_title"]).where("week_id", "=", week.id).where("member_id", "=", p.memberId).execute();
+        kept += rest.length;
+        // Un élément gardé (fait ou validé) n'est pas posé une seconde fois le même jour.
+        const there = new Set(rest.map((r) => `${r.day}|${r.exercise_id ? `e${r.exercise_id}` : r.activity_id ? `a${r.activity_id}` : `c${open(r.custom_title!).toLowerCase()}`}`));
+        const fresh = p.items.filter((i) => !there.has(`${i.day}|${i.exerciseId ? `e${i.exerciseId}` : i.activityId ? `a${i.activityId}` : `c${i.customTitle!.toLowerCase()}`}`));
+        const already = new Set((await trx.selectFrom("homework_week_foreign_books").select("textbook_key").where("week_id", "=", week.id).where("member_id", "=", p.memberId).execute()).map((b) => b.textbook_key));
+        for (const book of p.foreign) if (!already.has(book)) await trx.insertInto("homework_week_foreign_books").values({ week_id: week.id, account_id: v.accountId, member_id: p.memberId, textbook_key: book }).execute();
+        await insertItems(trx, v.accountId, week.id, fresh);
+      }
+      // Les colonnes de l'écran couvrent les anciens jours de travail et les nouveaux.
+      const days = [...new Set([...week.work_days, ...workDays])].sort((a, b) => a - b);
+      await trx.updateTable("homework_weeks").set({ work_days: days }).where("id", "=", week.id).execute();
+      return { weekId: week.id, replaced, kept };
+    });
+  } catch (error) {
+    throw translateItem(error);
+  }
+}
+
 /** La carte « Préparer la semaine de devoirs » n'apparaît pas si une semaine est déjà préparée pour la semaine de l'échéance (RF1, CA 1.2). */
 export async function weekPreparedFor(db: Db, accountId: string, day: string): Promise<boolean> {
   const row = await db.selectFrom("homework_weeks").select("id").where("account_id", "=", accountId).where(sql<boolean>`week_start = ${mondayOf(day)}::date`).executeTakeFirst();
