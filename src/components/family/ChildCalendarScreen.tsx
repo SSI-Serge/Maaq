@@ -33,7 +33,7 @@ export function ChildCalendarScreen() {
 
   const loading = (tasks.loading && !tasks.data) || (events.loading && !events.data);
   return (
-    <AppShell title="Mon calendrier" subtitle="Tes tâches et tes rendez-vous." back={{ href: "/assistant/devoirs/tache", label: "Mes devoirs" }}>
+    <AppShell title="Mon calendrier" subtitle="Tes tâches et tes rendez-vous." back={{ href: "/accueil", label: "Accueil" }}>
       {loading && <Loading slow={tasks.slow || events.slow} />}
       {tasks.error && <RetryNotice message={tasks.error.kind === "server" ? "Tes tâches n'ont pas pu être chargées." : tasks.error.message} onRetry={tasks.reload} />}
       {events.error && <RetryNotice message={events.error.kind === "server" ? "Tes rendez-vous n'ont pas pu être chargés." : events.error.message} onRetry={events.reload} />}

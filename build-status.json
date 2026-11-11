@@ -3,8 +3,16 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-11T13:40:00.000Z",
+  "updated": "2026-11-11T14:15:00.000Z",
   "deploys": [
+    {
+      "at": "2026-11-11T14:15:00.000Z",
+      "env": "preview",
+      "what": "Aide Devoirs : pour l'enfant, l'onglet « Calendrier » ouvre « Mon calendrier », et un bouton « Mon calendrier » est sur son accueil. Rév. 00113. Suite complète verte (1334 essais). Pas de changement de base. Écrans non vus : le PO teste.",
+      "storyIds": [
+        "f16s126"
+      ]
+    },
     {
       "at": "2026-11-11T13:40:00.000Z",
       "env": "preview",

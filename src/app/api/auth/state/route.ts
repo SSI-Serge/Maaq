@@ -4,6 +4,7 @@ import { pendingAcceptance } from "@/server/compliance/legal";
 import { accessRemoved, ctx, currentSession, isUnlocked, readPending } from "@/server/auth/http";
 import { homeFor } from "@/server/auth/service";
 import { handler } from "@/server/http";
+import { isChildProfile } from "@/server/assistant/profile-member";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +33,8 @@ export const GET = handler(async () => {
       maskedEmail: maskEmail(session.user.email),
       role: session.user.role,
       guestRank: session.user.guestRank,
+      // Profil d'un enfant, relié à sa fiche (D73) : son onglet « Calendrier » ouvre « Mon calendrier » (S-54).
+      childProfile: session.user.guestRank === "secondary" ? await isChildProfile(context.db, session.user.id) : false,
     },
     device: { hasPattern: session.device.hasPattern, patternLocked: session.device.patternLocked },
     home,

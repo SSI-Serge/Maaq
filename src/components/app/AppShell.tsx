@@ -114,8 +114,10 @@ export function AppShell({
       <nav className={styles.tabs} aria-label="Navigation principale">
         {tabs.map((tab) => {
           const active = [tab.href, ...(tab.alsoActiveOn ?? [])].some((prefix) => pathname.startsWith(prefix));
+          // Pour le profil d'un enfant, l'onglet « Calendrier » ouvre « Mon calendrier » (S-54).
+          const href = tab.href === "/calendrier" && user.childProfile ? "/calendrier/moi" : tab.href;
           return (
-            <Link key={tab.href} href={tab.href} className={`${styles.tab} ${active ? styles.tabActive : ""}`} aria-current={active ? "page" : undefined}>
+            <Link key={tab.href} href={href} className={`${styles.tab} ${active ? styles.tabActive : ""}`} aria-current={active ? "page" : undefined}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
                 {tab.icon}
               </svg>

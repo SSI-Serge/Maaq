@@ -65,6 +65,11 @@ export default function DashboardPage() {
           <Link href="/catalogue" className={s.smallButton} style={{ marginTop: 6 }}>
             Catalogue
           </Link>
+        ) : dashboard.data?.catalogClosed ? (
+          // L'enfant retrouve ses tâches et ses RDV d'ici, même un jour sans devoirs (S-54).
+          <Link href="/calendrier/moi" className={s.smallButton} style={{ marginTop: 6, background: "var(--primary)", color: "var(--primary-ink)", padding: "10px 14px", borderRadius: 8, fontSize: 14 }}>
+            Mon calendrier
+          </Link>
         ) : undefined
       }
     >

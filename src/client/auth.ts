@@ -10,7 +10,7 @@ export type AuthState =
   | {
       authenticated: true;
       unlocked: boolean;
-      user: { firstName: string; maskedEmail: string; role: "admin" | "primary_user" | "guest"; guestRank: "core" | "secondary" | null };
+      user: { firstName: string; maskedEmail: string; role: "admin" | "primary_user" | "guest"; guestRank: "core" | "secondary" | null; childProfile?: boolean };
       device: { hasPattern: boolean; patternLocked: boolean };
       home: string;
       /** Présent quand `home` est « Découvrir MAAQ » : la destination suivante, si l'écran ne peut pas être enregistré comme vu (US-140 RF8). */
