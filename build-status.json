@@ -3,8 +3,17 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-11T22:00:11.000Z",
+  "updated": "2026-11-11T22:14:25.000Z",
   "deploys": [
+    {
+      "at": "2026-11-11T22:14:25.000Z",
+      "env": "preview",
+      "what": "Aide Devoirs, retouches selon la maquette v85 : « Mon calendrier » (« Tâche à faire » ou « Tâche faite », « Mes devoirs du jour » seulement aujourd'hui), retour d'une semaine vers l'écran d'origine. Rév. 00118. Suite complète verte (1340 essais). Pas de changement de base. Écrans non vus : le PO teste.",
+      "storyIds": [
+        "f16s114",
+        "f16s127"
+      ]
+    },
     {
       "at": "2026-11-11T22:00:11.000Z",
       "env": "preview",
