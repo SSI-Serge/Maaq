@@ -319,6 +319,8 @@ export async function addAgent(ctx: Ctx, session: SessionContext, agentId: strin
  */
 export async function removeAgent(ctx: Ctx, session: SessionContext, agentId: string): Promise<void> {
   requireProfileWithDashboard(session);
+  // Le catalogue est fermé au profil d'un enfant : il ne retire pas un agent qu'il ne pourrait pas remettre (S-53).
+  await refuseChildCatalog(ctx.db, session.user.id);
   const request = await ctx.db.transaction().execute(async (trx) => {
     const removed = await trx
       .updateTable("profile_agents")

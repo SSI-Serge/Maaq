@@ -3,8 +3,17 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-11T12:55:00.000Z",
+  "updated": "2026-11-11T13:40:00.000Z",
   "deploys": [
+    {
+      "at": "2026-11-11T13:40:00.000Z",
+      "env": "preview",
+      "what": "Aide Devoirs, lot 4 : « Mon calendrier » de l'enfant (bouton à côté de « Bonjour [prénom] ! », sept jours, tâches et RDV de l'enfant), et l'enfant ne peut plus retirer un agent de son accueil. Rév. 00112. Suite complète verte (1334 essais). Pas de changement de base. Écran non vu, codé avant la publication de la maquette : le PO teste.",
+      "storyIds": [
+        "f16s126",
+        "f16s123"
+      ]
+    },
     {
       "at": "2026-11-11T12:55:00.000Z",
       "env": "preview",
@@ -2439,6 +2448,18 @@
             "Jamais essayé avec le vrai modèle : seule une réponse simulée a été contrôlée.",
             "Écrans jamais vus : le PO les teste.",
             "La justesse des questions n'est pas contrôlée par le code, seulement la forme de la page.",
+            "Rien en pilote avant la réponse du DPO."
+          ]
+        },
+        {
+          "id": "f16s126",
+          "title": "Ouvrir « Mon calendrier » avec le profil d'un enfant",
+          "state": "testing",
+          "env": "preview",
+          "at": "2026-11-11T13:40:00.000Z",
+          "note": "Sept jours à partir d'aujourd'hui, grandes cartes : ses tâches (il coche les siennes, pas la tâche des devoirs) et les RDV où il est nommé.",
+          "unsure": [
+            "Écran jamais vu, codé d'après la description : la maquette n'était pas encore publiée.",
             "Rien en pilote avant la réponse du DPO."
           ]
         }

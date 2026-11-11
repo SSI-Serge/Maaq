@@ -2,7 +2,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { sql, type Kysely } from "kysely";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { STATUS_CODE, TYPE_CODE } from "@/server/assistant/calendar";
-import { listUpcoming } from "@/server/assistant/events";
+import { listEvents, listUpcoming } from "@/server/assistant/events";
 import { addChild, familyOverview, setChildProfile } from "@/server/assistant/family";
 import { seal } from "@/server/assistant/fields";
 import { loadHomeworkCatalog } from "@/server/assistant/homework/catalog";
@@ -10,7 +10,7 @@ import { getHomeworkSetting, setHomeworkAge, setHomeworkDays, setHomeworkEnabled
 import { childOptions, getWeek, homeworkToday, listWeeks, prepareWeek, remainingDays, setItemChecked } from "@/server/assistant/homework/weeks";
 import { profileMember } from "@/server/assistant/profile-member";
 import { sendAssistantMessage } from "@/server/assistant/service";
-import { assignTask, createTask, listTasks, setTaskDone, updateTask, type NewTask, type TaskView } from "@/server/assistant/tasks";
+import { assignTask, createTask, listTasks, listTasksBetween, setTaskDone, updateTask, type NewTask, type TaskView } from "@/server/assistant/tasks";
 import type { Ctx } from "@/server/auth/service";
 import type { DB } from "@/server/db/schema.generated";
 import { Rejection } from "@/server/http";
@@ -219,6 +219,16 @@ describe("profil de l'enfant (D73 S-38 à S-49)", () => {
     expect(await upcomingTitles(f.elodieSession)).toEqual(["Judo de Léo"]);
     expect(await upcomingTitles(f.noeSession)).toEqual(["Repas de famille"]);
     expect(await upcomingTitles(f.camilleSession)).toEqual(["Danse de Mia", "Judo de Léo", "Repas de famille"]);
+    // S-54 : les vues du calendrier (mois, jour, « Mon calendrier ») lisent la même période : l'enfant n'y trouve que son RDV et ses tâches.
+    await createTask(ctx(), f.camilleSession, prepInput());
+    const own = await createTask(ctx(), f.camilleSession, { title: "Mettre la table", due: "2054-11-07", assigneeId: f.leo });
+    await createTask(ctx(), f.camilleSession, { title: "Payer la cantine", due: "2054-11-07", assigneeId: f.member });
+    const month = { from: "2054-11-01", to: "2054-11-30" };
+    expect((await listEvents(ctx(), f.elodieSession, month)).map((e) => e.title)).toEqual(["Judo de Léo"]);
+    expect((await listEvents(ctx(), f.camilleSession, month)).map((e) => e.title).sort()).toEqual(["Danse de Mia", "Judo de Léo", "Repas de famille"]);
+    const day = await listTasksBetween(ctx(), f.elodieSession, { from: "2054-11-06", to: "2054-11-07" });
+    expect(day.map((t) => [t.title, t.due, t.can.check])).toEqual([["Préparer les devoirs", "2054-11-06", false], ["Mettre la table", "2054-11-07", true]]);
+    expect((await setTaskDone(ctx(), f.elodieSession, own.id, true)).doneBy).toBe("Léo");
     // La base applique la même règle (fonction de visibilité).
     const { rows } = await sql<{ n: number }>`select count(*)::int as n from family_events_visible_to(${f.users.elodie}::uuid)`.execute(db);
     expect(rows[0].n).toBe(1);

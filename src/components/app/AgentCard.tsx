@@ -73,9 +73,11 @@ export function AgentCard({ agent, origin, onRemoved }: { agent: DashboardAgent;
             </Link>
           )}
         </div>
-        <button className={`${s.smallButton} ${s.danger}`} onClick={() => setConfirming(true)}>
-          Retirer
-        </button>
+        {!agent.chatClosed && (
+          <button className={`${s.smallButton} ${s.danger}`} onClick={() => setConfirming(true)}>
+            Retirer
+          </button>
+        )}
       </div>
       {confirming && (
         <ConfirmDialog

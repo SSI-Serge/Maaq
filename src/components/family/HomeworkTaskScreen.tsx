@@ -156,7 +156,16 @@ export function HomeworkTaskScreen({ taskId }: { taskId: string | null }) {
 
       {data?.role === "child" && (
         <>
-          <div style={{ fontFamily: "var(--font-serif, 'Newsreader', serif)", fontSize: 24 }}>Bonjour {data.firstName} !</div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+            <div style={{ fontFamily: "var(--font-serif, 'Newsreader', serif)", fontSize: 24 }}>Bonjour {data.firstName} !</div>
+            <Link href="/calendrier/moi" className={sheet.big} style={{ minHeight: 52, fontSize: 15, padding: "0 14px" }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+                <rect x="4" y="5" width="16" height="15" rx="2" />
+                <path d="M4 10h16M9 3v4M15 3v4" />
+              </svg>
+              Mon calendrier
+            </Link>
+          </div>
           <div className={styles.form}>
             <div style={{ fontSize: 15, fontWeight: 700 }}>Aujourd&apos;hui</div>
             {data.items.length === 0 && <span style={{ fontSize: 16 }}>Rien de prévu aujourd&apos;hui.</span>}
