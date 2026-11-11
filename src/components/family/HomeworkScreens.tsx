@@ -6,7 +6,7 @@ import { AppShell } from "@/components/app/AppShell";
 import { Loading, Notice, RetryNotice } from "@/components/ui";
 import type { HomeworkSetting } from "@/server/assistant/homework/settings";
 import type { WeekSummary } from "@/server/assistant/homework/weeks";
-import { weekTitle } from "./homework-domains";
+import { weekHref, weekTitle } from "./homework-domains";
 import styles from "./family.module.css";
 
 const WEEKDAY_NAMES = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"];
@@ -32,7 +32,7 @@ export function HistoryList({ weeks, today }: { weeks: WeekSummary[]; today: str
             const current = !past && w.weekStart <= today;
             const days = past ? "" : w.workDays.map((d) => WEEKDAY_NAMES[d - 1]).join(", ");
             return (
-              <Link key={w.id} href={`/assistant/devoirs/${w.id}`} className={styles.linkRow}>
+              <Link key={w.id} href={weekHref(w.id, null, true)} className={styles.linkRow}>
                 <span>
                   {weekTitle(w.weekStart)}
                   <span className={styles.linkRowSub}>{[names(w.children), days].filter(Boolean).join(" · ")}</span>
@@ -71,10 +71,15 @@ export function HomeworkListScreen({ from }: { from: "tache" | "reglages" }) {
       )}
       {data && enabled !== false && (
         <>
-          <p className={styles.hint}>Les semaines préparées, de la plus récente à la plus ancienne. Pour préparer une semaine, passez par la tâche « Préparer les devoirs ».</p>
-          {data.weeks.length === 0 && <p className={styles.hint}>Aucune semaine préparée pour le moment.</p>}
-          <HistoryList weeks={data.weeks} today={data.today} />
-          <p className={styles.hint}>Les semaines sont gardées 12 mois.</p>
+          {data.weeks.length === 0 ? (
+            <Notice tone="info">Aucune semaine préparée pour le moment.</Notice>
+          ) : (
+            <>
+              <p className={styles.hint}>Les semaines préparées, de la plus récente à la plus ancienne. Pour préparer une semaine, passez par la tâche « Préparer les devoirs ».</p>
+              <HistoryList weeks={data.weeks} today={data.today} />
+              <p className={styles.hint}>Les semaines sont gardées 12 mois.</p>
+            </>
+          )}
         </>
       )}
     </AppShell>

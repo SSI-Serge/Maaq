@@ -465,6 +465,9 @@ describe("alignement sur les maquettes v83 (S-52, S-54)", () => {
     expect(html.indexOf("À venir et en cours")).toBeGreaterThan(-1);
     expect(html.indexOf("Semaines passées")).toBeGreaterThan(html.indexOf("À venir et en cours"));
     expect(html).toContain("Semaine du 16 novembre");
+    // Ouverte depuis l'historique, la semaine y revient.
+    expect(html).toContain('href="/assistant/devoirs/a?retour=historique"');
+    expect(weekHref("a", "m", true)).toBe("/assistant/devoirs/a?enfant=m&retour=historique");
     expect(html).toMatch(/Semaine du 16 novembre.*?Inès et Léo · lundi, mardi.*?>À venir</s);
     expect(html).toMatch(/Semaine du 9 novembre.*?>En cours</s);
     // Une semaine passée : ni jours, ni pastille.
@@ -496,14 +499,18 @@ describe("alignement sur les maquettes v83 (S-52, S-54)", () => {
     expect(order).toEqual([...order].sort((a, b) => a - b));
     expect(html).toContain("8h30");
     expect(html).toContain("18h15");
-    expect(html).toContain("dans la journée");
+    expect(html).not.toContain("dans la journée");
+    expect(html).toContain("Tâche à faire");
+    expect(html).toContain("Tâche faite");
     expect(html).toContain("Rendez-vous");
-    expect(html).toContain("Mes devoirs du jour ›");
+    // « Mes devoirs du jour › » seulement aujourd'hui.
+    expect(html.match(/Mes devoirs du jour ›/g)).toHaveLength(1);
+    expect(renderToStaticMarkup(createElement(ChildCalendarDays, { days: ["2026-11-11", "2026-11-12"], busy: false, onToggle: () => undefined, tasks: [task("1", "Préparer les devoirs", "17:00", "todo", true)] as never, events: [] }))).not.toContain("Mes devoirs du jour");
     // Le RDV n'ouvre rien ; la tâche des devoirs ouvre son écran ; les autres tâches se cochent.
     expect(html).not.toContain("/calendrier/rdv/");
     expect(html).toContain('href="/assistant/devoirs/tache?tache=1"');
     expect(html.match(/role="checkbox"/g)).toHaveLength(2);
-    expect(html).toMatch(/aria-checked="true"[^>]*>.*?✓.*?line-through[^>]*>Ranger ma chambre/s);
+    expect(html).toMatch(/aria-checked="true"[^>]*>.*?✓.*?line-through[^>]*>Ranger ma chambre.*?Tâche faite/s);
     expect(html.match(/✓/g)).toHaveLength(1);
   });
 });

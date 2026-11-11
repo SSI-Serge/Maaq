@@ -12,9 +12,10 @@ import { addDays, clock, dayOf, longDate, timeOf, todayLocal } from "./format";
 const GOLD = "var(--secondary)";
 const BLUE = "#3F6B8A";
 const card = (border: string) =>
-  ({ display: "flex", alignItems: "center", gap: 14, minHeight: 72, padding: "12px 14px", borderRadius: 14, background: "var(--bg-raised)", border: `2px solid ${border}`, color: "var(--ink)", textDecoration: "none", textAlign: "left", width: "100%", font: "inherit" }) as const;
+  ({ display: "flex", flexDirection: "column", justifyContent: "center", gap: 6, minHeight: 72, padding: "12px 14px", borderRadius: 14, background: "var(--bg-raised)", border: `2px solid ${border}`, color: "var(--ink)", textDecoration: "none", textAlign: "left", width: "100%", font: "inherit" }) as const;
 const icon = (color: string, filled: boolean) =>
-  ({ width: 40, height: 40, borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 700, color: "#fff", border: `2px solid ${color}`, background: filled ? color : "transparent" }) as const;
+  ({ width: 36, height: 36, boxSizing: "border-box", borderRadius: "50%", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 700, color: "#fff", border: `3px solid ${color}`, background: filled ? color : "transparent" }) as const;
+const line = { display: "flex", alignItems: "center", gap: 14, width: "100%" } as const;
 const titleStyle = { display: "block", fontSize: 17, fontWeight: 700 } as const;
 const sub = { display: "block", fontSize: 14, fontWeight: 400, color: "var(--ink-soft)" } as const;
 const time = { fontSize: 16, fontWeight: 700 } as const;
@@ -41,14 +42,14 @@ export function ChildCalendarDays({ days, tasks, events, busy, onToggle }: { day
               at: e.allDay ? "00:00" : timeOf(e.start),
               node: (
                 <div style={card(BLUE)}>
-                  <span style={icon(BLUE, true)} aria-hidden>
-                    ●
+                  <span style={line}>
+                    <span style={icon(BLUE, true)} aria-hidden />
+                    <span style={{ flex: 1 }}>
+                      <span style={titleStyle}>{e.title}</span>
+                      <span style={sub}>Rendez-vous</span>
+                    </span>
+                    <span style={time}>{e.allDay ? "toute la journée" : clock(e.start)}</span>
                   </span>
-                  <span style={{ flex: 1 }}>
-                    <span style={titleStyle}>{e.title}</span>
-                    <span style={sub}>Rendez-vous</span>
-                  </span>
-                  <span style={time}>{e.allDay ? "toute la journée" : clock(e.start)}</span>
                 </div>
               ),
             })),
@@ -57,24 +58,30 @@ export function ChildCalendarDays({ days, tasks, events, busy, onToggle }: { day
             .map((t) => {
               const done = t.status === "done";
               const body = (
-                <>
+                <span style={line}>
                   <span style={icon(GOLD, done)} aria-hidden>
                     {done ? "✓" : ""}
                   </span>
                   <span style={{ flex: 1 }}>
-                    <span style={{ ...titleStyle, textDecoration: done ? "line-through" : undefined }}>{t.title}</span>
-                    <span style={sub}>{t.isHomeworkPrep ? "Mes devoirs du jour ›" : "Tâche"}</span>
+                    <span style={{ ...titleStyle, ...(done ? { textDecoration: "line-through", color: "var(--ink-soft)" } : {}) }}>{t.title}</span>
+                    <span style={sub}>{done ? "Tâche faite" : "Tâche à faire"}</span>
                   </span>
-                  <span style={time}>{t.dueTime ? clock(`0000-00-00T${t.dueTime}`) : "dans la journée"}</span>
-                </>
+                  {t.dueTime && <span style={time}>{clock(`0000-00-00T${t.dueTime}`)}</span>}
+                </span>
               );
               return {
                 key: `t${t.id}`,
                 at: t.dueTime ? t.dueTime.slice(0, 5) : "99:99",
+                // La tâche des devoirs ne se coche pas ici : aujourd'hui, « Mes devoirs du jour › » ouvre son écran (S-40).
                 node: t.isHomeworkPrep ? (
-                  <Link href={`/assistant/devoirs/tache?tache=${t.id}`} style={card("var(--line)")}>
+                  <div style={card("var(--line)")}>
                     {body}
-                  </Link>
+                    {i === 0 && (
+                      <Link href={`/assistant/devoirs/tache?tache=${t.id}`} style={{ alignSelf: "flex-start", marginLeft: 50, fontSize: 15, fontWeight: 700, color: "var(--primary)", textDecoration: "none" }}>
+                        Mes devoirs du jour ›
+                      </Link>
+                    )}
+                  </div>
                 ) : (
                   <button type="button" role="checkbox" aria-checked={done} disabled={!t.can.check || busy} onClick={() => onToggle(t)} style={{ ...card("var(--line)"), cursor: t.can.check ? "pointer" : "default" }}>
                     {body}
@@ -116,7 +123,7 @@ export function ChildCalendarScreen() {
 
   const loading = (tasks.loading && !tasks.data) || (events.loading && !events.data);
   return (
-    <AppShell title="Mon calendrier" subtitle="Tes tâches et tes rendez-vous." back={{ href: "/accueil", label: "Accueil" }}>
+    <AppShell title="Mon calendrier" subtitle="Tes tâches et tes rendez-vous, sur 7 jours." back={{ href: "/accueil", label: "Accueil" }}>
       {loading && <Loading slow={tasks.slow || events.slow} />}
       {tasks.error && <RetryNotice message={tasks.error.kind === "server" ? "Tes tâches n'ont pas pu être chargées." : tasks.error.message} onRetry={tasks.reload} />}
       {events.error && <RetryNotice message={events.error.kind === "server" ? "Tes rendez-vous n'ont pas pu être chargés." : events.error.message} onRetry={events.reload} />}

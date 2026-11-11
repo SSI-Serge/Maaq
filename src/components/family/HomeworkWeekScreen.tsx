@@ -13,7 +13,6 @@ import { PhotoPanel } from "./HomeworkPhotoPanel";
 import styles from "./family.module.css";
 import week from "./homework-week.module.css";
 
-const BACK = { href: "/assistant/devoirs?retour=tache", label: "Semaines de devoirs" };
 const DAYS = [1, 2, 3, 4, 5, 6, 7];
 
 /**
@@ -21,7 +20,9 @@ const DAYS = [1, 2, 3, 4, 5, 6, 7];
  * (sans valider : seules les photos valident, RF6), on déplace un élément d'un jour à l'autre, on en retire, on en ajoute dans un jour, on affiche les corrigés, on imprime.
  * Aucun compteur ni barre de progression (AT-9).
  */
-export function HomeworkWeekScreen({ id, childId = null }: { id: string; childId?: string | null }) {
+export function HomeworkWeekScreen({ id, childId = null, fromHistory = false }: { id: string; childId?: string | null; fromHistory?: boolean }) {
+  // Le retour mène à l'écran d'origine : l'historique « Devoirs », sinon la tâche « Préparer les devoirs ».
+  const BACK = fromHistory ? { href: "/assistant/devoirs?retour=tache", label: "Devoirs" } : { href: "/assistant/devoirs/tache", label: "Préparer les devoirs" };
   const query = useApiQuery<{ week: WeekView }>(`/api/family/homework/weeks/${id}`);
   const data = query.data?.week;
   const gone = query.error?.body?.code === "not_found";
@@ -30,7 +31,7 @@ export function HomeworkWeekScreen({ id, childId = null }: { id: string; childId
   const [child, setChildState] = useState<string | null>(childId);
   const setChild = (memberId: string) => {
     setChildState(memberId);
-    router.replace(weekHref(id, memberId), { scroll: false });
+    router.replace(weekHref(id, memberId, fromHistory), { scroll: false });
   };
   const [answers, setAnswers] = useState(false);
   const current = data ? childOfWeek(data.children, child) : undefined;
