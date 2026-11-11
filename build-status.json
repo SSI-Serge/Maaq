@@ -3,8 +3,17 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-11T11:35:00.000Z",
+  "updated": "2026-11-11T12:55:00.000Z",
   "deploys": [
+    {
+      "at": "2026-11-11T12:55:00.000Z",
+      "env": "preview",
+      "what": "Aide Devoirs, lot 3 : l'écran « Devoirs » devient l'historique des semaines préparées (ouvert depuis les réglages et depuis la tâche) ; le catalogue des agents est fermé au profil d'un enfant. Rév. 00111. Suite complète verte (1334 essais). Pas de changement de base. Écrans non vus : le PO teste.",
+      "storyIds": [
+        "f16s114",
+        "f16s123"
+      ]
+    },
     {
       "at": "2026-11-11T11:35:00.000Z",
       "env": "preview",
