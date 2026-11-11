@@ -42,6 +42,8 @@ export function HomeworkTaskScreen({ taskId }: { taskId: string | null }) {
   const all = lists.data ? [...lists.data.lists.overdue, ...lists.data.lists.today, ...lists.data.lists.upcoming, ...lists.data.lists.done] : [];
   // La tâche ouverte depuis la liste ; sinon celle d'aujourd'hui.
   const task: TaskView | undefined = all.find((t) => t.id === taskId) ?? all.find((t) => t.isHomeworkPrep && t.due === lists.data?.lists.todayDate);
+  // « Changer l'heure » modifie la série : une tâche déjà cochée ne se modifie plus, le lien ouvre alors la prochaine occurrence à faire.
+  const timeTask = task?.status === "todo" ? task : all.find((t) => t.isHomeworkPrep && t.status === "todo" && t.due >= (lists.data?.lists.todayDate ?? ""));
   const disabled = today.error?.body?.code === "homework_disabled";
   const forbidden = today.error?.body?.code === "forbidden";
   const child = data?.role === "child";
@@ -65,6 +67,11 @@ export function HomeworkTaskScreen({ taskId }: { taskId: string | null }) {
             {task?.dueTime ? ` · ${dueTimeLabel(task.dueTime)}` : ""} · les jours de devoirs : {data.days.map((d) => WEEKDAY_NAMES[d - 1]).join(", ")}. Tâche du foyer
             {data.children.some((c) => c.hasProfile) ? `, visible aussi par ${data.children.filter((c) => c.hasProfile).map((c) => c.firstName).join(" et ")}, qui ${data.children.filter((c) => c.hasProfile).length > 1 ? "ont leur profil" : "a son profil"}.` : "."}
           </p>
+          {timeTask && (
+            <Link href={`/assistant/taches/${timeTask.id}`} className={styles.link}>
+              Changer l&apos;heure de la tâche ›
+            </Link>
+          )}
           {task && (
             <label className={styles.taskRow} style={{ alignItems: "center", gap: 10 }}>
               <input type="checkbox" className={styles.taskCheck} checked={task.status === "done"} disabled={!task.can.check || check.pending} onChange={(e) => void toggle(e.target.checked)} />
@@ -81,6 +88,9 @@ export function HomeworkTaskScreen({ taskId }: { taskId: string | null }) {
             Préparer les devoirs
           </Link>
           <p className={styles.hint}>La semaine en cours ou une des 4 suivantes, pour tous les enfants à la fois.</p>
+          <Link href="/assistant/devoirs?retour=tache" className={styles.link}>
+            Semaines passées ›
+          </Link>
 
           <Section title="Planning du jour">
             {data.children.length === 0 && (
@@ -116,9 +126,6 @@ export function HomeworkTaskScreen({ taskId }: { taskId: string | null }) {
               </div>
             ))}
           </Section>
-          <Link href="/assistant/devoirs?retour=tache" className={styles.link}>
-            Semaines passées ›
-          </Link>
           <Section title="Exercices">
             <Link href="/assistant/devoirs/exercices" className={styles.linkRow}>
               <span>Dossier « Exercices »</span>
@@ -128,11 +135,6 @@ export function HomeworkTaskScreen({ taskId }: { taskId: string | null }) {
               Créer des exercices à partir d&apos;une leçon
             </button>
           </Section>
-          {task && task.status === "todo" && (
-            <Link href={`/assistant/taches/${task.id}`} className={styles.link}>
-              Changer l&apos;heure de la tâche ›
-            </Link>
-          )}
           {picking && (
             <div style={{ position: "fixed", inset: 0, zIndex: 50, background: "rgba(43, 33, 31, 0.5)", display: "flex", flexDirection: "column", justifyContent: "flex-end" }}>
               <div role="dialog" aria-modal="true" aria-label="Pour quel enfant ?" className={styles.form} style={{ background: "var(--bg-raised)", borderRadius: "16px 16px 0 0" }}>

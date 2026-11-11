@@ -80,7 +80,8 @@ export function AppShell({
 }: {
   title: string;
   subtitle?: ReactNode;
-  back?: { href: string; label: string };
+  /** `close` : une croix qui ferme un parcours (préparer ou refaire la semaine), à la place de la flèche de retour. */
+  back?: { href: string; label: string; close?: boolean };
   action?: ReactNode;
   /** Surtitre en police mono majuscule au-dessus du titre (semaine de devoirs) : donne aussi au titre sa forme italique et un filet d'accent. */
   eyebrow?: string;
@@ -99,7 +100,7 @@ export function AppShell({
       <header className={styles.header}>
         {back && (
           <Link href={back.href} className={styles.back}>
-            ‹ {back.label}
+            {back.close ? "✕" : "‹"} {back.label}
           </Link>
         )}
         {eyebrow && <div className={styles.eyebrow}>{eyebrow}</div>}

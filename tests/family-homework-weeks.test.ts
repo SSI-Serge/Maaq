@@ -1,3 +1,5 @@
+import { HistoryList } from "@/components/family/HomeworkScreens";
+import { ChildCalendarDays } from "@/components/family/ChildCalendarScreen";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { WeekPages } from "@/components/family/HomeworkWeekScreen";
@@ -446,5 +448,62 @@ describe("la page d'un enfant sans élément dans la semaine (anomalie du 11/11/
     expect(leo).not.toContain("Rien de prévu pour");
     // Sans enfant visé : la première page, comme avant.
     expect(render(null)).toContain('aria-label="Semaine de Léo"');
+  });
+});
+
+describe("alignement sur les maquettes v83 (S-52, S-54)", () => {
+  it("historique : deux groupes, pastilles « À venir » et « En cours », prénoms réunis par « et », jours de la semaine sauf pour une semaine passée", async () => {
+    const f = await family();
+    const { weekId } = await prepareWeek(ctx(), f.camilleSession, {
+      weekStart: WEEK, workDays: [1, 2],
+      children: [{ memberId: f.leo, items: [{ kind: "custom", title: "Lecture", days: [1] }] }, { memberId: f.ines, items: [{ kind: "custom", title: "Chant", days: [2] }] }],
+    });
+    const listed = (await listWeeks(ctx(), f.camilleSession)).weeks.find((w) => w.id === weekId)!;
+    expect(listed.workDays).toEqual([1, 2]);
+    const summary = (id: string, weekStart: string) => ({ ...listed, id, weekStart, weekEnd: new Date(Date.parse(weekStart) + 6 * 86_400_000).toISOString().slice(0, 10) });
+    const html = renderToStaticMarkup(createElement(HistoryList, { today: "2026-11-11", weeks: [summary("a", "2026-11-16"), summary("b", "2026-11-09"), summary("c", "2026-11-02")] }));
+    expect(html.indexOf("À venir et en cours")).toBeGreaterThan(-1);
+    expect(html.indexOf("Semaines passées")).toBeGreaterThan(html.indexOf("À venir et en cours"));
+    expect(html).toContain("Semaine du 16 novembre");
+    expect(html).toMatch(/Semaine du 16 novembre.*?Inès et Léo · lundi, mardi.*?>À venir</s);
+    expect(html).toMatch(/Semaine du 9 novembre.*?>En cours</s);
+    // Une semaine passée : ni jours, ni pastille.
+    const past = html.slice(html.indexOf("Semaines passées"));
+    expect(past).toContain("Semaine du 2 novembre");
+    expect(past).toContain(">Inès et Léo<");
+    expect(past).not.toContain("lundi");
+    expect(past).not.toContain("En cours");
+    // Sans semaine passée, le groupe n'apparaît pas.
+    expect(renderToStaticMarkup(createElement(HistoryList, { today: "2026-11-11", weeks: [summary("a", "2026-11-16")] }))).not.toContain("Semaines passées");
+  });
+
+  it("Mon calendrier : tâches et RDV mêlés par heure, un RDV n'est pas un lien, anneau vide puis « ✓ » et titre barré, heure à droite", () => {
+    const task = (id: string, title: string, dueTime: string | null, status: string, prep = false) => ({ id, title, due: "2026-11-12", dueTime, status, isHomeworkPrep: prep, can: { check: !prep }, version: 1 });
+    const html = renderToStaticMarkup(
+      createElement(ChildCalendarDays, {
+        days: ["2026-11-12", "2026-11-13"],
+        busy: false,
+        onToggle: () => undefined,
+        tasks: [task("1", "Préparer les devoirs", "17:00", "todo", true), task("2", "Ranger ma chambre", null, "done"), task("3", "Nourrir le chat", "08:30", "todo")] as never,
+        events: [{ id: "9", title: "RDV médical", start: "2026-11-12T18:15", allDay: false, status: "confirmed" }] as never,
+      }),
+    );
+    expect(html).toContain("Aujourd&#x27;hui · jeudi 12");
+    expect(html).toContain("Vendredi 13");
+    expect(html).toContain("Rien ce jour-là.");
+    // Par heure : 8h30, 17h00, 18h15, puis la tâche sans heure.
+    const order = ["Nourrir le chat", "Préparer les devoirs", "RDV médical", "Ranger ma chambre"].map((t) => html.indexOf(t));
+    expect(order).toEqual([...order].sort((a, b) => a - b));
+    expect(html).toContain("8h30");
+    expect(html).toContain("18h15");
+    expect(html).toContain("dans la journée");
+    expect(html).toContain("Rendez-vous");
+    expect(html).toContain("Mes devoirs du jour ›");
+    // Le RDV n'ouvre rien ; la tâche des devoirs ouvre son écran ; les autres tâches se cochent.
+    expect(html).not.toContain("/calendrier/rdv/");
+    expect(html).toContain('href="/assistant/devoirs/tache?tache=1"');
+    expect(html.match(/role="checkbox"/g)).toHaveLength(2);
+    expect(html).toMatch(/aria-checked="true"[^>]*>.*?✓.*?line-through[^>]*>Ranger ma chambre/s);
+    expect(html.match(/✓/g)).toHaveLength(1);
   });
 });

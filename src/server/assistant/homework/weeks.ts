@@ -538,6 +538,8 @@ export interface WeekSummary {
   id: string;
   weekStart: string;
   weekEnd: string;
+  /** Jours de travail de la semaine (1 = lundi). */
+  workDays: number[];
   children: string[];
   items: number;
 }
@@ -546,13 +548,13 @@ export interface WeekSummary {
 export async function listWeeks(ctx: Ctx, session: SessionContext): Promise<{ weeks: WeekSummary[]; today: string; mondays: { weekStart: string; prepared: boolean; weekId: string | null }[] }> {
   const v = await taskViewer(ctx, session);
   if (!v.parent) throw fail("forbidden", "Seuls les parents du foyer ont accès aux semaines de devoirs.", 403);
-  const rows = await ctx.db.selectFrom("homework_weeks").select(["id", sql<string>`week_start::text`.as("start")]).where("account_id", "=", v.accountId).orderBy("week_start", "desc").limit(60).execute();
+  const rows = await ctx.db.selectFrom("homework_weeks").select(["id", sql<string>`week_start::text`.as("start"), "work_days"]).where("account_id", "=", v.accountId).orderBy("week_start", "desc").limit(60).execute();
   const items = rows.length
     ? await ctx.db.selectFrom("homework_week_items as i").innerJoin("family_members as m", "m.id", "i.member_id").select(["i.week_id", "m.first_name", sql<number>`count(*)::int`.as("n")]).where("i.week_id", "in", rows.map((r) => r.id)).groupBy(["i.week_id", "m.first_name"]).execute()
     : [];
   const weeks = rows.map((r) => {
     const mine = items.filter((i) => i.week_id === r.id);
-    return { id: r.id, weekStart: r.start, weekEnd: addDays(r.start, 6), children: mine.map((i) => i.first_name ?? "").sort(), items: mine.reduce((sum, i) => sum + i.n, 0) };
+    return { id: r.id, weekStart: r.start, weekEnd: addDays(r.start, 6), workDays: [...r.work_days].sort((a, b) => a - b), children: mine.map((i) => i.first_name ?? "").sort(), items: mine.reduce((sum, i) => sum + i.n, 0) };
   });
   const prepared = new Map(rows.map((r) => [r.start, r.id]));
   return { weeks, today: v.today, mondays: upcomingMondays(v.today).map((weekStart) => ({ weekStart, prepared: prepared.has(weekStart), weekId: prepared.get(weekStart) ?? null })) };

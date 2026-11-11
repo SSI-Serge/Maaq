@@ -9,7 +9,7 @@ import { Button, Loading, Notice, RetryNotice } from "@/components/ui";
 import type { HomeworkSetting } from "@/server/assistant/homework/settings";
 import type { HomeworkOptions } from "@/server/assistant/homework/weeks";
 import { addDays, shortDate } from "./format";
-import { weekHref } from "./homework-domains";
+import { weekHref, weekTitle } from "./homework-domains";
 import styles from "./family.module.css";
 
 /**
@@ -52,6 +52,8 @@ interface Draft {
   /** Jours de chaque élément : `memberId|clé de l'élément`. */
   days: Record<string, number[]>;
   customs: Custom[];
+  /** Semaine déjà préparée : « Modifier » (recommandé) ouvre son écran, « Refaire » relance les 4 étapes (US-119 RF12). */
+  mode?: "modifier" | "refaire";
 }
 
 const emptyDraft = (weekStart: string): Draft => ({ step: 1, weekStart, rhythm: HOUSEHOLD, memberIds: [], themes: [], picks: {}, days: {}, customs: [] });
@@ -101,7 +103,13 @@ function elementsOf(options: HomeworkOptions | undefined, picks: string[]): Elem
 }
 
 const WEEKDAY_NAMES = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"];
-const BACK = { href: "/assistant/devoirs/tache", label: "Préparer les devoirs" };
+const BACK = { href: "/assistant/devoirs/tache", label: "Fermer", close: true };
+/** « 16 novembre » */
+const dayMonth = (weekStart: string) => weekTitle(weekStart).replace("Semaine du ", "");
+const capital = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+/** « jeudi », « jeudi et vendredi », « lundi, jeudi et vendredi » */
+const listOf = (list: string[]) => (list.length < 2 ? list.join("") : `${list.slice(0, -1).join(", ")} et ${list[list.length - 1]}`);
+const desc = { display: "block", fontSize: 11, fontWeight: 500, opacity: 0.8, marginTop: 1 } as const;
 
 /** « Refaire » une semaine déjà préparée (US-119 RF12) : pour les enfants choisis, ou pour un seul enfant depuis sa page de la semaine. */
 export interface Redo {
@@ -163,9 +171,11 @@ export function HomeworkPlanner({ weekStart, asked = false, redo = null }: { wee
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [needed.join(","), chosenWeek]);
 
-  const title = redo ? "Refaire la semaine" : "Préparer la semaine";
-  if (redo && weeks.data && !redoStart) return <AppShell title={title} back={BACK}><Notice tone="info">Cette semaine n&apos;existe plus.</Notice></AppShell>;
-  if (!draft) return <AppShell title={title} back={BACK}><Loading /></AppShell>;
+  // La croix ferme vers l'écran d'origine : la semaine si l'on vient de la page d'un enfant, sinon la tâche.
+  const back = redo?.memberId ? { href: weekHref(redo.weekId, redo.memberId), label: "Fermer", close: true } : BACK;
+  const baseTitle = redo ? "Refaire la semaine" : "Préparer la semaine";
+  if (redo && weeks.data && !redoStart) return <AppShell title={baseTitle} eyebrow="Aide Devoirs" back={back}><Notice tone="info">Cette semaine n&apos;existe plus.</Notice></AppShell>;
+  if (!draft) return <AppShell title={baseTitle} eyebrow="Aide Devoirs" back={back}><Loading /></AppShell>;
   const d = draft;
   const today = weeks.data?.today ?? null;
   const householdDays = setting.data?.setting.days ?? [1, 2, 4, 5];
@@ -175,14 +185,24 @@ export function HomeworkPlanner({ weekStart, asked = false, redo = null }: { wee
   const mondays = weeks.data?.mondays ?? [{ weekStart: d.weekStart, prepared: false, weekId: null }];
   // En refaisant une semaine, elle n'est plus traitée comme « déjà préparée » : le parcours continue.
   const picked = redo ? undefined : mondays.find((m) => m.weekStart === d.weekStart);
-  const shownChildren = redo?.memberId ? children.filter((c) => c.memberId === redo.memberId) : children;
+  // Semaine déjà préparée : « Modifier » (recommandé) ou « Refaire », qui continue ici même pour les enfants cochés.
+  const mode = picked?.prepared && picked.weekId ? (d.mode ?? "modifier") : null;
+  const eff: Redo | null = redo ?? (mode === "refaire" && picked?.weekId ? { weekId: picked.weekId, memberId: null } : null);
+  const kidRedo = redo?.memberId ? (children.find((c) => c.memberId === redo.memberId)?.firstName ?? "") : null;
+  const title = kidRedo ? `Refaire la semaine de ${kidRedo}` : eff ? "Refaire la semaine" : "Préparer la semaine";
   const redoNames = d.memberIds.map((id) => children.find((c) => c.memberId === id)?.firstName ?? "").filter(Boolean);
+  const allKids = children.map((c) => c.memberId);
+  const pickMode = (next: "modifier" | "refaire") => {
+    if (next === mode) return;
+    // « Refaire » : aucun enfant coché au départ ; « Modifier » : retour aux enfants du foyer.
+    change(next === "refaire" ? { mode: next, memberIds: [], kidsChosen: true } : { mode: next, memberIds: allKids, kidsChosen: false });
+  };
   const current = today !== null && mondays[0]?.weekStart === d.weekStart && d.weekStart <= today;
   // Changer de semaine repart des propositions de cette semaine-là : les choix d'exercices et de jours ne se reportent pas.
   const pickWeek = (start: string) => {
     if (start === d.weekStart) return;
     setOptions({});
-    change({ weekStart: start, picks: {}, days: {}, customs: [] });
+    change({ weekStart: start, picks: {}, days: {}, customs: [], mode: undefined, ...(d.mode === "refaire" ? { memberIds: allKids, kidsChosen: false } : {}) });
   };
   const name = (id: string) => children.find((c) => c.memberId === id)?.firstName ?? "";
   const elements = (id: string) => elementsOf(options[id], d.picks[id] ?? []);
@@ -210,8 +230,8 @@ export function HomeworkPlanner({ weekStart, asked = false, redo = null }: { wee
         ],
       })),
     };
-    const result = redo
-      ? await submit.run<{ weekId: string }>(`/api/family/homework/weeks/${redo.weekId}`, { method: "PUT", body: { workDays: body.workDays, children: body.children } })
+    const result = eff
+      ? await submit.run<{ weekId: string }>(`/api/family/homework/weeks/${eff.weekId}`, { method: "PUT", body: { workDays: body.workDays, children: body.children } })
       : await submit.run<{ weekId: string }>("/api/family/homework/weeks", { method: "POST", body });
     if (result) {
       if (!redo) saveDraft(null);
@@ -221,43 +241,72 @@ export function HomeworkPlanner({ weekStart, asked = false, redo = null }: { wee
   }
 
   return (
-    <AppShell title={title} back={redo ? { href: weekHref(redo.weekId, redo.memberId), label: "Semaine de devoirs" } : BACK}>
+    <AppShell title={title} eyebrow="Aide Devoirs" back={back}>
       {setting.error && <RetryNotice message={setting.error.message} onRetry={setting.reload} />}
       {setting.data && !setting.data.setting.enabled && <Notice tone="info">L&apos;aide Devoirs est désactivée : activez-la dans les réglages.</Notice>}
       {setting.data && setting.data.setting.enabled && children.length === 0 && <Notice tone="info">Indiquez l&apos;âge des devoirs d&apos;au moins un enfant dans les réglages.</Notice>}
       {setting.data?.setting.enabled && children.length > 0 && (
         <>
           <p className={styles.hint}>
-            Semaine du {shortDate(d.weekStart)} · étape {d.step} sur 4. Vous choisissez tout : l&apos;aide ne place rien à votre place.
+            {kidRedo && d.step === 1
+              ? `Refaire la semaine de ${kidRedo}, du ${dayMonth(d.weekStart)}. Les jours déjà passés ne sont pas proposés.`
+              : `Semaine du ${shortDate(d.weekStart)} · étape ${d.step} sur 4. Vous choisissez tout : l'aide ne place rien à votre place.`}
           </p>
 
           {d.step === 1 && (
             <div className={styles.form}>
-              {redo ? (
+              {redo && !kidRedo && (
                 <Notice tone="info">
-                  Vous refaites la semaine du {shortDate(d.weekStart)}. Les devoirs à venir des enfants choisis seront remplacés ; ce qui est déjà fait est gardé, et les autres enfants ne changent pas.
+                  Vous refaites la semaine du {dayMonth(d.weekStart)}. Les devoirs à venir des enfants choisis seront remplacés ; ce qui est déjà fait est gardé, et les autres enfants ne changent pas.
                 </Notice>
-              ) : (
+              )}
+              {!redo && (
                 <>
                   <div className={styles.label}>Quelle semaine ?</div>
                   <div className={styles.wrapRow}>
-                    {mondays.map((m, i) => (
-                      <button key={m.weekStart} type="button" className={styles.chipToggle} aria-pressed={d.weekStart === m.weekStart} onClick={() => pickWeek(m.weekStart)}>
-                        {i === 0 && today !== null && m.weekStart <= today ? `Cette semaine, du ${shortDate(m.weekStart)}` : `Du ${shortDate(m.weekStart)}`}
-                        {m.prepared ? " · déjà préparée" : ""}
-                      </button>
-                    ))}
+                    {mondays.map((m, i) => {
+                      const thisWeek = i === 0 && today !== null && m.weekStart <= today;
+                      const left = thisWeek ? householdDays.filter((day) => addDays(m.weekStart, day - 1) >= today) : [];
+                      const note = m.prepared
+                        ? "Déjà préparée · à modifier ou à refaire"
+                        : thisWeek && left.length > 0 && left.length < householdDays.length
+                          ? `${capital(listOf(left.map((x) => WEEKDAY_NAMES[x - 1])))} ${left.length > 1 ? "restent" : "reste"} à venir`
+                          : "";
+                      return (
+                        <button key={m.weekStart} type="button" className={styles.chipToggle} style={{ textAlign: "left" }} aria-pressed={d.weekStart === m.weekStart} onClick={() => pickWeek(m.weekStart)}>
+                          {thisWeek ? `Cette semaine, du ${dayMonth(m.weekStart)}` : `Du ${dayMonth(m.weekStart)}`}
+                          {i === 0 ? " (Recommandé)" : ""}
+                          {note && <span style={desc}>{note}</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {current && <span className={styles.hint}>Les jours déjà passés ne sont pas proposés.</span>}
+                </>
+              )}
+              {mode && (
+                <>
+                  <div className={styles.label}>Cette semaine est déjà préparée</div>
+                  <div className={styles.wrapRow}>
+                    <button type="button" className={styles.chipToggle} style={{ textAlign: "left" }} aria-pressed={mode === "modifier"} onClick={() => pickMode("modifier")}>
+                      Modifier (Recommandé)
+                      <span style={desc}>Ouvre « Semaine de devoirs »</span>
+                    </button>
+                    <button type="button" className={styles.chipToggle} style={{ textAlign: "left" }} aria-pressed={mode === "refaire"} onClick={() => pickMode("refaire")}>
+                      Refaire
+                      <span style={desc}>Relance les 4 étapes</span>
+                    </button>
                   </div>
                 </>
               )}
-              {picked?.prepared && <span className={styles.hint}>Cette semaine est déjà préparée. « Modifier » ouvre son écran « Semaine de devoirs » ; « Refaire » relance les 4 étapes pour les enfants que vous choisissez.</span>}
-              {!picked?.prepared && current && <span className={styles.hint}>Les jours déjà passés ne sont pas touchés.</span>}
-              {!picked?.prepared && (
+              {/* « Modifier » : les jours et les enfants ne servent à rien, ils ne sont pas demandés. */}
+              {mode !== "modifier" && (
                 <>
                   <div className={styles.label}>Quels jours ?</div>
                   <div className={styles.wrapRow}>
-                    <button type="button" className={styles.chipToggle} aria-pressed={d.rhythm === HOUSEHOLD} onClick={() => change({ rhythm: HOUSEHOLD })}>
-                      Les jours de devoirs du foyer ({householdDays.map((x) => WEEKDAY_NAMES[x - 1]).join(", ")})
+                    <button type="button" className={styles.chipToggle} style={{ textAlign: "left" }} aria-pressed={d.rhythm === HOUSEHOLD} onClick={() => change({ rhythm: HOUSEHOLD })}>
+                      Les jours de devoirs du foyer (Recommandé)
+                      <span style={desc}>{capital(householdDays.map((x) => WEEKDAY_NAMES[x - 1]).join(", "))}</span>
                     </button>
                     {RHYTHMS.map((r) => (
                       <button key={r.key} type="button" className={styles.chipToggle} aria-pressed={d.rhythm === r.key} onClick={() => change({ rhythm: r.key })}>
@@ -267,34 +316,34 @@ export function HomeworkPlanner({ weekStart, asked = false, redo = null }: { wee
                   </div>
                   <span className={styles.hint}>
                     Un autre choix ne vaut que pour cette semaine.
-                    {current && workDays.length > 0 && workDays.length < rhythmDays.length ? ` Il reste : ${workDays.map((x) => WEEKDAY_NAMES[x - 1]).join(", ")}.` : ""}
                     {workDays.length === 0 ? " Ces jours sont déjà passés cette semaine : choisissez d'autres jours, ou une autre semaine." : ""}
                   </span>
-                  <div className={styles.label}>Pour quels enfants ?</div>
-                  <div className={styles.wrapRow}>
-                    {shownChildren.map((c) => (
-                      <button key={c.memberId} type="button" className={styles.chipToggle} aria-pressed={d.memberIds.includes(c.memberId)} aria-disabled={redo?.memberId ? true : undefined} onClick={() => !redo?.memberId && change({ memberIds: toggle(d.memberIds, c.memberId), kidsChosen: true })}>
-                        {c.firstName}
-                        {c.levelLabel ? ` · ${c.levelLabel}` : ""}
-                      </button>
-                    ))}
-                  </div>
-                  <span className={styles.hint}>Seuls les enfants qui ont un âge des devoirs sont proposés.</span>
+                  {!kidRedo && (
+                    <>
+                      <div className={styles.label}>{eff ? "Quels enfants pour refaire la semaine ?" : "Pour quels enfants ?"}</div>
+                      <div className={styles.wrapRow}>
+                        {children.map((c) => (
+                          <button key={c.memberId} type="button" className={styles.chipToggle} style={{ textAlign: "left" }} aria-pressed={d.memberIds.includes(c.memberId)} onClick={() => change({ memberIds: toggle(d.memberIds, c.memberId), kidsChosen: true })}>
+                            {c.firstName}
+                            {c.levelLabel && <span style={desc}>Niveau {c.levelLabel}</span>}
+                          </button>
+                        ))}
+                      </div>
+                      <span className={styles.hint} role={eff && d.memberIds.length === 0 ? "alert" : undefined}>
+                        {eff ? (d.memberIds.length ? "Seule la semaine des enfants cochés est refaite." : "Cochez au moins un enfant.") : "Seuls les enfants qui ont un âge des devoirs sont proposés."}
+                      </span>
+                    </>
+                  )}
                 </>
               )}
               <div className={styles.actionsRow}>
-                {picked?.prepared && picked.weekId ? (
-                  <>
-                    <Link href={`/assistant/devoirs/${picked.weekId}`} className={styles.cta}>
-                      Modifier
-                    </Link>
-                    <Link href={`/assistant/devoirs/preparer?refaire=${picked.weekId}`} className={styles.cta}>
-                      Refaire
-                    </Link>
-                  </>
+                {mode === "modifier" && picked?.weekId ? (
+                  <Link href={weekHref(picked.weekId)} className={styles.cta}>
+                    Ouvrir la semaine du {dayMonth(d.weekStart)}
+                  </Link>
                 ) : (
                   <Button onClick={() => change({ step: 2 })} disabled={d.memberIds.length === 0 || workDays.length === 0}>
-                    Continuer
+                    Suivant
                   </Button>
                 )}
               </div>
@@ -316,7 +365,7 @@ export function HomeworkPlanner({ weekStart, asked = false, redo = null }: { wee
                   Retour
                 </Button>
                 <Button onClick={() => change({ step: 3 })} disabled={d.themes.length === 0}>
-                  Continuer
+                  Suivant
                 </Button>
               </div>
             </div>
@@ -380,7 +429,7 @@ export function HomeworkPlanner({ weekStart, asked = false, redo = null }: { wee
                   Retour
                 </Button>
                 <Button onClick={() => change({ step: 4 })} disabled={d.memberIds.some((id) => !options[id])}>
-                  Continuer
+                  Suivant
                 </Button>
               </div>
             </div>
@@ -421,18 +470,19 @@ export function HomeworkPlanner({ weekStart, asked = false, redo = null }: { wee
               <Button variant="secondary" onClick={() => change({ customs: [...d.customs, { memberId: d.memberIds[0], title: "", days: [] }] })}>
                 Ajouter une activité à moi
               </Button>
-              {redo && redoNames.length > 0 && (
-                <Notice tone="info">
-                  Les devoirs à venir de {redoNames.join(" et ")} cette semaine seront remplacés. Ce qui est déjà fait est gardé.
-                </Notice>
-              )}
+              {eff &&
+                redoNames.map((kid) => (
+                  <Notice key={kid} tone="warning">
+                    <b>Les devoirs à venir de {kid} cette semaine seront remplacés. Ce qui est déjà fait est gardé.</b>
+                  </Notice>
+                ))}
               {failed && <Notice tone="error">La préparation n&apos;a pas abouti. Vos choix sont gardés : réessayez.{submit.error && submit.error.kind !== "server" ? ` (${submit.error.message})` : ""}</Notice>}
               <div className={styles.actionsRow}>
                 <Button variant="ghost" onClick={() => change({ step: 3 })} disabled={submit.pending}>
                   Retour
                 </Button>
                 <Button onClick={() => void send()} loading={submit.pending} disabled={placedCount === 0}>
-                  {failed ? "Réessayer" : redo ? "Refaire la semaine" : "Préparer la semaine"}
+                  {failed ? "Réessayer" : eff ? "Refaire la semaine" : "Préparer la semaine"}
                 </Button>
               </div>
               <p className={styles.hint}>{placedCount === 0 ? "Choisissez au moins un jour pour un élément." : `${placedCount} élément${placedCount > 1 ? "s" : ""} placé${placedCount > 1 ? "s" : ""}.`}</p>

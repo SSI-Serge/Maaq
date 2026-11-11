@@ -150,13 +150,16 @@ function ChildWeek({ weekView, child, answers, onChanged }: { weekView: WeekView
       </div>
       {mutation.error && <Notice tone="error">{mutation.error.kind === "server" ? "La modification n'a pas pu être enregistrée." : mutation.error.message}</Notice>}
       <p className={styles.hint}>Une case cochée compte comme « fait ». Envoyez une photo du travail pour que les progrès soient notés.</p>
-      <PhotoPanel weekId={weekView.id} child={child} onDone={onChanged} />
       {/* Refaire la semaine de cet enfant seul (US-119 RF12) : ses devoirs à venir sont remplacés, ce qui est fait est gardé. Une semaine passée ne se refait plus. */}
       {weekView.weekEnd >= todayLocal() && (
-        <Link href={`/assistant/devoirs/preparer?refaire=${weekView.id}&enfant=${child.memberId}`} className={styles.link}>
-          Refaire la semaine de {child.firstName} ›
+        <Link
+          href={`/assistant/devoirs/preparer?refaire=${weekView.id}&enfant=${child.memberId}`}
+          style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: 40, border: "1px solid var(--line)", borderRadius: 8, background: "var(--bg-raised)", fontSize: 13, fontWeight: 700, color: "var(--ink)", textDecoration: "none" }}
+        >
+          Refaire la semaine de {child.firstName}
         </Link>
       )}
+      <PhotoPanel weekId={weekView.id} child={child} onDone={onChanged} />
       {zoom?.card && (
         <div className={week.lightbox} role="dialog" aria-modal="true" aria-label={`Carte : ${zoom.title}`} onClick={() => setZoom(null)}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
