@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireProfile } from "@/server/auth/http";
+import { eraseConversation, eraseExchange } from "@/server/courses/chat/erase";
 import { listCourseMessages, MAX_COURSE_TEXT, sendCourseMessage } from "@/server/courses/chat/service";
 import { handler, parseBody, Rejection } from "@/server/http";
 import { describeError } from "@/server/safe-log";
@@ -44,4 +45,13 @@ export const POST = handler(async (request: Request) => {
     },
   });
   return new Response(stream, { headers: { "content-type": "application/x-ndjson; charset=utf-8", "cache-control": "no-store", "x-accel-buffering": "no" } });
+});
+
+const eraseSchema = z.union([z.object({ messageId: z.string().regex(/^\d{1,18}$/) }), z.object({ all: z.literal(true) })]);
+
+/** Efface un échange (la demande et ses réponses) ou toute la conversation du profil connecté (US-179) : définitif, appelé par l'écran après le délai d'annulation. */
+export const DELETE = handler(async (request: Request) => {
+  const { session, ctx } = await requireProfile();
+  const body = await parseBody(request, eraseSchema);
+  return NextResponse.json("all" in body ? await eraseConversation(ctx, session) : await eraseExchange(ctx, session, body.messageId));
 });

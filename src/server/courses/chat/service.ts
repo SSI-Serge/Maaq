@@ -1,3 +1,4 @@
+import { exchangesOf } from "./exchanges";
 import { sql, type Kysely } from "kysely";
 import { familyTimeZone } from "@/server/assistant/reminders";
 import { createModel, type AssistantModel } from "@/server/assistant/model";
@@ -168,6 +169,8 @@ export async function sendCourseMessage(ctx: Ctx, session: SessionContext, input
 
 export interface CourseMessageView {
   id: string;
+  /** Échange du message (identifiant de son premier message) : une demande et les réponses qui la suivent s'effacent ensemble (US-179). */
+  exchange: string;
   role: "user" | "assistant";
   text: string;
   at: string;
@@ -201,8 +204,9 @@ export async function listCourseMessages(ctx: Ctx, session: SessionContext): Pro
     const card = parseCard(d.text);
     if (card?.validatedAt && !card.addAnswered && weeks[i] && !addable.has(weeks[i]!)) addable.set(weeks[i]!, await addableDishes(ctx.db, who.accountId, weeks[i]!));
   }
+  const exchanges = exchangesOf(decoded.map((d) => ({ id: String(d.r.id), sender: d.r.sender, text: d.text })));
   return decoded.map(({ r, text }, i): CourseMessageView => {
-    const base = { id: String(r.id), role: r.sender === "agent" ? ("assistant" as const) : ("user" as const), at: r.created_at.toISOString() };
+    const base = { id: String(r.id), exchange: exchanges.get(String(r.id)) ?? String(r.id), role: r.sender === "agent" ? ("assistant" as const) : ("user" as const), at: r.created_at.toISOString() };
     const adjust = parseAdjust(text);
     if (adjust) return { ...base, text: "", adjust: adjustView(String(r.id), adjust) };
     const envelope = parseCard(text);

@@ -23,6 +23,8 @@ import styles from "./courses.module.css";
 /** Un menu complet demande plus de 15 s : délai long avant le message de connexion lente (CC-3), comme pour la lecture des tickets. */
 const CHAT_TIMEOUT_MS = 110_000;
 const PAGE = 10;
+/** Délai d'annulation d'un effacement (US-179 RF2) : l'échange n'est supprimé en base qu'ensuite. */
+export const ERASE_DELAY_MS = 5_000;
 const MENU_WORDS = /menu|plat|d[iî]ner|express|remplace|chang|semaine|batch|s[eé]ance|recette/i;
 
 /** Texte d'une réponse de l'agent : les marqueurs `[[ecran:nom]]` deviennent des liens vers les écrans de l'application. */
@@ -64,7 +66,15 @@ export function ChatPanel({ couple, startMenu = 0, fromTicket = 0, weeks = [] }:
   const request = useRef<string>(crypto.randomUUID());
   const lastText = useRef("");
   const end = useRef<HTMLDivElement>(null);
-  const messages = history.data?.messages ?? [];
+  // US-179 : un échange effacé disparaît aussitôt de l'écran ; il n'est supprimé en base qu'après le délai d'annulation (ou avant une nouvelle demande, ou à la fermeture de la page)
+  const [erasing, setErasing] = useState<string | null>(null);
+  const eraseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const erasingRef = useRef<string | null>(null);
+  const [menuOf, setMenuOf] = useState<string | null>(null);
+  const [confirmAll, setConfirmAll] = useState(false);
+  const erase = useApiMutation();
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const messages = (history.data?.messages ?? []).filter((m) => m.exchange !== erasing);
 
   // parcours « Liste de courses et menu de la semaine » : 1 ou 2 plats de Mes plats, ou un plat écrit
   const [starter, setStarter] = useState(false);
@@ -107,12 +117,62 @@ export function ChatPanel({ couple, startMenu = 0, fromTicket = 0, weeks = [] }:
     end.current?.scrollIntoView({ block: "end" });
   }, [messages.length, pending, starter]);
 
+  /** Supprime pour de bon l'échange en attente (fin du délai, nouvelle demande, autre effacement). */
+  async function flushErase() {
+    const exchange = erasingRef.current;
+    if (eraseTimer.current) clearTimeout(eraseTimer.current);
+    eraseTimer.current = null;
+    if (!exchange) return;
+    erasingRef.current = null;
+    await erase.run("/api/courses/chat", { method: "DELETE", body: { messageId: exchange } });
+    history.reload();
+    setErasing((current) => (current === exchange ? null : current));
+  }
+  async function startErase(exchange: string) {
+    setMenuOf(null);
+    await flushErase();
+    erasingRef.current = exchange;
+    setErasing(exchange);
+    eraseTimer.current = setTimeout(() => void flushErase(), ERASE_DELAY_MS);
+  }
+  function cancelErase() {
+    if (eraseTimer.current) clearTimeout(eraseTimer.current);
+    eraseTimer.current = null;
+    erasingRef.current = null;
+    setErasing(null);
+  }
+  async function eraseAll() {
+    cancelErase();
+    setConfirmAll(false);
+    if (await erase.run("/api/courses/chat", { method: "DELETE", body: { all: true } })) {
+      setStarter(false);
+      setValidated(null);
+      history.reload();
+    }
+  }
+  // l'application se ferme pendant le délai : la suppression part quand même
+  useEffect(() => {
+    const leave = () => {
+      const exchange = erasingRef.current;
+      if (!exchange) return;
+      erasingRef.current = null;
+      void fetch("/api/courses/chat", { method: "DELETE", keepalive: true, credentials: "same-origin", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify({ messageId: exchange }) }).catch(() => undefined);
+    };
+    window.addEventListener("pagehide", leave);
+    return () => {
+      window.removeEventListener("pagehide", leave);
+      leave();
+    };
+  }, []);
+
   const hasOpenCard = messages.some((m) => m.card?.status === "open" || m.card?.status === "incomplete");
   const menuIntent = starter || hasOpenCard || MENU_WORDS.test(pending ?? "");
 
   async function submit(override?: string, forcedWeek?: string) {
     const value = (override ?? text).trim();
     if (!value || send.pending) return;
+    // un échange en cours d'effacement part avant la nouvelle demande : l'agent n'en tient plus compte (RF8)
+    await flushErase();
     lastText.current = value;
     setPending(value);
     setFailed(null);
@@ -173,29 +233,82 @@ export function ChatPanel({ couple, startMenu = 0, fromTicket = 0, weeks = [] }:
       <p className={styles.banner} style={{ fontWeight: 400, fontSize: 11, background: "var(--warning-bg)" }}>
         Vous échangez avec une IA. Ses réponses peuvent contenir des erreurs.
       </p>
+      {(history.data?.messages.length ?? 0) > 0 && (
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <button type="button" className={styles.link} style={{ background: "none", border: "none", padding: "4px 0" }} onClick={() => setConfirmAll(true)}>
+            Effacer la conversation
+          </button>
+        </div>
+      )}
+      {confirmAll && (
+        <div className={styles.dayCard} role="alertdialog" aria-label="Effacer la conversation">
+          <span style={{ fontSize: 14, lineHeight: 1.45 }}>Effacer toute la conversation avec l&apos;agent Courses et repas ? Vos menus, listes et tickets sont gardés. C&apos;est définitif.</span>
+          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+            <Button variant="ghost" onClick={() => setConfirmAll(false)}>
+              Annuler
+            </Button>
+            <Button onClick={() => void eraseAll()} loading={erase.pending}>
+              Effacer
+            </Button>
+          </div>
+        </div>
+      )}
       <div role="log" aria-live="polite" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {messages.map((m) =>
+        {messages.map((m, index) => {
+          const firstOfExchange = index === 0 || messages[index - 1].exchange !== m.exchange;
+          // appui long sur un message : le même menu que « … »
+          const hold = {
+            onPointerDown: () => {
+              pressTimer.current = setTimeout(() => setMenuOf(m.exchange), 600);
+            },
+            onPointerUp: () => pressTimer.current && clearTimeout(pressTimer.current),
+            onPointerLeave: () => pressTimer.current && clearTimeout(pressTimer.current),
+            onContextMenu: (e: { preventDefault: () => void }) => {
+              e.preventDefault();
+              setMenuOf(m.exchange);
+            },
+          };
+          const body =
           m.adjust ? (
-            <AdjustCard
-              key={m.id}
-              view={m.adjust}
-              busy={adjustingId === m.adjust.messageId}
-              onAction={async (action, key) => {
-                setAdjustingId(m.adjust!.messageId);
-                const done = await adjusting.run("/api/courses/chat/adjust", { method: "POST", body: { action, messageId: m.adjust!.messageId, ...(key ? { key } : {}) }, timeoutMs: CHAT_TIMEOUT_MS });
-                setAdjustingId(null);
-                if (done) history.reload();
-                return !!done;
-              }}
-            />
-          ) : m.card ? (
-            <MenuCard key={m.id} card={m.card} busy={validating === m.card.messageId} onValidate={(c) => void validateCard(c)} onAdd={addDishes} replaceApi={couple ? replaceApiOf(m.card) : undefined} />
-          ) : (
-            <div key={m.id} className={m.role === "user" ? undefined : styles.dayCard} style={m.role === "user" ? { alignSelf: "flex-end", maxWidth: "85%", padding: "8px 12px", borderRadius: "12px 12px 2px 12px", background: "var(--primary)", color: "var(--primary-ink)", fontSize: 14 } : { fontSize: 14, lineHeight: 1.4 }}>
-              {m.role === "user" ? m.text : <Rich text={m.text} couple={couple} />}
-            </div>
-          ),
-        )}
+              <AdjustCard
+                key={m.id}
+                view={m.adjust}
+                busy={adjustingId === m.adjust.messageId}
+                onAction={async (action, key) => {
+                  setAdjustingId(m.adjust!.messageId);
+                  const done = await adjusting.run("/api/courses/chat/adjust", { method: "POST", body: { action, messageId: m.adjust!.messageId, ...(key ? { key } : {}) }, timeoutMs: CHAT_TIMEOUT_MS });
+                  setAdjustingId(null);
+                  if (done) history.reload();
+                  return !!done;
+                }}
+              />
+            ) : m.card ? (
+              <MenuCard key={m.id} card={m.card} busy={validating === m.card.messageId} onValidate={(c) => void validateCard(c)} onAdd={addDishes} replaceApi={couple ? replaceApiOf(m.card) : undefined} />
+            ) : (
+              <div key={m.id} className={m.role === "user" ? undefined : styles.dayCard} style={m.role === "user" ? { alignSelf: "flex-end", maxWidth: "85%", padding: "8px 12px", borderRadius: "12px 12px 2px 12px", background: "var(--primary)", color: "var(--primary-ink)", fontSize: 14 } : { fontSize: 14, lineHeight: 1.4 }}>
+                {m.role === "user" ? m.text : <Rich text={m.text} couple={couple} />}
+              </div>
+            );
+          return (
+            <Fragment key={m.id}>
+              {firstOfExchange && (
+                <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8, minHeight: 24 }}>
+                  {menuOf === m.exchange && (
+                    <button type="button" className={styles.link} style={{ border: "1px solid var(--line)", borderRadius: 7, background: "var(--bg-raised)", minHeight: 30, padding: "0 10px", fontWeight: 700 }} onClick={() => void startErase(m.exchange)}>
+                      Effacer
+                    </button>
+                  )}
+                  <button type="button" aria-label="Actions sur cet échange" aria-expanded={menuOf === m.exchange} className={styles.link} style={{ background: "none", border: "none", padding: "0 6px", fontSize: 18, lineHeight: 1 }} onClick={() => setMenuOf(menuOf === m.exchange ? null : m.exchange)}>
+                    …
+                  </button>
+                </div>
+              )}
+              <div {...hold} style={{ display: "contents" }}>
+                {body}
+              </div>
+            </Fragment>
+          );
+        })}
         {starter && !pending && week === null && (
           <>
             <div className={styles.dayCard} style={{ fontSize: 14, lineHeight: 1.45 }}>
@@ -284,6 +397,15 @@ export function ChatPanel({ couple, startMenu = 0, fromTicket = 0, weeks = [] }:
         )}
         <div ref={end} />
       </div>
+      {erasing && (
+        <p className={styles.banner} role="status" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+          <span>Échange effacé.</span>
+          <button type="button" className={styles.link} style={{ background: "none", border: "none", fontWeight: 700 }} onClick={cancelErase}>
+            Annuler
+          </button>
+        </p>
+      )}
+      {erase.error && <Notice tone="error">{erase.error.message}</Notice>}
       {error && (retryable ? <RetryNotice message={error} onRetry={() => void submit(lastText.current)} /> : <Notice tone="error">{error}</Notice>)}
       {validate.error && <Notice tone="error">{validate.error.message}</Notice>}
       {adding.error && <Notice tone="error">{adding.error.message}</Notice>}

@@ -301,6 +301,20 @@ describe("CR-68 : « Produits ajoutés » ne montre que les ajouts à la main ; 
     await removeProduct(at(), f.elodie, "piles", W1);
     expect((await prepareList(at(), f.elodie, W1)).reminders).toHaveLength(1);
 
+    // un rappel déjà présent dans l'historique (acheté sur un ticket plus ancien) n'apparaît qu'une fois, avec sa mention
+    const receipt = await db.insertInto("grocery_receipts").values({ account_id: f.accountId, store_chain: "lidl", purchased_on: "2026-10-20" as never, total_amount: "6.50", recorded_by_user_id: f.userIds.sophie }).returning("id").executeTakeFirstOrThrow();
+    await db
+      .insertInto("grocery_receipt_lines")
+      .values([
+        { receipt_id: receipt.id, account_id: f.accountId, position: 1, label: "Piles", name_key: "piles", line_total: "4.50", aisle_id: aisles[0].id },
+        { receipt_id: receipt.id, account_id: f.accountId, position: 2, label: "Café moulu", name_key: "cafe moulu", line_total: "2.00", aisle_id: aisles[0].id },
+      ])
+      .execute();
+    const both = (await prepareList(at(), f.sophie, W1)).model!.items;
+    expect(both.filter((i) => i.name === "Piles").map((i) => [i.group, i.leftoverWeek])).toEqual([["habituel", W0]]);
+    expect(both.filter((i) => i.group === "habituel").map((i) => i.name)).toEqual(["Piles", "Café moulu"]);
+    await db.deleteFrom("grocery_receipts").where("id", "=", receipt.id).execute();
+
     // le rappel compte dans le seuil : avec un seuil de 1, « Pensez aussi à : » n'est plus proposé
     await setThreshold(1);
     expect(groupNames(await prepareList(at(), f.sophie, W1), "quotidien")).toEqual([]);
