@@ -72,6 +72,11 @@ export function ChatPanel({ couple, startMenu = 0, fromTicket = 0, weeks = [] }:
   const erasingRef = useRef<string | null>(null);
   const [menuOf, setMenuOf] = useState<string | null>(null);
   const [confirmAll, setConfirmAll] = useState(false);
+  const [erasedNote, setErasedNote] = useState("Échange effacé.");
+  const [topMenu, setTopMenu] = useState(false);
+  // « Pour quelle semaine ? » n'est pas enregistré : l'effacer ferme le parcours, « Annuler » le rouvre
+  const [starterErased, setStarterErased] = useState(false);
+  const starterTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const erase = useApiMutation();
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const messages = (history.data?.messages ?? []).filter((m) => m.exchange !== erasing);
@@ -131,9 +136,24 @@ export function ChatPanel({ couple, startMenu = 0, fromTicket = 0, weeks = [] }:
   async function startErase(exchange: string) {
     setMenuOf(null);
     await flushErase();
+    const rows = (history.data?.messages ?? []).filter((m) => m.exchange === exchange);
+    // un message de l'agent sans demande ; un menu déjà validé reste, seule sa carte part (CR-71)
+    setErasedNote(rows[0]?.role !== "user" ? "Message effacé." : rows.some((m) => m.card?.status === "validated") ? "Échange effacé. Le menu validé reste sur la page de l'agent." : "Échange effacé.");
     erasingRef.current = exchange;
     setErasing(exchange);
     eraseTimer.current = setTimeout(() => void flushErase(), ERASE_DELAY_MS);
+  }
+  function eraseStarter() {
+    setMenuOf(null);
+    setStarter(false);
+    setStarterErased(true);
+    if (starterTimer.current) clearTimeout(starterTimer.current);
+    starterTimer.current = setTimeout(() => setStarterErased(false), ERASE_DELAY_MS);
+  }
+  function cancelStarter() {
+    if (starterTimer.current) clearTimeout(starterTimer.current);
+    setStarterErased(false);
+    setStarter(true);
   }
   function cancelErase() {
     if (eraseTimer.current) clearTimeout(eraseTimer.current);
@@ -234,29 +254,48 @@ export function ChatPanel({ couple, startMenu = 0, fromTicket = 0, weeks = [] }:
         Vous échangez avec une IA. Ses réponses peuvent contenir des erreurs.
       </p>
       {(history.data?.messages.length ?? 0) > 0 && (
-        <div style={{ display: "flex", justifyContent: "flex-end" }}>
-          <button type="button" className={styles.link} style={{ background: "none", border: "none", padding: "4px 0" }} onClick={() => setConfirmAll(true)}>
-            Effacer la conversation
+        <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8 }}>
+          {topMenu && (
+            <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+              <button
+                type="button"
+                className={styles.link}
+                disabled={!!pending}
+                style={{ border: "1px solid var(--line)", borderRadius: 7, background: "var(--bg-raised)", minHeight: 30, padding: "0 10px", fontWeight: 700, opacity: pending ? 0.5 : 1 }}
+                onClick={() => {
+                  setTopMenu(false);
+                  setConfirmAll(true);
+                }}
+              >
+                Effacer la conversation
+              </button>
+              {pending && <span className={styles.meta}>Possible à la fin de la réponse en cours.</span>}
+            </span>
+          )}
+          <button type="button" aria-label="Actions sur la conversation" aria-expanded={topMenu} className={styles.link} style={{ background: "none", border: "none", padding: "0 6px", fontSize: 18, lineHeight: 1 }} onClick={() => setTopMenu(!topMenu)}>
+            …
           </button>
         </div>
       )}
       {confirmAll && (
-        <div className={styles.dayCard} role="alertdialog" aria-label="Effacer la conversation">
-          <span style={{ fontSize: 14, lineHeight: 1.45 }}>Effacer toute la conversation avec l&apos;agent Courses et repas ? Vos menus, listes et tickets sont gardés. C&apos;est définitif.</span>
-          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-            <Button variant="ghost" onClick={() => setConfirmAll(false)}>
-              Annuler
-            </Button>
-            <Button onClick={() => void eraseAll()} loading={erase.pending}>
-              Effacer
-            </Button>
+        <div style={{ position: "fixed", inset: 0, zIndex: 50, background: "rgba(0, 0, 0, 0.45)", display: "grid", placeItems: "center", padding: 16 }}>
+          <div className={styles.dayCard} role="alertdialog" aria-modal="true" aria-label="Effacer la conversation" style={{ maxWidth: 420, borderTop: "4px solid var(--danger, #b3261e)", background: "var(--bg-raised)" }}>
+            <span style={{ fontSize: 14, lineHeight: 1.45 }}>Effacer toute la conversation avec l&apos;agent Courses et repas ? Vos menus, listes et tickets sont gardés. C&apos;est définitif.</span>
+            <div style={{ display: "flex", gap: 8, marginTop: 10, justifyContent: "flex-end" }}>
+              <Button variant="ghost" onClick={() => setConfirmAll(false)}>
+                Annuler
+              </Button>
+              <Button variant="danger" onClick={() => void eraseAll()} loading={erase.pending}>
+                Effacer
+              </Button>
+            </div>
           </div>
         </div>
       )}
       <div role="log" aria-live="polite" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {messages.map((m, index) => {
           const firstOfExchange = index === 0 || messages[index - 1].exchange !== m.exchange;
-          // appui long sur un message : le même menu que « … »
+          // appui long sur la demande : le même menu que « … » (pas sur les cartes, dont les boutons se tiennent parfois appuyés)
           const hold = {
             onPointerDown: () => {
               pressTimer.current = setTimeout(() => setMenuOf(m.exchange), 600);
@@ -295,22 +334,44 @@ export function ChatPanel({ couple, startMenu = 0, fromTicket = 0, weeks = [] }:
                 <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8, minHeight: 24 }}>
                   {menuOf === m.exchange && (
                     <button type="button" className={styles.link} style={{ border: "1px solid var(--line)", borderRadius: 7, background: "var(--bg-raised)", minHeight: 30, padding: "0 10px", fontWeight: 700 }} onClick={() => void startErase(m.exchange)}>
-                      Effacer
+                      {m.role === "user" ? "Effacer cet échange" : "Effacer ce message"}
                     </button>
                   )}
-                  <button type="button" aria-label="Actions sur cet échange" aria-expanded={menuOf === m.exchange} className={styles.link} style={{ background: "none", border: "none", padding: "0 6px", fontSize: 18, lineHeight: 1 }} onClick={() => setMenuOf(menuOf === m.exchange ? null : m.exchange)}>
+                  <button
+                    type="button"
+                    aria-label={m.role === "user" ? "Actions sur cet échange" : "Actions sur ce message"}
+                    title={m.role === "user" ? "Sur téléphone : appui long sur la demande" : undefined}
+                    aria-expanded={menuOf === m.exchange}
+                    className={styles.link}
+                    style={{ background: "none", border: "none", padding: "0 6px", fontSize: 18, lineHeight: 1 }}
+                    onClick={() => setMenuOf(menuOf === m.exchange ? null : m.exchange)}
+                  >
                     …
                   </button>
                 </div>
               )}
-              <div {...hold} style={{ display: "contents" }}>
-                {body}
-              </div>
+              {m.role === "user" ? (
+                <div {...hold} style={{ display: "contents" }}>
+                  {body}
+                </div>
+              ) : (
+                body
+              )}
             </Fragment>
           );
         })}
         {starter && !pending && week === null && (
           <>
+            <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8, minHeight: 24 }}>
+              {menuOf === "starter" && (
+                <button type="button" className={styles.link} style={{ border: "1px solid var(--line)", borderRadius: 7, background: "var(--bg-raised)", minHeight: 30, padding: "0 10px", fontWeight: 700 }} onClick={eraseStarter}>
+                  Effacer ce message
+                </button>
+              )}
+              <button type="button" aria-label="Actions sur ce message" aria-expanded={menuOf === "starter"} className={styles.link} style={{ background: "none", border: "none", padding: "0 6px", fontSize: 18, lineHeight: 1 }} onClick={() => setMenuOf(menuOf === "starter" ? null : "starter")}>
+                …
+              </button>
+            </div>
             <div className={styles.dayCard} style={{ fontSize: 14, lineHeight: 1.45 }}>
               Pour quelle semaine ?
             </div>
@@ -379,6 +440,19 @@ export function ChatPanel({ couple, startMenu = 0, fromTicket = 0, weeks = [] }:
         )}
         {pending && (
           <>
+            <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 8, minHeight: 24 }}>
+              {menuOf === "pending" && (
+                <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+                  <button type="button" className={styles.link} disabled style={{ border: "1px solid var(--line)", borderRadius: 7, background: "var(--bg-raised)", minHeight: 30, padding: "0 10px", fontWeight: 700, opacity: 0.5 }}>
+                    Effacer cet échange
+                  </button>
+                  <span className={styles.meta}>L&apos;agent écrit sa réponse…</span>
+                </span>
+              )}
+              <button type="button" aria-label="Actions sur cet échange" aria-expanded={menuOf === "pending"} className={styles.link} style={{ background: "none", border: "none", padding: "0 6px", fontSize: 18, lineHeight: 1 }} onClick={() => setMenuOf(menuOf === "pending" ? null : "pending")}>
+                …
+              </button>
+            </div>
             <div style={{ alignSelf: "flex-end", maxWidth: "85%", padding: "8px 12px", borderRadius: "12px 12px 2px 12px", background: "var(--primary)", color: "var(--primary-ink)", fontSize: 14 }}>{pending}</div>
             <div className={styles.dayCard} role="status">
               <span className={styles.meta}>{menuIntent ? (send.slow ? "Je prépare votre menu… Toujours en cours…" : "Je prépare votre menu…") : "Courses et repas écrit…"}</span>
@@ -399,8 +473,16 @@ export function ChatPanel({ couple, startMenu = 0, fromTicket = 0, weeks = [] }:
       </div>
       {erasing && (
         <p className={styles.banner} role="status" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-          <span>Échange effacé.</span>
+          <span>{erasedNote}</span>
           <button type="button" className={styles.link} style={{ background: "none", border: "none", fontWeight: 700 }} onClick={cancelErase}>
+            Annuler
+          </button>
+        </p>
+      )}
+      {starterErased && (
+        <p className={styles.banner} role="status" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+          <span>Message effacé.</span>
+          <button type="button" className={styles.link} style={{ background: "none", border: "none", fontWeight: 700 }} onClick={cancelStarter}>
             Annuler
           </button>
         </p>
