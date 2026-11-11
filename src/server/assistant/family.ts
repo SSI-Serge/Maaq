@@ -268,8 +268,9 @@ export async function setChildProfile(ctx: Ctx, session: SessionContext, id: str
       await trx.deleteFrom("family_event_members").where("member_id", "=", own.id).execute();
       await sql`insert into family_event_series_members (series_id, member_id, account_id) select series_id, ${id}::uuid, account_id from family_event_series_members where member_id = ${own.id}::uuid on conflict do nothing`.execute(trx);
       await trx.deleteFrom("family_event_series_members").where("member_id", "=", own.id).execute();
-      // Tâches encore ouvertes et règles actives : assignées à la fiche enfant. Les tâches faites gardent leur histoire.
-      await trx.updateTable("family_tasks").set({ assigned_member_id: id }).where("assigned_member_id", "=", own.id).where("status", "in", ["proposed", "todo"]).execute();
+      // Tâches et règles actives : assignées à la fiche enfant. Les tâches déjà faites suivent aussi (assignation et « Faite par »), pour que l'historique de l'enfant reste cohérent.
+      await trx.updateTable("family_tasks").set({ assigned_member_id: id }).where("assigned_member_id", "=", own.id).execute();
+      await trx.updateTable("family_tasks").set({ done_by_member_id: id }).where("done_by_member_id", "=", own.id).execute();
       await trx.updateTable("family_task_series").set({ assigned_member_id: id }).where("assigned_member_id", "=", own.id).where("ended_at", "is", null).execute();
     }
     await trx.updateTable("family_members").set({ child_profile_user_id: userId }).where("id", "=", id).execute();

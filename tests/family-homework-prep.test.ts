@@ -228,6 +228,8 @@ describe("profil de l'enfant (D73 S-38 à S-49)", () => {
     const f = await family();
     // Avant le lien : une tâche assignée à la fiche « autre » d'Élodie, et deux RDV où elle figure (dont un où Léo figure déjà).
     const own = await createTask(ctx(), f.elodieSession, { title: "Ranger ma chambre", due: "2054-11-07", assigneeId: f.elodieMember });
+    const past = await createTask(ctx(), f.elodieSession, { title: "Arroser les plantes", due: "2054-11-06", assigneeId: f.elodieMember });
+    await setTaskDone(ctx(), f.elodieSession, past.id, true);
     const judo = await seedEvent(f, { title: "Judo", members: [f.leo, f.elodieMember] });
     const piscine = await seedEvent(f, { title: "Piscine", members: [f.elodieMember] });
     expect((await listTasks(ctx(), f.camilleSession)).assignable.map((m) => m.firstName)).toContain("Élodie");
@@ -236,6 +238,9 @@ describe("profil de l'enfant (D73 S-38 à S-49)", () => {
     expect(await participants(judo)).toEqual([f.leo]);
     expect(await participants(piscine)).toEqual([f.leo]);
     expect((await allTasks(f, f.camilleSession)).find((t) => t.id === own.id)?.assignee).toMatchObject({ id: f.leo, firstName: "Léo" });
+    // Les tâches déjà faites suivent : « Faite par Léo », assignée à sa fiche.
+    expect(await db.selectFrom("family_tasks").select(["assigned_member_id", "done_by_member_id"]).where("id", "=", past.id).executeTakeFirstOrThrow()).toEqual({ assigned_member_id: f.leo, done_by_member_id: f.leo });
+    expect(await db.selectFrom("family_tasks").select("id").where("account_id", "=", f.accountId).where((eb) => eb.or([eb("assigned_member_id", "=", f.elodieMember), eb("done_by_member_id", "=", f.elodieMember)])).execute()).toEqual([]);
     // La fiche masquée n'est plus proposée ; la base refuse qu'on la vise.
     expect((await listTasks(ctx(), f.camilleSession)).assignable.map((m) => m.id)).not.toContain(f.elodieMember);
     expect((await failure(createTask(ctx(), f.camilleSession, { title: "Tâche", due: "2054-11-07", assigneeId: f.elodieMember }))).code).toBe("invalid_assignee");
