@@ -3,8 +3,16 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-11T09:05:00.000Z",
+  "updated": "2026-11-11T10:20:00.000Z",
   "deploys": [
+    {
+      "at": "2026-11-11T10:20:00.000Z",
+      "env": "preview",
+      "what": "Aide Devoirs, lot 2 (US-180) : créer des exercices à partir d'une leçon, fiche réponse réservée aux parents, dossier « Exercices ». Rév. 00108. Suite complète verte (1332 essais). Pas de changement de base (tables créées avec le lot 1). Jamais essayé avec le vrai modèle ni vu à l'écran : le PO le teste. Rien en pilote avant la réponse du DPO.",
+      "storyIds": [
+        "f16s125"
+      ]
+    },
     {
       "at": "2026-11-11T09:05:00.000Z",
       "env": "preview",
@@ -2405,9 +2413,16 @@
         {
           "id": "f16s125",
           "title": "US-180 — Créer des exercices à partir d'une leçon",
-          "state": "building",
-          "env": null,
-          "note": "En cours : 3 exercices, fiche réponse réservée aux parents, barème sur 20, dossier « Exercices »."
+          "state": "testing",
+          "env": "preview",
+          "note": "Sur la zone de test : photo ou texte d'une leçon, 3 exercices (facile, moyen, difficile), fiche réponse et barème sur 20 réservés aux parents, « Mes exercices » pour l'enfant, dossier « Exercices » et suppression pour les parents, impression de l'énoncé seul.",
+          "at": "2026-11-11T10:20:00.000Z",
+          "unsure": [
+            "Jamais essayé avec le vrai modèle : seule une réponse simulée a été contrôlée.",
+            "Écrans jamais vus : le PO les teste.",
+            "La justesse des questions n'est pas contrôlée par le code, seulement la forme de la page.",
+            "Rien en pilote avant la réponse du DPO."
+          ]
         }
       ],
       "decisions": [
@@ -2667,8 +2682,7 @@
           "what": "Plan de développement en 9 lots validé dans ses grandes lignes ; aucun développement commencé"
         }
       ],
-      "building": true,
-      "currentAction": "US-180 : exercices à partir d'une leçon"
+      "building": false
     },
     {
       "id": "f17",
@@ -3366,6 +3380,16 @@
       "title": "Essai du lot 13 et des boutons Plans/Maps sur un vrai téléphone",
       "tag": "Proposed, not built",
       "note": "Tout a été vu dans un navigateur local à 375 px seulement."
+    },
+    {
+      "title": "Formulaire « Demander un RDV » pour l'enfant qui a un profil",
+      "tag": "Proposed, not built",
+      "note": "Reporté par le PO le 11/11/2026 (S-46) : les parents créent ses RDV. Chiffré 1 à 1,5 jour. Rien n'est perdu."
+    },
+    {
+      "title": "Données Devoirs et pages d'exercices dans l'export de la famille",
+      "tag": "Proposed, not built",
+      "note": "L'export ne contient aucune donnée Devoirs aujourd'hui. Signalé au relais le 11/11/2026 ; relève du lot 9. Rien n'est perdu."
     }
   ]
 }
