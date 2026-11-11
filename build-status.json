@@ -3,8 +3,17 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-11T10:20:00.000Z",
+  "updated": "2026-11-11T11:35:00.000Z",
   "deploys": [
+    {
+      "at": "2026-11-11T11:35:00.000Z",
+      "env": "preview",
+      "what": "Aide Devoirs : tous les tchats d'agents fermés au profil d'un enfant (refus du serveur, plus d'entrée à l'écran), données Devoirs et pages d'exercices dans l'export d'un parent, tâches déjà faites reportées sur la fiche enfant au lien du profil. Rév. 00110. Suite complète verte (1334 essais). Pas de changement de base. Écrans non vus, vrai modèle non essayé sur US-180 : le PO teste.",
+      "storyIds": [
+        "f16s123",
+        "f16s125"
+      ]
+    },
     {
       "at": "2026-11-11T10:20:00.000Z",
       "env": "preview",
@@ -3385,11 +3394,6 @@
       "title": "Formulaire « Demander un RDV » pour l'enfant qui a un profil",
       "tag": "Proposed, not built",
       "note": "Reporté par le PO le 11/11/2026 (S-46) : les parents créent ses RDV. Chiffré 1 à 1,5 jour. Rien n'est perdu."
-    },
-    {
-      "title": "Données Devoirs et pages d'exercices dans l'export de la famille",
-      "tag": "Proposed, not built",
-      "note": "L'export ne contient aucune donnée Devoirs aujourd'hui. Signalé au relais le 11/11/2026 ; relève du lot 9. Rien n'est perdu."
     }
   ]
 }
