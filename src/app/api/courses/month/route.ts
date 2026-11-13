@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireProfile } from "@/server/auth/http";
-import { composeMonth, monthReplace, monthReplaceOptions, monthStatus, monthValidate, monthWriteSteps } from "@/server/courses/month/service";
+import { validateMonthMenus } from "@/server/courses/menu-ia/after-validation";
+import { composeMonth, monthReplace, monthReplaceOptions, monthStatus, monthWriteSteps } from "@/server/courses/month/service";
 import { handler, parseBody } from "@/server/http";
 
 export const dynamic = "force-dynamic";
@@ -38,5 +39,5 @@ export const POST = handler(async (request: Request) => {
   if (body.action === "options") return NextResponse.json({ options: await monthReplaceOptions(ctx, session, body) });
   if (body.action === "replace") return NextResponse.json({ card: await monthReplace(ctx, session, body) });
   if (body.action === "steps") return NextResponse.json({ card: await monthWriteSteps(ctx, session, body) });
-  return NextResponse.json({ result: await monthValidate(ctx, session, body) });
+  return NextResponse.json({ result: await validateMonthMenus(ctx, session, body) });
 });

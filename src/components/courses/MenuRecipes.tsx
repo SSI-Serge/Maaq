@@ -24,7 +24,7 @@ function printBlock(title: string, element: HTMLElement | null): void {
 }
 
 /** Recette d'un plat : ingrédients et étapes pour 4 personnes, ou « Recette non renseignée » (CR-46). */
-function RecipeBody({ recipe, servings }: { recipe: Recipe; servings: number | null }) {
+export function RecipeBody({ recipe, servings }: { recipe: Recipe; servings: number | null }) {
   if (!recipe.ingredients.length && !recipe.steps.length) return <p className={styles.meta}>Recette non renseignée. Vous pouvez l&apos;ajouter dans « Mes plats ».</p>;
   return (
     <div style={{ fontSize: 12, lineHeight: 1.5 }}>

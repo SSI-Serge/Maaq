@@ -3,6 +3,7 @@ import type { Ctx, SessionContext } from "@/server/auth/service";
 import { env } from "@/server/env";
 import { loadSettings, requireAccess, type CourseAccess } from "./household/settings";
 import { weekChoices, type WeekChoice } from "./list/weeks";
+import { homeWeekMenu, type HomeWeekMenu } from "./menu-week";
 import { countMenusAndTickets, MIN_MENUS } from "./month/service";
 
 /** Accueil de l'agent « Courses et repas » (CR-Tchat) : ce qui est prêt, ce que l'autre parent a ajouté, le jour du budget. */
@@ -26,6 +27,10 @@ export interface CourseHome {
   month: { menus: number; tickets: number; ready: boolean; needed: number } | null;
   /** Faux pour le profil d'un enfant : les tchats des agents lui sont fermés (S-47), l'écran ne montre pas le tchat. */
   chat: boolean;
+  /** Carte « Menu de la semaine » en tête de l'accueil (CR-72), couple seulement : le menu validé de la semaine en cours, ou `null` (« Préparer le menu de la semaine »). */
+  weekMenu: HomeWeekMenu | null;
+  /** Un menu est validé pour la semaine suivante : « Semaine suivante › » (lundi de cette semaine-là), sinon `null`. */
+  nextWeekMenu: string | null;
 }
 
 const WEEKDAYS = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
@@ -50,8 +55,11 @@ export async function courseHome(ctx: Ctx, session: SessionContext): Promise<Cou
     .where("i.added_by_user_id", "<>", who.userId)
     .orderBy("i.created_at")
     .execute();
+  const weeks = couple ? await weekChoices(ctx.db, who.accountId, ctx.now) : [];
   return {
     access: who.access,
+    weekMenu: couple && weeks[0]?.hasMenu ? await homeWeekMenu(ctx.db, who.accountId, weeks[0].week, ctx.now) : null,
+    nextWeekMenu: couple && weeks[1]?.hasMenu ? weeks[1].week : null,
     firstName: session.user.firstName,
     chat: !(await isChildProfile(ctx.db, session.user.id)),
     missing: settings?.missing ?? [],
@@ -60,7 +68,7 @@ export async function courseHome(ctx: Ctx, session: SessionContext): Promise<Cou
     addedByOthers: others.length ? { by: [...new Set(others.map((o) => o.first_name))].join(" et "), names: others.map((o) => o.label) } : null,
     budgetDay: !!settings && ctx.now.getDate() === settings.budgetDay,
     menuIa: couple && env().MENU_IA === "live",
-    weeks: couple ? await weekChoices(ctx.db, who.accountId, ctx.now) : [],
+    weeks,
     month: couple ? await countMenusAndTickets(ctx.db, who.accountId).then((c) => ({ ...c, ready: c.menus >= MIN_MENUS, needed: MIN_MENUS })) : null,
   };
 }

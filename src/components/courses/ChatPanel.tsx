@@ -18,6 +18,7 @@ import type { ReplaceChoice, ReplaceKind, ReplaceOptions } from "@/server/course
 import { AdjustCard } from "./AdjustCard";
 import { MenuCard, type ReplaceApi } from "./MenuCard";
 import { DAY_LABELS } from "./menu-text";
+import { markMenuValidated } from "./validated-flag";
 import styles from "./courses.module.css";
 
 /** Un menu complet demande plus de 15 s : délai long avant le message de connexion lente (CC-3), comme pour la lecture des tickets. */
@@ -214,6 +215,8 @@ export function ChatPanel({ couple, startMenu = 0, fromTicket = 0, weeks = [] }:
     setValidating(null);
     if (response) {
       setValidated(response.result);
+      // la conversation est vidée côté serveur (CR-72) ; le bandeau « Menu validé » attend le retour sur l'accueil
+      markMenuValidated();
       history.reload();
       // « Valider le menu » ouvre la page Liste de courses (US-156 RF12) ; la question « Ajouter ces plats à vos plats ? » attend dans le tchat
       router.push(`/courses/liste?week=${card.proposal.week}`);

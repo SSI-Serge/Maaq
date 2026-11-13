@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { apiRequest } from "@/client/api";
 import { useApiMutation, useApiQuery } from "@/client/hooks";
@@ -12,6 +13,7 @@ import type { MonthStatus, MonthValidated, MonthView } from "@/server/courses/mo
 import { euro } from "./ListScreen";
 import { DishRow, type ReplaceApi } from "./MenuCard";
 import { DAY_LABELS, sessionText } from "./menu-text";
+import { markMenuValidated } from "./validated-flag";
 import styles from "./courses.module.css";
 
 const BACK = { href: "/courses", label: "Courses et repas" };
@@ -45,7 +47,8 @@ const rangeOf = (week: string, last = false) => {
 function Month({ status, reload }: { status: MonthStatus; reload: () => void }) {
   const [card, setCard] = useState<MonthView | null>(status.card);
   const [decisions, setDecisions] = useState<Record<string, "replace" | "keep">>({});
-  const [done, setDone] = useState<MonthValidated | null>(null);
+  const [done] = useState<MonthValidated | null>(null);
+  const router = useRouter();
   const [budget, setBudget] = useState("");
   const [pendingWhat, setPendingWhat] = useState<string | null>(null);
   const compose = useApiMutation();
@@ -106,7 +109,6 @@ function Month({ status, reload }: { status: MonthStatus; reload: () => void }) 
     if (result) {
       setCard(result.card);
       setDecisions({});
-      setDone(null);
     }
   }
 
@@ -128,7 +130,11 @@ function Month({ status, reload }: { status: MonthStatus; reload: () => void }) 
   async function validateAll(c: MonthView) {
     const keep = Object.entries(decisions).filter(([, v]) => v === "keep").map(([w]) => w);
     const result = await validate.run<{ result: MonthValidated }>("/api/courses/month", { method: "POST", body: { action: "validate", messageId: c.messageId, keep }, timeoutMs: COMPOSE_TIMEOUT_MS });
-    if (result) setDone(result.result);
+    // Validation du menu du mois (CR-72) : retour à l'accueil, avec le bandeau « Menu validé » ; la conversation est vidée côté serveur.
+    if (result) {
+      markMenuValidated();
+      router.push("/courses");
+    }
   }
 
   if (done && card) {

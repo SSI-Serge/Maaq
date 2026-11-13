@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useApiQuery } from "@/client/hooks";
 import { AppShell } from "@/components/app/AppShell";
 import family from "@/components/family/family.module.css";
 import { Loading, Notice, RetryNotice } from "@/components/ui";
 import type { CourseHome } from "@/server/courses/home";
 import { ChatPanel } from "./ChatPanel";
+import { takeMenuValidated } from "./validated-flag";
 import styles from "./courses.module.css";
 
 const BACK = { href: "/accueil", label: "Agents" };
@@ -43,8 +44,66 @@ export function CoursesHomeScreen() {
   );
 }
 
+/**
+ * Carte « Menu de la semaine », en premier sur l'accueil (maquette CR-Tchat v88) : la semaine, le nombre de repas, les 3 prochains repas ; un toucher ouvre le menu complet.
+ * Sans menu validé cette semaine : « Préparer le menu de la semaine », qui ouvre le tchat. « Semaine suivante › » quand la semaine suivante a un menu validé.
+ */
+export function WeekMenuCard({ menu, nextWeek, canPrepare, onPrepare }: { menu: CourseHome["weekMenu"]; nextWeek: string | null; canPrepare: boolean; onPrepare: () => void }) {
+  const plural = (n: number, one: string, many: string) => `${n} ${n > 1 ? many : one}`;
+  return (
+    <>
+      {menu ? (
+        <Link href={`/courses/menu?week=${menu.week}`} style={{ display: "flex", flexDirection: "column", gap: 6, background: "var(--bg-raised)", border: "1px solid var(--secondary)", borderRadius: "var(--radius)", padding: "12px 14px", color: "var(--ink)", textDecoration: "none" }}>
+          <span style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
+            <span style={{ fontFamily: "var(--font-mono, 'IBM Plex Mono', monospace)", fontSize: 10, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--secondary-strong)" }}>Menu de la semaine</span>
+            <span className={styles.meta}>
+              {plural(menu.dinners, "dîner", "dîners")}
+              {menu.express ? ` · ${menu.express} express` : ""}
+            </span>
+          </span>
+          <span style={{ fontFamily: "var(--font-serif, 'Newsreader', serif)", fontSize: 17 }}>{menu.range.replace(/^d/, "D")}</span>
+          {menu.next.map((m, i) => (
+            <span key={i} style={{ display: "flex", gap: 8, fontSize: 13, borderTop: "1px solid var(--line)", paddingTop: 5 }}>
+              <span style={{ width: 62, flexShrink: 0, fontWeight: 700, color: "var(--ink-soft)" }}>{m.day}</span>
+              <span style={{ flex: 1 }}>{m.name}</span>
+              {m.express && <span style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, borderRadius: 100, padding: "2px 8px", background: "var(--bg-sunken)", color: "var(--ink-soft)" }}>express</span>}
+            </span>
+          ))}
+          <span style={{ alignSelf: "flex-end", fontSize: 13, fontWeight: 700, color: "var(--primary)" }}>Voir le menu complet ›</span>
+        </Link>
+      ) : (
+        canPrepare && (
+          <button type="button" onClick={onPrepare} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, width: "100%", minHeight: 64, padding: "12px 14px", borderRadius: "var(--radius)", border: "none", background: "var(--primary)", color: "var(--primary-ink)", fontWeight: 700, fontSize: 18, textAlign: "left", cursor: "pointer" }}>
+            <span>
+              <span style={{ display: "block", fontFamily: "var(--font-serif, 'Newsreader', serif)", fontSize: 17 }}>Préparer le menu de la semaine</span>
+              <span style={{ display: "block", fontSize: 12, fontWeight: 500, opacity: 0.85 }}>Aucun menu validé cette semaine.</span>
+            </span>
+            <span aria-hidden="true">›</span>
+          </button>
+        )
+      )}
+      {nextWeek && (
+        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: -4 }}>
+          <Link href={`/courses/menu?week=${nextWeek}`} style={{ fontSize: 13, fontWeight: 700, color: "var(--primary)" }}>
+            Semaine suivante ›
+          </Link>
+        </div>
+      )}
+    </>
+  );
+}
+
 function Home({ home }: { home: CourseHome }) {
   const couple = home.access === "couple";
+  // « Menu validé. Retrouvez-le en haut de l'accueil. » : 5 secondes, au retour sur l'accueil après une validation (CR-72)
+  const [validatedNote, setValidatedNote] = useState(false);
+  useEffect(() => {
+    if (!takeMenuValidated()) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setValidatedNote(true);
+    const timer = setTimeout(() => setValidatedNote(false), 5000);
+    return () => clearTimeout(timer);
+  }, []);
   // menu composé en conversation (MENU_IA ouvert) : le premier parcours ouvre le tchat plutôt que l'ancien écran
   // arrivée par un lien (« Préparer le menu », « Menu à partir de ce ticket ») : le tchat prend la suite dès l'ouverture
   const params = useSearchParams();
@@ -62,6 +121,12 @@ function Home({ home }: { home: CourseHome }) {
           <Link href="/courses/reglages" className={styles.link} aria-label="Réglages du foyer">
             Réglages du foyer
           </Link>
+        </div>
+      )}
+      {couple && <WeekMenuCard menu={home.weekMenu} nextWeek={home.nextWeekMenu} canPrepare={home.menuIa && home.chat} onPrepare={() => setStartMenu((n) => n + 1)} />}
+      {validatedNote && (
+        <div role="status" style={{ position: "fixed", left: 16, right: 16, bottom: 84, zIndex: 12, maxWidth: 358, margin: "0 auto", background: "var(--ink)", color: "var(--primary-ink)", borderRadius: "var(--radius)", padding: "12px 14px", fontSize: 13, fontWeight: 600 }}>
+          Menu validé. Retrouvez-le en haut de l&apos;accueil.
         </div>
       )}
       <Link href="/courses/ma-liste" className={styles.scenarioCard} style={{ background: "var(--primary-soft)" }}>

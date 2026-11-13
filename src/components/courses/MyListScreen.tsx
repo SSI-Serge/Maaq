@@ -141,6 +141,12 @@ function Content({ list, reload, onPrint, printing, onWeek, onScope }: { list: M
     <>
       {selector}
       {scopes}
+      {/* Lien réciproque vers le menu validé de la semaine (CR-72), pour le couple. */}
+      {!printing && couple && list.hasMenu && list.week && (
+        <Link href={`/courses/menu?week=${list.week}`} className={styles.link} style={{ alignSelf: "flex-end" }}>
+          Menu de la semaine ›
+        </Link>
+      )}
       {printing && list.scope === "group" && list.group && <h2 style={{ margin: "0 0 8px", fontSize: 16 }}>Liste du mois · {list.group.weeks.length} semaines</h2>}
       {!printing && (
         <div className={styles.tools}>

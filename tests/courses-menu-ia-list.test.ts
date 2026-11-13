@@ -1,3 +1,14 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { WeekMenuCard } from "@/components/courses/HomeScreen";
+import { MenuDishRows } from "@/components/courses/MenuWeekScreen";
+import { listCourseMessages } from "@/server/courses/chat/service";
+import { courseHome } from "@/server/courses/home";
+import { validateWeekMenu } from "@/server/courses/menu-ia/after-validation";
+import { MONTH_PREFIX } from "@/server/courses/menu-ia/cards";
+import { weekMenuView } from "@/server/courses/menu-week";
+import { env } from "@/server/env";
+import { encrypt } from "@/server/security/crypto";
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import type { AssistantModel, ModelRequest, ModelResponse } from "@/server/assistant/model";
@@ -175,5 +186,118 @@ describe("CR-42 : revalidation, liste, Mes plats (M4)", () => {
     expect(again.added).toEqual([]);
     expect((await dishForm(at(), c.f.sophie)).dishes.filter((d) => d.name === "Velouté de panais")).toHaveLength(1);
     expect((await rejection(addMenuDishesToMine(at(), c.f.elodie, { week: WEEK, slots: ["dinner:1"] }))).status).toBe(403);
+  });
+});
+
+describe("CR-72, US-180bis : la conversation est vidée à la validation, le menu se retrouve sur l'accueil", () => {
+  const TUESDAY = new Date(2026, 10, 10, 10, 0, 0);
+  const key = () => Buffer.from(env().ENCRYPTION_KEY, "base64");
+  const threadOf = async (userId: string) => db.selectFrom("agent_conversations").select("id").where("user_id", "=", userId).executeTakeFirstOrThrow();
+
+  it("« Valider le menu » vide la conversation du profil qui valide, pour de bon ; la proposition cachée du mois et le fil de l'autre parent restent ; le menu est gardé", async () => {
+    const c = await household();
+    const card = await compose(c, fullMenu(c));
+    // l'autre parent a son propre fil, et une proposition du menu du mois est rangée, cachée, dans celui de Sophie
+    await sendCourseMessage(at(), c.f.marc, { requestId: randomUUID(), text: "Bonjour" }, { model: scripted(reply("Bonjour Marc")) });
+    const sophieThread = await threadOf(c.f.userIds.sophie);
+    const hidden = await db.insertInto("agent_conversation_messages").values({ conversation_id: sophieThread.id, sender: "agent", kind: "text", content: encrypt(`${MONTH_PREFIX},"id":"x","weeks":[]}`, key()), created_at: NOW }).returning("id").executeTakeFirstOrThrow();
+    expect((await listCourseMessages(at(), c.f.sophie)).length).toBeGreaterThanOrEqual(3);
+
+    const result = await validateWeekMenu(at(), c.f.sophie, card.card!.messageId);
+    expect(result).toMatchObject({ week: WEEK, cleared: true });
+    // vraie suppression : il ne reste dans le fil de Sophie que la proposition cachée
+    expect(await listCourseMessages(at(), c.f.sophie)).toEqual([]);
+    expect((await db.selectFrom("agent_conversation_messages").select("id").where("conversation_id", "=", sophieThread.id).execute()).map((r) => r.id)).toEqual([hidden.id]);
+    expect((await listCourseMessages(at(), c.f.marc)).map((m) => m.text)).toEqual(["Bonjour", "Bonjour Marc"]);
+    // le menu, ses recettes et la liste préparée sont là
+    expect((await prepareList(at(), c.f.sophie, WEEK)).menu?.recipes).toHaveLength(9);
+
+    // l'agent sait qu'un menu est validé par les données du menu, pas par la conversation (règle 4)
+    const model = scripted(reply("D'accord."));
+    await sendCourseMessage(at(TUESDAY), c.f.sophie, { requestId: randomUUID(), text: "Un menu pour cette semaine", week: WEEK }, { model });
+    expect(JSON.stringify(model.seen[0])).not.toContain("Compose mon menu");
+    const context = JSON.stringify(model.seen[0].messages);
+    expect(context).toContain("un menu est déjà validé pour cette semaine");
+    expect(context).not.toContain("Voici votre menu");
+  });
+
+  it("une réponse en cours ne bloque pas la validation : le menu est validé, la conversation reste telle quelle", async () => {
+    const c = await household();
+    const card = await compose(c, fullMenu(c));
+    const thread = await threadOf(c.f.userIds.sophie);
+    // une demande toute récente, sans réponse
+    await db.insertInto("agent_conversation_messages").values({ conversation_id: thread.id, sender: "profile", kind: "text", content: encrypt("Et pour dimanche ?", key()), created_at: new Date(NOW.getTime() + 30_000) }).execute();
+    const before = (await listCourseMessages(at(new Date(NOW.getTime() + 60_000)), c.f.sophie)).length;
+    const result = await validateWeekMenu(at(new Date(NOW.getTime() + 60_000)), c.f.sophie, card.card!.messageId);
+    expect(result.cleared).toBe(false);
+    expect((await listCourseMessages(at(new Date(NOW.getTime() + 60_000)), c.f.sophie)).length).toBe(before);
+    expect(await db.selectFrom("meal_menus").select("id").where("account_id", "=", c.f.accountId).execute()).toHaveLength(1);
+  });
+
+  it("accueil : la carte « Menu de la semaine » montre la semaine en cours, le nombre de repas et les 3 prochains dîners ; « Semaine suivante » quand elle a un menu", async () => {
+    const c = await household();
+    const card = await compose(c, fullMenu(c));
+    await validateWeekMenu(at(), c.f.sophie, card.card!.messageId);
+    // le vendredi 6, le menu est celui de la semaine suivante : pas de carte, mais le lien « Semaine suivante »
+    const friday = await courseHome(at(), c.f.sophie);
+    expect(friday.weekMenu).toBeNull();
+    expect(friday.nextWeekMenu).toBe(WEEK);
+    // le mardi 10, c'est la semaine en cours : le dîner du jour d'abord (« Ce soir »), puis mercredi et jeudi
+    const tuesday = await courseHome(at(TUESDAY), c.f.marc);
+    expect(tuesday.weekMenu).toMatchObject({ week: WEEK, range: "du 9 au 15 nov.", dinners: 7, express: 2 });
+    expect(tuesday.weekMenu!.next.map((m) => [m.day, m.express])).toEqual([["Ce soir", false], ["Mer. 11", false], ["Jeu. 12", false]]);
+    expect(tuesday.weekMenu!.next[0].name).toBe(c.catalogDishes[0]);
+    expect(tuesday.nextWeekMenu).toBeNull();
+    // le dimanche 15, il reste un dîner : les plats express complètent, sans jour
+    const sunday = await courseHome(at(new Date(2026, 10, 15, 10, 0, 0)), c.f.sophie);
+    expect(sunday.weekMenu!.next.map((m) => [m.day, m.express])).toEqual([["Ce soir", false], ["", true], ["", true]]);
+    // un invité secondaire n'a ni carte ni lien
+    const guest = await courseHome(at(TUESDAY), c.f.elodie);
+    expect([guest.weekMenu, guest.nextWeekMenu]).toEqual([null, null]);
+  });
+
+  it("écran « Menu de la semaine » : le menu complet de la semaine demandée, les plats à ajouter à « Mes plats », réservé au couple", async () => {
+    const c = await household();
+    const card = await compose(c, fullMenu(c));
+    await validateWeekMenu(at(), c.f.sophie, card.card!.messageId);
+    const view = await weekMenuView(at(TUESDAY), c.f.marc);
+    expect(view.tabs.map((t) => [t.label, t.week, t.hasMenu])).toEqual([["Cette semaine", WEEK, true], ["Semaine suivante", "2026-11-16", false]]);
+    expect(view).toMatchObject({ week: WEEK, today: 2, listValidated: false });
+    expect(view.menu!.recipes.filter((r) => r.kind === "dinner").map((r) => r.day)).toEqual(["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]);
+    // le plat de « Mes plats » n'est pas à ajouter ; les plats libres et ceux du catalogue le sont
+    expect(view.addable.map((a) => a.slot)).not.toContain("dinner:1");
+    expect(view.addable.map((a) => a.slot)).toEqual(expect.arrayContaining(["dinner:4", "express:1"]));
+    // « Ajouter à mes plats » depuis l'écran : le plat n'est plus proposé ensuite
+    await addMenuDishesToMine(at(TUESDAY), c.f.marc, { week: WEEK, slots: ["dinner:4"] });
+    expect((await weekMenuView(at(TUESDAY), c.f.marc)).addable.map((a) => a.slot)).not.toContain("dinner:4");
+    // la semaine suivante n'a pas de menu ; vue depuis le vendredi 6, le menu est celui de la « semaine suivante »
+    expect((await weekMenuView(at(TUESDAY), c.f.marc, "2026-11-16")).menu).toBeNull();
+    const early = await weekMenuView(at(), c.f.sophie);
+    expect(early).toMatchObject({ week: WEEK, today: null });
+    expect((await rejection(weekMenuView(at(TUESDAY), c.f.elodie))).status).toBe(403);
+  });
+
+  it("rendu : la carte de l'accueil et les lignes du menu (jour, « Ce soir », « Passé », « Ajouter à mes plats »)", () => {
+    const home = renderToStaticMarkup(createElement(WeekMenuCard, { menu: { week: WEEK, range: "du 9 au 15 nov.", dinners: 7, express: 4, next: [{ day: "Ce soir", name: "Poulet yassa", express: false }, { day: "", name: "Salade de lentilles", express: true }] }, nextWeek: "2026-11-16", canPrepare: true, onPrepare: () => undefined }));
+    expect(home).toContain("Menu de la semaine");
+    expect(home).toContain("7 dîners · 4 express");
+    expect(home).toContain("Du 9 au 15 nov.");
+    expect(home).toContain("Ce soir");
+    expect(home).toContain(`href="/courses/menu?week=${WEEK}"`);
+    expect(home).toContain("Voir le menu complet ›");
+    expect(home).toContain('href="/courses/menu?week=2026-11-16"');
+    const none = renderToStaticMarkup(createElement(WeekMenuCard, { menu: null, nextWeek: null, canPrepare: true, onPrepare: () => undefined }));
+    expect(none).toContain("Préparer le menu de la semaine");
+    expect(none).not.toContain("Semaine suivante");
+    expect(renderToStaticMarkup(createElement(WeekMenuCard, { menu: null, nextWeek: null, canPrepare: false, onPrepare: () => undefined }))).toBe("");
+
+    const recipe = (day: string, name: string) => ({ name, kind: "dinner" as const, day, time: "30 min", ingredients: [], steps: [] });
+    const rows = renderToStaticMarkup(createElement(MenuDishRows, { week: WEEK, today: 2, recipes: [recipe("Lundi", "Couscous"), recipe("Mardi", "Poulet yassa"), recipe("Mercredi", "Velouté de panais")], servings: 4, addable: ["dinner:3"], added: [], busy: false, onAdd: () => undefined }));
+    expect(rows).toMatch(/Lun\. 9.*Couscous.*Passé.*Mar\. 10.*Poulet yassa.*Ce soir.*Mer\. 11.*Velouté de panais/s);
+    expect(rows.match(/Ajouter à mes plats/g)).toHaveLength(1);
+    expect(rows.match(/Passé/g)).toHaveLength(1);
+    const added = renderToStaticMarkup(createElement(MenuDishRows, { week: WEEK, today: null, recipes: [recipe("Mercredi", "Velouté de panais")], servings: 4, addable: ["dinner:3"], added: ["dinner:3"], busy: false, onAdd: () => undefined }));
+    expect(added).toContain("✓ Ajouté à « Mes plats »");
+    expect(added).not.toContain("Ce soir");
   });
 });

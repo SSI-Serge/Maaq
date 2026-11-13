@@ -56,6 +56,20 @@ export async function eraseExchange(ctx: Ctx, session: SessionContext, messageId
   return { deleted: Number(done.numDeletedRows) };
 }
 
+/**
+ * Après la validation d'un menu (CR-72, US-180bis) : la conversation du profil qui valide est vidée, par une vraie suppression en base. Seuls ses messages visibles partent ;
+ * la proposition cachée du menu du mois reste, comme les menus, les listes, les recettes et le budget, et les fils des autres profils ne sont pas touchés. Une réponse en
+ * cours ne bloque rien : la conversation reste alors telle quelle (`skipped`), le menu est validé quand même.
+ */
+export async function clearAfterValidation(ctx: Ctx, userId: string): Promise<{ deleted: number; skipped: boolean }> {
+  const thread = await visible(ctx.db, userId);
+  if (!thread || !thread.rows.length) return { deleted: 0, skipped: false };
+  const last = thread.rows[thread.rows.length - 1];
+  if (last.sender !== "agent" && ctx.now.getTime() - last.at.getTime() < REPLY_IN_PROGRESS_MS) return { deleted: 0, skipped: true };
+  const done = await ctx.db.deleteFrom("agent_conversation_messages").where("conversation_id", "=", thread.conversationId).where("id", "in", thread.rows.map((r) => r.id) as never[]).executeTakeFirst();
+  return { deleted: Number(done.numDeletedRows), skipped: false };
+}
+
 /** « Effacer la conversation » : tous les échanges visibles de ce profil ; la proposition cachée du menu du mois reste. Une réponse en cours fait refuser l'effacement. */
 export async function eraseConversation(ctx: Ctx, session: SessionContext): Promise<{ deleted: number }> {
   await requireAccess(ctx, session, "list");

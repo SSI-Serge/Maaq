@@ -2,7 +2,7 @@ import { refuseChildChat } from "@/server/assistant/profile-member";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireProfile } from "@/server/auth/http";
-import { validateMenuCard } from "@/server/courses/menu-ia/validate";
+import { validateWeekMenu } from "@/server/courses/menu-ia/after-validation";
 import { handler, parseBody } from "@/server/http";
 
 export const dynamic = "force-dynamic";
@@ -16,5 +16,5 @@ export const POST = handler(async (request: Request) => {
   // Les tchats des agents sont fermés au profil d'un enfant (S-47) : ses cartes aussi.
   await refuseChildChat(ctx.db, session.user.id);
   const body = await parseBody(request, schema);
-  return NextResponse.json({ result: await validateMenuCard(ctx, session, body.messageId) });
+  return NextResponse.json({ result: await validateWeekMenu(ctx, session, body.messageId) });
 });
