@@ -183,6 +183,8 @@ async function nearbyOf(db: Kysely<DB>, v: Viewer, e: CalendarEvent): Promise<Ne
   const found: NearbyView[] = [];
   for (const o of around) {
     if (o.id === e.id || o.allDay || !(e.allFamily || o.allFamily || o.memberIds.some((m) => who.has(m)))) continue;
+    // Un RDV que le profil ne voit pas (RDV de toute la famille pour le profil d'un enfant, S-45) n'est pas signalé, même par son heure.
+    if (!canSee(v, o)) continue;
     const before = e.startsAt.getTime() - o.endsAt.getTime();
     const after = o.startsAt.getTime() - end.getTime();
     if (before >= 0 && before < gap) found.push({ id: o.id, side: "before", at: utcToLocal(o.endsAt, v.timeZone), minutes: Math.round(before / 60_000) });

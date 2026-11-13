@@ -4,6 +4,8 @@
  * est concluant : le corps de la requête est le même, seule la création du client changera. Microsoft Foundry est abandonné (pas de Claude en Europe).
  */
 
+import { estimateCostUsd } from "./cost";
+
 export interface TextBlock { type: "text"; text: string }
 export interface ToolUseBlock { type: "tool_use"; id: string; name: string; input: unknown }
 /** Bloc de réflexion et autres : à renvoyer tels quels dans l'historique. */
@@ -76,7 +78,7 @@ export function createModel(config: ModelConfig): AssistantModel {
   const sleep = config.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   const url = `${config.baseUrl ?? "https://api.anthropic.com"}/v1/messages`;
 
-  return {
+  const core: AssistantModel = {
     id: config.model,
     async send(request, options = {}) {
       const streaming = !!options.onDelta;
@@ -138,6 +140,16 @@ export function createModel(config: ModelConfig): AssistantModel {
           clearTimeout(timer);
         }
       }
+    },
+  };
+  return {
+    ...core,
+    async send(request, options) {
+      const response = await core.send(request, options);
+      // Trace de dépense, une ligne par appel réussi, tous modules confondus : des chiffres seulement. L'alerte de budget (`src/server/budget-alert.ts`) les additionne.
+      const apiCostUsd = estimateCostUsd(config.model, response.usage);
+      if (apiCostUsd !== null) console.info(JSON.stringify({ event: "model_call", model: config.model, apiCostUsd }));
+      return response;
     },
   };
 }

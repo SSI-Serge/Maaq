@@ -79,6 +79,8 @@ const schema = z.object({
   PRESENTATION_BUCKET: z.string().min(3).optional(),
   /** Service interne de lecture des documents (OCR, noms propres), `services/contract-reader`. Absent : les documents restent en attente de masquage. */
   CONTRACT_READER_URL: z.string().url().optional(),
+  /** Budget mensuel des appels à l'IA, en dollars : des alertes partent à 50, 80 et 95 % (`src/server/budget-alert.ts`). Absent : pas d'alerte. */
+  BUDGET_ALERT_USD: z.coerce.number().positive().optional(),
   /** Bucket Cloud Storage privé (UE) des sauvegardes quotidiennes de la base ; absent : pas de sauvegarde automatique. Lu directement par `src/server/backup.ts`. */
   BACKUP_BUCKET: z.string().min(3).optional(),
   /** Zone de test : adresses et numéros des comptes internes dont les messages sont copiés dans la boîte de test, séparés par des virgules. Lu par la messagerie. */

@@ -52,7 +52,7 @@ export class LocalStore implements ObjectStore {
 
 /** Jeton d'accès du compte de service de Cloud Run, demandé au serveur de métadonnées de Google et gardé jusqu'à sa fin de validité. */
 let token: { value: string; expiresAt: number } | null = null;
-async function accessToken(): Promise<string> {
+export async function accessToken(): Promise<string> {
   if (token && token.expiresAt > Date.now() + 60_000) return token.value;
   const response = await fetch("http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token", { headers: { "Metadata-Flavor": "Google" } });
   if (!response.ok) throw new Error(`Jeton Google indisponible (${response.status})`);

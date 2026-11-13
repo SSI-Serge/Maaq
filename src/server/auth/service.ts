@@ -573,7 +573,8 @@ export async function verifyRecoveryCode(
   input: { email: string; code: string; purpose: RecoveryPurpose; knownDeviceIds: string[] },
 ): Promise<RecoveryCheckResult> {
   const user = await findUserByEmail(ctx.db, input.email);
-  if (!user || !canRecover(user)) return { kind: "incorrect" };
+  // Même réponse qu'une adresse connue sans code en cours : la vérification ne dit pas si l'adresse a un compte (revue de sécurité du 13/11/2026).
+  if (!user || !canRecover(user)) return { kind: "missing" };
   const result = await checkCode(ctx.db, { userId: user.id, purpose: input.purpose, code: input.code, now: ctx.now });
   if (result !== "ok") return { kind: result };
   return {

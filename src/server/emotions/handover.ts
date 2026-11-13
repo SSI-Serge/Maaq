@@ -50,6 +50,8 @@ export async function undoHandOver(ctx: Ctx, session: SessionContext, taskId: st
 /** Fin du délai : envoie la notification retenue si l'on n'a pas annulé. Sans danger à relancer ; avant l'échéance, elle ne part pas. */
 export async function releaseHandOver(ctx: Ctx, session: SessionContext, taskId: string): Promise<{ sent: number }> {
   await requireCouple(ctx, session);
+  // La tâche est celle du foyer du profil : sans ce contrôle, un parent pouvait faire partir la notification retenue d'un autre foyer (revue de sécurité du 13/11/2026).
+  await getTask(ctx, session, taskId);
   return { sent: await releaseHeldAssignments(ctx, { taskId }) };
 }
 

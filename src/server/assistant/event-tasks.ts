@@ -90,6 +90,8 @@ export async function loadEventTasks(db: Kysely<DB>, v: TaskViewer, e: CalendarE
       }))
       .sort((a, b) => (a.due ?? "").localeCompare(b.due ?? "") || a.title.localeCompare(b.title, "fr"));
   }
+  // Une tâche proposée n'est montrée qu'aux parents et au demandeur du RDV, comme le veut la règle de la base (family_tasks_visible_to) : ni à un invité secondaire, ni à un enfant.
+  if (!v.parent && e.createdByUserId !== v.userId) items = items.filter((i) => i.status !== "proposed");
   const open_ = e.status === "provisional" || e.status === "set_aside" || e.status === "confirmed";
   return {
     items, limit, reached: items.length >= limit, perSession: Boolean(e.seriesId), assignable: assignableMembers(v, chips), editable: canActOn(v, e) && open_ && e.startsAt.getTime() > now.getTime(),

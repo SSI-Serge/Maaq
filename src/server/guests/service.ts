@@ -438,6 +438,8 @@ export async function removeGuest(ctx: Ctx, session: SessionContext, guestId: st
       .where("revoked_at", "is", null)
       .execute();
     await trx.deleteFrom("cc_addresses").where("user_id", "=", guestId).execute();
+    // Plus aucune notification vers ses appareils.
+    await trx.deleteFrom("push_subscriptions").where("device_id", "in", (eb) => eb.selectFrom("devices").select("id").where("user_id", "=", guestId)).execute();
     // La fiche enfant reliée à ce profil redevient libre : elle peut être proposée à une nouvelle invitation (S-56).
     await trx.updateTable("family_members").set({ child_profile_user_id: null }).where("account_id", "=", accountId).where("child_profile_user_id", "=", guestId).execute();
     return guest;

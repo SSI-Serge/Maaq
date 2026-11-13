@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 /**
@@ -7,6 +8,18 @@ import { NextResponse } from "next/server";
  */
 export function isDevToolsEnabled(): boolean {
   return process.env.NODE_ENV !== "production" || process.env.MAAQ_ZONE === "test";
+}
+
+/**
+ * Une action serveur des pages /dev peut être postée sur n'importe quelle adresse, donc hors du contrôle de `src/proxy.ts` : sur la zone de test en ligne, elle revérifie
+ * elle-même que l'appelant détient la clé des outils de test (cookie posé par le proxy).
+ */
+export async function devActionAllowed(): Promise<boolean> {
+  if (!isDevToolsEnabled()) return false;
+  if (process.env.NODE_ENV !== "production") return true;
+  const key = process.env.MAAQ_DEV_TOOLS_KEY;
+  if (!key || key.length < 16) return false;
+  return (await cookies()).get("maaq_dev")?.value === key;
 }
 
 /** Réponse 404 si une route de développement est appelée en production. */

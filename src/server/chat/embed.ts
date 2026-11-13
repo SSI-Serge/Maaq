@@ -1,4 +1,5 @@
 import { digitorn } from "@/server/adapters/digitorn";
+import { refuseChildChat } from "@/server/assistant/profile-member";
 import type { Ctx, SessionContext } from "@/server/auth/service";
 import { asRejection } from "@/server/digitorn-errors";
 import { env } from "@/server/env";
@@ -55,6 +56,8 @@ export function buildClaims(session: SessionContext, members: { firstName: strin
  * le tchat de Digitorn.
  */
 export async function openEmbeddedChat(ctx: Ctx, session: SessionContext, agentId: string): Promise<EmbeddedChat> {
+  // Le profil d'un enfant n'a aucun tchat (S-47), tchat intégré de Digitorn compris : ce chemin n'avait pas le contrôle (revue de sécurité du 13/11/2026).
+  await refuseChildChat(ctx.db, session.user.id);
   const agent = await loadAgent(ctx, session, agentId);
   if (!isEmbedded(agent)) throw new Rejection("not_embedded", "Cet agent n'a pas de tchat Digitorn intégré.", 409);
   const viaProject = agent.has_project && digitorn().embeddedChat;

@@ -1,3 +1,4 @@
+import { runBudgetAlert } from "./budget-alert";
 import { runDailyBackup } from "./backup";
 import { sql } from "kysely";
 import type { Ctx } from "@/server/auth/service";
@@ -107,6 +108,8 @@ export async function runDueJobs(ctx: Ctx, options: { force?: boolean } = {}): P
     console.error(`Idées de sorties : ${describeError(error)}`);
     return { prepared: 0, empty: 0, notified: 0, failed: 1 };
   });
+  // Alerte avant la limite de dépense de la clé Anthropic, une fois par heure, quand un budget est réglé (BUDGET_ALERT_USD).
+  await runBudgetAlert(ctx).catch((error) => console.error(`Alerte de budget : ${describeError(error)}`));
   // Sauvegarde quotidienne de la base, la nuit, quand un bucket de sauvegarde est configuré (BACKUP_BUCKET).
   await runDailyBackup(ctx).catch((error) => console.error(`Sauvegarde quotidienne : ${describeError(error)}`));
   // Documents de contrat : la suppression 48 h après la transmission demande un passage à chaque tour, pas une purge quotidienne.

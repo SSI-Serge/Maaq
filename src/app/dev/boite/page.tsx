@@ -2,13 +2,13 @@ import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { devOutbox, messenger } from "@/server/adapters/messaging";
 import { Button, Card, Eyebrow, Screen } from "@/components/ui";
-import { isDevToolsEnabled } from "@/server/dev-tools";
+import { devActionAllowed } from "@/server/dev-tools";
 
 export const dynamic = "force-dynamic";
 
 async function sendTestEmail() {
   "use server";
-  if (!isDevToolsEnabled()) return;
+  if (!(await devActionAllowed())) return;
   await messenger().sendEmail({
     to: "camille@maaq.test",
     subject: "Email de test MAAQ",

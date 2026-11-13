@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { devDigitorn } from "@/server/adapters/digitorn";
 import { reportRevokedAuthorization } from "@/server/connectors/service";
 import { db } from "@/server/db/client";
-import { isDevToolsEnabled } from "@/server/dev-tools";
+import { devActionAllowed } from "@/server/dev-tools";
 import { Button, Card, Eyebrow, Screen } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +13,7 @@ const SERVICE = { google_drive: "Google Drive", google_calendar: "Google Agenda"
 
 async function decide(formData: FormData) {
   "use server";
-  if (!isDevToolsEnabled()) return;
+  if (!(await devActionAllowed())) return;
   const state = String(formData.get("etat") ?? "");
   const outcome = String(formData.get("resultat") ?? "");
   const other = String(formData.get("autre_compte") ?? "").trim();
@@ -25,7 +25,7 @@ async function decide(formData: FormData) {
 
 async function revoke(formData: FormData) {
   "use server";
-  if (!isDevToolsEnabled()) return;
+  if (!(await devActionAllowed())) return;
   await reportRevokedAuthorization(
     { db: db(), now: new Date() },
     {

@@ -222,6 +222,10 @@ describe("« Confier à » (US-146, E-18)", () => {
     // Avant la fin du délai, rien ne part ; ensuite la notification est envoyée une seule fois.
     expect(await releaseHeldAssignments(at())).toBe(0);
     expect((await releaseHandOver(at(), f.sophie, task.id)).sent).toBe(0);
+    // Un parent d'un autre foyer ne peut pas faire partir cette notification, même une fois le délai écoulé (revue de sécurité du 13/11/2026).
+    const other = await coupleFamily(db);
+    await expect(releaseHandOver(at(new Date(Date.now() + 20_000)), other.sophie, task.id)).rejects.toThrow();
+    expect(await assignedMails(f)).toEqual([]);
     expect(await releaseHeldAssignments(at(new Date(Date.now() + 20_000)))).toBe(1);
     const mails = await assignedMails(f);
     expect(mails).toHaveLength(1);
