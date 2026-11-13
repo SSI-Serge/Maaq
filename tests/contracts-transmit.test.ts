@@ -3,7 +3,7 @@ import { sql } from "kysely";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { addContract as addCategory, addContractField, addDocumentField, archiveContract } from "@/server/admin/contracts";
 import { updateSettings } from "@/server/admin/settings";
-import { messenger } from "@/server/adapters/messaging";
+import { devOutbox, messenger } from "@/server/adapters/messaging";
 import type { Ctx, SessionContext } from "@/server/auth/service";
 import { addContract, addDocument, getContracts, setChannel, type ContractView } from "@/server/contracts/service";
 import { sealBlob } from "@/server/contracts/masked";
@@ -177,6 +177,30 @@ describe("transmission pour le challenge par email (US-129 RF5, RF6, C-03)", () 
     expect(again.slots[0].document?.expiresAt).toBe(again.transmission!.documentsDeletedAt);
     // Rien à renvoyer quand l'envoi a abouti.
     expect((await failure(relaunchChannel(at(), f.session, base.id, "challenge"))).message).toMatch(/échoué|renvoie/);
+  });
+});
+
+describe("challenge simulé sur une zone de test (décision du PO du 13/11)", () => {
+  afterEach(() => {
+    delete process.env.MAAQ_ZONE;
+  });
+
+  it("zone de test : l'email ne part pas par la messagerie réelle, il est déposé dans la boîte de test avec « [Simulation] », sans le contenu des pièces jointes ; l'écran le sait", async () => {
+    const { f, base } = await readyForChallenge();
+    expect((await getContracts(at(), f.session)).challenge.simulated).toBe(false);
+    process.env.MAAQ_ZONE = "test";
+    expect((await getContracts(at(), f.session)).challenge.simulated).toBe(true);
+    const box = vi.spyOn(devOutbox(), "sendEmail");
+    const before = (await messagesTo(BROKER)).length;
+
+    const done = await transmitContract(at(), f.session, base.id);
+    expect(done.transmission?.challengeStatus).toBe("sent");
+    expect(box).toHaveBeenCalledTimes(1);
+    expect(box.mock.calls[0][0].subject).toMatch(/^\[Simulation\] Challenge d'un contrat — /);
+    const mails = (await messagesTo(BROKER)).slice(0, (await messagesTo(BROKER)).length - before);
+    expect(mails).toHaveLength(1);
+    expect(mails[0].text).toMatch(/Pièces jointes : conditions\.pdf \(\d+ Ko\)/);
+    expect(mails[0].text).not.toContain("%PDF");
   });
 });
 

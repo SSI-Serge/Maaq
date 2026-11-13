@@ -1,6 +1,6 @@
 import { createHmac } from "node:crypto";
 import { sql } from "kysely";
-import { messenger } from "@/server/adapters/messaging";
+import { devOutbox, messenger } from "@/server/adapters/messaging";
 import { open } from "@/server/assistant/fields";
 import { familyTimeZone } from "@/server/assistant/reminders";
 import { localDay } from "@/server/assistant/local-time";
@@ -9,7 +9,7 @@ import { env } from "@/server/env";
 import { Rejection } from "@/server/http";
 import { describeError } from "@/server/safe-log";
 import { loadDocument } from "./storage";
-import { unbundlePhotos, type ContractView } from "./service";
+import { challengeSimulated, unbundlePhotos, type ContractView } from "./service";
 import { getContracts } from "./service";
 
 /**
@@ -140,9 +140,11 @@ export async function deliverChallenge(ctx: Ctx, transmissionId: string): Promis
         }
     }
     const reference = familyReference(row.account_id);
-    await messenger().sendEmail({
+    // Zone de test : jamais d'envoi réel, la boîte de test interne tient lieu de boîte du courtier.
+    const simulated = challengeSimulated();
+    await (simulated ? devOutbox() : messenger()).sendEmail({
       to,
-      subject: `Challenge d'un contrat — ${row.category} — ${reference}`,
+      subject: `${simulated ? "[Simulation] " : ""}Challenge d'un contrat — ${row.category} — ${reference}`,
       text: `Bonjour,\n\nUne famille de MAAQ demande le challenge d'un contrat.\n\nCatégorie : ${row.category}\nIdentifiant de la famille : ${reference}\nDocuments en pièces jointes : ${attachments.length}\n\nMAAQ ne conserve pas ces documents au-delà de 48 h après leur transmission.`,
       attachments,
     });

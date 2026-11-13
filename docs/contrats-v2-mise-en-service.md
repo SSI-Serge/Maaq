@@ -12,6 +12,8 @@
 
 Le **challenge** a son propre verrou : il reste fermé aux familles tant que le courtier (nom et email) n'est pas désigné dans la console (Réglages).
 
+**Challenge simulé sur une zone de test** (décision du PO du 13/11/2026, test Friends and family) : quand `MAAQ_ZONE=test`, l'email du challenge ne passe jamais par le serveur d'envoi réel, quelle que soit l'adresse saisie dans la console. Il est déposé dans la boîte de test interne (`/dev/boite`, clé des outils de test), avec un objet commençant par « [Simulation] » et seulement le nom et la taille des pièces jointes. L'écran du contrat ajoute « Essai : vos documents n'ont été envoyés à aucun courtier ». Sur la zone, le courtier de la console est « Courtier simulé (essai) » avec une adresse fictive. La production n'a pas `MAAQ_ZONE` : rien n'y change.
+
 ## Ce qui est déjà en place sur la zone de test
 
 - Schéma du lot 11 (appliqué depuis les fichiers d'origine de la base de données, empreintes contrôlées).

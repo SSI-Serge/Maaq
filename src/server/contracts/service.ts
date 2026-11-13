@@ -114,7 +114,8 @@ export interface CategoryView {
 export interface ContractsView {
   limits: { maxDocumentMb: number; maxContracts: number };
   analysis: { mode: AnalysisMode; text: string };
-  challenge: { available: boolean; brokerName: string | null; text: string };
+  /** `simulated` : zone de test, l'email du challenge ne part chez aucun courtier (il reste dans la boîte de test interne). */
+  challenge: { available: boolean; brokerName: string | null; text: string; simulated: boolean };
   categories: CategoryView[];
 }
 
@@ -182,6 +183,12 @@ async function brokerName(db: Kysely<DB>): Promise<string | null> {
   const row = await db.selectFrom("platform_settings").select("value_text").where("setting_key", "=", "contract_broker_name").executeTakeFirst();
   return row?.value_text?.trim() || null;
 }
+
+/**
+ * Challenge simulé (décision du PO du 13/11, test Friends and family) : sur une zone de test (MAAQ_ZONE=test), l'email du challenge ne passe jamais par le vrai serveur d'envoi,
+ * quelle que soit l'adresse saisie dans la console ; il est déposé dans la boîte de test interne, sans le contenu des pièces jointes. La production n'a pas cette variable.
+ */
+export const challengeSimulated = (): boolean => process.env.MAAQ_ZONE === "test";
 
 async function challengeAvailable(db: Kysely<DB>): Promise<boolean> {
   return (await sql<{ ok: boolean }>`select contract_challenge_available() as ok`.execute(db)).rows[0]?.ok ?? false;
@@ -341,7 +348,7 @@ async function loadView(ctx: Ctx, accountId: string): Promise<ContractsView> {
   return {
     limits: { maxDocumentMb, maxContracts },
     analysis: { mode: analysisMode(), text: analysisVersion.content },
-    challenge: { available, brokerName: broker, text: broker ? challengeVersion.content.replace("[nom du partenaire]", broker) : challengeVersion.content },
+    challenge: { available, brokerName: broker, text: broker ? challengeVersion.content.replace("[nom du partenaire]", broker) : challengeVersion.content, simulated: challengeSimulated() },
     categories,
   };
 }

@@ -74,6 +74,7 @@ export function TransmitArea({ contract, view, archived, onChanged }: { contract
       )}
       {t?.challengeStatus === "sending" && <div className={styles.docMeta}>Envoi au challenge en cours…</div>}
       {t?.challengeStatus === "sent" && <div className={styles.docMeta}>Envoyé au challenge le {frDate(t.at)}</div>}
+      {t?.forChallenge && view.challenge.simulated && <div className={styles.hint}>Essai : vos documents n&apos;ont été envoyés à aucun courtier. Dans la version finale, ils partiront chez notre partenaire.</div>}
       {t?.challengeStatus === "failed" && documentsLeft && (
         <div className={styles.channel}>
           <div className={styles.error}>L&apos;envoi au challenge a échoué.</div>
