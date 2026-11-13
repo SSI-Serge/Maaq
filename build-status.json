@@ -3,8 +3,14 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-13T13:36:07.000Z",
+  "updated": "2026-11-13T14:29:19.279Z",
   "deploys": [
+    {
+      "at": "2026-11-13T14:29:19.279Z",
+      "env": "preview",
+      "what": "Rév. 00129 : challenge des contrats simulé sur la zone de test (boîte de test interne, jamais de vrai courtier) ; analyse IA inchangée (aperçu)",
+      "storyIds": []
+    },
     {
       "at": "2026-11-13T13:36:07.000Z",
       "env": "preview",
@@ -3527,6 +3533,13 @@
       "tag": "Proposed, not built",
       "note": "Un essai du menu du mois (Courses) et un de l'assistant (D39) échouent parfois dans la suite complète et passent seuls. À stabiliser après la préparation du test. Rien n'est perdu.",
       "at": "2026-11-13T04:52:29.000Z"
+    }
+  ],
+  "activity": [
+    {
+      "at": "2026-11-13T14:29:19.279Z",
+      "kind": "live",
+      "text": "Challenge des contrats en simulé sur la zone de test (rév. 00129). Reste : courtier simulé à saisir dans la console."
     }
   ]
 }
