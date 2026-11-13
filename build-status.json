@@ -3,8 +3,14 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-13T04:52:29.000Z",
+  "updated": "2026-11-13T05:26:00.000Z",
   "deploys": [
+    {
+      "at": "2026-11-13T05:26:00.000Z",
+      "env": "preview",
+      "what": "Suites de la revue de sécurité : le nouvel email d'un invité doit être confirmé par lui, le profil d'un enfant n'a plus de géolocalisation ni de suivi de trajet, les journaux d'erreurs ne contiennent plus d'adresse. Relevé des coûts d'IA par type d'appel. Rév. 00123 puis 00124. Pas de changement de base.",
+      "storyIds": []
+    },
     {
       "at": "2026-11-13T04:52:29.000Z",
       "env": "preview",
