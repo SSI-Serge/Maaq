@@ -1,3 +1,4 @@
+import { runDailyBackup } from "./backup";
 import { sql } from "kysely";
 import type { Ctx } from "@/server/auth/service";
 import { runAutoConfirm, runEventNotices, type NoticesResult } from "@/server/assistant/notices";
@@ -106,6 +107,8 @@ export async function runDueJobs(ctx: Ctx, options: { force?: boolean } = {}): P
     console.error(`Idées de sorties : ${describeError(error)}`);
     return { prepared: 0, empty: 0, notified: 0, failed: 1 };
   });
+  // Sauvegarde quotidienne de la base, la nuit, quand un bucket de sauvegarde est configuré (BACKUP_BUCKET).
+  await runDailyBackup(ctx).catch((error) => console.error(`Sauvegarde quotidienne : ${describeError(error)}`));
   // Documents de contrat : la suppression 48 h après la transmission demande un passage à chaque tour, pas une purge quotidienne.
   const contracts = await runContractMaintenance(ctx).catch((error) => {
     console.error(`Documents de contrat : ${describeError(error)}`);

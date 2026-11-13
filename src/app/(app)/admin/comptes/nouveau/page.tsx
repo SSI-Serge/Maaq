@@ -14,7 +14,7 @@ type Form = { firstName: string; lastName: string; email: string; phone: string;
 /** Création du compte d'un utilisateur principal (US-64 RF2 à RF9). */
 export default function CreateAccountPage() {
   const router = useRouter();
-  const [form, setForm] = useState<Form>({ firstName: "", lastName: "", email: "", phone: "", guestQuota: "", dailyRequestLimit: "50" });
+  const [form, setForm] = useState<Form>({ firstName: "", lastName: "", email: "", phone: "", guestQuota: "", dailyRequestLimit: "20" });
   const [errors, setErrors] = useState<Partial<Record<keyof Form, string>>>({});
   const create = useApiAction<unknown, { accountId: string; email: string }>("/api/admin/accounts");
 
