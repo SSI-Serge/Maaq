@@ -73,18 +73,26 @@ export default function InstallGuidePage() {
               </div>
             )}
           {platform?.samsung ? (
-            <ol className={styles.steps}>
-              <Step n={1}>
-                Vous êtes dans <b>Samsung Internet</b> : ouvrez le menu <b>☰</b> en bas de l&apos;écran.
-              </Step>
-              <Step n={2}>
-                Choisissez <b>« Ajouter à »</b> (ou <b>« Ajouter la page à »</b>), puis <b>« Écran d&apos;accueil »</b>.
-              </Step>
-              <Step n={3}>
-                Si le navigateur propose <b>« Installer »</b>, choisissez-le plutôt qu&apos;un simple raccourci.
-              </Step>
-              <Step n={4}>Confirmez — l&apos;icône MAAQ apparaît sur votre écran d&apos;accueil. Ouvrez ensuite MAAQ depuis cette icône.</Step>
-            </ol>
+            <>
+              <div style={{ marginBottom: 14 }}>
+                <Notice tone="warning">
+                  Vous êtes dans <b>Samsung Internet</b>. Sur les versions récentes d&apos;Android, l&apos;installation depuis ce navigateur peut être bloquée par un message de sécurité. Installez plutôt MAAQ
+                  depuis <b>Chrome</b>. Si Android affiche un message de blocage, touchez <b>« OK »</b> et reprenez dans Chrome.
+                </Notice>
+              </div>
+              <ol className={styles.steps}>
+                <Step n={1}>
+                  Ouvrez <b>Chrome</b> sur cet appareil et allez sur <b>{typeof window === "undefined" ? "MAAQ" : window.location.host}</b>.
+                </Step>
+                <Step n={2}>
+                  Dans Chrome, ouvrez le menu <b>⋮</b> en haut à droite.
+                </Step>
+                <Step n={3}>
+                  Choisissez <b>« Ajouter à l&apos;écran d&apos;accueil »</b>, puis <b>« Installer »</b> (et non « Créer un raccourci »).
+                </Step>
+                <Step n={4}>Confirmez — l&apos;icône MAAQ apparaît sur votre écran d&apos;accueil. Ouvrez ensuite MAAQ depuis cette icône.</Step>
+              </ol>
+            </>
           ) : (
             <ol className={styles.steps}>
               <Step n={1}>

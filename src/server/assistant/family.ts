@@ -247,6 +247,57 @@ export async function updateMember(ctx: Ctx, session: SessionContext, id: string
  * fiche enfant, et sa propre fiche « autre » est masquée : les RDV (participants) et les tâches (assignations) déjà posés sur elle sont reportés sur la fiche enfant, sans
  * doublon, dans la même transaction. La base refuse ensuite toute écriture qui viserait la fiche masquée. Retirer le lien ne déplace rien.
  */
+/** Fiche enfant sans profil : celle qu'on peut relier au profil d'un invité secondaire (S-48, S-56). */
+export interface ChildSheet {
+  memberId: string;
+  firstName: string;
+  /** Âge en années, quand le mois et l'année de naissance sont connus. */
+  age: number | null;
+}
+
+/** Les fiches au rôle « enfant », actives, sans profil : ni fiche d'un profil, ni déjà reliée au profil d'un invité. */
+export async function freeChildSheets(db: Kysely<DB>, accountId: string, now: Date): Promise<ChildSheet[]> {
+  const rows = await db
+    .selectFrom("family_members")
+    .select(["id", "first_name", "birth_year", "birth_month"])
+    .where("account_id", "=", accountId)
+    .where("role", "=", "child")
+    .where("archived_at", "is", null)
+    .where("user_id", "is", null)
+    .where("child_profile_user_id", "is", null)
+    .orderBy("created_at")
+    .execute();
+  return rows.map((r) => ({
+    memberId: r.id,
+    firstName: r.first_name ?? "",
+    age: r.birth_year === null ? null : Math.max(0, now.getUTCFullYear() - r.birth_year - (now.getUTCMonth() + 1 < (r.birth_month ?? 1) ? 1 : 0)),
+  }));
+}
+
+/** Profil d'un invité secondaire actif qui n'est relié à aucune fiche, avec les fiches enfant libres du foyer : de quoi proposer le lien aux parents (S-56, rattrapage). */
+export interface ChildLinkCandidate {
+  userId: string;
+  firstName: string;
+  sheets: ChildSheet[];
+}
+
+export async function childLinkCandidates(ctx: Ctx, session: SessionContext): Promise<ChildLinkCandidate[]> {
+  const accountId = requireParent(session);
+  const sheets = await freeChildSheets(ctx.db, accountId, ctx.now);
+  if (sheets.length === 0) return [];
+  const rows = await ctx.db
+    .selectFrom("users as u")
+    .select(["u.id", "u.first_name"])
+    .where("u.account_id", "=", accountId)
+    .where("u.role", "=", "guest")
+    .where("u.guest_rank", "=", "secondary")
+    .where("u.status", "=", "active")
+    .where(({ not, exists, selectFrom }) => not(exists(selectFrom("family_members as c").select("c.id").whereRef("c.child_profile_user_id", "=", "u.id"))))
+    .orderBy("u.created_at")
+    .execute();
+  return rows.map((r) => ({ userId: r.id, firstName: r.first_name, sheets }));
+}
+
 export async function setChildProfile(ctx: Ctx, session: SessionContext, id: string, userId: string | null): Promise<FamilyMemberView> {
   const accountId = requireParent(session);
   const child = await ctx.db.selectFrom("family_members").select(["id", "role", "user_id", "archived_at", "child_profile_user_id"]).where("account_id", "=", accountId).where("id", "=", id).executeTakeFirst();

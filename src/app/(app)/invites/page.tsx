@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useApiMutation, useApiQuery } from "@/client/hooks";
 import { AppShell, Section, appStyles as s } from "@/components/app/AppShell";
 import { ConfirmDialog, ErrorLine } from "@/components/auth/parts";
+import { ChildLinkBanner, ChildQuestion, type ChildSheetOption } from "@/components/family/ChildLinkBanner";
 import { Button, Field, Loading, Notice, RetryNotice } from "@/components/ui";
 
 type Status = "not_invited" | "sending" | "invitation_sent" | "invitation_expired" | "send_failed" | "active" | "grace_period";
@@ -17,13 +18,17 @@ interface Guest {
   rank: "core" | "secondary";
   status: Status;
   lastSentAt: string | null;
+  childSheet: string | null;
 }
+
+type ChildSheet = ChildSheetOption;
 
 interface GuestList {
   guests: Guest[];
   quota: number;
   used: number;
   hasCoreGuest: boolean;
+  childSheets: ChildSheet[];
 }
 
 type Form = { firstName: string; lastName: string; email: string; phone: string };
@@ -94,6 +99,13 @@ export default function GuestsPage() {
       </Section>
 
       {toast && <Notice tone="success">✓ {toast}</Notice>}
+      {/* Profil déjà créé, pas encore relié à une fiche enfant (S-56, rattrapage). */}
+      <ChildLinkBanner
+        onLinked={() => {
+          setList(null);
+          reload();
+        }}
+      />
 
       {data?.guests.map((guest) => (
         <GuestCard key={`${guest.id}-${guest.status}-${guest.email}-${guest.rank}`} guest={guest} canDesignate={!data.hasCoreGuest} onUpdated={update} />
@@ -102,10 +114,11 @@ export default function GuestsPage() {
       {adding ? (
         <AddGuestForm
           canDesignate={data ? !data.hasCoreGuest : false}
+          sheets={data?.childSheets ?? []}
           onCancel={() => setAdding(false)}
-          onAdded={(next) => {
+          onAdded={(next, linkedTo) => {
             setAdding(false);
-            update(next, "Invitation envoyée");
+            update(next, linkedTo ? `Invitation envoyée. Le profil sera relié à la fiche de ${linkedTo}.` : "Invitation envoyée");
           }}
         />
       ) : (
@@ -145,7 +158,12 @@ function GuestCard({ guest, canDesignate, onUpdated }: { guest: Guest; canDesign
   return (
     <Section
       title={guest.rank === "core" ? "Invité 1" : "Invité secondaire"}
-      action={<span className={`${s.badge} ${status.tone}`}>{status.label}</span>}
+      action={
+        <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          {guest.childSheet !== null && <span className={`${s.badge} ${s.ok}`}>Profil enfant</span>}
+          <span className={`${s.badge} ${status.tone}`}>{status.label}</span>
+        </span>
+      }
     >
       {mode === "edit" ? (
         <div className={s.form}>
@@ -222,7 +240,7 @@ function GuestCard({ guest, canDesignate, onUpdated }: { guest: Guest; canDesign
               </Button>
             </>
           )}
-          {canDesignate && (
+          {canDesignate && guest.childSheet === null && (
             <Button variant="ghost" onClick={() => setMode("designate")}>
               Désigner comme invité 1
             </Button>
@@ -270,16 +288,20 @@ function GuestCard({ guest, canDesignate, onUpdated }: { guest: Guest; canDesign
   );
 }
 
-function AddGuestForm({ canDesignate, onCancel, onAdded }: { canDesignate: boolean; onCancel: () => void; onAdded: (list: GuestList) => void }) {
+function AddGuestForm({ canDesignate, sheets, onCancel, onAdded }: { canDesignate: boolean; sheets: ChildSheet[]; onCancel: () => void; onAdded: (list: GuestList, linkedTo: string | null) => void }) {
   const [form, setForm] = useState<Form>({ firstName: "", lastName: "", email: "", phone: "" });
   const [designateCore, setDesignateCore] = useState(false);
+  const [kid, setKid] = useState<boolean | null>(null);
+  const [sheet, setSheet] = useState<string | null>(null);
   const mutation = useApiMutation();
   const errors = mutation.error?.body?.code === "invalid_guest" ? (mutation.error.body.details as Record<string, string>) : {};
-  const complete = form.firstName.trim() && form.lastName.trim() && form.email.trim();
+  const chosen = kid ? (sheets.find((x) => x.memberId === sheet) ?? null) : null;
+  // « Inviter » reste inactif tant que la réponse est « Oui » sans fiche choisie.
+  const complete = form.firstName.trim() && form.lastName.trim() && form.email.trim() && !(kid && !chosen);
 
   async function send() {
-    const result = await mutation.run<GuestList>("/api/guests", { method: "POST", body: { ...form, designateCore } });
-    if (result) onAdded(result);
+    const result = await mutation.run<GuestList>("/api/guests", { method: "POST", body: { ...form, designateCore: kid ? false : designateCore, childMemberId: chosen?.memberId ?? null } });
+    if (result) onAdded(result, chosen?.firstName ?? null);
   }
 
   return (
@@ -304,7 +326,18 @@ function AddGuestForm({ canDesignate, onCancel, onAdded }: { canDesignate: boole
           hint="Sans numéro, l'invitation n'est envoyée que par email."
           onChange={(e) => setForm({ ...form, phone: e.target.value })}
         />
-        {canDesignate && (
+        <ChildQuestion
+          sheets={sheets}
+          kid={kid}
+          sheet={sheet}
+          onKid={(answer) => {
+            setKid(answer);
+            // Une seule fiche libre : elle est choisie d'office.
+            setSheet(answer && sheets.length === 1 ? sheets[0].memberId : null);
+          }}
+          onSheet={setSheet}
+        />
+        {canDesignate && !kid && (
           <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13 }}>
             <input type="checkbox" checked={designateCore} onChange={(e) => setDesignateCore(e.target.checked)} />
             Désigner comme invité 1

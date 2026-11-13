@@ -1,3 +1,9 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+
+import { ChildLinkCard, ChildQuestion, LINK_DECLINED, LINK_DONE } from "@/components/family/ChildLinkBanner";
+import { addChild, childLinkCandidates, setChildProfile } from "@/server/assistant/family";
+import { isChildProfile } from "@/server/assistant/profile-member";
 import type { Kysely } from "kysely";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { activate, inspectActivation } from "@/server/accounts/activate";
@@ -274,5 +280,105 @@ describe("US-20 — supprimer un invité", () => {
     await removeGuest(at(), session, core.guestId);
     const designated = await addGuest(at(), session, { ...guestInput(), designateCore: true });
     expect((await listGuests(at(), profile.accountId!)).guests.find((g) => g.id === designated.guestId)!.rank).toBe("core");
+  });
+});
+
+describe("S-56 — le lien avec la fiche enfant est proposé à l'invitation", () => {
+  async function household() {
+    const { profile, session } = await primary();
+    // Le premier invité du compte devient l'invité 1 : le couple est en place.
+    await addGuest(at(), session, guestInput());
+    const lea = await addChild(at(), session, { firstName: "Léa", birth: "2018-03" });
+    return { profile, session, lea };
+  }
+  const linkOf = async (memberId: string) => (await db.selectFrom("family_members").select("child_profile_user_id").where("id", "=", memberId).executeTakeFirstOrThrow()).child_profile_user_id;
+
+  it("« Oui » avec une fiche : le profil en attente est relié dès l'invitation, invité secondaire, et la fiche n'est plus proposée", async () => {
+    const f = await household();
+    const before = await listGuests(at(), f.profile.accountId!);
+    expect(before.childSheets.map((x) => x.firstName)).toEqual(["Léa"]);
+    expect(before.childSheets[0].age).toBeGreaterThanOrEqual(7);
+    const { guestId } = await addGuest(at(), f.session, { ...guestInput(), firstName: "Léa", childMemberId: f.lea.id });
+    expect(await linkOf(f.lea.id)).toBe(guestId);
+    const user = await db.selectFrom("users").select(["guest_rank", "status"]).where("id", "=", guestId).executeTakeFirstOrThrow();
+    expect(user).toEqual({ guest_rank: "secondary", status: "pending_activation" });
+    const after = await listGuests(at(), f.profile.accountId!);
+    expect(after.childSheets).toEqual([]);
+    expect(after.guests.find((g) => g.id === guestId)?.childSheet).toBe("Léa");
+    expect(after.guests.filter((g) => g.id !== guestId).every((g) => g.childSheet === null)).toBe(true);
+    // Le profil est celui d'un enfant avant même l'activation : rien à rattraper.
+    expect(await isChildProfile(db, guestId)).toBe(true);
+    expect(await childLinkCandidates(at(), f.session)).toEqual([]);
+  });
+
+  it("un enfant premier invité du compte reste invité secondaire ; il ne peut pas être désigné invité 1", async () => {
+    const { session } = await primary();
+    const tom = await addChild(at(), session, { firstName: "Tom" });
+    expect((await rejectionOf(addGuest(at(), session, { ...guestInput(), designateCore: true, childMemberId: tom.id }))).code).toBe("child_not_core");
+    const { guestId } = await addGuest(at(), session, { ...guestInput(), childMemberId: tom.id });
+    expect((await db.selectFrom("users").select("guest_rank").where("id", "=", guestId).executeTakeFirstOrThrow()).guest_rank).toBe("secondary");
+  });
+
+  it("refus : fiche déjà reliée, fiche d'un parent, fiche d'un autre foyer ; rien n'est créé", async () => {
+    const f = await household();
+    await addGuest(at(), f.session, { ...guestInput(), childMemberId: f.lea.id });
+    expect((await rejectionOf(addGuest(at(), f.session, { ...guestInput(), childMemberId: f.lea.id }))).code).toBe("child_sheet_taken");
+    const own = await db.selectFrom("family_members").select("id").where("user_id", "=", f.profile.id).executeTakeFirstOrThrow();
+    expect((await rejectionOf(addGuest(at(), f.session, { ...guestInput(), childMemberId: own.id }))).code).toBe("invalid_child_sheet");
+    const other = await household();
+    const email = unique("refus");
+    expect((await rejectionOf(addGuest(at(), f.session, { ...guestInput(email), childMemberId: other.lea.id }))).code).toBe("invalid_child_sheet");
+    expect(await db.selectFrom("users").select("id").where("email", "=", email).execute()).toEqual([]);
+    expect(await linkOf(other.lea.id)).toBeNull();
+  });
+
+  it("supprimer l'invitation libère la fiche", async () => {
+    const f = await household();
+    const { guestId } = await addGuest(at(), f.session, { ...guestInput(), childMemberId: f.lea.id });
+    await removeGuest(at(), f.session, guestId);
+    expect((await listGuests(at(), f.profile.accountId!)).childSheets.map((x) => x.firstName)).toEqual(["Léa"]);
+  });
+
+  it("rattrapage : un invité secondaire actif non relié est proposé aux parents tant qu'une fiche enfant est libre ; « Relier » le relie", async () => {
+    const f = await household();
+    const added = await addAndDeliver(f.session, { ...guestInput(), firstName: "Léa" });
+    // En attente d'activation : pas encore proposé.
+    expect(await childLinkCandidates(at(), f.session)).toEqual([]);
+    await activate(at(), { token: added.token, accepted: true, password: "Motdepasse-2026!", confirmation: "Motdepasse-2026!", timezone: "Europe/Paris", userAgent: null });
+    const candidates = await childLinkCandidates(at(), f.session);
+    expect(candidates).toEqual([{ userId: added.guestId, firstName: "Léa", sheets: [expect.objectContaining({ memberId: f.lea.id, firstName: "Léa" })] }]);
+    // Réservé aux parents : le profil lui-même n'y a pas accès.
+    expect((await rejectionOf(childLinkCandidates(at(), await sessionFor(db, added.guestId)))).code).toBe("forbidden");
+    await setChildProfile(at(), f.session, f.lea.id, added.guestId);
+    expect(await childLinkCandidates(at(), f.session)).toEqual([]);
+    expect((await listGuests(at(), f.profile.accountId!)).guests.find((g) => g.id === added.guestId)?.childSheet).toBe("Léa");
+  });
+
+  it("écran : les impacts sont affichés avant toute réponse ; « Oui » montre la fiche, le rappel neutre et le lien vers les membres", () => {
+    const sheets = [{ memberId: "m1", firstName: "Léa", age: 8 }];
+    const render = (props: { kid: boolean | null; sheet: string | null; sheets?: typeof sheets }) => renderToStaticMarkup(createElement(ChildQuestion, { sheets, onKid: () => undefined, onSheet: () => undefined, ...props }));
+    const start = render({ kid: null, sheet: null });
+    expect(start).toContain("Est-ce un de vos enfants ?");
+    expect(start).toContain("Si vous répondez oui, votre enfant aura un espace adapté");
+    expect(start).toContain("Si vous répondez non, ce profil verra les RDV de toute la famille, comme tout invité.");
+    expect(start).not.toContain("Quelle fiche est la sienne ?");
+    expect(render({ kid: false, sheet: null })).not.toContain("Quelle fiche est la sienne ?");
+    const yes = render({ kid: true, sheet: "m1" });
+    expect(yes).toContain("Quelle fiche est la sienne ?");
+    expect(yes).toContain("Enfant · 8 ans · pas encore de profil");
+    expect(yes).toContain("Léa verra la tâche des devoirs, ses exercices, son calendrier et seulement ses propres RDV. Pas de tchats des agents ni de catalogue.");
+    expect(render({ kid: true, sheet: null })).not.toContain("Léa verra");
+    const none = render({ kid: true, sheet: null, sheets: [] });
+    expect(none).toContain("Toutes les fiches au rôle « Enfant » ont déjà un profil.");
+    expect(none).toContain('href="/assistant/membres"');
+  });
+
+  it("écran : le bandeau de rattrapage propose « Relier à [fiche] » et « Non »", () => {
+    const html = renderToStaticMarkup(createElement(ChildLinkCard, { candidate: { userId: "u", firstName: "Léa", sheets: [{ memberId: "m1", firstName: "Léa", age: null }] }, busy: false, onLink: () => undefined, onNo: () => undefined }));
+    expect(html).toContain("Léa a son profil. Est-ce le profil d&#x27;un de vos enfants ?");
+    expect(html).toContain("Relier à Léa");
+    expect(html).toContain(">Non<");
+    expect(LINK_DONE("Léa")).toBe("Le profil de Léa est relié à sa fiche. Vous pourrez changer ce lien dans Réglages › Membres.");
+    expect(LINK_DECLINED).toBe("C'est noté. Vous pourrez relier ce profil plus tard dans Réglages › Membres.");
   });
 });

@@ -1,6 +1,7 @@
 import { sql, type Transaction } from "kysely";
 import { messenger } from "@/server/adapters/messaging";
 import { issueActivationLink } from "@/server/accounts/activation";
+import { freeChildSheets, type ChildSheet } from "@/server/assistant/family";
 import type { Ctx, SessionContext } from "@/server/auth/service";
 import type { DB } from "@/server/db/schema.generated";
 import { Rejection } from "@/server/http";
@@ -21,6 +22,8 @@ export interface Guest {
   rank: "core" | "secondary";
   status: GuestStatus;
   lastSentAt: string | null;
+  /** Prénom de la fiche enfant à laquelle ce profil est relié (« Profil enfant »), sinon `null`. */
+  childSheet: string | null;
 }
 
 export interface GuestList {
@@ -28,6 +31,8 @@ export interface GuestList {
   quota: number;
   used: number;
   hasCoreGuest: boolean;
+  /** Fiches enfant sans profil, proposées à « Est-ce un de vos enfants ? » (S-56). */
+  childSheets: ChildSheet[];
 }
 
 /** Une invitation à envoyer, une fois la transaction validée (traitement en arrière-plan). */
@@ -90,6 +95,9 @@ export async function listGuests(ctx: Ctx, accountId: string): Promise<GuestList
     .where("account_id", "=", accountId)
     .executeTakeFirstOrThrow();
 
+  const linked = new Map(
+    (await ctx.db.selectFrom("family_members").select(["child_profile_user_id", "first_name"]).where("account_id", "=", accountId).where("child_profile_user_id", "is not", null).execute()).map((m) => [m.child_profile_user_id!, m.first_name ?? ""]),
+  );
   const guests: Guest[] = rows.map((r) => {
     let status: GuestStatus;
     if (r.status === "active") status = "active";
@@ -109,6 +117,7 @@ export async function listGuests(ctx: Ctx, accountId: string): Promise<GuestList
       rank: r.guest_rank!,
       status,
       lastSentAt: r.sent_at ? new Date(r.sent_at).toISOString() : null,
+      childSheet: linked.get(r.id) ?? null,
     };
   });
 
@@ -117,6 +126,7 @@ export async function listGuests(ctx: Ctx, accountId: string): Promise<GuestList
     quota: quota.guest_quota ?? 0,
     used: Number(quota.guests_used ?? 0),
     hasCoreGuest: guests.some((g) => g.rank === "core"),
+    childSheets: await freeChildSheets(ctx.db, accountId, ctx.now),
   };
 }
 
@@ -193,11 +203,15 @@ async function rankForNewGuest(trx: Transaction<DB>, accountId: string, designat
   return designateCore ? "core" : "secondary";
 }
 
-/** Ajoute un invité et prépare l'envoi de son invitation (US-18). Quota vérifié côté serveur (RT1). */
+/**
+ * Ajoute un invité et prépare l'envoi de son invitation (US-18). Quota vérifié côté serveur (RT1).
+ * `childMemberId` (S-56) : l'invité est un enfant du foyer. Son profil, encore en attente d'activation, est relié à sa fiche enfant dans la même transaction : dès l'activation,
+ * il arrive sur son espace d'enfant. Un enfant est toujours un invité secondaire, jamais l'invité 1, même s'il est le premier invité du compte.
+ */
 export async function addGuest(
   ctx: Ctx,
   session: SessionContext,
-  input: GuestInput & { designateCore: boolean },
+  input: GuestInput & { designateCore: boolean; childMemberId?: string | null },
 ): Promise<{ guestId: string; delivery: PendingDelivery }> {
   const accountId = requirePrimary(session);
   return ctx.db.transaction().execute(async (trx) => {
@@ -216,7 +230,14 @@ export async function addGuest(
 
     const host = await hostOf(trx, accountId);
     const { email, phone } = await validateGuest(trx, input, { primaryEmail: host.email });
-    const rank = await rankForNewGuest(trx, accountId, input.designateCore);
+    const childMemberId = input.childMemberId ?? null;
+    if (childMemberId) {
+      if (input.designateCore) throw new Rejection("child_not_core", "Un enfant ne peut pas être l'invité 1.", 422);
+      const sheet = await trx.selectFrom("family_members").select(["id", "role", "user_id", "archived_at", "child_profile_user_id"]).where("account_id", "=", accountId).where("id", "=", childMemberId).forUpdate().executeTakeFirst();
+      if (!sheet || sheet.archived_at || sheet.role !== "child" || sheet.user_id) throw new Rejection("invalid_child_sheet", "Choisissez la fiche d'un de vos enfants.", 422);
+      if (sheet.child_profile_user_id) throw new Rejection("child_sheet_taken", "Cette fiche a déjà un profil.", 409);
+    }
+    const rank = childMemberId ? "secondary" : await rankForNewGuest(trx, accountId, input.designateCore);
     const guest = await trx
       .insertInto("users")
       .values({
@@ -232,6 +253,7 @@ export async function addGuest(
       })
       .returning(["id", "first_name", "email", "phone"])
       .executeTakeFirstOrThrow();
+    if (childMemberId) await trx.updateTable("family_members").set({ child_profile_user_id: guest.id }).where("id", "=", childMemberId).execute();
     return { guestId: guest.id, delivery: await invite(trx, guest, host, ctx.now) };
   });
 }
@@ -416,6 +438,8 @@ export async function removeGuest(ctx: Ctx, session: SessionContext, guestId: st
       .where("revoked_at", "is", null)
       .execute();
     await trx.deleteFrom("cc_addresses").where("user_id", "=", guestId).execute();
+    // La fiche enfant reliée à ce profil redevient libre : elle peut être proposée à une nouvelle invitation (S-56).
+    await trx.updateTable("family_members").set({ child_profile_user_id: null }).where("account_id", "=", accountId).where("child_profile_user_id", "=", guestId).execute();
     return guest;
   });
 

@@ -13,6 +13,7 @@ import type { EventView } from "@/server/assistant/events";
 import type { EmotionsHome } from "@/server/emotions/home";
 import type { TaskLists } from "@/server/assistant/tasks";
 import { clock, dayOf, shortDate } from "./format";
+import { ChildLinkBanner } from "./ChildLinkBanner";
 import { OutingHomeCard } from "./OutingsScreens";
 import { Dots } from "./parts";
 import { AnticipationCards } from "./QuestionCards";
@@ -106,6 +107,8 @@ export function AssistantHome() {
         </span>
       }
     >
+      {/* Un profil d'invité déjà créé, pas encore relié à la fiche de l'enfant (S-56, rattrapage) : proposé aux parents seulement, le serveur ne rend rien aux autres. */}
+      <ChildLinkBanner />
       <div className={styles.homeActions}>
         {/* Le tchat de l'Assistant Famille est réservé aux deux parents (le serveur le refuse aux autres profils) : l'entrée n'est pas montrée au profil d'un enfant (S-47). */}
         {!lists?.viewer.child && (

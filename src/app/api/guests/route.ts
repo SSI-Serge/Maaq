@@ -21,6 +21,8 @@ const schema = z.object({
   email: z.string().max(254),
   phone: z.string().max(30),
   designateCore: z.boolean(),
+  /** « Est-ce un de vos enfants ? » : la fiche enfant choisie (S-56). */
+  childMemberId: z.uuid().nullable().optional(),
 });
 
 /** Ajoute un invité ; l'invitation part en arrière-plan (US-18 RF4, RF12). */
