@@ -1,3 +1,4 @@
+import { emotionsHome } from "@/server/emotions/home";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import type { Kysely } from "kysely";
@@ -47,6 +48,10 @@ describe("Nos envies (US-147, US-148)", () => {
     expect(marc.partner).toBe("Sophie");
     expect((await failure(listWishes(at(), f.elodie))).code).toBe("forbidden");
     expect((await failure(addWish(at(), f.elodie, { title: "Intrus" }))).code).toBe("forbidden");
+    // L'accueil de l'assistant (E-21) : la carte « Nos envies » n'existe que pour l'utilisateur principal et l'invité 1 ; un invité secondaire ne reçoit rien, même quand le couple a des envies.
+    expect((await emotionsHome(at(), f.sophie)).wishes?.latest.map((w) => w.title)).toEqual(["Week-end à Lisbonne"]);
+    expect((await emotionsHome(at(), f.marc)).wishes?.latest).toHaveLength(1);
+    expect(await emotionsHome(at(), f.elodie)).toEqual({ couple: null, review: null, wishes: null });
   });
 
   it("titre obligatoire de 60 caractères au plus, description de 200, horizon dans la liste (RF1, RF2)", async () => {
