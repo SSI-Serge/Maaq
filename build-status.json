@@ -3,8 +3,14 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-11T22:14:25.000Z",
+  "updated": "2026-11-13T04:04:08.000Z",
   "deploys": [
+    {
+      "at": "2026-11-13T04:04:08.000Z",
+      "env": "preview",
+      "what": "Inviter un enfant : la question « Est-ce un de vos enfants ? » relie le profil à sa fiche dès l'invitation ; bandeau pour relier un profil déjà créé. Installation : MAAQ ouverte depuis un raccourci de l'écran d'accueil est reconnue, le guidage ne revient plus ; sur Samsung Internet, le guidage envoie vers Chrome. Rév. 00120. Suite complète verte (1350 essais). Pas de changement de base. Écrans non vus : le PO teste.",
+      "storyIds": []
+    },
     {
       "at": "2026-11-11T22:14:25.000Z",
       "env": "preview",
