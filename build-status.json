@@ -3,8 +3,14 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-13T05:26:00.000Z",
+  "updated": "2026-11-13T05:48:18.000Z",
   "deploys": [
+    {
+      "at": "2026-11-13T05:48:18.000Z",
+      "env": "preview",
+      "what": "Courses et repas : le tchat se vide quand on valide un menu, et le menu validé se retrouve en haut de l'accueil, avec un écran « Menu de la semaine » (recettes, déroulé, lien vers la liste). Rév. 00125. Pas de changement de base. Écrans non vus : le PO teste.",
+      "storyIds": []
+    },
     {
       "at": "2026-11-13T05:26:00.000Z",
       "env": "preview",
