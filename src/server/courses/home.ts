@@ -27,9 +27,9 @@ export interface CourseHome {
   month: { menus: number; tickets: number; ready: boolean; needed: number } | null;
   /** Faux pour le profil d'un enfant : les tchats des agents lui sont fermés (S-47), l'écran ne montre pas le tchat. */
   chat: boolean;
-  /** Carte « Menu de la semaine » en tête de l'accueil (CR-72), couple seulement : le menu validé de la semaine en cours, ou `null` (« Préparer le menu de la semaine »). */
+  /** Carte « Menu de la semaine » en tête de l'accueil (CR-72), couple seulement : le menu validé de la semaine en cours, à défaut celui de la semaine prochaine (`upcoming`), ou `null` (« Préparer le menu de la semaine »). */
   weekMenu: HomeWeekMenu | null;
-  /** Un menu est validé pour la semaine suivante : « Semaine suivante › » (lundi de cette semaine-là), sinon `null`. */
+  /** Les deux semaines ont un menu validé : « Semaine suivante › » sous la carte de la semaine en cours (lundi de la semaine suivante), sinon `null`. */
   nextWeekMenu: string | null;
 }
 
@@ -58,8 +58,9 @@ export async function courseHome(ctx: Ctx, session: SessionContext): Promise<Cou
   const weeks = couple ? await weekChoices(ctx.db, who.accountId, ctx.now) : [];
   return {
     access: who.access,
-    weekMenu: couple && weeks[0]?.hasMenu ? await homeWeekMenu(ctx.db, who.accountId, weeks[0].week, ctx.now) : null,
-    nextWeekMenu: couple && weeks[1]?.hasMenu ? weeks[1].week : null,
+    // Semaine en cours d'abord ; sans menu cette semaine, la carte montre celui de la semaine prochaine (le cas le plus courant : on compose en fin de semaine).
+    weekMenu: !couple ? null : weeks[0]?.hasMenu ? await homeWeekMenu(ctx.db, who.accountId, weeks[0].week, ctx.now) : weeks[1]?.hasMenu ? await homeWeekMenu(ctx.db, who.accountId, weeks[1].week, ctx.now, true) : null,
+    nextWeekMenu: couple && weeks[0]?.hasMenu && weeks[1]?.hasMenu ? weeks[1].week : null,
     firstName: session.user.firstName,
     chat: !(await isChildProfile(ctx.db, session.user.id)),
     missing: settings?.missing ?? [],

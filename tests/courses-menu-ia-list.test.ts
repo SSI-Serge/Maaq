@@ -238,13 +238,16 @@ describe("CR-72, US-180bis : la conversation est vidée à la validation, le men
     const c = await household();
     const card = await compose(c, fullMenu(c));
     await validateWeekMenu(at(), c.f.sophie, card.card!.messageId);
-    // le vendredi 6, le menu est celui de la semaine suivante : pas de carte, mais le lien « Semaine suivante »
-    const friday = await courseHome(at(), c.f.sophie);
-    expect(friday.weekMenu).toBeNull();
-    expect(friday.nextWeekMenu).toBe(WEEK);
+    // le vendredi 6, le seul menu est celui de la semaine prochaine : la carte le montre (« Menu de la semaine prochaine »), avec ses 3 premiers dîners, pour les deux parents
+    for (const parent of [c.f.sophie, c.f.marc]) {
+      const friday = await courseHome(at(), parent);
+      expect(friday.weekMenu).toMatchObject({ week: WEEK, upcoming: true, range: "du 9 au 15 nov.", dinners: 7, express: 2 });
+      expect(friday.weekMenu!.next.map((m) => m.day)).toEqual(["Lun. 9", "Mar. 10", "Mer. 11"]);
+      expect(friday.nextWeekMenu).toBeNull();
+    }
     // le mardi 10, c'est la semaine en cours : le dîner du jour d'abord (« Ce soir »), puis mercredi et jeudi
     const tuesday = await courseHome(at(TUESDAY), c.f.marc);
-    expect(tuesday.weekMenu).toMatchObject({ week: WEEK, range: "du 9 au 15 nov.", dinners: 7, express: 2 });
+    expect(tuesday.weekMenu).toMatchObject({ week: WEEK, upcoming: false, range: "du 9 au 15 nov.", dinners: 7, express: 2 });
     expect(tuesday.weekMenu!.next.map((m) => [m.day, m.express])).toEqual([["Ce soir", false], ["Mer. 11", false], ["Jeu. 12", false]]);
     expect(tuesday.weekMenu!.next[0].name).toBe(c.catalogDishes[0]);
     expect(tuesday.nextWeekMenu).toBeNull();
@@ -278,7 +281,7 @@ describe("CR-72, US-180bis : la conversation est vidée à la validation, le men
   });
 
   it("rendu : la carte de l'accueil et les lignes du menu (jour, « Ce soir », « Passé », « Ajouter à mes plats »)", () => {
-    const home = renderToStaticMarkup(createElement(WeekMenuCard, { menu: { week: WEEK, range: "du 9 au 15 nov.", dinners: 7, express: 4, next: [{ day: "Ce soir", name: "Poulet yassa", express: false }, { day: "", name: "Salade de lentilles", express: true }] }, nextWeek: "2026-11-16", canPrepare: true, onPrepare: () => undefined }));
+    const home = renderToStaticMarkup(createElement(WeekMenuCard, { menu: { week: WEEK, upcoming: false, range: "du 9 au 15 nov.", dinners: 7, express: 4, next: [{ day: "Ce soir", name: "Poulet yassa", express: false }, { day: "", name: "Salade de lentilles", express: true }] }, nextWeek: "2026-11-16", canPrepare: true, onPrepare: () => undefined }));
     expect(home).toContain("Menu de la semaine");
     expect(home).toContain("7 dîners · 4 express");
     expect(home).toContain("Du 9 au 15 nov.");
@@ -286,6 +289,15 @@ describe("CR-72, US-180bis : la conversation est vidée à la validation, le men
     expect(home).toContain(`href="/courses/menu?week=${WEEK}"`);
     expect(home).toContain("Voir le menu complet ›");
     expect(home).toContain('href="/courses/menu?week=2026-11-16"');
+    expect(home).not.toContain("Préparer le menu de cette semaine");
+    // menu de la semaine prochaine seulement : son titre le dit, et « Préparer le menu de cette semaine » reste proposé en dessous
+    const upcoming = renderToStaticMarkup(createElement(WeekMenuCard, { menu: { week: "2026-11-16", upcoming: true, range: "du 16 au 22 nov.", dinners: 7, express: 4, next: [{ day: "Lun. 16", name: "Lasagnes", express: false }] }, nextWeek: null, canPrepare: true, onPrepare: () => undefined }));
+    expect(upcoming).toContain("Menu de la semaine prochaine");
+    expect(upcoming).toContain("Du 16 au 22 nov.");
+    expect(upcoming).toContain("Lun. 16");
+    expect(upcoming).toContain('href="/courses/menu?week=2026-11-16"');
+    expect(upcoming).toContain("Préparer le menu de cette semaine");
+    expect(upcoming).not.toContain("Semaine suivante");
     const none = renderToStaticMarkup(createElement(WeekMenuCard, { menu: null, nextWeek: null, canPrepare: true, onPrepare: () => undefined }));
     expect(none).toContain("Préparer le menu de la semaine");
     expect(none).not.toContain("Semaine suivante");

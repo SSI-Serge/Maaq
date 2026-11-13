@@ -18,8 +18,10 @@ const isoDow = (date: Date) => ((date.getDay() + 6) % 7) + 1;
 export const dayLabel = (week: string, slot: number) => `${SHORT_DAYS[slot - 1] ?? ""} ${Number(addDaysIso(week, slot - 1).slice(8, 10))}`;
 
 export interface HomeWeekMenu {
-  /** Lundi de la semaine en cours. */
+  /** Lundi de la semaine du menu montré. */
   week: string;
+  /** Vrai quand la carte montre le menu de la semaine PROCHAINE, faute de menu pour la semaine en cours : « Menu de la semaine prochaine », avec ses 3 premiers dîners. */
+  upcoming: boolean;
   /** « du 9 au 15 nov. » */
   range: string;
   dinners: number;
@@ -31,17 +33,21 @@ export interface HomeWeekMenu {
   next: { day: string; name: string; express: boolean }[];
 }
 
-/** La carte de l'accueil : le menu validé de la semaine en cours, ou rien. */
-export async function homeWeekMenu(db: Kysely<DB>, accountId: string, week: string, now: Date): Promise<HomeWeekMenu | null> {
+/**
+ * La carte de l'accueil : le menu validé de la semaine en cours ; à défaut celui de la semaine prochaine (`upcoming`), pour que le menu qu'on vient de valider en fin de
+ * semaine se retrouve bien en haut de l'accueil ; sinon rien.
+ */
+export async function homeWeekMenu(db: Kysely<DB>, accountId: string, week: string, now: Date, upcoming = false): Promise<HomeWeekMenu | null> {
   const menu = await db.selectFrom("meal_menus").select("id").where("account_id", "=", accountId).where("week_start", "=", week as never).executeTakeFirst();
   if (!menu) return null;
   const entries = await db.selectFrom("meal_menu_entries").select(["kind", "slot", "dish_name"]).where("menu_id", "=", menu.id).where("kind", "in", ["dinner", "express"] as never[]).orderBy("slot").execute();
   const dinners = entries.filter((e) => e.kind === "dinner");
   const express = entries.filter((e) => e.kind === "express");
-  const today = isoDow(now);
+  // Semaine prochaine : tous ses dîners sont à venir, aucun n'est « ce soir ».
+  const today = upcoming ? 0 : isoDow(now);
   const next: HomeWeekMenu["next"] = dinners.filter((e) => e.slot >= today).map((e) => ({ day: e.slot === today ? "Ce soir" : dayLabel(week, e.slot), name: e.dish_name, express: false }));
   for (const e of express) if (next.length < 3) next.push({ day: "", name: e.dish_name, express: true });
-  return { week, range: weekRange(week), dinners: dinners.length, express: express.length, next: next.slice(0, 3) };
+  return { week, upcoming, range: weekRange(week), dinners: dinners.length, express: express.length, next: next.slice(0, 3) };
 }
 
 export interface WeekMenuView {

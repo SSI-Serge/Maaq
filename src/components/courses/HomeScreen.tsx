@@ -55,7 +55,7 @@ export function WeekMenuCard({ menu, nextWeek, canPrepare, onPrepare }: { menu: 
       {menu ? (
         <Link href={`/courses/menu?week=${menu.week}`} style={{ display: "flex", flexDirection: "column", gap: 6, background: "var(--bg-raised)", border: "1px solid var(--secondary)", borderRadius: "var(--radius)", padding: "12px 14px", color: "var(--ink)", textDecoration: "none" }}>
           <span style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
-            <span style={{ fontFamily: "var(--font-mono, 'IBM Plex Mono', monospace)", fontSize: 10, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--secondary-strong)" }}>Menu de la semaine</span>
+            <span style={{ fontFamily: "var(--font-mono, 'IBM Plex Mono', monospace)", fontSize: 10, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--secondary-strong)" }}>{menu.upcoming ? "Menu de la semaine prochaine" : "Menu de la semaine"}</span>
             <span className={styles.meta}>
               {plural(menu.dinners, "dîner", "dîners")}
               {menu.express ? ` · ${menu.express} express` : ""}
@@ -81,6 +81,13 @@ export function WeekMenuCard({ menu, nextWeek, canPrepare, onPrepare }: { menu: 
             <span aria-hidden="true">›</span>
           </button>
         )
+      )}
+      {/* Le menu montré est celui de la semaine prochaine : celui de cette semaine reste à préparer, en bouton secondaire. */}
+      {menu?.upcoming && canPrepare && (
+        <button type="button" onClick={onPrepare} className={styles.scenarioCard} style={{ minHeight: 44, borderColor: "var(--primary)", color: "var(--primary)", background: "transparent", textAlign: "left", cursor: "pointer" }}>
+          <span>Préparer le menu de cette semaine</span>
+          <span aria-hidden="true">›</span>
+        </button>
       )}
       {nextWeek && (
         <div style={{ display: "flex", justifyContent: "flex-end", marginTop: -4 }}>
