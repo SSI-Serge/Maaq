@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { installGuide, installGuideDue, installGuideUrl, platformOf, safeNext, type Platform } from "@/client/auth";
+import { HOME_LAUNCH_PARAM, installGuide, installGuideDue, installGuideUrl, launchedFromHome, platformOf, safeNext, type Platform } from "@/client/auth";
+import manifest from "@/app/manifest";
 
 const IPHONE_SAFARI = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Mobile/15E148 Safari/604.1";
 const IPHONE_CHROME = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/124.0.6367.88 Mobile/15E148 Safari/604.1";
@@ -14,8 +15,8 @@ const platform = (userAgent: string, standalone = false, maxTouchPoints = 5): Pl
 
 describe("détection de l'appareil pour le guidage d'installation (US-1 RF2, RF5, RT1)", () => {
   it("reconnaît iPhone dans Safari, Android dans Chrome et un ordinateur, sans navigateur intégré", () => {
-    expect(platform(IPHONE_SAFARI)).toEqual({ os: "iphone", standalone: false, iosNonSafari: false, inApp: false });
-    expect(platform(ANDROID_CHROME)).toEqual({ os: "android", standalone: false, iosNonSafari: false, inApp: false });
+    expect(platform(IPHONE_SAFARI)).toEqual({ os: "iphone", standalone: false, samsung: false, iosNonSafari: false, inApp: false });
+    expect(platform(ANDROID_CHROME)).toEqual({ os: "android", standalone: false, samsung: false, iosNonSafari: false, inApp: false });
     expect(platform(DESKTOP, false, 0)).toMatchObject({ os: "desktop", inApp: false });
   });
 
@@ -120,5 +121,34 @@ describe("adresse de reprise après le guidage (paramètre next)", () => {
     for (const bad of [null, "", "accueil", "https://exemple.fr/x", "//exemple.fr", "/\\exemple.fr", "/installer", "/installer?next=%2Faccueil", "/installer/", "/" + "a".repeat(400)]) {
       expect(safeNext(bad), String(bad)).toBeNull();
     }
+  });
+});
+
+describe("MAAQ lancée depuis l'écran d'accueil sans mode installé (tablette Samsung du 12/11/2026, US-1 RF8)", () => {
+  const TABLET_SAMSUNG = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/30.0 Chrome/143.0.0.0 Safari/537.36";
+  const TABLET_CHROME = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/157.0.0.0 Safari/537.36";
+
+  it("une tablette Android reçoit le guidage, et Samsung Internet est reconnu pour ses propres étapes", () => {
+    expect(platformOf({ userAgent: TABLET_SAMSUNG, maxTouchPoints: 5, standalone: false })).toMatchObject({ os: "android", samsung: true, standalone: false, inApp: false });
+    expect(platformOf({ userAgent: TABLET_CHROME, maxTouchPoints: 5, standalone: false })).toMatchObject({ os: "android", samsung: false });
+    expect(installGuideDue(platformOf({ userAgent: TABLET_SAMSUNG, maxTouchPoints: 5, standalone: false }), { dismissed: false })).toBe(true);
+  });
+
+  it("l'adresse de démarrage du manifeste marque le lancement depuis l'écran d'accueil, sans changer l'identité de l'application", () => {
+    const m = manifest();
+    expect(m.id).toBe("/");
+    expect(m.start_url).toBe(`/?${HOME_LAUNCH_PARAM}`);
+    expect(launchedFromHome(new URL(m.start_url!, "https://maaq.test").search)).toBe(true);
+    expect(launchedFromHome("")).toBe(false);
+    expect(launchedFromHome("?source=email")).toBe(false);
+  });
+
+  it("un raccourci déjà utilisé sur l'appareil vaut lancement depuis l'écran d'accueil : plus de guidage, même dans un onglet et dans une nouvelle session", () => {
+    const shortcut = platformOf({ userAgent: TABLET_SAMSUNG, maxTouchPoints: 5, standalone: false, homeScreen: true });
+    expect(shortcut.standalone).toBe(true);
+    expect(installGuideDue(shortcut, { dismissed: false })).toBe(false);
+    expect(installGuideDue(shortcut, { dismissed: false, alreadyShown: false })).toBe(false);
+    // Le navigateur intégré d'une application reste signalé tant que MAAQ n'est pas en mode installé.
+    expect(platformOf({ userAgent: TABLET_CHROME, maxTouchPoints: 5, standalone: true }).standalone).toBe(true);
   });
 });

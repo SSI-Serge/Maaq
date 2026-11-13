@@ -34,7 +34,7 @@ export default function InstallGuidePage() {
 
   return (
     <Screen>
-      <div className={styles.eyebrow}>Installer MAAQ sur votre téléphone</div>
+      <div className={styles.eyebrow}>Installer MAAQ sur votre téléphone ou votre tablette</div>
       <h1 className={styles.title}>Installer MAAQ</h1>
       <p className={styles.lead}>Ajoutez MAAQ à votre écran d&apos;accueil pour l&apos;ouvrir aussi vite qu&apos;une app native.</p>
 
@@ -72,18 +72,36 @@ export default function InstallGuidePage() {
                 </Notice>
               </div>
             )}
-          <ol className={styles.steps}>
-            <Step n={1}>
-              Ouvrez MAAQ dans <b>Chrome</b>.
-            </Step>
-            <Step n={2}>
-              Ouvrez le menu <b>⋮</b> en haut à droite.
-            </Step>
-            <Step n={3}>
-              Choisissez <b>« Ajouter à l&apos;écran d&apos;accueil »</b> ou <b>« Installer l&apos;application »</b>.
-            </Step>
-            <Step n={4}>Confirmez — l&apos;icône MAAQ apparaît sur votre écran d&apos;accueil.</Step>
-          </ol>
+          {platform?.samsung ? (
+            <ol className={styles.steps}>
+              <Step n={1}>
+                Vous êtes dans <b>Samsung Internet</b> : ouvrez le menu <b>☰</b> en bas de l&apos;écran.
+              </Step>
+              <Step n={2}>
+                Choisissez <b>« Ajouter à »</b> (ou <b>« Ajouter la page à »</b>), puis <b>« Écran d&apos;accueil »</b>.
+              </Step>
+              <Step n={3}>
+                Si le navigateur propose <b>« Installer »</b>, choisissez-le plutôt qu&apos;un simple raccourci.
+              </Step>
+              <Step n={4}>Confirmez — l&apos;icône MAAQ apparaît sur votre écran d&apos;accueil. Ouvrez ensuite MAAQ depuis cette icône.</Step>
+            </ol>
+          ) : (
+            <ol className={styles.steps}>
+              <Step n={1}>
+                Ouvrez MAAQ dans <b>Chrome</b>.
+              </Step>
+              <Step n={2}>
+                Ouvrez le menu <b>⋮</b> en haut à droite.
+              </Step>
+              <Step n={3}>
+                Choisissez <b>« Ajouter à l&apos;écran d&apos;accueil »</b> ou <b>« Installer l&apos;application »</b>.
+              </Step>
+              <Step n={4}>
+                Si Chrome propose <b>« Installer »</b> ou <b>« Créer un raccourci »</b>, choisissez <b>« Installer »</b>.
+              </Step>
+              <Step n={5}>Confirmez — l&apos;icône MAAQ apparaît sur votre écran d&apos;accueil. Ouvrez ensuite MAAQ depuis cette icône.</Step>
+            </ol>
+          )}
           </>
         )
       ) : (

@@ -33,6 +33,11 @@ export function deviceTimezone(): string {
 const REMEMBERED_EMAIL = "maaq:email";
 const PENDING_LOGOUT = "maaq:pending-logout";
 const INSTALL_DISMISSED = "maaq:install-later";
+/** MAAQ a déjà été lancée depuis l'écran d'accueil sur cet appareil (mode installé, ou raccourci) : gardé sur l'appareil, pas pour la seule session. */
+const INSTALL_HOME = "maaq:install-home";
+/** Marque posée par l'adresse de démarrage du manifeste : MAAQ est ouverte depuis l'icône de l'écran d'accueil, même si ce n'est qu'un raccourci dans un onglet. */
+export const HOME_LAUNCH_PARAM = "source=ecran-accueil";
+export const launchedFromHome = (search: string) => new URLSearchParams(search).get("source") === "ecran-accueil";
 
 function read(storage: () => Storage, key: string): string | null {
   try {
@@ -126,6 +131,9 @@ export function forcedDestination(state: Extract<AuthState, { authenticated: tru
  * dans l'espace connecté, après une activation), on note qu'il a été montré pendant cette session : il n'est pas redemandé à chaque écran.
  */
 export const installGuide = {
+  /** MAAQ est sur l'écran d'accueil de cet appareil : le guidage ne s'y affiche plus (RF8). */
+  onHomeScreen: () => read(() => localStorage, INSTALL_HOME) === "1",
+  markOnHomeScreen: () => write(() => localStorage, INSTALL_HOME, "1"),
   dismissed: () => read(() => sessionStorage, INSTALL_DISMISSED) === "1",
   dismiss: () => write(() => sessionStorage, INSTALL_DISMISSED, "1"),
   shown: () => read(() => sessionStorage, INSTALL_SHOWN) === "1",
@@ -133,7 +141,7 @@ export const installGuide = {
 };
 
 /**
- * Faut-il proposer le guidage ? Sur un téléphone seulement, pas quand l'application est déjà lancée depuis l'écran d'accueil (mode installé), pas après « Plus tard »
+ * Faut-il proposer le guidage ? Sur un téléphone ou une tablette seulement, pas quand l'application est déjà lancée depuis l'écran d'accueil (mode installé), pas après « Plus tard »
  * dans la même session. `alreadyShown` : le guidage a déjà été amené par l'application dans cette session (garde de l'espace connecté, activation).
  */
 export function installGuideDue(platform: Platform, session: { dismissed: boolean; alreadyShown?: boolean }): boolean {
@@ -183,7 +191,10 @@ export async function flushPendingLogout(): Promise<boolean> {
 
 export interface Platform {
   os: "android" | "iphone" | "desktop" | "unknown";
+  /** MAAQ est lancée depuis l'écran d'accueil : mode installé, ou raccourci déjà utilisé sur cet appareil. */
   standalone: boolean;
+  /** Samsung Internet : ses menus ne sont pas ceux de Chrome. */
+  samsung: boolean;
   /** iPhone dans un autre navigateur que Safari, ou dans le navigateur intégré d'une application (RF5) : l'ajout à l'écran d'accueil n'y est pas possible. */
   iosNonSafari: boolean;
   /** Navigateur intégré à une autre application (messagerie, réseau social, WebView) : l'installation n'y est pas possible, sur iPhone comme sur Android. */
@@ -194,12 +205,14 @@ let platformCache: Platform | null = null;
 
 /** Détection du système pour le guidage d'installation (US-1 RF2, RT1, RT2), calculée une fois. */
 export function detectPlatform(): Platform {
-  if (typeof navigator === "undefined") return { os: "unknown", standalone: false, iosNonSafari: false, inApp: false };
-  platformCache ??= platformOf({
-    userAgent: navigator.userAgent,
-    maxTouchPoints: navigator.maxTouchPoints,
-    standalone: window.matchMedia?.("(display-mode: standalone)").matches || (navigator as Navigator & { standalone?: boolean }).standalone === true,
-  });
+  if (typeof navigator === "undefined") return { os: "unknown", standalone: false, samsung: false, iosNonSafari: false, inApp: false };
+  if (!platformCache) {
+    // Mode installé : selon le navigateur, « standalone », « fullscreen » ou « minimal-ui ».
+    const installed = ["standalone", "fullscreen", "minimal-ui"].some((mode) => window.matchMedia?.(`(display-mode: ${mode})`).matches) || (navigator as Navigator & { standalone?: boolean }).standalone === true;
+    // Un lancement depuis l'icône de l'écran d'accueil (mode installé, ou marque de l'adresse de démarrage) est retenu sur l'appareil.
+    if (installed || launchedFromHome(window.location.search)) installGuide.markOnHomeScreen();
+    platformCache = platformOf({ userAgent: navigator.userAgent, maxTouchPoints: navigator.maxTouchPoints, standalone: installed, homeScreen: installGuide.onHomeScreen() });
+  }
   return platformCache;
 }
 
@@ -207,7 +220,7 @@ export function detectPlatform(): Platform {
 const IN_APP_TOKENS = /FBAN|FBAV|FB_IAB|FBIOS|Instagram|Messenger|LinkedInApp|Snapchat|Twitter|Line\/|MicroMessenger|Teams|Outlook|GSA\/|WhatsApp/i;
 
 /** Ce que le navigateur dit de l'appareil (pur, pour les tests) : système, mode installé, navigateur autre que Safari ou intégré à une application. */
-export function platformOf(facts: { userAgent: string; maxTouchPoints: number; standalone: boolean }): Platform {
+export function platformOf(facts: { userAgent: string; maxTouchPoints: number; standalone: boolean; homeScreen?: boolean }): Platform {
   const ua = facts.userAgent;
   const isIos = /iphone|ipad|ipod/i.test(ua) || (/macintosh/i.test(ua) && facts.maxTouchPoints > 1);
   const isAndroid = /android/i.test(ua);
@@ -218,7 +231,8 @@ export function platformOf(facts: { userAgent: string; maxTouchPoints: number; s
   const inApp = (isIos || isAndroid) && !facts.standalone && (IN_APP_TOKENS.test(ua) || iosWebView || androidWebView);
   return {
     os: isIos ? "iphone" : isAndroid ? "android" : isMobile ? "unknown" : "desktop",
-    standalone: facts.standalone,
+    standalone: facts.standalone || facts.homeScreen === true,
+    samsung: isAndroid && /SamsungBrowser/i.test(ua),
     iosNonSafari: isIos && (/crios|fxios|edgios|opios/i.test(ua) || inApp),
     inApp,
   };

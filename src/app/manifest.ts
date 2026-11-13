@@ -7,7 +7,11 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: "MAAQ",
     description: "Vos agents IA pour l'administratif et le quotidien, en toute transparence.",
     lang: "fr",
-    start_url: "/",
+    // `id` garde l'identité de l'application installée (c'était l'adresse de démarrage « / »). L'adresse de démarrage porte la marque d'un lancement depuis l'écran d'accueil :
+    // elle sert quand le navigateur n'a créé qu'un raccourci, qui s'ouvre dans un onglet et non en mode installé (US-1 RF8).
+    id: "/",
+    scope: "/",
+    start_url: "/?source=ecran-accueil",
     display: "standalone",
     orientation: "portrait",
     background_color: "#e9e1d2",

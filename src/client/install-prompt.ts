@@ -27,6 +27,12 @@ export function captureInstallPrompt(): void {
     notify();
   });
   window.addEventListener("appinstalled", () => {
+    // MAAQ vient d'être installée : le guidage ne revient plus sur cet appareil (US-1 RF8).
+    try {
+      localStorage.setItem("maaq:install-home", "1");
+    } catch {
+      // Sans stockage, le mode installé suffira à le reconnaître.
+    }
     deferred = null;
     notify();
   });
