@@ -1,3 +1,4 @@
+import { summarize } from "../scripts/cost-report";
 import { describe, expect, it } from "vitest";
 import { resetBudgetAlert, runBudgetAlert, type LogReader } from "@/server/budget-alert";
 import type { Ctx } from "@/server/auth/service";
@@ -63,5 +64,18 @@ describe("alerte avant la limite de dépense de la clé Anthropic", () => {
     // Une alerte du mois précédent ne compte pas pour ce mois-ci.
     const next = await runBudgetAlert(ctx("2026-12-10T12:00:00Z"), { budgetUsd: 500, reader: logs([260], [{ month: "2026-11", threshold: 50 }]).reader, alert: box.alert });
     expect(next).toMatchObject({ month: "2026-12", sent: [50] });
+  });
+});
+
+describe("relevé des coûts par type d'appel", () => {
+  it("additionne par type, du plus coûteux au moins coûteux, avec le coût moyen et les recherches web", () => {
+    expect(
+      summarize([
+        { kind: "assistant", apiCostUsd: 0.03, webSearches: 0 },
+        { kind: "sortie", apiCostUsd: 0.12, webSearches: 4 },
+        { kind: "assistant", apiCostUsd: 0.05, webSearches: 0 },
+      ]).map((r) => [r.kind, r.calls, Number(r.costUsd.toFixed(2)), Number(r.averageUsd.toFixed(2)), r.webSearches]),
+    ).toEqual([["sortie", 1, 0.12, 0.12, 4], ["assistant", 2, 0.08, 0.04, 0]]);
+    expect(summarize([])).toEqual([]);
   });
 });

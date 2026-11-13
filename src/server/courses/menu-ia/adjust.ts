@@ -234,7 +234,7 @@ export async function proposeAdjustments(ctx: Ctx, session: SessionContext, mess
   const proposals: AdjustProposal[] = [];
   let failed = false;
   try {
-    const response = await model.send({ system: SYSTEM, tools: [ADJUST_TOOL], messages: [{ role: "user", content }] });
+    const response = await model.send({ kind: "menu_semaine", system: SYSTEM, tools: [ADJUST_TOOL], messages: [{ role: "user", content }] });
     const use = response.content.find((b) => b.type === "tool_use" && b.name === ADJUST_TOOL.name);
     const parsed = use && use.type === "tool_use" ? proposalsInput.safeParse(use.input) : null;
     if (!parsed?.success) failed = true;

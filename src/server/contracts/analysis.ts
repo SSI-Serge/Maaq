@@ -97,7 +97,7 @@ function liveRunner(): AnalysisRunner {
     async run(input) {
       const settings = env();
       modelCache ??= createModel({ provider: settings.ASSISTANT_PROVIDER, apiKey: settings.ANTHROPIC_API_KEY!, model: settings.ASSISTANT_MODEL, effort: "medium", timeoutMs: 300_000, maxTokens: 8_000 });
-      const answer = await modelCache.send({ system: ANALYSIS_SYSTEM, tools: [], messages: [{ role: "user", content: buildAnalysisMessage(input) }] });
+      const answer = await modelCache.send({ kind: "contrat", system: ANALYSIS_SYSTEM, tools: [], messages: [{ role: "user", content: buildAnalysisMessage(input) }] });
       return answer.content.filter((b): b is TextBlock => b.type === "text").map((b) => b.text).join("\n");
     },
   };

@@ -105,7 +105,7 @@ export async function createExercisePage(ctx: Ctx, session: SessionContext, inpu
   if (input.photo) content.push({ type: "image", source: { type: "base64", media_type: input.photo.mediaType, data: input.photo.data.toString("base64") } });
   let answer: Awaited<ReturnType<AssistantModel["send"]>>;
   try {
-    answer = await model.send({ system: instructions(), tools: [], messages: [{ role: "user", content }] });
+    answer = await model.send({ kind: "page_exercices", system: instructions(), tools: [], messages: [{ role: "user", content }] });
   } catch (error) {
     await release();
     console.error(`Page d'exercices non créée : ${describeError(error)}`);

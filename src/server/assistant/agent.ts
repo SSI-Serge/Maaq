@@ -162,7 +162,7 @@ export async function runAssistant(input: AgentRunInput): Promise<AgentRunResult
         break;
       }
       result.turns += 1;
-      const response = await input.model.send({ system: input.definition.instructions, tools: input.definition.tools, messages });
+      const response = await input.model.send({ kind: "assistant", system: input.definition.instructions, tools: input.definition.tools, messages });
       result.usage.inputTokens += response.usage.inputTokens;
       result.usage.outputTokens += response.usage.outputTokens;
       result.usage.cacheRead += response.usage.cacheRead;

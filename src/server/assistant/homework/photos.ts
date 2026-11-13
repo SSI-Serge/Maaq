@@ -131,6 +131,7 @@ export async function analyzeHomeworkPhoto(
   let answer: Awaited<ReturnType<AssistantModel["send"]>>;
   try {
     answer = await model.send({
+      kind: "photo_devoirs",
       system: instructions(),
       tools: [],
       messages: [{ role: "user", content: [{ type: "text", text: `<niveau>${LEVEL_LABEL[level as "cp"]}</niveau>\n<exercices>${JSON.stringify(exercises)}</exercices>` }, image] }],

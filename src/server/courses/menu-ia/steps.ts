@@ -56,7 +56,7 @@ async function registerRequest(ctx: Ctx, accountId: string, userId: string): Pro
 export async function draftSteps(model: AssistantModel, dishes: DeroulDish[]): Promise<ProposalStep[] | null> {
   try {
     const content = `Plats de la séance (lundi à vendredi) :\n${dishes.map((d, i) => `${i + 1}. ${d.name} — ${d.minutes} min — ${d.ingredients.slice(0, 14).join(", ")}`).join("\n")}`;
-    const response = await model.send({ system: SYSTEM, tools: [STEPS_TOOL], messages: [{ role: "user", content }] });
+    const response = await model.send({ kind: "menu_deroule", system: SYSTEM, tools: [STEPS_TOOL], messages: [{ role: "user", content }] });
     const use = response.content.find((b) => b.type === "tool_use" && b.name === STEPS_TOOL.name);
     if (!use || use.type !== "tool_use") return null;
     const parsed = stepsInput.safeParse(use.input);

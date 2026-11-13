@@ -18,6 +18,8 @@ export interface ImageBlock { type: "image"; source: { type: "base64"; media_typ
 export type ModelMessage = { role: "user"; content: string | (TextBlock | ToolResultBlock | ImageBlock)[] } | { role: "assistant"; content: ContentBlock[] };
 
 export interface ModelRequest {
+  /** Type d'appel, pour le relevé des coûts (journal « model_call ») : un mot fixe, jamais de contenu ni d'identifiant. N'est pas envoyé au modèle. */
+  kind?: string;
   system: string;
   tools: unknown[];
   messages: ModelMessage[];
@@ -148,7 +150,7 @@ export function createModel(config: ModelConfig): AssistantModel {
       const response = await core.send(request, options);
       // Trace de dépense, une ligne par appel réussi, tous modules confondus : des chiffres seulement. L'alerte de budget (`src/server/budget-alert.ts`) les additionne.
       const apiCostUsd = estimateCostUsd(config.model, response.usage);
-      if (apiCostUsd !== null) console.info(JSON.stringify({ event: "model_call", model: config.model, apiCostUsd }));
+      if (apiCostUsd !== null) console.info(JSON.stringify({ event: "model_call", kind: request.kind ?? "autre", model: config.model, apiCostUsd, webSearches: response.usage.webSearches ?? 0 }));
       return response;
     },
   };

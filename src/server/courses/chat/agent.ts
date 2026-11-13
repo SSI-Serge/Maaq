@@ -124,7 +124,7 @@ export async function runCourseAgent(input: CourseAgentInput): Promise<CourseAge
       }
       let shown = "";
       const response = await input.model.send(
-        { system, tools: definition, messages },
+        { kind: "tchat_courses", system, tools: definition, messages },
         input.onProgress
           ? {
               onDelta: (delta) => {

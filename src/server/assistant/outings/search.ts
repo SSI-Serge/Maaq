@@ -192,7 +192,7 @@ export async function findIdeas(model: AssistantModel, request: SearchRequest, e
   const startedAt = Date.now();
   let calls = 0;
   for (let turn = 0; turn <= MAX_CONTINUATIONS; turn++) {
-    const answer = await model.send({ system: instructions(), tools: [{ type: "web_search_20250305", name: "web_search", max_uses: MAX_SEARCHES }], messages });
+    const answer = await model.send({ kind: "sortie", system: instructions(), tools: [{ type: "web_search_20250305", name: "web_search", max_uses: MAX_SEARCHES }], messages });
     for (const url of resultUrls(answer.content)) urls.add(url);
     searches += Math.max(answer.usage.webSearches ?? 0, answer.content.filter((b) => b.type === "server_tool_use").length);
     calls += 1;

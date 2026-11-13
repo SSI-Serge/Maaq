@@ -281,7 +281,7 @@ export async function prepareDigest(ctx: Ctx, accountId: string, weekStart: stri
     input = await summaryInput(ctx.db, accountId, weekStart, timeZone);
     if (!model) throw new Error("assistant fermé");
     const answer = await Promise.race([
-      model.send({ system: instructions(), tools: [], messages: [{ role: "user", content: input.text }] }),
+      model.send({ kind: "point_semaine", system: instructions(), tools: [], messages: [{ role: "user", content: input.text }] }),
       new Promise<never>((_resolve, reject) => setTimeout(() => reject(new Error("délai dépassé")), SUMMARY_TIMEOUT_MS)),
     ]);
     // Trace d'exploitation : métadonnées seulement, jamais le contenu du résumé.

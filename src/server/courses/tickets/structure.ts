@@ -57,6 +57,7 @@ export function ticketStructurer(): TicketStructurer | null {
     async structure({ text, aisles }) {
       globalThis.__maaqTicketModel ??= createModel({ provider: settings.ASSISTANT_PROVIDER, apiKey: settings.ANTHROPIC_API_KEY!, model: settings.ASSISTANT_MODEL, effort: "low", timeoutMs: 90_000, maxTokens: 4_000 });
       const answer = await globalThis.__maaqTicketModel.send({
+        kind: "ticket",
         system: instructions(),
         tools: [],
         messages: [{ role: "user", content: `Rayons disponibles : ${aisles.join(" | ")}\n\n<ticket>\n${text}\n</ticket>` }],

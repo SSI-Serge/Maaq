@@ -105,7 +105,7 @@ export async function askSeasonDishes(ctx: Ctx, a: SeasonAsk): Promise<{ ids: st
       `Plats déjà donnés (ne les répète pas) : ${avoid.join(" ; ") || "aucun"}`,
       `Propose ${n} plats de saison et bon marché pour le mois ${month}.`,
     ].join("\n\n");
-    const response = await a.model.send({ system: SYSTEM, tools: [SEASON_TOOL], messages: [{ role: "user", content }] });
+    const response = await a.model.send({ kind: "menu_mois", system: SYSTEM, tools: [SEASON_TOOL], messages: [{ role: "user", content }] });
     const use = response.content.find((b) => b.type === "tool_use" && b.name === SEASON_TOOL.name);
     const parsed = use && use.type === "tool_use" ? seasonInput.safeParse(use.input) : null;
     if (!parsed?.success) throw new Error("réponse invalide");
