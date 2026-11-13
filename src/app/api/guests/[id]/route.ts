@@ -16,8 +16,9 @@ export const PATCH = handler(async (request: Request, { params }: Params) => {
   const { session, ctx } = await requireProfile();
   const { id } = await params;
   return idempotent(ctx, request, session.user.id, async () => {
-    await updateGuest(ctx, session, id, await parseBody(request, schema));
-    return NextResponse.json(await listGuests(ctx, requirePrimary(session)));
+    const { emailPending } = await updateGuest(ctx, session, id, await parseBody(request, schema));
+    // `emailPending` : l'invité actif doit confirmer son nouvel email depuis le lien reçu à la nouvelle adresse.
+    return NextResponse.json({ ...(await listGuests(ctx, requirePrimary(session))), emailPending });
   });
 });
 

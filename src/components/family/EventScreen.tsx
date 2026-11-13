@@ -380,14 +380,14 @@ export function EventScreen({ id }: { id: string }) {
           </div>
 
           {/* Suivi du trajet, propre à ce profil (US-107 RF4) */}
-          {event.travel && (
+          {event.travel && !user.childProfile && (
             <OptionalSection label="Suivre mon trajet">
               <TravelSection event={event} consent={location.data?.consent.status ?? null} onChanged={reload} onEditAddress={() => setMode("edit")} />
             </OptionalSection>
           )}
 
           {/* « Sur place » : où se garer et où manger près du lieu (US-112) ; jamais pour un RDV médical */}
-          {event.place && event.type !== "medical" && !event.past && (provisional || event.status === "confirmed") && (
+          {event.place && !user.childProfile && event.type !== "medical" && !event.past && (provisional || event.status === "confirmed") && (
             <OptionalSection label="Sur place">
               <PlaceSection eventId={event.id} />
             </OptionalSection>

@@ -38,6 +38,14 @@ export async function refuseChildChat(db: Kysely<DB>, userId: string): Promise<v
   if (rows[0]?.child) throw new Rejection("child_no_chat", "Le tchat des agents n'est pas ouvert à ce profil.", 403);
 }
 
+/**
+ * Le profil d'un enfant n'a ni consentement de géolocalisation, ni position, ni suivi de trajet, ni recherche « Sur place » (décision du PO du 13/11/2026, mineur : point
+ * transmis au DPO). Refus côté serveur ; les écrans n'en montrent aucune entrée. Il garde ses tâches (S-46).
+ */
+export async function refuseChildLocation(db: Kysely<DB>, userId: string): Promise<void> {
+  if (await isChildProfile(db, userId)) throw new Rejection("child_no_location", "Cette fonction n'est pas ouverte à ce profil.", 403);
+}
+
 /** Le catalogue des agents est fermé au profil d'un enfant (D73 S-53) : ni liste, ni fiche, ni ajout d'un agent. Refus côté serveur ; les écrans n'en montrent aucune entrée. */
 export async function refuseChildCatalog(db: Kysely<DB>, userId: string): Promise<void> {
   const { rows } = await sql<{ child: boolean }>`select profile_is_child_linked(${userId}::uuid) as child`.execute(db);

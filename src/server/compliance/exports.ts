@@ -1,3 +1,4 @@
+import { describeError } from "@/server/safe-log";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { sql } from "kysely";
@@ -515,12 +516,12 @@ async function failExport(ctx: Ctx, exportId: string, user: { email: string; fir
       text: `Bonjour ${user.first_name},\n\nLa préparation de l'export de vos données a échoué. Vous pouvez renouveler votre demande depuis les Réglages de MAAQ.\n\nL'équipe MAAQ`,
     });
   } catch (error) {
-    console.error("Échec d'export enregistré, email non envoyé :", error);
+    console.error("Échec d'export enregistré, email non envoyé :", describeError(error));
   }
 }
 
 export function prepareInBackground(ctx: Ctx, exportId: string): void {
-  void prepareExport(ctx, exportId).catch((error) => console.error("Préparation de l'export", exportId, error));
+  void prepareExport(ctx, exportId).catch((error) => console.error("Préparation de l'export", exportId, describeError(error)));
 }
 
 // ---------------------------------------------------------------------------

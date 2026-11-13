@@ -1,5 +1,9 @@
 import { sql, type Transaction } from "kysely";
 import { messenger } from "@/server/adapters/messaging";
+import { signToken, verifyToken } from "@/server/auth/tokens";
+import { env } from "@/server/env";
+import { describeError } from "@/server/safe-log";
+import { decrypt, encrypt, sha256 } from "@/server/security/crypto";
 import { issueActivationLink } from "@/server/accounts/activation";
 import { freeChildSheets, type ChildSheet } from "@/server/assistant/family";
 import type { Ctx, SessionContext } from "@/server/auth/service";
@@ -347,11 +351,35 @@ export async function sendInvitation(ctx: Ctx, session: SessionContext, guestId:
   });
 }
 
+/** Durée de validité du lien de confirmation d'un nouvel email de connexion. */
+export const EMAIL_CONFIRMATION_HOURS = 48;
+
+interface EmailChangeToken {
+  exp: number;
+  /** Profil de l'invité. */
+  uid: string;
+  /** Empreinte de l'email de connexion au moment de la demande : si l'email a changé entre-temps, le lien ne vaut plus. */
+  old: string;
+  /** Nouvel email, chiffré : il ne se lit ni dans l'adresse du lien ni dans les journaux. */
+  enc: string;
+}
+
+const dataKey = () => Buffer.from(env().ENCRYPTION_KEY, "base64");
+const printOf = (email: string) => sha256(email.trim().toLowerCase()).toString("hex");
+
+function confirmationUrl(guestId: string, oldEmail: string, newEmail: string, now: Date): string {
+  const token = signToken<EmailChangeToken>({ exp: now.getTime() + EMAIL_CONFIRMATION_HOURS * 3_600_000, uid: guestId, old: printOf(oldEmail), enc: encrypt(newEmail, dataKey()).toString("base64url") });
+  return `${env().APP_URL.replace(/\/$/, "")}/confirmer-email?jeton=${encodeURIComponent(token)}`;
+}
+
 /**
- * Modifie les coordonnées d'un invité (US-19). Non activé : un changement d'email ou de téléphone
- * invalide le lien en cours. Actif : l'email de connexion change, les deux adresses sont prévenues.
+ * Modifie les coordonnées d'un invité (US-19). Non activé : un changement d'email ou de téléphone invalide le lien en cours.
+ * Actif : le nouvel email de connexion ne s'applique qu'après confirmation par l'invité (décision du PO du 13/11/2026, revue de sécurité) : un lien part à la NOUVELLE
+ * adresse, l'ancienne est informée, et tant que l'invité n'a pas confirmé, son email actuel reste le seul valable. Sans cela, l'utilisateur principal pouvait prendre la
+ * main sur le profil d'un invité en changeant son email puis en demandant un nouveau mot de passe. Rien n'est gardé en base : le lien signé porte la demande.
+ * Retourne `emailPending` quand une confirmation est attendue.
  */
-export async function updateGuest(ctx: Ctx, session: SessionContext, guestId: string, input: GuestInput): Promise<void> {
+export async function updateGuest(ctx: Ctx, session: SessionContext, guestId: string, input: GuestInput): Promise<{ emailPending: boolean }> {
   const accountId = requirePrimary(session);
   const notice = await ctx.db.transaction().execute(async (trx) => {
     const guest = await guestOf(trx, accountId, guestId);
@@ -359,10 +387,12 @@ export async function updateGuest(ctx: Ctx, session: SessionContext, guestId: st
     const { email, phone } = await validateGuest(trx, input, { primaryEmail: host.email, exceptUserId: guestId });
     const emailChanged = email.toLowerCase() !== guest.email.toLowerCase();
     const phoneChanged = phone !== guest.phone;
+    // Invité actif : son email de connexion ne change pas ici.
+    const confirm = guest.status !== "pending_activation" && emailChanged;
 
     await trx
       .updateTable("users")
-      .set({ first_name: input.firstName.trim(), last_name: input.lastName.trim(), email, phone, updated_at: ctx.now })
+      .set({ first_name: input.firstName.trim(), last_name: input.lastName.trim(), ...(confirm ? {} : { email }), phone, updated_at: ctx.now })
       .where("id", "=", guestId)
       .execute();
 
@@ -375,33 +405,89 @@ export async function updateGuest(ctx: Ctx, session: SessionContext, guestId: st
         .where("revoked_at", "is", null)
         .execute();
     }
-    if (guest.status === "active" && emailChanged) {
-      await trx
-        .insertInto("security_events")
-        .values({
-          user_id: guestId,
-          actor_user_id: session.user.id,
-          event_type: "login_email_changed",
-          occurred_at: ctx.now,
-          details: JSON.stringify({ changed_by: "primary_user" }),
-        })
-        .execute();
-      return { oldEmail: guest.email, newEmail: email, firstName: input.firstName.trim() };
-    }
-    return null;
+    return confirm ? { oldEmail: guest.email, newEmail: email, firstName: input.firstName.trim() } : null;
   });
 
-  if (notice) {
-    const text = (to: string) =>
+  if (!notice) return { emailPending: false };
+  const by = `${session.user.firstName} ${session.user.lastName}`;
+  await messenger().sendEmail({
+    to: notice.newEmail,
+    subject: "Confirmez votre nouvel email de connexion MAAQ",
+    text:
       `Bonjour ${notice.firstName},\n\n` +
-      `L'email de connexion de votre accès MAAQ a été modifié par ${session.user.firstName} ${session.user.lastName}. ` +
-      `Il est désormais : ${notice.newEmail}.\n\n` +
-      (to === notice.oldEmail ? "Cette adresse ne permet plus de vous connecter.\n\n" : "") +
-      "L'équipe MAAQ";
-    for (const to of [notice.oldEmail, notice.newEmail]) {
-      await messenger().sendEmail({ to, subject: "Votre email de connexion MAAQ a changé", text: text(to) });
-    }
+      `${by} demande que cette adresse devienne l'email de connexion de votre accès MAAQ.\n\n` +
+      `Pour l'accepter, ouvrez ce lien dans les ${EMAIL_CONFIRMATION_HOURS} heures :\n${confirmationUrl(guestId, notice.oldEmail, notice.newEmail, ctx.now)}\n\n` +
+      "Tant que vous n'avez pas confirmé, votre email de connexion actuel reste le seul valable. Si vous n'êtes pas à l'origine de cette demande, ignorez ce message.\n\n" +
+      "L'équipe MAAQ",
+  });
+  await messenger().sendEmail({
+    to: notice.oldEmail,
+    subject: "Demande de changement de votre email de connexion MAAQ",
+    text:
+      `Bonjour ${notice.firstName},\n\n` +
+      `${by} a demandé à changer l'email de connexion de votre accès MAAQ. Un lien de confirmation a été envoyé à la nouvelle adresse.\n\n` +
+      "Rien ne change tant que vous n'avez pas confirmé depuis ce lien : cette adresse reste votre email de connexion. Si vous n'êtes pas d'accord, ne confirmez pas.\n\n" +
+      "L'équipe MAAQ",
+  });
+  return { emailPending: true };
+}
+
+/** Ce que l'écran de confirmation montre avant d'appliquer : rien de plus que le prénom et le nouvel email. */
+export interface EmailConfirmationView {
+  firstName: string;
+  newEmail: string;
+}
+
+async function readEmailChange(ctx: Ctx, token: string): Promise<{ guest: { id: string; first_name: string; email: string; account_id: string | null }; newEmail: string }> {
+  const gone = () => new Rejection("link_expired", "Ce lien n'est plus valable. Demandez à la personne qui gère le compte de refaire la demande.", 410);
+  const payload = verifyToken<EmailChangeToken>(token, ctx.now);
+  if (!payload || typeof payload.uid !== "string" || typeof payload.old !== "string" || typeof payload.enc !== "string") throw gone();
+  let newEmail: string;
+  try {
+    newEmail = decrypt(Buffer.from(payload.enc, "base64url"), dataKey());
+  } catch {
+    throw gone();
   }
+  const guest = await ctx.db.selectFrom("users").select(["id", "first_name", "email", "account_id"]).where("id", "=", payload.uid).where("role", "=", "guest").where("status", "=", "active").executeTakeFirst();
+  // L'email a changé depuis la demande (lien déjà utilisé, ou autre changement) : le lien ne vaut plus.
+  if (!guest || printOf(guest.email) !== payload.old) throw gone();
+  return { guest, newEmail };
+}
+
+export async function inspectEmailChange(ctx: Ctx, token: string): Promise<EmailConfirmationView> {
+  const { guest, newEmail } = await readEmailChange(ctx, token);
+  return { firstName: guest.first_name, newEmail };
+}
+
+/** L'invité confirme : le nouvel email devient son email de connexion, les deux adresses sont prévenues (US-19 RF4, RT1). Le lien ne sert qu'une fois. */
+export async function confirmEmailChange(ctx: Ctx, token: string): Promise<EmailConfirmationView> {
+  const { guest, newEmail } = await readEmailChange(ctx, token);
+  const oldEmail = guest.email;
+  await ctx.db.transaction().execute(async (trx) => {
+    const current = await trx.selectFrom("users").select("email").where("id", "=", guest.id).forUpdate().executeTakeFirstOrThrow();
+    if (current.email.toLowerCase() !== oldEmail.toLowerCase()) throw new Rejection("link_expired", "Ce lien n'est plus valable.", 410);
+    const taken = await trx.selectFrom("users").select("id").where("email", "=", newEmail).where("status", "<>", "removed").where("id", "<>", guest.id).executeTakeFirst();
+    if (taken) throw new Rejection("email_taken", "Cette adresse est déjà associée à un compte MAAQ.", 409);
+    await trx.updateTable("users").set({ email: newEmail, updated_at: ctx.now }).where("id", "=", guest.id).execute();
+    await trx
+      .insertInto("security_events")
+      .values({ user_id: guest.id, actor_user_id: guest.id, event_type: "login_email_changed", occurred_at: ctx.now, details: JSON.stringify({ changed_by: "primary_user", confirmed_by: "guest" }) })
+      .execute();
+  });
+  for (const to of [oldEmail, newEmail]) {
+    await messenger()
+      .sendEmail({
+        to,
+        subject: "Votre email de connexion MAAQ a changé",
+        text:
+          `Bonjour ${guest.first_name},\n\n` +
+          `L'email de connexion de votre accès MAAQ est désormais : ${newEmail}.\n\n` +
+          (to === oldEmail ? "Cette adresse ne permet plus de vous connecter.\n\n" : "") +
+          "L'équipe MAAQ",
+      })
+      .catch((error) => console.error(`Information du changement d'email non envoyée : ${describeError(error)}`));
+  }
+  return { firstName: guest.first_name, newEmail };
 }
 
 /**

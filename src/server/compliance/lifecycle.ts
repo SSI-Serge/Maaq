@@ -31,7 +31,7 @@ async function mail(to: string, subject: string, text: string): Promise<void> {
   try {
     await messenger().sendEmail({ to, subject, text });
   } catch (error) {
-    console.error(`Email « ${subject} » non envoyé :`, error);
+    console.error(`Email « ${subject} » non envoyé :`, describeError(error));
   }
 }
 
@@ -418,7 +418,7 @@ export async function runLifecycle(ctx: Ctx): Promise<LifecycleResult> {
       return true;
     } catch (error) {
       result.failures++;
-      console.error(`Suppression en échec (${label}), reprise au prochain passage :`, error);
+      console.error(`Suppression en échec (${label}), reprise au prochain passage :`, describeError(error));
       return false;
     }
   };

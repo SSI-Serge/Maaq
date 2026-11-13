@@ -1,3 +1,4 @@
+import { describeError } from "@/server/safe-log";
 import { messenger } from "@/server/adapters/messaging";
 import type { Ctx, SessionContext } from "@/server/auth/service";
 import { processChatErasure } from "@/server/auth/service";
@@ -164,7 +165,7 @@ export async function revokeDevice(ctx: Ctx, actor: RevokeActor, deviceId: strin
         `Si vous n'êtes pas à l'origine de cette demande, contactez le support depuis les Réglages.\n\nL'équipe MAAQ`,
     });
   } catch (error) {
-    console.error("Révocation enregistrée mais email non envoyé :", error);
+    console.error("Révocation enregistrée mais email non envoyé :", describeError(error));
   }
   return { revokedCurrent: deviceId === actor.currentDeviceId };
 }

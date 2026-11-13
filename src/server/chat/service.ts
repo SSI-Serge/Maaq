@@ -1,3 +1,4 @@
+import { describeError } from "@/server/safe-log";
 import { refuseChildChat } from "@/server/assistant/profile-member";
 import { sql } from "kysely";
 import { digitorn, type ActionProposal, type ChatEvent, type RequesterRank } from "@/server/adapters/digitorn";
@@ -542,7 +543,7 @@ export async function reportError(
           `\nDemande :\n${requestText ?? "(non disponible)"}\n\nRéponse signalée :\n${responseText}\n`,
       });
     } catch (error) {
-      console.error("Signalement enregistré mais non transmis au support :", error);
+      console.error("Signalement enregistré mais non transmis au support :", describeError(error));
     }
   }
   return { alreadyReported: false };

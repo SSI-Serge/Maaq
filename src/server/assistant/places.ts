@@ -1,3 +1,4 @@
+import { refuseChildLocation } from "./profile-member";
 import { sql, type Kysely } from "kysely";
 import type { Ctx, SessionContext } from "@/server/auth/service";
 import type { DB } from "@/server/db/schema.generated";
@@ -186,6 +187,7 @@ async function createSearch(db: Db, now: Date, user: SearchUser, eventId: string
  */
 export async function requestPlaceSearch(ctx: Ctx, session: SessionContext, eventId: string, origin: "button" | "chat" | "suggestion", provider: PlaceProvider | null = placeProvider()): Promise<string> {
   const { accountId, parent } = requireFamilyProfile(session);
+  await refuseChildLocation(ctx.db, session.user.id);
   if (!provider) throw fail("place_off", "La recherche « Sur place » n'est pas ouverte.", 409);
   return createSearch(ctx.db, ctx.now, { id: session.user.id, accountId, timeZone: session.device.timezone || "Europe/Paris", parent }, eventId, origin);
 }
@@ -227,6 +229,7 @@ export async function suggestPlaceSearch(db: Db, now: Date, user: SearchUser, ev
 /** « Oui » lance la recherche (origine « suggestion ») ; « Non, merci » est mémorisé et l'assistant répond (CA 3.2). La réponse ne se donne qu'une fois, par le parent à qui la suggestion a été faite. */
 export async function answerPlaceSuggestion(ctx: Ctx, session: SessionContext, eventId: string, answer: "accepted" | "declined", provider: PlaceProvider | null = placeProvider()): Promise<{ searchId: string | null }> {
   const { accountId, parent } = requireFamilyProfile(session);
+  await refuseChildLocation(ctx.db, session.user.id);
   const suggestion = await ctx.db.selectFrom("event_place_suggestions").select(["answer", "suggested_to_user_id"]).where("event_id", "=", eventId).where("account_id", "=", accountId).executeTakeFirst();
   if (!suggestion || suggestion.suggested_to_user_id !== session.user.id) throw fail("not_found", "Cette suggestion n'existe plus.", 404);
   if (suggestion.answer !== "pending") throw fail("already_answered", "Vous avez déjà répondu à cette suggestion.", 409);

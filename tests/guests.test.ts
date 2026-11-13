@@ -11,7 +11,7 @@ import type { Messenger } from "@/server/adapters/messaging";
 import { createSession, getSession, type Ctx } from "@/server/auth/service";
 import type { DB } from "@/server/db/schema.generated";
 import { deliverInvitation } from "@/server/guests/invitations";
-import { addGuest, designateCoreGuest, listGuests, removeGuest, sendInvitation, updateGuest } from "@/server/guests/service";
+import { addGuest, confirmEmailChange, designateCoreGuest, inspectEmailChange, listGuests, removeGuest, sendInvitation, updateGuest } from "@/server/guests/service";
 import { Rejection } from "@/server/http";
 import { completeSetup, getSetup, saveMyInfo } from "@/server/profile/setup";
 import { createProfile, messagesTo, minutesLater, sessionFor, testDb } from "./helpers/fixtures";
@@ -216,19 +216,55 @@ describe("US-19 — modifier un invité", () => {
     expect(await inspectActivation(at(), token)).toMatchObject({ kind: "expired" });
   });
 
-  it("RF4, RT1 : pour un invité actif, l'email de connexion change ; les deux adresses sont prévenues", async () => {
+  it("RF4, RT1 : pour un invité actif, le nouvel email ne s'applique qu'après sa confirmation ; l'ancien reste valable d'ici là", async () => {
     const { session } = await primary();
     const { guestId, token, email } = await addAndDeliver(session);
     await activate(at(), { token, accepted: true, password: "Invite-2026x", confirmation: "Invite-2026x", timezone: "UTC", userAgent: null });
     const newEmail = unique("julien-pro");
-    await updateGuest(at(), session, guestId, { firstName: "Julien", lastName: "Martin", email: newEmail, phone: "" });
+    expect(await updateGuest(at(), session, guestId, { firstName: "Julien", lastName: "Martin", email: newEmail, phone: "" })).toEqual({ emailPending: true });
 
-    const user = await db.selectFrom("users").select(["email", "phone"]).where("id", "=", guestId).executeTakeFirstOrThrow();
-    expect(user).toEqual({ email: newEmail, phone: null });
+    // Rien n'a changé : l'email de connexion est toujours l'ancien, le téléphone, lui, est mis à jour.
+    const emailOf = async () => (await db.selectFrom("users").select(["email", "phone"]).where("id", "=", guestId).executeTakeFirstOrThrow());
+    expect(await emailOf()).toEqual({ email, phone: null });
+    expect((await db.selectFrom("security_events").select("event_type").where("user_id", "=", guestId).execute()).map((e) => e.event_type)).not.toContain("login_email_changed");
+    // Le lien part à la NOUVELLE adresse ; l'ancienne est informée, sans lien.
+    const toNew = (await messagesTo(newEmail)).find((m) => m.subject === "Confirmez votre nouvel email de connexion MAAQ")!;
+    const toOld = (await messagesTo(email)).find((m) => m.subject === "Demande de changement de votre email de connexion MAAQ")!;
+    expect(toOld.text).not.toContain("/confirmer-email");
+    expect(toOld.text).toContain("Rien ne change tant que vous n'avez pas confirmé");
+    const link = /\/confirmer-email\?jeton=(\S+)/.exec(toNew.text)![1];
+    const jeton = decodeURIComponent(link);
+    // Le nouvel email ne se lit pas dans le lien.
+    expect(link).not.toContain(encodeURIComponent(newEmail));
+    expect(Buffer.from(jeton.split(".")[0], "base64url").toString("utf8")).not.toContain(newEmail);
+
+    // Un lien falsifié ou trop vieux est refusé.
+    expect((await rejectionOf(confirmEmailChange(at(), jeton.slice(0, -2) + "xx"))).code).toBe("link_expired");
+    expect((await rejectionOf(confirmEmailChange(at(new Date(Date.now() + 49 * 3_600_000)), jeton))).code).toBe("link_expired");
+    expect(await inspectEmailChange(at(), jeton)).toEqual({ firstName: "Julien", newEmail });
+    expect(await emailOf()).toEqual({ email, phone: null });
+
+    // L'invité confirme : l'email change, les deux adresses sont prévenues, le lien ne sert qu'une fois.
+    expect(await confirmEmailChange(at(), jeton)).toEqual({ firstName: "Julien", newEmail });
+    expect((await emailOf()).email).toBe(newEmail);
     expect((await messagesTo(email)).map((m) => m.subject)).toContain("Votre email de connexion MAAQ a changé");
     expect((await messagesTo(newEmail)).map((m) => m.subject)).toContain("Votre email de connexion MAAQ a changé");
-    const events = await db.selectFrom("security_events").select("event_type").where("user_id", "=", guestId).execute();
-    expect(events.map((e) => e.event_type)).toContain("login_email_changed");
+    expect((await db.selectFrom("security_events").select("event_type").where("user_id", "=", guestId).execute()).map((e) => e.event_type)).toContain("login_email_changed");
+    expect((await rejectionOf(confirmEmailChange(at(), jeton))).code).toBe("link_expired");
+  });
+
+  it("une adresse prise entre-temps par un autre compte est refusée à la confirmation ; sans changement d'email, pas de confirmation", async () => {
+    const { session } = await primary();
+    const { guestId, token, email } = await addAndDeliver(session);
+    await activate(at(), { token, accepted: true, password: "Invite-2026x", confirmation: "Invite-2026x", timezone: "UTC", userAgent: null });
+    expect(await updateGuest(at(), session, guestId, { firstName: "Jules", lastName: "Martin", email, phone: "" })).toEqual({ emailPending: false });
+    const wanted = unique("convoitee");
+    await updateGuest(at(), session, guestId, { firstName: "Jules", lastName: "Martin", email: wanted, phone: "" });
+    const jeton = decodeURIComponent(/\/confirmer-email\?jeton=(\S+)/.exec((await messagesTo(wanted))[0].text)![1]);
+    const other = await createProfile(db);
+    await db.updateTable("users").set({ email: wanted }).where("id", "=", other.id).execute();
+    expect((await rejectionOf(confirmEmailChange(at(), jeton))).code).toBe("email_taken");
+    expect((await db.selectFrom("users").select("email").where("id", "=", guestId).executeTakeFirstOrThrow()).email).toBe(email);
   });
 });
 

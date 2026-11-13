@@ -1,3 +1,6 @@
+import { grantLocationConsent, LOCATION_NOTICE_VERSION, saveLastPosition } from "@/server/assistant/location-consent";
+import { answerPlaceSuggestion, requestPlaceSearch } from "@/server/assistant/places";
+import { refreshTravel, setTracking } from "@/server/assistant/travel";
 import { randomBytes, randomUUID } from "node:crypto";
 import { sql, type Kysely } from "kysely";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -327,5 +330,24 @@ describe("planning du jour et préparation à tout moment (US-119 RF1, RF11)", (
     // Aide désactivée : plus de planning, pour personne.
     await setHomeworkEnabled(ctx(), f.camilleSession, { enabled: false });
     expect((await failure(homeworkToday(ctx(), f.elodieSession))).code).toBe("homework_disabled");
+  });
+});
+
+describe("profil de l'enfant : ni géolocalisation, ni suivi de trajet, ni « Sur place » (décision du PO du 13/11/2026)", () => {
+  it("relié à une fiche enfant, tout lui est refusé côté serveur ; l'autre invité n'est pas touché", async () => {
+    const f = await family();
+    const provider = { search: async () => ({ parking: [], food: [] }) } as never;
+    const travel = { route: async () => ({ minutes: 10 }) } as never;
+    await setChildProfile(ctx(), f.camilleSession, f.leo, f.users.elodie);
+    const id = "00000000-0000-4000-8000-000000000000";
+    expect((await failure(grantLocationConsent(ctx(), f.elodieSession, LOCATION_NOTICE_VERSION))).code).toBe("child_no_location");
+    expect((await failure(saveLastPosition(ctx(), f.elodieSession, { lat: 48.9, lon: 2.2 }))).code).toBe("child_no_location");
+    expect((await failure(requestPlaceSearch(ctx(), f.elodieSession, id, "button", provider))).code).toBe("child_no_location");
+    expect((await failure(answerPlaceSuggestion(ctx(), f.elodieSession, id, "accepted", provider))).code).toBe("child_no_location");
+    expect((await failure(setTracking(ctx(), f.elodieSession, id, { enabled: true } as never, travel))).code).toBe("child_no_location");
+    expect((await failure(refreshTravel(ctx(), f.elodieSession, id, {}, travel))).code).toBe("child_no_location");
+    // Le refus porte un 403 ; un invité secondaire ordinaire, lui, ne reçoit pas ce refus.
+    expect((await failure(grantLocationConsent(ctx(), f.elodieSession, LOCATION_NOTICE_VERSION))).status).toBe(403);
+    expect((await failure(requestPlaceSearch(ctx(), f.noeSession, id, "button", provider))).code).not.toBe("child_no_location");
   });
 });

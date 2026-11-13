@@ -1,3 +1,4 @@
+import { refuseChildLocation } from "./profile-member";
 import { sql } from "kysely";
 import type { Ctx, SessionContext } from "@/server/auth/service";
 import { Rejection } from "@/server/http";
@@ -41,6 +42,7 @@ export async function getLocationConsent(ctx: Ctx, session: SessionContext): Pro
  */
 export async function grantLocationConsent(ctx: Ctx, session: SessionContext, noticeVersion: string): Promise<LocationConsentView> {
   requireFamilyProfile(session);
+  await refuseChildLocation(ctx.db, session.user.id);
   if (noticeVersion !== LOCATION_NOTICE_VERSION) throw new Rejection("notice_changed", "Le texte d'information a changé : relisez-le avant d'autoriser.", 409);
   const current = await getLocationConsent(ctx, session);
   if (current.status !== "active") {
@@ -64,6 +66,7 @@ export async function withdrawLocationConsent(ctx: Ctx, session: SessionContext)
  */
 export async function saveLastPosition(ctx: Ctx, session: SessionContext, point: unknown, options: { eventId?: string } = {}): Promise<boolean> {
   requireFamilyProfile(session);
+  await refuseChildLocation(ctx.db, session.user.id);
   const place: PlacePoint | null = parsePoint(point);
   if (!place) throw new Rejection("invalid_position", "La position reçue est invalide.", 422);
   if ((await getLocationConsent(ctx, session)).status !== "active") throw new Rejection("no_location_consent", "La position n'est pas autorisée sur cet appareil.", 403);

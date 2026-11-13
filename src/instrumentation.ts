@@ -13,7 +13,7 @@ export async function register() {
       const { db } = await import("@/server/db/client");
       await runDueJobs({ db: db(), now: new Date() });
     } catch (error) {
-      console.error("Traitements périodiques :", error);
+      console.error("Traitements périodiques :", error instanceof Error ? error.name : typeof error);
     }
   };
   setTimeout(tick, 30_000);

@@ -1,3 +1,4 @@
+import { describeError } from "@/server/safe-log";
 import { messenger } from "@/server/adapters/messaging";
 import type { Ctx, SessionContext } from "@/server/auth/service";
 import { Rejection } from "@/server/http";
@@ -47,6 +48,6 @@ export async function sendSupportMessage(ctx: Ctx, session: SessionContext, inpu
       text: `Bonjour ${user.firstName},\n\nVoici la copie du message transmis au support :\n\n${text}\n\nL'équipe MAAQ vous répondra rapidement.\n`,
     });
   } catch (error) {
-    console.error("Message transmis au support, copie non envoyée :", error);
+    console.error("Message transmis au support, copie non envoyée :", describeError(error));
   }
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { useSessionUser } from "@/components/auth/AuthGate";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useApiMutation, useApiQuery } from "@/client/hooks";
@@ -236,6 +237,7 @@ function SchoolZone() {
 export function SettingsScreen() {
   const query = useApiQuery<{ settings: Setting[]; canEdit: boolean }>("/api/family/reminder-settings");
   const { state: push } = usePush();
+  const user = useSessionUser();
   const mutation = useApiMutation();
   // Valeurs confirmées par le serveur depuis le chargement : elles remplacent celles de la liste chargée.
   const [confirmed, setConfirmed] = useState<Partial<Record<EventType, Setting>>>({});
@@ -270,7 +272,8 @@ export function SettingsScreen() {
     <AppShell title="Réglages" subtitle="Assistant Famille" back={{ href: "/assistant", label: "Assistant Famille" }}>
       <MyNotifications pushState={push} />
 
-      <MyPosition />
+      {/* Pas de géolocalisation pour le profil d'un enfant (décision du 13/11/2026). */}
+      {!user.childProfile && <MyPosition />}
 
       <SchoolZone />
       <HomeworkSettings />

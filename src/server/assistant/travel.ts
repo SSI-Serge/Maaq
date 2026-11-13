@@ -1,3 +1,4 @@
+import { refuseChildLocation } from "./profile-member";
 import { sql, type Kysely } from "kysely";
 import type { Ctx, SessionContext } from "@/server/auth/service";
 import type { DB } from "@/server/db/schema.generated";
@@ -172,6 +173,7 @@ async function visibleEvent(ctx: Ctx, session: SessionContext, eventId: string):
 /** « Suivre mon trajet » (RF4) : activé ou retiré pour soi seul, sur un RDV ou sur sa série. Les règles (médical, adresse, RDV concerné) sont celles de la base. */
 export async function setTracking(ctx: Ctx, session: SessionContext, eventId: string, change: TrackingChange, provider: TravelProvider | null = travelProvider()): Promise<TravelView> {
   if (!provider) throw fail("travel_off", "Le suivi du trajet n'est pas ouvert.", 409);
+  await refuseChildLocation(ctx.db, session.user.id);
   const e = await visibleEvent(ctx, session, eventId);
   const userId = session.user.id;
   if (change.scope === "series" && !e.seriesId) throw fail("not_recurring", "Ce rendez-vous ne fait pas partie d'une série.", 422);
@@ -237,6 +239,7 @@ export interface TravelScreenView {
  */
 export async function refreshTravel(ctx: Ctx, session: SessionContext, eventId: string, input: { position?: unknown }, provider: TravelProvider | null = travelProvider()): Promise<TravelScreenView> {
   if (!provider) throw fail("travel_off", "Le suivi du trajet n'est pas ouvert.", 409);
+  await refuseChildLocation(ctx.db, session.user.id);
   const e = await visibleEvent(ctx, session, eventId);
   const userId = session.user.id;
   const to = pointOf(e.locationPoint);

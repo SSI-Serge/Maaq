@@ -1,3 +1,4 @@
+import { describeError } from "@/server/safe-log";
 import { sql, type Kysely } from "kysely";
 import { digitorn, type LogbookItem } from "@/server/adapters/digitorn";
 import { messenger } from "@/server/adapters/messaging";
@@ -243,6 +244,6 @@ export async function alertAdmin(db: Kysely<DB>, subject: string, text: string):
   try {
     await messenger().sendEmail({ to: setting.value_text, subject: `MAAQ — ${subject}`, text });
   } catch (error) {
-    console.error("Alerte non envoyée :", error);
+    console.error("Alerte non envoyée :", describeError(error));
   }
 }

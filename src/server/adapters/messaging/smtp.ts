@@ -1,3 +1,4 @@
+import { describeError } from "@/server/safe-log";
 import nodemailer from "nodemailer";
 import type { Messenger, OutgoingEmail, OutgoingSms } from "./types";
 
@@ -88,7 +89,7 @@ export class MirroredMessenger implements Messenger {
   ) {}
 
   async sendEmail(message: OutgoingEmail): Promise<void> {
-    await this.copy.sendEmail(message).catch((error) => console.error("Copie dans la boîte de test impossible :", error));
+    await this.copy.sendEmail(message).catch((error) => console.error("Copie dans la boîte de test impossible :", describeError(error)));
     await this.primary.sendEmail(message);
   }
 

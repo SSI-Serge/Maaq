@@ -148,10 +148,11 @@ function GuestCard({ guest, canDesignate, onUpdated }: { guest: Guest; canDesign
   const errors = mutation.error?.body?.code === "invalid_guest" ? (mutation.error.body.details as Record<string, string>) : {};
 
   async function act(path: string, method: "POST" | "PATCH" | "DELETE", message: string, body?: unknown) {
-    const result = await mutation.run<GuestList>(path, { method, body });
+    const result = await mutation.run<GuestList & { emailPending?: boolean }>(path, { method, body });
     if (result) {
       setMode("view");
-      onUpdated(result, message);
+      // Invité actif : son nouvel email ne s'applique qu'après sa confirmation (lien envoyé à la nouvelle adresse).
+      onUpdated(result, result.emailPending ? `Informations mises à jour. Le nouvel email s'appliquera quand ${guest.firstName} l'aura confirmé : un lien vient de lui être envoyé à cette adresse.` : message);
     }
   }
 
@@ -172,6 +173,7 @@ function GuestCard({ guest, canDesignate, onUpdated }: { guest: Guest; canDesign
           <Field label="Email" type="email" value={form.email} error={errors.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
           <Field label="Téléphone (facultatif)" type="tel" value={form.phone} error={errors.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
           {pendingActivation && <p className={s.muted}>Changer l&apos;email ou le téléphone invalide le lien d&apos;invitation en cours.</p>}
+          {!pendingActivation && <p className={s.muted}>Un nouvel email ne s&apos;applique qu&apos;après confirmation par {guest.firstName}, depuis le lien envoyé à la nouvelle adresse.</p>}
           {!errors.email && <ErrorLine error={mutation.error} />}
           <div className={s.row}>
             <Button variant="secondary" disabled={mutation.pending} onClick={() => (dirty ? setAbandoning(true) : setMode("view"))}>
