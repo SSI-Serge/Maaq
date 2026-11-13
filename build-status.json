@@ -3,8 +3,20 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-13T05:48:18.000Z",
+  "updated": "2026-11-13T13:36:07.000Z",
   "deploys": [
+    {
+      "at": "2026-11-13T13:36:07.000Z",
+      "env": "preview",
+      "what": "Tâches ménagères guidées (lot 1) : le foyer choisit ses tâches du guide dans les réglages, avec leurs jours et la personne ; elles reviennent dans l'écran Tâches avec leur pas à pas ; sorties de poubelles la veille de chaque collecte. Base mise à jour (lot 15) avec l'accord du PO et une sauvegarde. Rév. 00128. Écrans non vus : le PO teste.",
+      "storyIds": []
+    },
+    {
+      "at": "2026-11-13T13:36:07.000Z",
+      "env": "preview",
+      "what": "Courses et repas, CR-73 : « Menu de la semaine » se parcourt semaine par semaine. Rév. 00127.",
+      "storyIds": []
+    },
     {
       "at": "2026-11-13T05:48:18.000Z",
       "env": "preview",
