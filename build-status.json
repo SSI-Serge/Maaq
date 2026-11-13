@@ -3,8 +3,14 @@
     "name": "MAAQ",
     "summary": "Des agents IA qui gèrent l'administratif et le quotidien du foyer, en toute transparence."
   },
-  "updated": "2026-11-13T04:04:08.000Z",
+  "updated": "2026-11-13T04:52:29.000Z",
   "deploys": [
+    {
+      "at": "2026-11-13T04:52:29.000Z",
+      "env": "preview",
+      "what": "Préparation du test Friends and family : idées de sorties ouvertes en réel, sauvegarde automatique chaque nuit (gardée 14 jours), boîte de test limitée aux comptes internes, alerte par email quand la dépense d'IA approche du budget, corrections de la revue de sécurité. Rév. 00122. Pas de changement de schéma. Reste : changer la clé de test avant le 20/11.",
+      "storyIds": []
+    },
     {
       "at": "2026-11-13T04:04:08.000Z",
       "env": "preview",
@@ -3491,6 +3497,12 @@
       "title": "Formulaire « Demander un RDV » pour l'enfant qui a un profil",
       "tag": "Proposed, not built",
       "note": "Reporté par le PO le 11/11/2026 (S-46) : les parents créent ses RDV. Chiffré 1 à 1,5 jour. Rien n'est perdu."
+    },
+    {
+      "title": "Deux essais automatiques instables",
+      "tag": "Proposed, not built",
+      "note": "Un essai du menu du mois (Courses) et un de l'assistant (D39) échouent parfois dans la suite complète et passent seuls. À stabiliser après la préparation du test. Rien n'est perdu.",
+      "at": "2026-11-13T04:52:29.000Z"
     }
   ]
 }
