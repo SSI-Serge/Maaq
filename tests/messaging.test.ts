@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import net from "node:net";
 import { describe, expect, it, vi } from "vitest";
-import { createSmtpTransport, MirroredMessenger, SmtpMessenger, type MailTransport } from "@/server/adapters/messaging/smtp";
+import { createSmtpTransport, InternalOnlyOutbox, internalRecipients, MirroredMessenger, SmtpMessenger, type MailTransport } from "@/server/adapters/messaging/smtp";
 import type { Messenger, OutgoingEmail, OutgoingSms } from "@/server/adapters/messaging";
 import { parseEnv } from "@/server/env";
 
@@ -179,5 +179,32 @@ describe("transport SMTP réel", () => {
   it("un serveur injoignable fait échouer l'envoi plutôt que de le perdre en silence", async () => {
     const transport = createSmtpTransport({ host: "127.0.0.1", port: 1, user: "u", password: "p" });
     await expect(new SmtpMessenger(transport, "MAAQ <a@maaq.fr>", recorder().messenger).sendEmail({ to: "x@exemple.fr", subject: "s", text: "t" })).rejects.toThrow();
+  });
+});
+
+describe("boîte de test limitée aux comptes internes (zone ouverte à des testeurs extérieurs)", () => {
+  it("ne garde que les emails et les SMS des adresses et numéros internes ; sans liste, rien", async () => {
+    const copy = recorder();
+    const box = new InternalOnlyOutbox(copy.messenger, internalRecipients(" Interne@maaq.fr, +33600000001 ;autre@maaq.fr"));
+    await box.sendEmail({ to: "interne@MAAQ.fr", subject: "code", text: "123456" });
+    await box.sendEmail({ to: "testeur@exemple.fr", subject: "code", text: "654321" });
+    await box.sendSms({ to: "+33600000001", text: "lien" });
+    await box.sendSms({ to: "+33699999999", text: "lien du testeur" });
+    expect(JSON.stringify(copy)).toContain("123456");
+    expect(JSON.stringify(copy)).not.toContain("654321");
+    expect(JSON.stringify(copy)).not.toContain("lien du testeur");
+    const none = recorder();
+    const closed = new InternalOnlyOutbox(none.messenger, internalRecipients(undefined));
+    await closed.sendEmail({ to: "interne@maaq.fr", subject: "s", text: "secret" });
+    await closed.sendSms({ to: "+33600000001", text: "secret" });
+    expect(JSON.stringify(none)).not.toContain("secret");
+  });
+
+  it("l'email d'un testeur part quand même réellement", async () => {
+    const real = recorder();
+    const copy = recorder();
+    await new MirroredMessenger(real.messenger, new InternalOnlyOutbox(copy.messenger, internalRecipients("interne@maaq.fr"))).sendEmail({ to: "testeur@exemple.fr", subject: "s", text: "bienvenue" });
+    expect(JSON.stringify(real)).toContain("bienvenue");
+    expect(JSON.stringify(copy)).not.toContain("bienvenue");
   });
 });

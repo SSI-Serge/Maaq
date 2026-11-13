@@ -49,6 +49,34 @@ export class SmtpMessenger implements Messenger {
   }
 }
 
+/** Adresses et numéros des comptes internes, depuis une liste séparée par des virgules ou des espaces (DEV_OUTBOX_ALLOW). Vide : personne. */
+export function internalRecipients(raw: string | undefined): Set<string> {
+  return new Set((raw ?? "").split(/[\s,;]+/).map((x) => x.trim().toLowerCase()).filter(Boolean));
+}
+
+/**
+ * Boîte de test d'une zone ouverte à des testeurs extérieurs : elle ne garde que les messages adressés aux comptes internes. Les emails et les SMS des autres profils
+ * (liens d'activation, codes de connexion) n'y sont jamais écrits : détenir la clé des outils de test ne donne pas accès à leurs comptes.
+ */
+export class InternalOnlyOutbox implements Messenger {
+  constructor(
+    private readonly inner: Messenger,
+    private readonly allowed: Set<string>,
+  ) {}
+
+  private internal(to: string): boolean {
+    return this.allowed.has(to.trim().toLowerCase());
+  }
+
+  async sendEmail(message: OutgoingEmail): Promise<void> {
+    if (this.internal(message.to)) await this.inner.sendEmail(message);
+  }
+
+  async sendSms(message: OutgoingSms): Promise<void> {
+    if (this.internal(message.to)) await this.inner.sendSms(message);
+  }
+}
+
 /**
  * Zone de test : chaque email part réellement, et une copie est aussi déposée dans la boîte de test (/dev/boite),
  * pour lire un code sans ouvrir sa messagerie. La copie ne fait jamais échouer l'envoi.
