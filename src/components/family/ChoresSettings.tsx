@@ -34,6 +34,9 @@ export const clockLabel = (time: string) => {
 
 const previousDay = (day: number) => (day === 1 ? 7 : day - 1);
 
+/** Heures de sortie proposées (TM-11, maquette v92) : de 17 h à 22 h, 19 h par défaut. */
+export const BIN_HOURS = ["17:00", "18:00", "19:00", "20:00", "21:00", "22:00"];
+
 /** La ligne d'une tâche : nom, temps proposé, interrupteur ; une fois activée, jours (ou bacs et heure), personne et lien vers le pas à pas. */
 export function ChoreRow({ task, members, canEdit, busy, error, onSave }: { task: ChoreTaskSetting; members: ChoresSetting["members"]; canEdit: boolean; busy: boolean; error: string | null; onSave: (input: ChoreTaskInput) => void }) {
   const locked = !canEdit || busy;
@@ -109,18 +112,27 @@ export function ChoreRow({ task, members, canEdit, busy, error, onSave }: { task
                       ))}
                     </select>
                   </label>
-                  {b.collectionDay !== null && (
-                    <span className={styles.hint}>
-                      « {b.taskTitle} » le {CHORE_DAYS[previousDay(b.collectionDay) - 1].name} soir
-                    </span>
-                  )}
+                  <span className={styles.hint}>
+                    {b.collectionDay !== null ? `« ${b.taskTitle} », le ${CHORE_DAYS[previousDay(b.collectionDay) - 1].name} à ${clockLabel(task.binTime ?? "19:00")}` : "Pas de collecte"}
+                  </span>
                 </div>
               ))}
               <label style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, fontSize: 13 }}>
-                <span>Heure de sortie des bacs</span>
-                <input type="time" className={styles.input} style={{ width: 110 }} aria-label="Heure de sortie des bacs" value={task.binTime ?? "19:00"} disabled={locked || task.withdrawn} onChange={(e) => e.target.value && onSave({ enabled: true, binTime: e.target.value })} />
+                <span>
+                  Heure de sortie
+                  <span className={styles.hint} style={{ display: "block" }}>
+                    La même pour tous les bacs
+                  </span>
+                </span>
+                <select className={styles.select} aria-label="Heure de sortie des bacs" value={task.binTime ?? "19:00"} disabled={locked || task.withdrawn} onChange={(e) => onSave({ enabled: true, binTime: e.target.value })}>
+                  {[...new Set([...BIN_HOURS, task.binTime ?? "19:00"])].sort().map((h) => (
+                    <option key={h} value={h}>
+                      {clockLabel(h)}
+                    </option>
+                  ))}
+                </select>
               </label>
-              <span className={styles.hint}>La tâche apparaît la veille au soir de chaque collecte, avec le nom du bac : « Sortir le bac jaune ».</span>
+              <span className={styles.hint}>La tâche apparaît la veille de chaque collecte, à l&apos;heure de sortie, avec le nom du bac : « Sortir le bac jaune ».</span>
             </>
           )}
           <label style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, fontSize: 13 }}>

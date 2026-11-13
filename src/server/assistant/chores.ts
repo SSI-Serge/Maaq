@@ -226,7 +226,7 @@ export interface ChoreDetail {
   gestures: { name: string; product: string | null; minutes: number | null; steps: string[] }[];
   /** Notes qui suivent les gestes (ordre de la séance, tri, autres déchets). */
   notes: { title: string | null; body: string }[];
-  /** « Si ça ne se passe pas bien » : vide pour une tâche sans dépannage ; sinon terminé par la ligne fixe (RF5). */
+  /** « Si ça ne se passe pas bien » : le dépannage de la tâche, toujours terminé par la ligne fixe, seule quand la tâche n'a pas de dépannage (RF5, décision du PO). */
   troubleshooting: { problem: string; solution: string }[];
   /** « Avant de commencer » : `null` pour Sorties de poubelles (TM-07). */
   before: null | {
@@ -276,7 +276,7 @@ export async function choreDetail(ctx: Ctx, session: SessionContext, taskId: num
     intro: notes.filter((n) => n.kind === "intro").map((n) => n.body),
     gestures: gestures.map((g) => ({ name: g.name, product: g.product, minutes: g.minutes, steps: [...g.steps] })),
     notes: notes.filter((n) => n.kind === "other").map((n) => ({ title: n.title, body: n.body })),
-    troubleshooting: trouble.length ? [...trouble.map((x) => ({ problem: x.problem, solution: x.solution })), ...(closing ? [closing] : [])] : [],
+    troubleshooting: [...trouble.map((x) => ({ problem: x.problem, solution: x.solution })), ...(closing ? [closing] : [])],
     before: collection
       ? null
       : {

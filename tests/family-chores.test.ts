@@ -205,8 +205,8 @@ describe("pas à pas d'une tâche ménagère (US-182)", () => {
     expect(poubelles.bins).toHaveLength(4);
     expect(poubelles.binTime).toBe("19:00");
     expect(poubelles.notes.some((n) => n.title === "Autres déchets")).toBe(true);
-    // Toilettes n'a pas de dépannage : pas de section
-    expect((await choreDetail(ctx(), f.camilleSession, await idOf("Toilettes"))).troubleshooting).toEqual([]);
+    // Toilettes n'a pas de dépannage rattaché : la section garde la ligne fixe (décision du PO)
+    expect((await choreDetail(ctx(), f.camilleSession, await idOf("Toilettes"))).troubleshooting.map((x) => x.problem)).toEqual(["Problème que ce guide ne couvre pas"]);
   });
 });
 
@@ -224,8 +224,9 @@ describe("écrans et export des tâches ménagères", () => {
     expect(linge).toMatch(/aria-pressed="true" aria-label="vendredi"/);
     expect(linge).toContain("/assistant/taches/menage/");
     const bins = row("Sorties de poubelles");
-    expect(bins).toContain("« Sortir le bac jaune » le lundi soir");
-    expect(bins).toContain('value="19:00"');
+    expect(bins).toContain("« Sortir le bac jaune », le lundi à 19 h");
+    expect(bins).toContain("La même pour tous les bacs");
+    expect(bins.match(/<option value="(1[7-9]|2[0-2]):00"/g)).toHaveLength(6);
     expect(bins).toContain("Pas de collecte");
     expect(row("Cuisine")).toContain("environ 35 min");
     expect(row("Cuisine")).not.toContain("Jours");
@@ -242,6 +243,8 @@ describe("écrans et export des tâches ménagères", () => {
     expect(toilettes).toContain("Première fois ?");
     expect(toilettes).toContain("0 sur 3 gestes");
     expect(toilettes).toContain('aria-expanded="false"');
+    expect(toilettes).toContain("Si ça ne se passe pas bien");
+    expect(toilettes).toContain("Problème que ce guide ne couvre pas");
     expect(toilettes).not.toContain("Les 5 règles d&#x27;or");
     const poubelles = await idOf("Sorties de poubelles");
     const jaune = await binOf("Emballages");

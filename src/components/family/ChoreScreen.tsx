@@ -131,6 +131,7 @@ export function ChoreDetailView({ d, binId }: { d: ChoreDetail; binId: number | 
         </div>
       )}
 
+      {/* Toujours affichée, au moins avec la ligne fixe « Problème que ce guide ne couvre pas » (décision du PO). */}
       {d.troubleshooting.length > 0 && (
         <>
           <div style={{ fontWeight: 700 }}>Si ça ne se passe pas bien</div>
