@@ -50,7 +50,7 @@ export function shiftRule(rule: SeriesRule, oldDue: string, newDue: string): Ser
 const COLUMNS = [
   "id", "account_id", "title", "note", "assigned_member_id", sql<string | null>`due_time::text`.as("due_time"), "event_series_id", "days_before_event", sql<string | null>`first_date::text`.as("first_date"),
   "repeat_unit", "repeat_interval", "weekdays", "month_mode", "month_day", "month_nth", "month_weekday", "end_kind", sql<string | null>`until_date::text`.as("until_date"), "occurrence_count",
-  sql<string | null>`materialized_until::text`.as("materialized_until"), "ended_at", "proposed", "created_by_user_id", "source", "version",
+  sql<string | null>`materialized_until::text`.as("materialized_until"), "ended_at", "proposed", "created_by_user_id", "source", "version", "chore_task_id", "chore_bin_id",
 ] as const;
 
 export async function loadTaskSeries(db: Db, accountId: string, id: string, options: { forUpdate?: boolean } = {}) {

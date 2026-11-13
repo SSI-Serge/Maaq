@@ -124,8 +124,38 @@ interface Collected {
   homeworkWeeks: unknown[];
   homeworkValidations: unknown[];
   homeworkPages: unknown[];
+  /** Tâches ménagères guidées (US-181) : le réglage du foyer (tâches activées, jours, personne, jours de collecte), dans l'export d'un parent seulement. */
+  householdChores: unknown[];
   devices: unknown[];
   digitorn: unknown;
+}
+
+const DAY_NAMES = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"];
+
+/** Réglage « Tâches ménagères guidées » du foyer : une ligne par tâche réglée, avec ses bacs pour Sorties de poubelles. Les occurrences sont dans les tâches. */
+async function collectChores(db: Kysely<DB>, accountId: string) {
+  const tasks = await db
+    .selectFrom("chore_household_tasks as h")
+    .innerJoin("chore_tasks as t", "t.id", "h.task_id")
+    .leftJoin("family_members as m", "m.id", "h.member_id")
+    .select(["h.task_id", "t.name", "h.is_enabled", "h.weekdays", "m.first_name"])
+    .where("h.account_id", "=", accountId)
+    .orderBy("t.position")
+    .execute();
+  const bins = await db
+    .selectFrom("chore_household_bins as b")
+    .innerJoin("chore_bins as c", "c.id", "b.bin_id")
+    .select(["b.task_id", "c.name", "b.collection_day", sql<string>`b.due_time::text`.as("due_time")])
+    .where("b.account_id", "=", accountId)
+    .orderBy("c.position")
+    .execute();
+  return tasks.map((t) => ({
+    tache: t.name,
+    activee: t.is_enabled,
+    jours: (t.weekdays ?? []).map((d) => DAY_NAMES[d - 1]),
+    personne: t.first_name ?? null,
+    bacs: bins.filter((b) => b.task_id === t.task_id).map((b) => ({ bac: b.name, collecte: b.collection_day ? DAY_NAMES[b.collection_day - 1] : "pas de collecte", heure: b.due_time.slice(0, 5) })),
+  }));
 }
 
 /** Données de l'aide Devoirs du foyer : plannings, progrès et pages d'exercices (fiche réponse comprise, l'export étant celui d'un parent). */
@@ -361,6 +391,7 @@ async function collect(db: Kysely<DB>, userId: string, now: Date): Promise<{ dat
 
   // Aide Devoirs : pour un parent du foyer seulement ; un invité secondaire (dont le profil d'un enfant) n'exporte rien de ces données.
   const homework = user.account_id && (isPrimary || user.guest_rank === "core") ? await collectHomework(db, user.account_id) : { children: [], weeks: [], validations: [], pages: [] };
+  const householdChores = user.account_id && (isPrimary || user.guest_rank === "core") ? await collectChores(db, user.account_id) : [];
 
   // Données détenues par Digitorn : historique, configuration des agents (RT1).
   let digitornData: unknown = null;
@@ -405,6 +436,7 @@ async function collect(db: Kysely<DB>, userId: string, now: Date): Promise<{ dat
     homeworkWeeks: homework.weeks,
     homeworkValidations: homework.validations,
     homeworkPages: homework.pages,
+    householdChores,
     devices: devices.map((d) => ({ type: d.device_type, navigateur: d.browser, premiereConnexion: date(d.first_connected_at), derniereActivite: date(d.last_activity_at), revoqueLe: date(d.revoked_at) })),
     digitorn: digitornData,
   };
@@ -431,6 +463,7 @@ const SECTIONS: [keyof Collected, string][] = [
   ["homeworkWeeks", "Aide Devoirs : semaines préparées"],
   ["homeworkValidations", "Aide Devoirs : exercices validés sur photos"],
   ["homeworkPages", "Aide Devoirs : pages d'exercices, avec leur fiche réponse"],
+  ["householdChores", "Tâches ménagères guidées : réglage du foyer"],
   ["devices", "Mes appareils"],
 ];
 

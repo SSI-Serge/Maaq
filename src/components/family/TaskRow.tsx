@@ -69,7 +69,9 @@ export function TaskRow({ task, assignable, showDate = true, onChanged }: Props)
   const color = task.assignee?.color ?? FALLBACK_COLOR;
   const code = mutation.error?.body?.code;
   // « Préparer les devoirs » est une tâche du foyer : elle n'est assignée à personne (D71).
-  const canAssign = task.can.manage && task.status === "todo" && assignable.length > 0 && !task.isHomeworkPrep;
+  const canAssign = task.can.manage && task.status === "todo" && assignable.length > 0 && !task.isHomeworkPrep && !task.chore;
+  // Tâche ménagère guidée : son titre ouvre le pas à pas (US-182)
+  const choreHref = task.chore ? `/assistant/taches/menage/${task.chore.taskId}${task.chore.binId ? `?bac=${task.chore.binId}` : ""}` : null;
   const unassigned = task.isHomeworkPrep ? "Tâche du foyer" : "Non assignée";
   return (
     <div className={`${styles.taskRow} ${checked ? styles.taskDone : ""}`} style={{ borderLeftColor: color }}>
@@ -82,7 +84,7 @@ export function TaskRow({ task, assignable, showDate = true, onChanged }: Props)
         aria-label={`${checked ? "Décocher" : "Cocher"} : ${task.title}`}
       />
       <div className={styles.taskBody}>
-        <Link href={task.homeworkPrep ? `/assistant/devoirs/tache?tache=${task.id}` : `/assistant/taches/${task.id}`} className={styles.taskTitle}>
+        <Link href={choreHref ?? (task.homeworkPrep ? `/assistant/devoirs/tache?tache=${task.id}` : `/assistant/taches/${task.id}`)} className={styles.taskTitle}>
           {task.assignee && task.assignee.role === "child" && !task.homeworkWeekId ? `${task.assignee.firstName} — ${task.title.charAt(0).toLowerCase()}${task.title.slice(1)}` : task.title}
         </Link>
         <div className={styles.taskMeta}>
@@ -101,6 +103,7 @@ export function TaskRow({ task, assignable, showDate = true, onChanged }: Props)
           {task.event && <Link href={`/calendrier/rdv/${task.event.id}`}>{task.event.title} ›</Link>}
           {task.homeworkWeekId && <Link href={`/assistant/devoirs/${task.homeworkWeekId}${task.assignee ? `?enfant=${task.assignee.id}` : ""}`}>Semaine de devoirs ›</Link>}
           {task.homeworkPrep && <Link href={`/assistant/devoirs/tache?tache=${task.id}`}>Planning du jour et exercices ›</Link>}
+          {choreHref && <Link href={choreHref}>Pas à pas ›</Link>}
           {checked && task.status === "done" && task.doneBy && <span>Faite par {task.doneBy}</span>}
           {task.status === "done" && task.heart?.thanksFrom && <HeartButton target={{ kind: "task", id: task.id }} heart={task.heart} onChanged={onChanged} />}
           {justDone && (

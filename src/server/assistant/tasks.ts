@@ -1,3 +1,4 @@
+import { choreRefsOfSeries } from "./chores";
 import { sql, type Kysely } from "kysely";
 import type { Ctx, SessionContext } from "@/server/auth/service";
 import type { DB } from "@/server/db/schema.generated";
@@ -65,6 +66,11 @@ export interface TaskView {
    * Devoirs est désactivée (la tâche reste alors dans la liste des parents, sans lien).
    */
   homeworkPrep: { role: "parent" | "child" } | null;
+  /**
+   * Tâche ménagère guidée (source `household_chore`, US-181, US-182) : la tâche du catalogue, pour ouvrir son pas à pas, et le bac pour « Sortir le bac… ». Son titre vient du
+   * catalogue ; ses jours, sa personne et son heure se règlent dans les réglages, jamais depuis l'écran Tâches.
+   */
+  chore: { taskId: number; binId: number | null } | null;
   doneBy: string | null;
   doneAt: string | null;
   version: number;
@@ -179,6 +185,9 @@ export function translateDbError(error: unknown): unknown {
 // Lecture
 // ---------------------------------------------------------------------------------------------------------------------------
 
+/** Les jours, la personne et l'arrêt d'une tâche ménagère guidée se règlent dans les réglages (US-181 RF6). */
+const choreSettled = () => fail("chore_in_settings", "Cette tâche ménagère se règle dans les réglages de l'Assistant Famille, carte « Tâches ménagères guidées ».", 422);
+
 export function selectTasks(db: Kysely<DB>) {
   return db
     .selectFrom("family_tasks as t")
@@ -221,17 +230,20 @@ export async function toTaskViews(db: Kysely<DB>, v: TaskViewer, rows: TaskRow[]
     Boolean((await db.selectFrom("family_settings").select("homework_help_enabled").where("account_id", "=", v.accountId).executeTakeFirst())?.homework_help_enabled);
   const prep = (r: TaskRow): TaskView["homeworkPrep"] => (prepOn && r.source === "homework_prep" ? { role: v.parent ? "parent" : "child" } : null);
   const hearts = await heartsOfTasks(db, v.userId, rows);
+  const chores = await choreRefsOfSeries(db, [...new Set(rows.filter((r) => r.source === "household_chore" && r.series_id).map((r) => r.series_id!))]);
   return rows.map((r): TaskView => {
+    const chore = r.source === "household_chore" && r.series_id ? chores.get(r.series_id) : undefined;
     const event = r.event_id ? events.get(r.event_id) : undefined;
     const s = r.series_id ? series.get(r.series_id) : undefined;
     const own: SeriesRule | null = s && !s.event_series_id ? taskRuleOf(s) : null;
     return {
-      id: r.id, title: r.source === "homework_prep" ? HOMEWORK_PREP_TITLE : open(r.title), note: openOptional(r.note), status: r.status, due: r.due_date, dueTime: r.due_time ? r.due_time.slice(0, 5) : null, overdue: isOverdue(v, r),
+      id: r.id, title: r.source === "homework_prep" ? HOMEWORK_PREP_TITLE : chore ? chore.title : r.source === "household_chore" ? "Tâche ménagère" : open(r.title), note: openOptional(r.note), status: r.status, due: r.due_date, dueTime: r.due_time ? r.due_time.slice(0, 5) : null, overdue: isOverdue(v, r),
       assignee: r.assigned_member_id ? (chips.get(r.assigned_member_id) ?? null) : null,
       event: event && sees(v, event) ? { id: event.id, title: event.title, start: utcToLocal(event.startsAt, v.timeZone) } : null,
-      daysBefore: r.days_before_event, recurring: Boolean(r.series_id), rule: own ? ruleLabel(own) : null, repetition: own ? taskRepetitionOf(own) : null, followsEventSeries: Boolean(s?.event_series_id), homeworkWeekId: r.homework_week_id, isHomeworkPrep: r.source === "homework_prep", homeworkPrep: prep(r),
+      daysBefore: r.days_before_event, recurring: Boolean(r.series_id), rule: chore?.binId ? "Veille de chaque collecte" : own ? ruleLabel(own) : null, repetition: own ? taskRepetitionOf(own) : null, followsEventSeries: Boolean(s?.event_series_id), homeworkWeekId: r.homework_week_id, isHomeworkPrep: r.source === "homework_prep", homeworkPrep: prep(r),
       doneBy: r.done_by_member_id ? (chips.get(r.done_by_member_id)?.firstName ?? null) : null, doneAt: r.done_at ? utcToLocal(r.done_at, v.timeZone) : null, version: r.version,
-      can: { check: canCheckTask(v, r), manage: canManageTask(v, r) }, heart: hearts.get(r.id) ?? null,
+      chore: chore ? { taskId: chore.taskId, binId: chore.binId } : null,
+      can: { check: canCheckTask(v, r), manage: r.source !== "household_chore" && canManageTask(v, r) }, heart: hearts.get(r.id) ?? null,
     };
   });
 }
@@ -388,7 +400,7 @@ export async function createTask(ctx: Ctx, session: SessionContext, input: NewTa
 function emptyView(task: CheckedTask): TaskView {
   return {
     id: "", title: task.title, note: task.note, status: "todo", due: task.due, dueTime: task.dueTime, overdue: false, assignee: null, event: null, daysBefore: null, recurring: false, rule: null,
-    repetition: null, followsEventSeries: false, homeworkWeekId: null, isHomeworkPrep: false, homeworkPrep: null, doneBy: null, doneAt: null, version: 1, can: { check: true, manage: true }, heart: null,
+    repetition: null, followsEventSeries: false, homeworkWeekId: null, isHomeworkPrep: false, homeworkPrep: null, chore: null, doneBy: null, doneAt: null, version: 1, can: { check: true, manage: true }, heart: null,
   };
 }
 
@@ -420,6 +432,7 @@ export async function updateTask(ctx: Ctx, session: SessionContext, id: string, 
     await ctx.db.transaction().execute(async (trx) => {
       const row = await lockTask(trx, v, id);
       if (!canManageTask(v, row)) throw fail("forbidden", "Vous ne pouvez pas modifier cette tâche.", 403);
+      if (row.source === "household_chore") throw choreSettled();
       if (row.status !== "todo") throw settled(row);
       if (row.version !== options.expectedVersion) throw staleVersion(row);
       const task = checkFields(v, changes, members, { keepAssignee: row.assigned_member_id });
@@ -469,6 +482,7 @@ export async function assignTask(ctx: Ctx, session: SessionContext, id: string, 
     await ctx.db.transaction().execute(async (trx) => {
       const row = await lockTask(trx, v, id);
       if (!canManageTask(v, row)) throw fail("forbidden", "Vous ne pouvez pas réassigner cette tâche.", 403);
+      if (row.source === "household_chore") throw choreSettled();
       if (row.source === "homework_prep" && memberId) throw fail("household_task", "« Préparer les devoirs » est une tâche du foyer : elle n'est assignée à personne.", 422);
       if (row.status !== "todo") throw settled(row);
       if (options.expectedVersion !== undefined && row.version !== options.expectedVersion) throw staleVersion(row);
@@ -518,6 +532,7 @@ export async function cancelTask(ctx: Ctx, session: SessionContext, id: string, 
     await ctx.db.transaction().execute(async (trx) => {
       const row = await lockTask(trx, v, id);
       if (!canManageTask(v, row)) throw fail("forbidden", "Vous ne pouvez pas annuler cette tâche.", 403);
+      if (row.source === "household_chore") throw choreSettled();
       if (row.status !== "todo") throw settled(row);
       if (options.expectedVersion !== undefined && row.version !== options.expectedVersion) throw staleVersion(row);
       const series = row.series_id ? await loadTaskSeries(trx, v.accountId, row.series_id, { forUpdate: true }) : undefined;

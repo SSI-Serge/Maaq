@@ -23,7 +23,7 @@ export type ArrayTypeImpl<T> = T extends ColumnType<infer S, infer I, infer U>
   ? ColumnType<S[], I[], U[]>
   : T[];
 
-export type AuditAction = "account_created" | "account_updated" | "activation_link_resent" | "agent_blocked" | "agent_published" | "agent_reactivated" | "agent_restored" | "agent_retired" | "contract_analysis_decided" | "contract_archived" | "contract_created" | "contract_document_field_changed" | "contract_field_changed" | "contract_review_viewed" | "contract_updated" | "device_revoked_by_admin" | "grocery_catalog_changed" | "grocery_price_moderated" | "meal_catalog_changed" | "meal_planning_changed" | "presentation_updated" | "seasonal_dish_changed" | "daily_product_changed";
+export type AuditAction = "account_created" | "account_updated" | "activation_link_resent" | "agent_blocked" | "agent_published" | "agent_reactivated" | "agent_restored" | "agent_retired" | "chore_catalog_changed" | "contract_analysis_decided" | "contract_archived" | "contract_created" | "contract_document_field_changed" | "contract_field_changed" | "contract_review_viewed" | "contract_updated" | "device_revoked_by_admin" | "grocery_catalog_changed" | "grocery_price_moderated" | "meal_catalog_changed" | "meal_planning_changed" | "presentation_updated" | "seasonal_dish_changed" | "daily_product_changed";
 
 export type ChangeScope = "all" | "following" | "this";
 
@@ -205,9 +205,13 @@ export type SyncStatus = "failed" | "running" | "succeeded";
 
 export type TaskCancelReason = "event_cancelled" | "expired" | "series_ended" | "user";
 
-export type TaskSource = "agent" | "anticipation" | "homework" | "homework_prep" | "user";
+export type TaskSource = "agent" | "anticipation" | "homework" | "homework_prep" | "household_chore" | "user";
 
 export type TaskStatus = "cancelled" | "done" | "proposed" | "todo";
+
+export type ChoreNoteKind = "before_start" | "intro" | "other";
+
+export type ChoreScheduleMode = "day_before_collection" | "weekdays";
 
 export type Timestamp = ColumnType<Date, Date | string, Date | string>;
 
@@ -1414,6 +1418,14 @@ export interface FamilyTasks {
 export interface FamilyTaskSeries {
   account_id: string;
   assigned_member_id: string | null;
+  /**
+   * Bac de la tâche « Sorties de poubelles » (lot 15) ; la série tombe la veille de sa collecte
+   */
+  chore_bin_id: number | null;
+  /**
+   * Tâche ménagère guidée du catalogue (source household_chore, lot 15) ; le titre de la série est vide, lu dans le catalogue
+   */
+  chore_task_id: number | null;
   created_at: Generated<Timestamp>;
   created_by_user_id: string | null;
   days_before_event: number | null;
@@ -2907,7 +2919,168 @@ export interface WeeklyReviews {
   week_start: Timestamp;
 }
 
+export interface ChoreBins {
+  collection_hint: string | null;
+  contents: string;
+  id: Generated<number>;
+  name: string;
+  position: number;
+  task_id: number;
+  task_title: string;
+}
+
+export interface ChoreFabricSettings {
+  advice: string;
+  fabric: string;
+  id: Generated<number>;
+  iron_points: number;
+  max_temperature_c: number;
+  position: number;
+  task_id: number;
+}
+
+export interface ChoreGestures {
+  id: Generated<number>;
+  minutes: number | null;
+  name: string;
+  position: number;
+  product: string | null;
+  steps: string[];
+  task_id: number;
+}
+
+export interface ChoreGoldenRules {
+  body: string;
+  id: Generated<number>;
+  position: number;
+  title: string;
+}
+
+export interface ChoreHouseholdBins {
+  account_id: string;
+  bin_id: number;
+  chore_series_id: string | null;
+  collection_day: number | null;
+  created_at: Generated<Timestamp>;
+  due_time: Generated<string>;
+  task_id: number;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface ChoreHouseholdTasks {
+  account_id: string;
+  chore_series_id: string | null;
+  created_at: Generated<Timestamp>;
+  is_enabled: Generated<boolean>;
+  member_id: string | null;
+  task_id: number;
+  updated_at: Generated<Timestamp>;
+  weekdays: number[] | null;
+}
+
+export interface ChoreMaterials {
+  detail: string | null;
+  id: Generated<number>;
+  name: string;
+  position: number;
+}
+
+export interface ChoreNeverDo {
+  body: string;
+  id: Generated<number>;
+  position: number;
+}
+
+export interface ChoreNeverDoTasks {
+  never_do_id: number;
+  task_id: number;
+}
+
+export interface ChoreProducts {
+  avoid_on: string | null;
+  id: Generated<number>;
+  is_optional: Generated<boolean>;
+  name: string;
+  position: number;
+  used_for: string;
+}
+
+export interface ChoreRecipes {
+  dosage: string;
+  id: Generated<number>;
+  name: string;
+  position: number;
+  used_for: string;
+}
+
+export interface ChoreTaskMaterials {
+  material_id: number;
+  task_id: number;
+}
+
+export interface ChoreTaskNotes {
+  body: string;
+  id: Generated<number>;
+  kind: ChoreNoteKind;
+  position: number;
+  task_id: number;
+  title: string | null;
+}
+
+export interface ChoreTaskProducts {
+  product_id: number;
+  task_id: number;
+}
+
+export interface ChoreTaskRecipes {
+  recipe_id: number;
+  task_id: number;
+}
+
+export interface ChoreTasks {
+  created_at: Generated<Timestamp>;
+  default_days: number[] | null;
+  id: Generated<number>;
+  is_active: Generated<boolean>;
+  name: string;
+  position: number;
+  schedule_mode: Generated<ChoreScheduleMode>;
+  suggested_minutes: number;
+  updated_at: Generated<Timestamp>;
+}
+
+export interface ChoreTroubleshooting {
+  id: Generated<number>;
+  is_closing: Generated<boolean>;
+  position: number;
+  problem: string;
+  solution: string;
+}
+
+export interface ChoreTroubleshootingTasks {
+  task_id: number;
+  troubleshooting_id: number;
+}
+
 export interface DB {
+  chore_bins: ChoreBins;
+  chore_fabric_settings: ChoreFabricSettings;
+  chore_gestures: ChoreGestures;
+  chore_golden_rules: ChoreGoldenRules;
+  chore_household_bins: ChoreHouseholdBins;
+  chore_household_tasks: ChoreHouseholdTasks;
+  chore_materials: ChoreMaterials;
+  chore_never_do: ChoreNeverDo;
+  chore_never_do_tasks: ChoreNeverDoTasks;
+  chore_products: ChoreProducts;
+  chore_recipes: ChoreRecipes;
+  chore_task_materials: ChoreTaskMaterials;
+  chore_task_notes: ChoreTaskNotes;
+  chore_task_products: ChoreTaskProducts;
+  chore_task_recipes: ChoreTaskRecipes;
+  chore_tasks: ChoreTasks;
+  chore_troubleshooting: ChoreTroubleshooting;
+  chore_troubleshooting_tasks: ChoreTroubleshootingTasks;
   account_connections: AccountConnections;
   account_contracts: AccountContracts;
   accounts: Accounts;
