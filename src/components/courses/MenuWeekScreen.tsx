@@ -82,11 +82,42 @@ export function MenuDishRows({ week, today, recipes, servings, addable, added, b
   );
 }
 
+const arrow = (off: boolean) =>
+  ({ width: 40, height: 40, flexShrink: 0, borderRadius: 8, border: "1px solid var(--line)", background: "transparent", fontSize: 22, fontWeight: 700, lineHeight: 1, color: off ? "var(--line)" : "var(--ink)", cursor: off ? "default" : "pointer" }) as const;
+
+/**
+ * Passage d'une semaine à l'autre (CR-73, maquette CR-Menu-Semaine v91) : ‹ ›, « Cette semaine », « Semaine prochaine » ou « Dans 3 semaines », la position dans la liste,
+ * et le titre « 9 – 15 novembre ». Les flèches sont inactives aux deux bouts.
+ */
+export function WeekNav({ weeks, week, onWeek }: { weeks: WeekMenuView["weeks"]; week: string; onWeek: (week: string) => void }) {
+  const index = Math.max(0, weeks.findIndex((w) => w.week === week));
+  const current = weeks[index];
+  const first = index === 0;
+  const last = index === weeks.length - 1;
+  const when = current.offset === 0 ? "Cette semaine" : current.offset === 1 ? "Semaine prochaine" : `Dans ${current.offset} semaines`;
+  return (
+    <div role="group" aria-label="Semaine" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <button type="button" aria-label="Semaine précédente" aria-disabled={first} onClick={() => !first && onWeek(weeks[index - 1].week)} style={arrow(first)}>
+        ‹
+      </button>
+      <div aria-live="polite" style={{ flex: 1, textAlign: "center", display: "flex", flexDirection: "column", gap: 1 }}>
+        <span style={{ fontSize: 11, fontWeight: 600, color: "var(--ink-soft)" }}>
+          {when} · {index + 1} sur {weeks.length}
+        </span>
+        <span style={{ fontSize: 15, fontWeight: 700, color: "var(--ink)" }}>{current.title}</span>
+      </div>
+      <button type="button" aria-label="Semaine suivante" aria-disabled={last} onClick={() => !last && onWeek(weeks[index + 1].week)} style={arrow(last)}>
+        ›
+      </button>
+    </div>
+  );
+}
+
 function Menu({ view, onWeek, reload }: { view: WeekMenuView; onWeek: (week: string) => void; reload: () => void }) {
   const add = useApiMutation();
   const [added, setAdded] = useState<string[]>([]);
   const menu = view.menu;
-  const tab = view.tabs.find((t) => t.week === view.week);
+  const tab = view.weeks.find((t) => t.week === view.week);
 
   async function addDish(slot: string) {
     if (await add.run("/api/courses/chat/menu/dishes", { method: "POST", body: { week: view.week, slots: [slot] } })) setAdded((cur) => [...cur, slot]);
@@ -98,21 +129,11 @@ function Menu({ view, onWeek, reload }: { view: WeekMenuView; onWeek: (week: str
   const count = (n: number, one: string, many: string) => `${n} ${n > 1 ? many : one}`;
   return (
     <>
-      <div role="group" aria-label="Semaine" style={{ display: "flex", gap: 6 }}>
-        {view.tabs.map((t) => {
-          const on = t.week === view.week;
-          return (
-            <button key={t.week} type="button" aria-pressed={on} onClick={() => onWeek(t.week)} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 1, minHeight: 44, borderRadius: 8, fontSize: 13, fontWeight: 700, border: `1px solid ${on ? "var(--primary)" : "var(--line)"}`, background: on ? "var(--primary)" : "transparent", color: on ? "var(--primary-ink)" : "var(--ink)" }}>
-              <span style={{ fontSize: 10, fontWeight: 600 }}>{t.label}</span>
-              <span>{t.range.replace(/^du /, "")}</span>
-            </button>
-          );
-        })}
-      </div>
+      <WeekNav weeks={view.weeks} week={view.week} onWeek={onWeek} />
 
       {!menu && (
         <>
-          <Notice tone="info">Aucun menu validé {tab?.range ?? "pour cette semaine"}.</Notice>
+          <Notice tone="info">Aucun menu validé {tab?.range ?? "cette semaine"}.</Notice>
           <Link href="/courses?menu=1" className={styles.scenarioCard} style={{ minHeight: 44, background: "var(--primary)", borderColor: "var(--primary)", color: "var(--primary-ink)" }}>
             <span>Préparer le menu de la semaine</span>
             <span aria-hidden="true">›</span>

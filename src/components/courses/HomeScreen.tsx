@@ -9,7 +9,7 @@ import family from "@/components/family/family.module.css";
 import { Loading, Notice, RetryNotice } from "@/components/ui";
 import type { CourseHome } from "@/server/courses/home";
 import { ChatPanel } from "./ChatPanel";
-import { takeMenuValidated } from "./validated-flag";
+import { takeMenuValidated, type Validated } from "./validated-flag";
 import styles from "./courses.module.css";
 
 const BACK = { href: "/accueil", label: "Agents" };
@@ -100,15 +100,34 @@ export function WeekMenuCard({ menu, nextWeek, canPrepare, onPrepare }: { menu: 
   );
 }
 
+const BANNER = { position: "fixed", left: 16, right: 16, bottom: 84, zIndex: 12, maxWidth: 358, margin: "0 auto", display: "block", background: "var(--ink)", color: "var(--primary-ink)", borderRadius: "var(--radius)", padding: "12px 14px", fontSize: 13, fontWeight: 600, textDecoration: "none" } as const;
+
+/** Bandeau du retour après une validation (CR-72, CR-73) ; celui du menu du mois ouvre « Menu de la semaine » sur la première semaine validée. */
+export function ValidatedBanner({ note }: { note: Validated }) {
+  if (note.kind === "week") {
+    return (
+      <div role="status" style={BANNER}>
+        Menu validé. Retrouvez-le en haut de l&apos;accueil.
+      </div>
+    );
+  }
+  return (
+    <Link role="status" href={`/courses/menu${note.firstWeek ? `?week=${note.firstWeek}` : ""}`} style={BANNER}>
+      Menus validés. Retrouvez-les dans le menu de la semaine.
+    </Link>
+  );
+}
+
 function Home({ home }: { home: CourseHome }) {
   const couple = home.access === "couple";
   // « Menu validé. Retrouvez-le en haut de l'accueil. » : 5 secondes, au retour sur l'accueil après une validation (CR-72)
-  const [validatedNote, setValidatedNote] = useState(false);
+  const [validatedNote, setValidatedNote] = useState<Validated | null>(null);
   useEffect(() => {
-    if (!takeMenuValidated()) return;
+    const note = takeMenuValidated();
+    if (!note) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setValidatedNote(true);
-    const timer = setTimeout(() => setValidatedNote(false), 5000);
+    setValidatedNote(note);
+    const timer = setTimeout(() => setValidatedNote(null), 5000);
     return () => clearTimeout(timer);
   }, []);
   // menu composé en conversation (MENU_IA ouvert) : le premier parcours ouvre le tchat plutôt que l'ancien écran
@@ -131,11 +150,7 @@ function Home({ home }: { home: CourseHome }) {
         </div>
       )}
       {couple && <WeekMenuCard menu={home.weekMenu} nextWeek={home.nextWeekMenu} canPrepare={home.menuIa && home.chat} onPrepare={() => setStartMenu((n) => n + 1)} />}
-      {validatedNote && (
-        <div role="status" style={{ position: "fixed", left: 16, right: 16, bottom: 84, zIndex: 12, maxWidth: 358, margin: "0 auto", background: "var(--ink)", color: "var(--primary-ink)", borderRadius: "var(--radius)", padding: "12px 14px", fontSize: 13, fontWeight: 600 }}>
-          Menu validé. Retrouvez-le en haut de l&apos;accueil.
-        </div>
-      )}
+      {validatedNote && <ValidatedBanner note={validatedNote} />}
       <Link href="/courses/ma-liste" className={styles.scenarioCard} style={{ background: "var(--primary-soft)" }}>
         <span>
           <div className={styles.lineName}>Ma liste de courses</div>

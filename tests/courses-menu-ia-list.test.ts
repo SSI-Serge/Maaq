@@ -1,7 +1,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { WeekMenuCard } from "@/components/courses/HomeScreen";
-import { MenuDishRows } from "@/components/courses/MenuWeekScreen";
+import { ValidatedBanner, WeekMenuCard } from "@/components/courses/HomeScreen";
+import { MenuDishRows, WeekNav } from "@/components/courses/MenuWeekScreen";
 import { listCourseMessages } from "@/server/courses/chat/service";
 import { courseHome } from "@/server/courses/home";
 import { validateWeekMenu } from "@/server/courses/menu-ia/after-validation";
@@ -264,7 +264,8 @@ describe("CR-72, US-180bis : la conversation est vidée à la validation, le men
     const card = await compose(c, fullMenu(c));
     await validateWeekMenu(at(), c.f.sophie, card.card!.messageId);
     const view = await weekMenuView(at(TUESDAY), c.f.marc);
-    expect(view.tabs.map((t) => [t.label, t.week, t.hasMenu])).toEqual([["Cette semaine", WEEK, true], ["Semaine suivante", "2026-11-16", false]]);
+    // la semaine en cours, seule semaine qui a un menu : rien d'autre à parcourir
+    expect(view.weeks.map((t) => [t.week, t.offset, t.title, t.hasMenu])).toEqual([[WEEK, 0, "9 – 15 novembre", true]]);
     expect(view).toMatchObject({ week: WEEK, today: 2, listValidated: false });
     expect(view.menu!.recipes.filter((r) => r.kind === "dinner").map((r) => r.day)).toEqual(["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]);
     // le plat de « Mes plats » n'est pas à ajouter ; les plats libres et ceux du catalogue le sont
@@ -273,10 +274,13 @@ describe("CR-72, US-180bis : la conversation est vidée à la validation, le men
     // « Ajouter à mes plats » depuis l'écran : le plat n'est plus proposé ensuite
     await addMenuDishesToMine(at(TUESDAY), c.f.marc, { week: WEEK, slots: ["dinner:4"] });
     expect((await weekMenuView(at(TUESDAY), c.f.marc)).addable.map((a) => a.slot)).not.toContain("dinner:4");
-    // la semaine suivante n'a pas de menu ; vue depuis le vendredi 6, le menu est celui de la « semaine suivante »
-    expect((await weekMenuView(at(TUESDAY), c.f.marc, "2026-11-16")).menu).toBeNull();
+    // une semaine sans menu n'est pas proposée : la demander ramène au menu validé
+    expect((await weekMenuView(at(TUESDAY), c.f.marc, "2026-11-16")).week).toBe(WEEK);
+    // vue depuis le vendredi 6 : la semaine en cours (sans menu) puis la prochaine, qui s'ouvre d'abord
     const early = await weekMenuView(at(), c.f.sophie);
     expect(early).toMatchObject({ week: WEEK, today: null });
+    expect(early.weeks.map((w) => [w.week, w.offset, w.hasMenu])).toEqual([["2026-11-02", 0, false], [WEEK, 1, true]]);
+    expect((await weekMenuView(at(), c.f.sophie, "2026-11-02")).menu).toBeNull();
     expect((await rejection(weekMenuView(at(TUESDAY), c.f.elodie))).status).toBe(403);
   });
 
@@ -311,5 +315,51 @@ describe("CR-72, US-180bis : la conversation est vidée à la validation, le men
     const added = renderToStaticMarkup(createElement(MenuDishRows, { week: WEEK, today: null, recipes: [recipe("Mercredi", "Velouté de panais")], servings: 4, addable: ["dinner:3"], added: ["dinner:3"], busy: false, onAdd: () => undefined }));
     expect(added).toContain("✓ Ajouté à « Mes plats »");
     expect(added).not.toContain("Ce soir");
+  });
+});
+
+describe("CR-73 : passer d'une semaine à l'autre dans « Menu de la semaine »", () => {
+  const TUESDAY = new Date(2026, 10, 10, 10, 0, 0);
+  it("toutes les semaines à venir qui ont un menu, plus la semaine en cours ; une semaine sans menu entre deux est sautée ; jamais de semaine passée", async () => {
+    const c = await household();
+    // menus validés pour les semaines du 16 et du 30 novembre ; pas pour celle du 23
+    for (const week of ["2026-11-16", "2026-11-30"]) {
+      const card = await compose(c, fullMenu(c, { semaine: week }), at(TUESDAY));
+      await validateWeekMenu(at(TUESDAY), c.f.sophie, card.card!.messageId);
+    }
+    const view = await weekMenuView(at(TUESDAY), c.f.marc);
+    expect(view.weeks.map((w) => [w.week, w.offset, w.title, w.hasMenu])).toEqual([
+      [WEEK, 0, "9 – 15 novembre", false],
+      ["2026-11-16", 1, "16 – 22 novembre", true],
+      ["2026-11-30", 3, "30 nov. – 6 décembre", true],
+    ]);
+    // sans semaine demandée : la première semaine qui a un menu
+    expect(view.week).toBe("2026-11-16");
+    expect((await weekMenuView(at(TUESDAY), c.f.marc, "2026-11-30")).menu?.week).toBe("2026-11-30");
+    // deux semaines plus tard, la semaine du 16 est passée : elle n'est plus proposée
+    const later = await weekMenuView(at(new Date(2026, 10, 24, 10, 0, 0)), c.f.marc);
+    expect(later.weeks.map((w) => w.week)).toEqual(["2026-11-23", "2026-11-30"]);
+  });
+
+  it("rendu : flèches inactives aux deux bouts, « Dans 3 semaines », position dans la liste ; bandeau du menu du mois vers la première semaine validée", () => {
+    const weeks = [
+      { week: WEEK, offset: 0, range: "du 9 au 15 nov.", title: "9 – 15 novembre", hasMenu: false },
+      { week: "2026-11-16", offset: 1, range: "du 16 au 22 nov.", title: "16 – 22 novembre", hasMenu: true },
+      { week: "2026-11-30", offset: 3, range: "du 30 nov. au 6 déc.", title: "30 nov. – 6 décembre", hasMenu: true },
+    ];
+    const nav = (week: string) => renderToStaticMarkup(createElement(WeekNav, { weeks, week, onWeek: () => undefined }));
+    expect(nav(WEEK)).toContain("Cette semaine · 1 sur 3");
+    expect(nav(WEEK)).toMatch(/aria-label="Semaine précédente" aria-disabled="true"/);
+    expect(nav(WEEK)).toMatch(/aria-label="Semaine suivante" aria-disabled="false"/);
+    expect(nav("2026-11-16")).toContain("Semaine prochaine · 2 sur 3");
+    expect(nav("2026-11-30")).toContain("Dans 3 semaines · 3 sur 3");
+    expect(nav("2026-11-30")).toContain("30 nov. – 6 décembre");
+    expect(nav("2026-11-30")).toMatch(/aria-label="Semaine suivante" aria-disabled="true"/);
+    const week = renderToStaticMarkup(createElement(ValidatedBanner, { note: { kind: "week" } }));
+    expect(week).toContain("Menu validé. Retrouvez-le en haut de l&#x27;accueil.");
+    expect(week).not.toContain("href");
+    const month = renderToStaticMarkup(createElement(ValidatedBanner, { note: { kind: "month", firstWeek: "2026-11-16" } }));
+    expect(month).toContain("Menus validés. Retrouvez-les dans le menu de la semaine.");
+    expect(month).toContain('href="/courses/menu?week=2026-11-16"');
   });
 });

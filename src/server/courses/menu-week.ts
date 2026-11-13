@@ -50,9 +50,23 @@ export async function homeWeekMenu(db: Kysely<DB>, accountId: string, week: stri
   return { week, upcoming, range: weekRange(week), dinners: dinners.length, express: express.length, next: next.slice(0, 3) };
 }
 
+const MONTHS_FULL = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
+const MONTHS_SHORT = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
+
+/** « 9 – 15 novembre » ; « 30 nov. – 6 décembre » quand la semaine change de mois (titre du passage d'une semaine à l'autre, CR-73). */
+export function navTitle(week: string): string {
+  const end = addDaysIso(week, 6);
+  const [, m1, d1] = week.split("-").map(Number);
+  const [, m2, d2] = end.split("-").map(Number);
+  return m1 === m2 ? `${d1} – ${d2} ${MONTHS_FULL[m2 - 1]}` : `${d1} ${MONTHS_SHORT[m1 - 1]} – ${d2} ${MONTHS_FULL[m2 - 1]}`;
+}
+
 export interface WeekMenuView {
-  /** Cette semaine et la suivante. */
-  tabs: { week: string; label: string; range: string; hasMenu: boolean }[];
+  /**
+   * Semaines que l'on parcourt avec ‹ › (CR-73, US-180bis RF10) : la semaine en cours, même sans menu, puis chaque semaine à venir qui a un menu validé, dans l'ordre.
+   * Une semaine sans menu entre deux semaines validées est sautée ; les semaines passées ne sont jamais proposées. `offset` : 0 cette semaine, 1 la prochaine, etc.
+   */
+  weeks: { week: string; offset: number; range: string; title: string; hasMenu: boolean }[];
   /** Semaine affichée (lundi). */
   week: string;
   /** Jour d'aujourd'hui (1 = lundi) quand la semaine affichée est la semaine en cours : sert à « Ce soir » et « Passé ». */
@@ -65,15 +79,16 @@ export interface WeekMenuView {
   listValidated: boolean;
 }
 
-/** L'écran « Menu de la semaine » : le menu validé de la semaine demandée (cette semaine ou la suivante), sinon de la première des deux qui en a un. */
+/** L'écran « Menu de la semaine » : le menu validé de la semaine demandée, sinon de la première semaine à venir qui en a un, sinon la semaine en cours (sans menu). */
 export async function weekMenuView(ctx: Ctx, session: SessionContext, requested?: string | null): Promise<WeekMenuView> {
   const who = await requireAccess(ctx, session, "couple");
-  const choices = (await weekChoices(ctx.db, who.accountId, ctx.now)).slice(0, 2);
-  const tabs = choices.map((c, i) => ({ week: c.week, label: i === 0 ? "Cette semaine" : "Semaine suivante", range: c.range, hasMenu: c.hasMenu }));
-  const week = tabs.find((t) => t.week === requested)?.week ?? tabs.find((t) => t.hasMenu)?.week ?? tabs[0].week;
-  const today = week === tabs[0].week ? isoDow(ctx.now) : null;
-  if (!tabs.find((t) => t.week === week)?.hasMenu) return { tabs, week, today, menu: null, addable: [], listValidated: false };
+  // Un menu ne se valide que pour la semaine en cours ou l'une des quatre suivantes : toutes les semaines à parcourir sont dans cette fenêtre.
+  const choices = await weekChoices(ctx.db, who.accountId, ctx.now);
+  const weeks = choices.map((c, offset) => ({ week: c.week, offset, range: c.range, title: navTitle(c.week), hasMenu: c.hasMenu })).filter((w) => w.offset === 0 || w.hasMenu);
+  const week = weeks.find((t) => t.week === requested)?.week ?? weeks.find((t) => t.hasMenu)?.week ?? weeks[0].week;
+  const today = week === weeks[0].week ? isoDow(ctx.now) : null;
+  if (!weeks.find((t) => t.week === week)?.hasMenu) return { weeks, week, today, menu: null, addable: [], listValidated: false };
   const prepared = await prepareList(ctx, session, week);
   const menu = prepared.week === week ? prepared.menu : null;
-  return { tabs, week, today, menu, addable: menu ? await addableDishes(ctx.db, who.accountId, week) : [], listValidated: menu ? prepared.validated : false };
+  return { weeks, week, today, menu, addable: menu ? await addableDishes(ctx.db, who.accountId, week) : [], listValidated: menu ? prepared.validated : false };
 }

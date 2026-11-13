@@ -132,7 +132,7 @@ function Month({ status, reload }: { status: MonthStatus; reload: () => void }) 
     const result = await validate.run<{ result: MonthValidated }>("/api/courses/month", { method: "POST", body: { action: "validate", messageId: c.messageId, keep }, timeoutMs: COMPOSE_TIMEOUT_MS });
     // Validation du menu du mois (CR-72) : retour à l'accueil, avec le bandeau « Menu validé » ; la conversation est vidée côté serveur.
     if (result) {
-      markMenuValidated();
+      markMenuValidated({ kind: "month", firstWeek: [...result.result.validated].sort()[0] ?? null });
       router.push("/courses");
     }
   }
